@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QTC Address Toolkit — Quantus Muse Builder</title>
+<meta name="description" content="Inspect any Quantus (QTC) address: decode the SS58 payload, verify the blake2b checksum, and encode 32-byte keys into prefix-189 addresses. All client-side, no network calls.">
+<link rel="stylesheet" href="styles.css?v=1.0.0">
+</head>
+<body>
+<div class="scan" aria-hidden="true"></div>
+
+<header class="nav">
+  <a class="back" href="../../index.html">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Address Toolkit</span></div>
+  <nav class="links">
+    <a href="https://github.com/Quantus-Network/chain/blob/main/node/src/chain_spec.rs" target="_blank" rel="noopener">chain spec</a>
+    <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow">SS58 &middot; prefix 189 &middot; 100% client-side</p>
+    <h1>Is this QTC address <span class="grn">real?</span></h1>
+    <p class="lede">Paste any address. The toolkit decodes the SS58 payload, re-computes the <strong>blake2b checksum</strong>, and tells you exactly what it is — prefix, key bytes, and verdict. No network calls, no wallet, nothing leaves your browser.</p>
+  </section>
+
+  <section class="panel">
+    <div class="tabs" role="tablist">
+      <button class="tab active" id="tab-inspect" role="tab" aria-selected="true">Inspect address</button>
+      <button class="tab" id="tab-encode" role="tab" aria-selected="false">Encode key</button>
+    </div>
+
+    <div class="tabpage" id="page-inspect" role="tabpanel">
+      <label class="fld">Address to inspect
+        <input id="in-addr" type="text" spellcheck="false" autocomplete="off"
+               placeholder="qz&hellip;" aria-label="Address to inspect">
+      </label>
+      <div class="samples">
+        <span>Try:</span>
+        <button class="chip" data-sample="qzkmmtHL1XZ94LnDc43hTuUUW6o2jkjQBSgwSYF7Dm2JErapB">upstream genesis address</button>
+        <button class="chip" data-sample="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau">builder donation address</button>
+      </div>
+      <div id="verdict" class="verdict idle">
+        <div class="v-title">Awaiting input</div>
+        <div class="v-sub">Paste an address above — the verdict lands here.</div>
+      </div>
+      <div id="decode-table" class="kv" hidden></div>
+      <p class="fine">Format check only — this validates the address <em>structure</em>, not whether the account exists or holds funds on-chain.</p>
+    </div>
+
+    <div class="tabpage" id="page-encode" role="tabpanel" hidden>
+      <div class="enc-grid">
+        <label class="fld">Public key (hex)
+          <input id="in-hex" type="text" spellcheck="false" autocomplete="off"
+                 placeholder="64 hex characters = 32 bytes" aria-label="Public key in hex">
+        </label>
+        <label class="fld narrow">SS58 prefix
+          <input id="in-prefix" type="number" min="0" max="16383" value="189" aria-label="SS58 prefix">
+        </label>
+      </div>
+      <div class="samples">
+        <span>Try:</span>
+        <button class="chip" id="chip-rand">random 32-byte key</button>
+      </div>
+      <div id="enc-out" class="verdict idle">
+        <div class="v-title">Awaiting key</div>
+        <div class="v-sub">Enter 64 hex characters — the SS58 address appears here.</div>
+      </div>
+      <p class="fine">Encoding is pure math: <span class="mono">base58(prefix &Vert; key &Vert; checksum)</span>, checksum = first 2 bytes of <span class="mono">blake2b("SS58PRE" &Vert; prefix &Vert; key)</span>.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>How a QTC address is built</h2>
+    <p class="body">Quantus uses the <strong>SS58</strong> address format (the Substrate standard) with network prefix <strong>189</strong> — set in <a href="https://github.com/Quantus-Network/chain/blob/main/node/src/chain_spec.rs" target="_blank" rel="noopener">chain_spec.rs</a>. That prefix is why every mainnet address starts with <span class="mono">qz</span>.</p>
+    <div class="bytes" aria-label="SS58 address byte layout">
+      <div class="bseg pfx"><span class="bl">prefix bytes</span><span class="bv">111 &middot; 64</span><span class="bn">= 189</span></div>
+      <div class="bseg key"><span class="bl">32-byte account key</span><span class="bv">32 bytes</span></div>
+      <div class="bseg chk"><span class="bl">checksum</span><span class="bv">2 bytes</span></div>
+    </div>
+    <div class="grid3">
+      <div class="fact"><div class="fk">Checksum</div><div class="fv">blake2b-512 of <span class="mono">"SS58PRE" + prefix + key</span>, first 2 bytes. Any typo breaks it.</div></div>
+      <div class="fact"><div class="fk">Base58</div><div class="fv">Bitcoin-style alphabet — no <span class="mono">0</span>, <span class="mono">O</span>, <span class="mono">I</span>, <span class="mono">l</span>. Ambiguous characters are rejected.</div></div>
+      <div class="fact"><div class="fk">Wrong network?</div><div class="fv">A valid SS58 address with a different prefix (e.g. Polkadot's 0) is flagged, not mistaken for QTC.</div></div>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team.
+  </footer>
+</main>
+
+<script src="app.js?v=1.0.0"></script>
+</body>
+</html>

@@ -112,7 +112,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em}
     <p class="sec-sub">The facts the builder works from — re-verified against real sources before any claim ships.</p>
     <div class="grid">
       <div class="card"><div class="k">Signatures</div><h3>ML-DSA from block one</h3><p>Transactions are verified with <b>ML-DSA-65 and ML-DSA-87</b>, the post-quantum standard NIST finalized in 2024. No future migration, no address moves — quantum resistance is the foundation, not a retrofit.</p></div>
-      <div class="card"><div class="k">Consensus</div><h3>Proof-of-work</h3><p>Secured by <b>open mining</b> with no built-in advantage for Quantus Labs. Initial token distribution is through mining — earn it, don't buy it from insiders.</p></div>
+      <div class="card"><div class="k">Consensus</div><h3>Proof-of-work</h3><p>Secured by <b>open mining</b> — 100% of every block reward goes to the miner, nothing minted to a treasury. A <b>27% genesis allocation (5.67M QTC)</b> vests to early contributors and the treasury, mostly locked for year one; the remaining 73% is mined into existence.</p></div>
       <div class="card"><div class="k">Supply</div><h3>21M QTC cap</h3><p>The native coin <b>$QTC</b> is capped at <b>21 million</b>. Fixed, scarce, and distributed through work.</p></div>
       <div class="card"><div class="k">Engineering</div><h3>7 KB txs, aggregated</h3><p>ML-DSA signatures are big — about <b>7 KB per transaction</b> vs ~100 bytes for Bitcoin. Quantus answers with <b>native transaction aggregation</b>, posting succinct proofs on-chain and getting more efficient as volume grows.</p></div>
       <div class="card"><div class="k">Security</div><h3>Audited in the open</h3><p>Reviewed by <b>Neodyme, Eiger, Hashcloak, and V12</b>, with a public <b>Immunefi</b> audit competition before launch.</p></div>
@@ -129,6 +129,12 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em}
       <h3>QTC Mining Calculator <span class="arrow">&rarr;</span></h3>
       <p>Estimate your Quantus mining rewards from your hashrate — built on the chain's real emission formula (<b>(21M &minus; supply) / 50,000,000</b>), 12-second blocks, and 100% of every block reward to the miner. Includes the emission decay chart and a six-step mining quickstart from the official guide.</p>
       <div class="meta">Verified in a real browser &middot; 8/8 logic tests green</div>
+    </a>
+    <a class="app-card" href="pages/address-toolkit/">
+      <span class="tag">Shipped &middot; Sept 29, 2026</span>
+      <h3>QTC Address Toolkit <span class="arrow">&rarr;</span></h3>
+      <p>Inspect any Quantus address: the toolkit decodes the SS58 payload, re-computes the <b>blake2b checksum</b>, and reports prefix, key bytes, and a plain-English verdict. Also encodes 32-byte keys into prefix-189 addresses. The codec is validated against real addresses from the upstream genesis vesting table — 100% client-side, no network calls.</p>
+      <div class="meta">Verified in a real browser &middot; 13/13 logic tests green</div>
     </a>
     <div class="apps-empty">
       <strong>More builds on the bench.</strong><br>
