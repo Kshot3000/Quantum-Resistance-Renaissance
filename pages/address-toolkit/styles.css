@@ -123,3 +123,36 @@ footer a:hover{text-decoration:underline}
   .bseg{border-right:none;border-bottom:1px solid var(--line)}
   .bseg:last-child{border-bottom:none}
 }
+
+/* === v1.8 craft pass === */
+:root{--focus:#34ff88}
+body{font-family:var(--font-sans,Inter,system-ui,sans-serif)}
+.nav.chrome{
+  max-width:920px;margin:0 auto;padding:14px 22px;
+  background:rgba(2,6,4,.84);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:50
+}
+.nav-end{margin-left:auto}
+.qmb-switch > summary{border-color:rgba(52,255,136,.28);background:rgba(52,255,136,.06);color:var(--grn)}
+.qmb-switch[open] > summary{border-color:var(--grn);background:rgba(52,255,136,.12)}
+.qmb-menu{background:rgba(2,8,5,.97);border-color:rgba(52,255,136,.22)}
+.qmb-menu a:hover{background:rgba(52,255,136,.1)}
+.qmb-menu a.current{background:rgba(52,255,136,.14);color:var(--grn)}
+.hero{padding:60px 0 36px}
+.panel{transition:border-color .2s,transform .2s}
+.panel:hover{border-color:rgba(52,255,136,.28)}
+.tab{transition:all .18s}
+.verdict{transition:border-color .25s,box-shadow .25s,background .25s}
+.verdict.ok,.verdict.warn,.verdict.err{animation:qmb-rise .35s ease}
+.chip{transition:transform .15s,background .18s}
+.chip:hover{transform:translateY(-1px)}
+.fld input{transition:border-color .18s,box-shadow .18s}
+@media(max-width:640px){
+  .nav.chrome{padding:12px 16px}
+  .links{display:none}
+  .hero{padding:40px 0 24px}
+  .panel{padding:20px 16px}
+}
+
+/* mobile overflow fix */
+html,body{overflow-x:hidden;max-width:100%}

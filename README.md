@@ -14,11 +14,16 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `quantum-shield/` — interactive post-quantum explainer (ML-DSA, signature math, exposure demo)
   - `tokenomics/` — QTC tokenomics explorer (verified genesis vesting, unlock simulator, emission tail, fee-burn calculator, funding)
 
+## Live data
+
+The public Quantus indexer (`sqm.quantus.com`) only allowlists official Quantus domains for browser CORS. Community Pages apps therefore read a **same-origin snapshot** at `data/live.json` (produced by `node scripts/fetch-chain-data.mjs` from that indexer). Direct indexer calls are still attempted first. Re-run the script and commit to refresh the snapshot.
+
 ## Standards
 
 - Every app is verified in a real browser and on the live Pages URL before it's announced.
 - No demo figures dressed as live data — simulated content is clearly labeled.
 - Releases bump cache keys (`?v=`) for every changed JS/CSS file so fixes actually reach returning visitors.
+- Live chain numbers never invent figures: if the snapshot and indexer are both unreachable, the UI says so.
 
 ## Live
 

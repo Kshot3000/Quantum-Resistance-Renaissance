@@ -1,0 +1,116 @@
+/* Quantus Muse Builder — shared design tokens & chrome
+   Loaded by every site so typography, focus, motion, and app-nav stay consistent. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap");
+
+:root{
+  --font-sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --radius-sm:10px;
+  --radius-md:14px;
+  --radius-lg:18px;
+  --radius-xl:22px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --shadow-glow:0 20px 50px rgba(0,0,0,.45);
+}
+
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+code,.mono,pre,kbd{font-family:var(--font-mono)}
+
+/* Accessibility */
+.skip-link{
+  position:absolute;left:12px;top:-60px;z-index:10000;
+  background:#40e0ff;color:#03242b;font-weight:700;font-size:14px;
+  padding:10px 16px;border-radius:10px;text-decoration:none;transition:top .2s var(--ease)
+}
+.skip-link:focus{top:12px;outline:3px solid #fbbf24;outline-offset:2px}
+:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{
+  outline:2px solid var(--focus, #40e0ff);outline-offset:3px
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+
+/* Sticky glass chrome used by apps */
+.qmb-topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:14px 0;margin-bottom:4px;
+  background:rgba(4,7,13,.72);backdrop-filter:blur(14px) saturate(140%);
+  border-bottom:1px solid rgba(64,224,255,.1)
+}
+.qmb-topbar .back{text-decoration:none;font-size:14px;font-weight:500;letter-spacing:.02em;white-space:nowrap}
+.qmb-brand{font-weight:800;letter-spacing:.06em;font-size:14px;display:flex;align-items:center;gap:10px}
+.qmb-brand span{font-weight:500;opacity:.7}
+
+/* App switcher */
+.qmb-switch{position:relative}
+.qmb-switch > summary{
+  list-style:none;cursor:pointer;user-select:none;
+  border:1px solid rgba(64,224,255,.22);border-radius:999px;
+  padding:7px 14px;font-size:13px;font-weight:600;letter-spacing:.04em;
+  background:rgba(64,224,255,.05);color:inherit;
+  display:flex;align-items:center;gap:8px
+}
+.qmb-switch > summary::-webkit-details-marker{display:none}
+.qmb-switch > summary::after{content:"▾";opacity:.7;font-size:11px}
+.qmb-switch[open] > summary{border-color:rgba(64,224,255,.5);background:rgba(64,224,255,.1)}
+.qmb-menu{
+  position:absolute;right:0;top:calc(100% + 8px);min-width:260px;z-index:60;
+  background:rgba(8,14,24,.96);border:1px solid rgba(64,224,255,.2);
+  border-radius:14px;padding:8px;box-shadow:var(--shadow-glow);backdrop-filter:blur(16px)
+}
+.qmb-menu a{
+  display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;
+  text-decoration:none;color:inherit;font-size:14px;font-weight:600;transition:background .15s
+}
+.qmb-menu a:hover{background:rgba(64,224,255,.08)}
+.qmb-menu a.current{background:rgba(64,224,255,.12);color:#40e0ff}
+.qmb-menu .ico{
+  width:28px;height:28px;border-radius:8px;display:grid;place-items:center;
+  font-size:14px;flex:none
+}
+.qmb-menu .meta{display:block;font-size:11.5px;font-weight:500;opacity:.55;margin-top:1px}
+.qmb-menu .hub-link{border-top:1px solid rgba(64,224,255,.1);margin-top:4px;padding-top:8px}
+
+/* Utility */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+
+/* Sticky chrome + end cluster used by every app header */
+header.chrome, .topbar.chrome, .nav.chrome{
+  position:sticky;top:0;z-index:50;
+  backdrop-filter:blur(16px) saturate(140%);
+  -webkit-backdrop-filter:blur(16px) saturate(140%);
+}
+.nav-end{display:flex;align-items:center;gap:12px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.qmb-switch .ico{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)
+}
+.qmb-menu a.current .ico{box-shadow:0 0 12px currentColor}
+
+/* Soft enter animation for cards/panels */
+@keyframes qmb-rise{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.qmb-rise{animation:qmb-rise .45s var(--ease) both}
+
+/* Shared empty / error / loading states */
+.qmb-empty,.qmb-loading,.qmb-error{
+  text-align:center;padding:28px 18px;border-radius:var(--radius-md);
+  border:1px dashed rgba(255,255,255,.12);color:var(--muted,#8ba3bd);font-size:14.5px;line-height:1.6
+}
+.qmb-error{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.06);color:#fda4af}
+.qmb-loading{border-style:solid;border-color:rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
+.qmb-loading::before{
+  content:"";display:inline-block;width:14px;height:14px;margin-right:10px;vertical-align:-2px;
+  border:2px solid rgba(255,255,255,.2);border-top-color:currentColor;border-radius:50%;
+  animation:qmb-spin .8s linear infinite
+}
+@keyframes qmb-spin{to{transform:rotate(360deg)}}
+
+@media (max-width:720px){
+  .nav-end .links{display:none}
+  .qmb-menu{right:0;left:auto;min-width:min(280px,92vw)}
+}

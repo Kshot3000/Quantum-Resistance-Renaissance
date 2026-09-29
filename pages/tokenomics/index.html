@@ -3,19 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.8.0">
 <title>QTC Tokenomics Explorer — the 21M QTC, traced from genesis</title>
 <meta name="description" content="The full Quantus money map: 27% genesis mint verified against the chain's own vesting source, unlock simulator through 2036, emission tail with block-reward milestones, wormhole fee-burn calculator, and funding history. Every figure sourced, model assumptions labeled.">
-<link rel="stylesheet" href="styles.css?v=1.7.0">
+<link rel="stylesheet" href="styles.css?v=1.8.0">
+<style>:root{--focus:#5eead4;}</style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <canvas id="dust" aria-hidden="true"></canvas>
 
-<header class="topbar">
+<header class="topbar chrome">
   <a class="back" href="../../">&larr; Builder hub</a>
-  <div class="mint-pill"><span class="mint-ico">&#9670;</span><span>the mint, on the record</span></div>
+  <div class="nav-end">
+    <div class="mint-pill"><span class="mint-ico">&#9670;</span><span>the mint, on the record</span></div>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">✧</span><span>Quantum Shield<span class="meta">PQC explainer</span></span></a>
+    <a href="../tokenomics/" class="current"><span class="ico">◈</span><span>Tokenomics Explorer<span class="meta">21M supply map</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
 </header>
 
-<main class="wrap">
+<main id="main" class="wrap">
 
   <section class="hero">
     <div class="hero-badge">Sourced from the chain itself</div>
@@ -135,8 +152,9 @@
         <code>Quantus-Network/docs</code>, <code>docs/reference/tokenomics.md</code>, marked
         <i>draft: true</i> upstream.</li>
       <li><b>Live block height</b> &mdash; the public Subsquid indexer
-        (<code>sqm.quantus.com/v1/graphql</code>); supply anchored to that height via the emission
-        formula, labeled <i>modeled</i> because issuance isn't queried per-block.</li>
+        (<code>sqm.quantus.com/v1/graphql</code>), delivered via a same-origin snapshot when browser CORS
+        blocks a direct call; supply anchored to that height via the emission formula, labeled
+        <i>modeled</i> because issuance isn't queried per-block.</li>
       <li><b>TGE modeling</b> &mdash; vesting offsets count from the first non-zero block timestamp;
         this page models TGE as 2026-09-09 00:00 UTC (mainnet launch). Exact on-chain TGE may differ
         by hours; unlock dates shift with it.</li>
@@ -153,6 +171,7 @@
   <p class="quiet">Not affiliated with Quantus Labs. This is community-built tooling. Educational content &mdash; not financial advice.</p>
 </footer>
 
-<script src="app.js?v=1.7.0"></script>
+<script src="app.js?v=1.8.0"></script>
+<script src="../../assets/app-nav.js?v=1.8.0"></script>
 </body>
 </html>

@@ -118,3 +118,53 @@ body{
 .donate .copy{font:inherit; color:var(--gold); background:rgba(240,192,96,.08); border:1px dashed var(--line2);
   border-radius:8px; padding:3px 10px; cursor:pointer;}
 .donate .copy:hover{background:rgba(240,192,96,.16);}
+
+/* === v1.8 craft pass === */
+:root{--focus:#5eead4}
+body{font-family:var(--font-sans,Inter,system-ui,sans-serif)}
+.topbar.chrome{
+  max-width:1180px;margin:0 auto;padding:14px 28px;
+  background:rgba(4,18,13,.84);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  position:sticky;top:0;z-index:50;backdrop-filter:blur(16px)
+}
+.qmb-switch > summary{border-color:rgba(94,234,212,.3);background:rgba(94,234,212,.06);color:var(--mint)}
+.qmb-switch[open] > summary{border-color:var(--mint);background:rgba(94,234,212,.12)}
+.qmb-menu{background:rgba(4,16,12,.97);border-color:rgba(94,234,212,.22);color:var(--text)}
+.qmb-menu a{color:var(--text)}
+.qmb-menu a:hover{background:rgba(94,234,212,.1)}
+.qmb-menu a.current{background:rgba(94,234,212,.14);color:var(--mint)}
+.hero{padding:40px 0 16px}
+.live-tile{transition:border-color .2s,transform .2s}
+.live-tile:hover{transform:translateY(-2px);border-color:rgba(94,234,212,.35)}
+.alloc-card,.clock-cell,.emit-card,.fee-card,.chart-card,.fund-row{
+  transition:border-color .2s,transform .2s,box-shadow .25s
+}
+.alloc-card:hover,.emit-card:hover,.fee-card:hover{
+  transform:translateY(-2px);border-color:rgba(94,234,212,.32);box-shadow:0 14px 36px rgba(0,0,0,.28)
+}
+.panel{scroll-margin-top:72px}
+.fld input{transition:border-color .18s,box-shadow .18s}
+.fld input:focus{box-shadow:0 0 0 3px rgba(94,234,212,.15)}
+.clock-controls input[type=range]{height:28px;cursor:pointer}
+@media(max-width:760px){
+  .topbar.chrome{padding:12px 16px}
+  .mint-pill span:not(.mint-ico){display:none}
+  .wrap{padding:0 16px 48px}
+  .hero h1{font-size:clamp(1.8rem,7vw,2.6rem)}
+  .panel{margin-top:32px}
+}
+@media(prefers-reduced-motion:reduce){
+  .live-tile:hover,.alloc-card:hover,.emit-card:hover,.fee-card:hover{transform:none}
+}
+
+/* mobile overflow fix */
+html,body{overflow-x:hidden;max-width:100%}
+.wrap{overflow-x:hidden}
+.fund-row{word-break:break-word}
+.donate .copy{max-width:100%;word-break:break-all}
+.alloc-bar{max-width:100%}
+@media(max-width:760px){
+  .live-tile .v{font-size:1.25rem}
+  .hero .sub{font-size:.98rem}
+}

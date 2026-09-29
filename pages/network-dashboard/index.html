@@ -3,24 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.8.0">
 <title>QTC Network Dashboard — Live Quantus Chain Telemetry</title>
 <meta name="description" content="Live Quantus (QTC) chain stats: block height, TPS, accounts, transfers, recent blocks and 14-day activity — streamed from the public Quantus indexer.">
-<link rel="stylesheet" href="styles.css?v=1.5.0">
+<link rel="stylesheet" href="styles.css?v=1.8.0">
+<style>:root{--focus:#22d3ee;}</style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <div class="aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
 
-<header class="topbar">
+<header class="topbar chrome">
   <a class="back" href="../../">&larr; Builder hub</a>
-  <div class="live-pill" id="livePill"><span class="dot"></span><span id="liveText">connecting…</span></div>
+  <div class="nav-end">
+    <div class="live-pill" id="livePill"><span class="dot"></span><span id="liveText">connecting…</span></div>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/" class="current"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">✧</span><span>Quantum Shield<span class="meta">PQC explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◈</span><span>Tokenomics Explorer<span class="meta">21M supply map</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
 </header>
 
-<main class="wrap">
+<main id="main" class="wrap">
   <section class="hero">
     <h1>QTC Network Dashboard</h1>
-    <p class="sub">Live telemetry from the Quantus mainnet — every number below is read from the
-      public Subsquid indexer (<code>sqm.quantus.com</code>) when this page loads, and refreshes
-      every 15 seconds. If the indexer is unreachable, the page says so instead of guessing.</p>
+    <p class="sub">Live telemetry from the Quantus mainnet. Numbers come from the public Subsquid indexer
+      (<code>sqm.quantus.com</code>). Because that indexer only allowlists official Quantus domains for browser CORS,
+      this Pages build serves a <b>same-origin snapshot</b> refreshed about every 10 minutes by GitHub Actions
+      (and still tries a direct call first). If both fail, the page says so instead of guessing.</p>
   </section>
 
   <section class="stats" id="statsGrid">
@@ -60,7 +78,7 @@
   <section class="panel method">
     <h2>How the numbers are made</h2>
     <ul>
-      <li><b>Block height, accounts, transfers:</b> live GraphQL query to the public Quantus Subsquid indexer at <code>sqm.quantus.com</code> (the same backend powering the official explorer).</li>
+      <li><b>Block height, accounts, transfers:</b> from the public Quantus Subsquid indexer at <code>sqm.quantus.com</code> (same backend as the official explorer), delivered via a same-origin snapshot when browser CORS blocks a direct call.</li>
       <li><b>TPS (24h):</b> today's <code>tx_count</code> from <code>daily_chain_stats</code> ÷ 86,400.</li>
       <li><b>Observed block time:</b> mean gap between the timestamps of the latest 12 blocks.</li>
       <li><b>Circulating supply (est.):</b> <code>21M − (21M − 5.67M) · e<sup>−blocks/50,000,000</sup></code> — the emission formula verified against <code>docs/reference/tokenomics.md</code> (12s blocks, 27% genesis mint of 5.67M QTC). Marked "est." because vesting unlocks move inside the genesis share.</li>
@@ -76,6 +94,7 @@
   <p class="quiet">Not affiliated with Quantus Labs. This is community-built tooling.</p>
 </footer>
 
-<script src="app.js?v=1.5.0"></script>
+<script src="app.js?v=1.8.0"></script>
+<script src="../../assets/app-nav.js?v=1.8.0"></script>
 </body>
 </html>

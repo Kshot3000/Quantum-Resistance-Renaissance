@@ -7,7 +7,7 @@
 "use strict";
 
 var ENDPOINT = "https://sqm.quantus.com/v1/graphql";
-var REFRESH_MS = 15000;
+var REFRESH_MS = 60000;
 var BLOCKS_LIMIT = 15;
 var DAILY_LIMIT = 14;
 
@@ -95,15 +95,28 @@ if (typeof module !== "undefined" && module.exports) module.exports = API;
 
 /* ---------------- fetch layer ---------------- */
 
+var SNAPSHOT = "../../data/live.json";
+var lastFetchedAt = null;
+var dataMode = "snapshot"; /* snapshot | live | mock */
+
 function gql(query){
-  /* Test hook for headless QA (the sandbox has no network egress):
+  /* Test hook for headless QA:
    * QA injects window.__qtcdash_mock = {ok:true,data:{...}} before load. */
   if (typeof window !== "undefined" && window.__qtcdash_mock){
     var m = window.__qtcdash_mock;
+    dataMode = "mock";
+    lastFetchedAt = new Date().toISOString();
     return m.ok ? Promise.resolve(m.data) : Promise.reject(new Error(m.error || "mock indexer failure"));
   }
+  /* Browser CORS: sqm.quantus.com only allowlists explorer.quantus.com / quantus.com.
+   * On GitHub Pages we load a same-origin snapshot refreshed by GitHub Actions (~10 min).
+   * Still attempt a direct call first in case CORS opens; fall back to snapshot. */
+  return fetchDirect(query).catch(function(){ return fetchSnapshot(); });
+}
+
+function fetchDirect(query){
   var ctl = new AbortController();
-  var timer = setTimeout(function(){ ctl.abort(); }, 15000);
+  var timer = setTimeout(function(){ ctl.abort(); }, 4000);
   return fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -115,7 +128,22 @@ function gql(query){
     return res.json();
   }).then(function(json){
     if (json.errors) throw new Error("indexer: " + json.errors[0].message);
+    dataMode = "live";
+    lastFetchedAt = new Date().toISOString();
     return json.data;
+  });
+}
+
+function fetchSnapshot(){
+  var bust = SNAPSHOT + "?t=" + Math.floor(Date.now() / 60000);
+  return fetch(bust, { cache: "no-store" }).then(function(res){
+    if (!res.ok) throw new Error("snapshot HTTP " + res.status);
+    return res.json();
+  }).then(function(payload){
+    if (!payload || !payload.ok || !payload.data) throw new Error("snapshot empty");
+    dataMode = "snapshot";
+    lastFetchedAt = payload.fetched_at || null;
+    return payload.data;
   });
 }
 
@@ -311,14 +339,17 @@ var refreshTimer = null;
 function refresh(){
   setPill("", "connecting…");
   gql(QUERY).then(function(data){
-    setPill("on", "live · refreshes every 15s");
+    var modeLabel = dataMode === "live"
+      ? "live · direct indexer"
+      : ("snapshot · updated " + (lastFetchedAt ? new Date(lastFetchedAt).toLocaleString() : "recently"));
+    setPill("on", modeLabel);
     renderStats(data);
     renderBlocks(data.blocks);
   }).catch(function(err){
     setPill("err", "indexer unreachable");
-    els.blocksBody.innerHTML = '<tr><td colspan="4" class="perror">Could not reach the Quantus indexer (' +
-      String(err && err.message || err) + '). Showing nothing rather than stale guesses — retrying automatically.</td></tr>';
-    els.chartNote.textContent = "Daily activity unavailable — the indexer did not respond.";
+    els.blocksBody.innerHTML = '<tr><td colspan="4" class="perror">Could not load chain data (' +
+      String(err && err.message || err) + '). Direct indexer is CORS-locked to official domains; the same-origin snapshot was also unreachable. Retrying…</td></tr>';
+    els.chartNote.textContent = "Daily activity unavailable — snapshot and indexer both failed.";
   });
 }
 

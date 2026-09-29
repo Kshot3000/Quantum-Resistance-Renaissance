@@ -389,13 +389,24 @@ $("hsInput").addEventListener("input", renderHs); renderHs();
   }
   function local(){ setTiles(0, false); }
   try {
+    function fromSnap(){
+      return fetch("../../data/live.json?t=" + Math.floor(Date.now()/60000), { cache: "no-store" })
+        .then(function(r){ return r.json(); })
+        .then(function(p){
+          var h = p && p.data && p.data.status && p.data.status.block_height;
+          if (h > 0){ setTiles(h, true); $("ltHeightSrc").textContent = "snapshot · sqm.quantus.com"; }
+          else local();
+        });
+    }
     fetch("https://sqm.quantus.com/v1/graphql", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query: 'query { chain_stats_by_pk(id: "global") { block_height } }' })
+      body: JSON.stringify({ query: 'query { chain_stats_by_pk(id: "global") { block_height } }' }),
+      signal: (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(3500) : undefined
     }).then(function(r){ return r.json(); }).then(function(j){
       var h = j && j.data && j.data.chain_stats_by_pk && j.data.chain_stats_by_pk.block_height;
-      setTiles(h > 0 ? h : 0, h > 0);
-    }).catch(local);
+      if (h > 0) setTiles(h, true);
+      else throw new Error("empty");
+    }).catch(function(){ return fromSnap().catch(local); });
     setTimeout(function(){ if ($("ltHeight").textContent === "—") local(); }, 8000);
   } catch (e){ local(); }
 })();
