@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantum Shield — Post-Quantum Cryptography, Explained for Quantus</title>
+<meta name="description" content="Why Quantus uses ML-DSA post-quantum signatures from the genesis block: the Shor threat, signature-size math, aggregation throughput, and what 'quantum-safe' actually means. Every claim sourced.">
+<link rel="stylesheet" href="styles.css?v=1.6.0">
+</head>
+<body>
+<div class="shield-bg" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span></div>
+
+<header class="topbar">
+  <a class="back" href="../../">&larr; Builder hub</a>
+  <div class="verdict-pill"><span class="shield-ico">&#10022;</span><span>post-quantum from block one</span></div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="hero-badge">The Quantus difference, explained</div>
+    <h1>Quantum Shield</h1>
+    <p class="sub">Every other major chain was designed before quantum computing was a credible threat — and
+      will have to retrofit post-quantum cryptography someday. Quantus was built for the quantum era from
+      the <b>genesis block</b>: its signatures are <b>ML-DSA</b>, the NIST post-quantum standard (FIPS 204),
+      immune to the algorithm that breaks ECDSA. This page explains why that matters — with every claim
+      sourced and every number checkable.</p>
+    <nav class="toc" aria-label="Contents">
+      <a href="#threat">The threat</a>
+      <a href="#mldsa">ML-DSA deep dive</a>
+      <a href="#explorer">Signature-size explorer</a>
+      <a href="#scale">How it scales</a>
+      <a href="#exposure">Are you exposed?</a>
+      <a href="#quantus">Inside Quantus</a>
+      <a href="#faq">FAQ</a>
+      <a href="#sources">Sources</a>
+    </nav>
+  </section>
+
+  <section class="panel" id="threat">
+    <div class="sec-k">01 &middot; The threat</div>
+    <h2>Shor's algorithm breaks every classical signature</h2>
+    <p class="lead">Bitcoin, Ethereum, and nearly every chain in production secure coins with <b>ECDSA</b> or
+      <b>Ed25519</b> signatures. Both rest on math problems — the elliptic-curve discrete logarithm — that
+      <b>Shor's algorithm</b> solves in polynomial time on a sufficiently large quantum computer. When such a
+      machine exists, a published public key can be turned into its private key in <b>minutes to hours</b>,
+      versus <b>2<sup>128</sup>-class</b> effort for classical computers. Schnorr signatures (Bitcoin Taproot)
+      fall the same way.</p>
+    <div class="duo">
+      <div class="callout good">
+        <h3>&#10003; No such machine exists yet</h3>
+        <p>NIST notes that <b>no cryptographically relevant quantum computer has been built</b>. Breaking
+          ECDSA-256 needs on the order of ~1,200–1,450 logical qubits (about a million noisy physical ones,
+          per a March 2026 Google Quantum AI estimate) — current chips run ~1,000 noisy physical qubits. The
+          threat is real but not live today.</p>
+      </div>
+      <div class="callout bad">
+        <h3>&#9888; But exposure starts before the machine does</h3>
+        <p><b>&ldquo;Harvest now, forge later.&rdquo;</b> Any address whose public key was ever revealed
+          on-chain — a spent address, a Taproot output, P2PK — can be <b>archived today</b> and forged the day
+          the machine arrives. Blockchains are immutable, so that exposure can't be retroactively patched. The
+          U.S. Federal Reserve (2025) flagged this as an ongoing risk for distributed ledgers, not a future one.</p>
+      </div>
+    </div>
+    <div class="timeline" id="qTimeline">
+      <h3>How we got here</h3>
+      <div class="tl" data-year="1994"><span class="tl-year">1994</span><span class="tl-body"><b>Shor's algorithm</b> published — polynomial-time factoring and discrete logs on a quantum computer.</span></div>
+      <div class="tl" data-year="2016"><span class="tl-year">2016</span><span class="tl-body">NIST opens the post-quantum cryptography standardization process; CRYSTALS-Dilithium (later ML-DSA) is a candidate.</span></div>
+      <div class="tl" data-year="2024"><span class="tl-year">Aug 2024</span><span class="tl-body"><b>FIPS 204 published</b> — ML-DSA becomes the U.S. federal standard for post-quantum digital signatures.</span></div>
+      <div class="tl" data-year="2026"><span class="tl-year">Sept 9, 2026</span><span class="tl-body"><b>Quantus mainnet</b> launches with ML-DSA signatures from block one — no retrofit required, ever.</span></div>
+      <div class="tl" data-year="2030"><span class="tl-year">2027&ndash;2030s</span><span class="tl-body"><b>Estimates for a cryptographically relevant quantum computer:</b> Citi Institute (Jan 2026) says most likely 2027&ndash;2030; the U.S. National Academies point to the 2030s. Ranges, not dates — but the trend line is one direction.</span></div>
+    </div>
+  </section>
+
+  <section class="panel" id="mldsa">
+    <div class="sec-k">02 &middot; The standard</div>
+    <h2>ML-DSA: lattice math instead of elliptic curves</h2>
+    <p class="lead"><b>ML-DSA</b> (Module-Lattice-Based Digital Signature Algorithm), standardized as
+      <b>NIST FIPS 204</b> on August 13, 2024, is built on the hardness of <b>lattice problems</b>
+      (Module Learning With Errors and Module Short Integer Solution) — problems with no known quantum
+      shortcut. It descends from the CRYSTALS-Dilithium submission. NIST defines three parameter sets,
+      trading size against security category:</p>
+    <div class="table-scroll">
+      <table class="specs" id="paramTable">
+        <thead><tr><th>Parameter set</th><th>Security category</th><th>Roughly equivalent to</th><th>Public key</th><th>Signature</th></tr></thead>
+        <tbody>
+          <tr><td><b>ML-DSA-44</b></td><td>Category 2</td><td>breaking SHA-256/SHA3-256 collisions</td><td class="mono">1,312 B</td><td class="mono">2,420 B</td></tr>
+          <tr><td><b>ML-DSA-65</b></td><td>Category 3</td><td>AES-192 key search</td><td class="mono">1,952 B</td><td class="mono">3,309 B</td></tr>
+          <tr class="hot"><td><b>ML-DSA-87</b> <span class="used">used by Quantus</span></td><td>Category 5</td><td>AES-256 key search</td><td class="mono">2,592 B</td><td class="mono">4,627 B</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Categories are NIST's five post-quantum security levels from the standardization process. Values
+      per FIPS 204; cross-checked against multiple PQC references.</p>
+  </section>
+
+  <section class="panel" id="explorer">
+    <div class="sec-k">03 &middot; Interactive</div>
+    <h2>Signature-size explorer</h2>
+    <p class="lead">Post-quantum signatures are big — that's the honest cost of lattice security. Select a
+      parameter set and compare it against classical signatures. An ECDSA signature is ~65 bytes; one
+      ML-DSA-87 signature is ~4,627 bytes — <b id="ratioLine">about 71&times; larger</b>.</p>
+    <div class="param-tabs" role="tablist" aria-label="ML-DSA parameter set">
+      <button class="ptab" data-set="44" role="tab" aria-selected="false">ML-DSA-44</button>
+      <button class="ptab" data-set="65" role="tab" aria-selected="false">ML-DSA-65</button>
+      <button class="ptab active" data-set="87" role="tab" aria-selected="true">ML-DSA-87</button>
+    </div>
+    <div class="viz-card">
+      <div class="viz-row"><span class="viz-label">Selected ML-DSA signature</span><div class="bar-track"><div class="bar pq" id="barPq"></div></div><span class="viz-val mono" id="valPq">4,627 B</span></div>
+      <div class="viz-row"><span class="viz-label">ECDSA (secp256k1)</span><div class="bar-track"><div class="bar cl" id="barCl1"></div></div><span class="viz-val mono">65 B</span></div>
+      <div class="viz-row"><span class="viz-label">Ed25519</span><div class="bar-track"><div class="bar cl" id="barCl2"></div></div><span class="viz-val mono">64 B</span></div>
+      <div class="viz-row"><span class="viz-label">Schnorr (BIP-340)</span><div class="bar-track"><div class="bar cl" id="barCl3"></div></div><span class="viz-val mono">64 B</span></div>
+    </div>
+    <div class="stat-duo">
+      <div class="mini-stat"><div class="ms-label">Security category</div><div class="ms-value mono" id="msCat">5</div><div class="ms-foot" id="msCatFoot">&asymp; AES-256 key search</div></div>
+      <div class="mini-stat"><div class="ms-label">Public key</div><div class="ms-value mono" id="msPk">2,592 B</div><div class="ms-foot">vs 33 B compressed ECDSA</div></div>
+      <div class="mini-stat"><div class="ms-label">ECDSA sigs that fit inside</div><div class="ms-value mono" id="msFit">&asymp;71</div><div class="ms-foot">4,627 &divide; 65</div></div>
+      <div class="mini-stat"><div class="ms-label">NIST reference impl.</div><div class="ms-value" style="font-size:15px">FIPS 204</div><div class="ms-foot">qp-rusty-crystals, NIST-ACVP KAT-verified</div></div>
+    </div>
+  </section>
+
+  <section class="panel" id="scale">
+    <div class="sec-k">04 &middot; The scaling answer</div>
+    <h2>Big signatures, aggregated away</h2>
+    <p class="lead">A transparent Quantus transaction is <b>~7 KB</b> — roughly 70&times; a ~100-byte Bitcoin
+      transaction. If every transaction carried its full signature on-chain, a 12-second, 3.75 MB block would
+      hold about <b>510 transactions &asymp; 43 TPS</b>. Quantus answers this with <b>native transaction
+      aggregation</b>: users generate compact Plonky2 ZK proofs, and batches of proofs collapse into one
+      succinct proof posted on-chain — packing about <b>5,200 transactions per block &asymp; 430 TPS</b>.
+      Try it:</p>
+    <div class="sim-card">
+      <label class="sim-label" for="txSlider">Transactions to settle: <b id="txCountOut" class="mono">5,000</b></label>
+      <input type="range" id="txSlider" min="100" max="20000" step="100" value="5000">
+      <div class="sim-grid">
+        <div class="sim-cell">
+          <div class="sim-mode">Transparent mode <span class="pill-mode">~510 tx/block</span></div>
+          <div class="sim-nums"><span class="mono" id="simBlocksT">10</span> blocks &middot; <span class="mono" id="simTimeT">~2.0 min</span></div>
+        </div>
+        <div class="sim-cell hl">
+          <div class="sim-mode">Aggregated mode <span class="pill-mode pq-mode">~5,200 tx/block</span></div>
+          <div class="sim-nums"><span class="mono" id="simBlocksA">1</span> block &middot; <span class="mono" id="simTimeA">~12 s</span></div>
+        </div>
+      </div>
+      <p class="note">Packing figures from Quantus's architecture docs (<b>design figures from testing</b>:
+        ~43 QTPS transparent, ~430 QTPS encrypted two-layer aggregation), 12-second blocks. Not measured
+        mainnet throughput — watch the <a href="../network-dashboard/">Network Dashboard</a> for live numbers.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="exposure">
+    <div class="sec-k">05 &middot; Interactive</div>
+    <h2>Are your coins quantum-exposed?</h2>
+    <p class="lead">Click each address archetype to see its quantum story. The rule is simple: <b>once a public
+      key is on-chain, it can be harvested today and forged tomorrow</b> — blockchains can't un-publish history.</p>
+    <div class="expo-grid" id="expoGrid">
+      <button class="expo-card" data-kind="spent">
+        <span class="expo-title">Spent ECDSA address</span>
+        <span class="expo-sub">Bitcoin/Ethereum address that already sent coins</span>
+      </button>
+      <button class="expo-card" data-kind="taproot">
+        <span class="expo-title">Taproot / P2PK address</span>
+        <span class="expo-sub">Public key visible in the address itself</span>
+      </button>
+      <button class="expo-card" data-kind="fresh">
+        <span class="expo-title">Fresh hashed address</span>
+        <span class="expo-sub">Never spent from; key still hidden behind the hash</span>
+      </button>
+      <button class="expo-card" data-kind="mldsa">
+        <span class="expo-title">ML-DSA address (Quantus)</span>
+        <span class="expo-sub">Post-quantum signature from the start</span>
+      </button>
+    </div>
+    <div class="expo-detail" id="expoDetail" hidden>
+      <div class="expo-verdict" id="expoVerdict"></div>
+      <p class="expo-why" id="expoWhy"></p>
+      <p class="expo-fix" id="expoFix"></p>
+    </div>
+  </section>
+
+  <section class="panel" id="quantus">
+    <div class="sec-k">06 &middot; Under the hood</div>
+    <h2>What Quantus actually runs</h2>
+    <p class="lead">From the Quantus architecture docs and upstream repos (checked Sept 29, 2026):</p>
+    <ul class="stack-list">
+      <li><b>Chain signatures: ML-DSA-87</b> — NIST security Category 5, the strongest parameter set. Post-quantum from the genesis block, so there is no migration cliff and no legacy signature history to harvest.</li>
+      <li><b>Peer-to-peer encryption: ML-KEM-768</b> — the NIST post-quantum key-encapsulation standard (FIPS 203), via libp2p-noise, so node traffic is quantum-safe too.</li>
+      <li><b>Proof of work: QPoW</b> (Poseidon2-based) — open mining with no built-in advantage for Quantus Labs; 12-second blocks, 3.75 MB per block, 21M QTC cap.</li>
+      <li><b>Aggregation: Plonky2 STARKs</b> — transaction batches collapse into one succinct on-chain proof; this is what turns ~43 transparent TPS into ~430 aggregated TPS in testing.</li>
+      <li><b>Open implementations:</b> <code>qp-rusty-crystals</code> (pure-Rust, no-std ML-DSA, NIST-ACVP test-vector verified) and <code>quantus-cli</code> (defaults to ML-DSA-65, ML-DSA-87 available). SS58 addresses use prefix 189 (<code>qz&hellip;</code>).</li>
+    </ul>
+    <p class="note">Audited by Neodyme, Eiger, Hashcloak, and V12 with an Immunefi competition, per September 2026 launch coverage. First exchange venue announced: NEAR Intents (no listing date confirmed as of Sept 2026).</p>
+  </section>
+
+  <section class="panel" id="faq">
+    <div class="sec-k">07 &middot; FAQ</div>
+    <h2>Straight answers</h2>
+    <div class="faq" id="faqList">
+      <details open><summary>Is Bitcoin broken right now?</summary>
+        <p>No. No cryptographically relevant quantum computer exists, so ECDSA and Ed25519 are safe <em>today</em>.
+          The risk is forward-looking: public keys already exposed on-chain are archivable now and attackable later.
+          Coins in never-spent hashed addresses stay safe until their key is revealed by spending.</p></details>
+      <details><summary>Why not just upgrade old chains later?</summary>
+        <p>Upgrading signatures is the easy part; the hard part is the <b>history</b>. Every exposed public key
+          ever published stays exposed forever. A chain that retrofits PQC in 2030 still has 20+ years of
+          harvestable keys. Starting with ML-DSA at genesis means there is no pre-quantum history to exploit —
+          that window never opened.</p></details>
+      <details><summary>Does ML-DSA-65 vs 87 matter?</summary>
+        <p>Both are NIST-standardized; Category 5 (ML-DSA-87) targets AES-256-equivalent effort versus AES-192 for
+          Category 3 (ML-DSA-65). Quantus runs <b>ML-DSA-87 on-chain</b> per its architecture docs — the strongest
+          setting — while the <code>quantus-cli</code> wallet tool defaults to ML-DSA-65 with 87 available.</p></details>
+      <details><summary>Are there downsides to post-quantum signatures?</summary>
+        <p>Honestly, yes: <b>size</b> (a 4.6 KB signature vs 65 bytes) and somewhat slower verification. Quantus's
+          answer is native aggregation — the per-transaction on-chain footprint shrinks as batches grow. The
+          tradeoff is deliberate: pay bytes now, never face a migration cliff later.</p></details>
+      <details><summary>Could quantum computers break ML-DSA too?</summary>
+        <p>No known quantum algorithm breaks the lattice problems ML-DSA rests on — that's the entire basis of the
+          NIST standard. Cryptography is never "proven" safe, but ML-DSA survived the most scrutinized selection
+          process in the field's history and is the U.S. federal standard.</p></details>
+      <details><summary>Where do I read the real specs?</summary>
+        <p>Start with <a href="https://csrc.nist.gov/pubs/fips/204/final" target="_blank" rel="noopener">FIPS 204</a>
+          itself, Quantus's <a href="https://github.com/Quantus-Network/docs/blob/HEAD/docs/architecture.md" target="_blank" rel="noopener">architecture docs</a>,
+          the <a href="https://github.com/Quantus-Network/qp-rusty-crystals" target="_blank" rel="noopener">qp-rusty-crystals</a>
+          implementation, and the <a href="https://github.com/Quantus-Network/quantus-cli" target="_blank" rel="noopener">quantus-cli</a> README.</p></details>
+    </div>
+  </section>
+
+  <section class="panel method" id="sources">
+    <div class="sec-k">08 &middot; Receipts</div>
+    <h2>Sources</h2>
+    <ul>
+      <li><b>FIPS 204</b> — Module-Lattice-Based Digital Signature Standard, published Aug 13, 2024: <a href="https://csrc.nist.gov/pubs/fips/204/final" target="_blank" rel="noopener">csrc.nist.gov/pubs/fips/204/final</a></li>
+      <li><b>ML-DSA parameter sizes</b> (pk/sig bytes per set): <a href="https://github.com/terra-quantum-public/tq42-pqc-oss/blob/HEAD/docs/post_quantum_algs/digital_signature/ml-dsa.md" target="_blank" rel="noopener">tq42-pqc-oss ML-DSA reference</a></li>
+      <li><b>Quantus architecture docs</b> — ML-DSA-87 signatures, ML-KEM-768 P2P, 3.75 MB blocks, QTPS design table: <a href="https://github.com/Quantus-Network/docs/blob/HEAD/docs/architecture.md" target="_blank" rel="noopener">Quantus-Network/docs &middot; architecture.md</a></li>
+      <li><b>qp-rusty-crystals</b> — pure-Rust ML-DSA, NIST-ACVP KAT-verified: <a href="https://github.com/Quantus-Network/qp-rusty-crystals" target="_blank" rel="noopener">Quantus-Network/qp-rusty-crystals</a></li>
+      <li><b>quantus-cli</b> — Dilithium/ML-DSA support, default ML-DSA-65: <a href="https://github.com/Quantus-Network/quantus-cli" target="_blank" rel="noopener">Quantus-Network/quantus-cli</a></li>
+      <li><b>Quantum timeline estimates</b> — Google Quantum AI resource estimate (Mar 2026), Citi Institute window 2027&ndash;2030, National Academies 2030s: via Sept 2026 launch coverage, e.g. <a href="https://thebittimes.com/quantus-launches-mainnet-with-post-quantum-cryptography-from-block-one-as-quantum-threat-grows-tbt128376.html" target="_blank" rel="noopener">The Bit Times</a></li>
+      <li><b>Federal Reserve (2025)</b> on harvest-now/decrypt-later risk for distributed ledgers; <b>NIST</b>: no cryptographically relevant quantum computer has been built.</li>
+    </ul>
+    <p class="note">Every figure on this page was re-verified against these sources on Sept 29, 2026. If a source moves, the claim moves with it — nothing here is asserted on vibes.</p>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <p class="src">Explainer by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; upstream reference: <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network</a></p>
+  <p class="attr">Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot;
+    <span class="donate">Tip in QTC: <button class="copy" id="donateCopy" title="Copy address">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span></p>
+  <p class="quiet">Not affiliated with Quantus Labs. This is community-built tooling. Educational content — not financial advice.</p>
+</footer>
+
+<script src="app.js?v=1.6.0"></script>
+</body>
+</html>
