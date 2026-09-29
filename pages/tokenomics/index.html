@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QTC Tokenomics Explorer — the 21M QTC, traced from genesis</title>
+<meta name="description" content="The full Quantus money map: 27% genesis mint verified against the chain's own vesting source, unlock simulator through 2036, emission tail with block-reward milestones, wormhole fee-burn calculator, and funding history. Every figure sourced, model assumptions labeled.">
+<link rel="stylesheet" href="styles.css?v=1.7.0">
+</head>
+<body>
+<canvas id="dust" aria-hidden="true"></canvas>
+
+<header class="topbar">
+  <a class="back" href="../../">&larr; Builder hub</a>
+  <div class="mint-pill"><span class="mint-ico">&#9670;</span><span>the mint, on the record</span></div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="hero-badge">Sourced from the chain itself</div>
+    <h1>QTC Tokenomics Explorer</h1>
+    <p class="sub">21,000,000 QTC. No more, ever. This page traces every coin from the genesis block —
+      the <b>27% premine</b> (5,670,000 QTC, almost all vested), the <b>73% miner tail</b> (15,330,000 QTC,
+      exponential decay, no halvings), the fee burns, and the rounds that funded it. Allocation buckets are
+      verified against the vesting constants in the chain's own genesis presets; where a model stands in
+      for chain data, it says so.</p>
+    <div class="live-strip" id="liveStrip">
+      <div class="live-tile"><span class="k">Block height</span><span class="v" id="ltHeight">&mdash;</span><span class="s" id="ltHeightSrc">connecting&hellip;</span></div>
+      <div class="live-tile"><span class="k">Modeled supply</span><span class="v" id="ltSupply">&mdash;</span><span class="s">genesis + emission formula</span></div>
+      <div class="live-tile"><span class="k">Vesting unlocked now</span><span class="v" id="ltUnlocked">&mdash;</span><span class="s">of 5,670,000 QTC genesis mint</span></div>
+      <div class="live-tile"><span class="k">Block reward now</span><span class="v" id="ltReward">&mdash;</span><span class="s">(21M &minus; supply) / 50M</span></div>
+    </div>
+    <p class="fineprint" id="liveNote">Supply and reward are modeled from the on-chain emission formula anchored to the live block height; vesting math is computed from the genesis schedules.</p>
+  </section>
+
+  <section class="panel" id="allocation">
+    <h2>Where the 21M goes</h2>
+    <p class="lede">Five slices of the genesis mint, plus the miner tail. Buckets, amounts, and unlock terms
+      below match <code>mainnet_vesting.rs</code> in the chain repo (the compile-time assertion
+      <code>sum(VESTING) + 20 &times; SEED == 5,670,000</code> holds).</p>
+    <div class="alloc-grid" id="allocGrid"></div>
+    <div class="alloc-bar" id="allocBar" aria-hidden="true"></div>
+    <div class="alloc-legend" id="allocLegend"></div>
+  </section>
+
+  <section class="panel" id="vesting">
+    <h2>The vesting clock</h2>
+    <p class="lede">Almost nothing from the premine is liquid yet. Drag the date: the clock walks every
+      bucket's linear schedule from <b>TGE</b> (the first non-zero block timestamp &mdash; modeled here as
+      mainnet launch, Sept 9, 2026, since vesting offsets count from TGE, not the genesis block).</p>
+    <div class="clock-controls">
+      <label for="dateSlider">Vesting date</label>
+      <input type="range" id="dateSlider" min="0" max="1460" step="1" value="20">
+      <div class="clock-read"><span id="clockDate">Sept 29, 2026</span><span id="clockPct"></span></div>
+    </div>
+    <div class="clock-grid" id="clockGrid"></div>
+    <div class="chart-card">
+      <div class="chart-head"><h3>Genesis unlock curve, 2026&ndash;2036</h3><span class="chart-note">stacked: liquid now &middot; unlocked per bucket &middot; locked</span></div>
+      <div id="vestChart"></div>
+      <div class="milestones" id="vestMilestones"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="emission">
+    <h2>The 73%: emission tail</h2>
+    <p class="lede">Mining rewards follow a smooth exponential decay &mdash;
+      <code>reward = (21,000,000 &minus; supply) / 50,000,000</code> &mdash; with no halvings and no dev tax:
+      100% of every block reward goes to the miner. The reward effectively halves about every
+      <b>13.2 years</b>.</p>
+    <div class="chart-card">
+      <div class="chart-head"><h3>Total supply trajectory (model)</h3><span class="chart-note">genesis mint + exponential emission</span></div>
+      <div id="emitChart"></div>
+    </div>
+    <div class="emit-grid">
+      <div class="emit-card"><h3>Reward milestones</h3><div id="milestoneTable"></div></div>
+      <div class="emit-card"><h3>Try a date</h3>
+        <label class="fld">Year
+          <input type="number" id="yrInput" min="2026" max="2100" value="2031" step="1">
+        </label>
+        <div class="emit-out" id="yrOut"></div>
+        <p class="fineprint">Modeled with the continuous form of the per-block formula; chain reality
+          discretizes per block and per 12-second cadence.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="fees">
+    <h2>Fee burn, priced</h2>
+    <p class="lede">Quantus charges a <b>4 bps (0.04%)</b> volume fee on wormhole exits. Each exit's fee is
+      rounded <b>up to whole quanta</b> (1 quantum = 0.01 QTC), then split: the burn bucket takes
+      <code>ceil(50%)</code> and the miner keeps the rest; in public batches, <code>floor(50%)</code> of the
+      burn bucket is redirected to the aggregator. Small exits therefore pay a minimum of one quantum.
+      High-security / reversible transfers pay a separate <b>1% volume fee, burned entirely</b>.</p>
+    <div class="fee-grid">
+      <div class="fee-card">
+        <h3>Wormhole exit calculator</h3>
+        <label class="fld">Exit volume (QTC)
+          <input type="number" id="exitInput" min="0.01" step="0.01" value="1000">
+        </label>
+        <div class="fee-out" id="feeOut"></div>
+        <div class="fee-bar" id="feeBar" aria-hidden="true"></div>
+      </div>
+      <div class="fee-card">
+        <h3>High-security transfer</h3>
+        <label class="fld">Transfer volume (QTC)
+          <input type="number" id="hsInput" min="0.01" step="0.01" value="1000">
+        </label>
+        <div class="fee-out" id="hsOut"></div>
+        <p class="fineprint">1% of volume is burned &mdash; no miner split. This is the privacy-and-reversibility premium.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="funding">
+    <h2>Funding history</h2>
+    <p class="lede">What it cost to get here &mdash; from the team's own tokenomics document
+      (labeled <i>draft</i> upstream, so treat figures as the team's stated history).</p>
+    <div class="fund-table" id="fundTable"></div>
+    <div class="fund-implied" id="fundImplied"></div>
+  </section>
+
+  <section class="panel" id="sources">
+    <h2>Sources &amp; method</h2>
+    <ul class="src-list">
+      <li><b>Allocation &amp; vesting constants</b> &mdash; verified 2026-09-29 in
+        <code>Quantus-Network/chain</code>, <code>runtime/src/genesis_config_presets/mainnet_vesting.rs</code>
+        (FINALIZED = true, 48 vesting rows, compile-time assertions hold).</li>
+      <li><b>Emission divisor 50,000,000</b> &mdash; verified in
+        <code>runtime/src/configs/mod.rs</code> (<code>EmissionDivisor = ConstU128&lt;50_000_000&gt;</code>);
+        reward formula from <code>pallets/mining-rewards</code>.</li>
+      <li><b>Wormhole exit fee 4 bps</b> &mdash; verified in <code>pallets/wormhole</code> tests
+        (<code>volume_fee_bps: 4</code>); burn-split rules from the tokenomics doc.</li>
+      <li><b>Tokenomics narrative</b> (fee splits, funding rounds, TGE definition) &mdash;
+        <code>Quantus-Network/docs</code>, <code>docs/reference/tokenomics.md</code>, marked
+        <i>draft: true</i> upstream.</li>
+      <li><b>Live block height</b> &mdash; the public Subsquid indexer
+        (<code>sqm.quantus.com/v1/graphql</code>); supply anchored to that height via the emission
+        formula, labeled <i>modeled</i> because issuance isn't queried per-block.</li>
+      <li><b>TGE modeling</b> &mdash; vesting offsets count from the first non-zero block timestamp;
+        this page models TGE as 2026-09-09 00:00 UTC (mainnet launch). Exact on-chain TGE may differ
+        by hours; unlock dates shift with it.</li>
+    </ul>
+    <p class="fineprint">Not affiliated with Quantus Labs. Community-built tooling; educational content &mdash; not financial advice.</p>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <p class="src">Tokenomics explorer by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; upstream reference: <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network</a></p>
+  <p class="attr">Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot;
+    <span class="donate">Tip in QTC: <button class="copy" id="donateCopy" title="Copy address">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span></p>
+  <p class="quiet">Not affiliated with Quantus Labs. This is community-built tooling. Educational content &mdash; not financial advice.</p>
+</footer>
+
+<script src="app.js?v=1.7.0"></script>
+</body>
+</html>

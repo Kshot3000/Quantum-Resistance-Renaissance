@@ -12,6 +12,7 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `address-toolkit/` — SS58 prefix-189 address inspector/encoder
   - `network-dashboard/` — live mainnet telemetry from the public Subsquid indexer
   - `quantum-shield/` — interactive post-quantum explainer (ML-DSA, signature math, exposure demo)
+  - `tokenomics/` — QTC tokenomics explorer (verified genesis vesting, unlock simulator, emission tail, fee-burn calculator, funding)
 
 ## Standards
 
