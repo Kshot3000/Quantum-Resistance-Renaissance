@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.11.0">
+<title>QTC Benchmark Lab — Quantus vs Bitcoin, Ethereum, Solana &amp; Ergo</title>
+<meta name="description" content="Head-to-head comparison of Quantus (QTC) against Bitcoin, Ethereum, Solana and Ergo: consensus, post-quantum signatures, throughput math, fees, supply and launch fairness — every figure cited and dated.">
+<link rel="stylesheet" href="styles.css?v=1.12.0">
+<style>:root{--focus:#c084fc;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="sigrain" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Benchmark Lab</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com" target="_blank" rel="noopener">Quantus docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">Explorer</a>
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">✧</span><span>Quantum Shield<span class="meta">PQC explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◈</span><span>Tokenomics Explorer<span class="meta">21M supply map</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Mainnet search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">⚙</span><span>Mining Studio<span class="meta">Command center</span></span></a>
+    <a href="../safesend/"><span class="ico">✉</span><span>SafeSend Lab<span class="meta">Secure transfers</span></span></a>
+    <a href="../benchmark-lab/" class="current"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow">Independent comparison &middot; figures cited &amp; dated &middot; updated Sept 29, 2026</p>
+    <h1>Where does <span class="q">Quantus</span> actually stand?</h1>
+    <p class="lede">A new post-quantum chain is only as good as its trade-offs. This lab puts QTC head-to-head with
+    <strong>Bitcoin</strong>, <strong>Ethereum</strong>, <strong>Solana</strong> and <strong>Ergo</strong> across the metrics
+    that matter — consensus, quantum safety, throughput math, fees, supply, and launch fairness. Every cell carries a
+    source and an evidence badge; nothing here is vibes.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Chains compared</span><span class="v">5</span></div>
+      <div class="fact"><span class="k">Metrics</span><span class="v" id="fact-metrics">12</span></div>
+      <div class="fact"><span class="k">Figures cited</span><span class="v" id="fact-cited">—</span></div>
+      <div class="fact"><span class="k">Verified</span><span class="v">Sept 29, 2026</span></div>
+    </div>
+    <div class="chain-picker" id="chain-picker" role="group" aria-label="Highlight a chain column"></div>
+  </section>
+
+  <section class="card" id="matrix-card">
+    <div class="card-head">
+      <h2>The head-to-head matrix</h2>
+      <p class="note">Click a chain above to spotlight its column. Badges: <span class="badge b-measured">measured</span> observed on-chain or in spec,
+      <span class="badge b-claimed">claimed</span> project's own figure, <span class="badge b-approx">approx</span> third-party estimate,
+      <span class="badge b-unverified">unverified</span> could not confirm.</p>
+    </div>
+    <div class="matrix-wrap" id="matrix-wrap"></div>
+  </section>
+
+  <section class="card" id="tps-lab">
+    <div class="card-head">
+      <h2>Throughput anatomy</h2>
+      <p class="note">TPS is arithmetic, not magic: block size ÷ block time ÷ average tx size. Drag the average tx size and watch each chain's theoretical ceiling move.</p>
+    </div>
+    <div class="tps-grid">
+      <div class="tps-controls">
+        <label for="txsize">Average transaction size <output id="txsize-out">250 B</output></label>
+        <input type="range" id="txsize" min="64" max="8000" step="1" value="250">
+        <div class="tps-presets">
+          <button data-size="250">BTC-style · 250 B</button>
+          <button data-size="120">ETH-style · 120 B</button>
+          <button data-size="7000">QTC raw · 7 KB</button>
+        </div>
+        <p class="fine">Byte math applies to BTC and QTC (byte-metered blocks). Ethereum, Solana and Ergo are gas/compute-metered, so their bars show researched typical throughput as a labeled reference instead of slider math. This is a ceiling — real throughput also depends on validation cost, networking, and demand.</p>
+      </div>
+      <div class="tps-bars" id="tps-bars"></div>
+    </div>
+    <div class="agg-callout">
+      <h3>Why Quantus quotes ~430 TPS with 7&nbsp;KB transactions</h3>
+      <p>ML-DSA signatures are big — a raw Quantus transfer is on the order of <strong>7&nbsp;KB</strong>. The chain's answer is
+      <strong>native transaction aggregation</strong>: many transfers are batched into one aggregated envelope so the per-transfer
+      on-chain cost collapses. The ~430&nbsp;TPS figure is the project's <span class="badge b-claimed">claimed</span> design target for aggregated
+      throughput, not a measured mainnet number — mainnet went live Sept 9, 2026 and real load is far below it (see the
+      <a href="../network-dashboard/">Network Dashboard</a>). Aggregation is the honest version of the trick every high-TPS chain uses;
+      the lab above shows what happens to the math <em>without</em> it.</p>
+    </div>
+  </section>
+
+  <section class="card" id="sig-lab">
+    <div class="card-head">
+      <h2>The signature showdown</h2>
+      <p class="note">Post-quantum security has a price: size. Classical signatures are tiny; NIST-standard ML-DSA signatures are kilobytes. That single fact explains most of Quantus's design.</p>
+    </div>
+    <div class="sig-bars" id="sig-bars"></div>
+    <div class="sig-notes">
+      <div class="sig-note"><strong>ECDSA / Ed25519</strong> — 64-byte signatures. Elegant, battle-tested, and breakable by a sufficiently large quantum computer running Shor's algorithm.</div>
+      <div class="sig-note"><strong>ML-DSA-65 / ML-DSA-87</strong> — NIST FIPS 204 standards (2024). Signature sizes are <span class="badge b-measured">measured</span> from the standard itself. Quantus signs with ML-DSA from the genesis block; no migration cliff, no "harvest now, decrypt later" exposure on its own ledger.</div>
+    </div>
+  </section>
+
+  <section class="card" id="fairness">
+    <div class="card-head">
+      <h2>Launch fairness, side by side</h2>
+      <p class="note">Who got coins at the start, and on what terms? The one dimension marketing never wants you to compare.</p>
+    </div>
+    <div class="fair-grid" id="fair-grid"></div>
+  </section>
+
+  <section class="card" id="verdicts">
+    <div class="card-head">
+      <h2>Scorecards</h2>
+      <p class="note">One honest paragraph per chain — what it's genuinely best at, and the catch. Independent builder's view, not financial advice.</p>
+    </div>
+    <div class="verdict-grid" id="verdict-grid"></div>
+  </section>
+
+  <section class="card" id="sources">
+    <div class="card-head">
+      <h2>Sources</h2>
+      <p class="note">Every figure above traces to one of these. Re-verified <strong>Sept 29, 2026</strong>; figures move — check the live chain before acting on them.</p>
+    </div>
+    <ol class="source-list" id="source-list"></ol>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team. Comparator figures verified against project docs and public chain data, Sept 29, 2026. Not financial advice.
+  </footer>
+</main>
+
+<script src="app.js?v=1.12.0"></script>
+<script src="../../assets/app-nav.js?v=1.11.0"></script>
+</body>
+</html>
