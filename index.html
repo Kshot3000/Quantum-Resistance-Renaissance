@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantus Muse Builder — Apps for the Quantum-Era Chain</title>
+<meta name="description" content="A builder hub shipping apps and tools for the Quantus blockchain: the post-quantum, proof-of-work L1 with ML-DSA signatures from the genesis block.">
+<meta name="theme-color" content="#04070d">
+<style>
+:root{
+  --bg:#04070d;
+  --panel:rgba(10,18,30,.78);
+  --line:rgba(64,224,255,.16);
+  --cyan:#40e0ff;
+  --teal:#2dd4bf;
+  --amber:#fbbf24;
+  --ink:#e8f4ff;
+  --muted:#8ba3bd;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;min-height:100vh;overflow-x:hidden}
+#field{position:fixed;inset:0;z-index:0;pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 22px}
+header.nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.06em}
+.brand .atom{width:34px;height:34px;flex:none}
+.brand small{display:block;font-weight:500;color:var(--muted);letter-spacing:.02em;font-size:11px}
+.nav-links{display:flex;gap:18px;font-size:14px}
+.nav-links a{color:var(--muted);text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:var(--cyan)}
+.hero{text-align:center;padding:70px 0 50px}
+.hero .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:6px 16px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin-bottom:22px;background:rgba(45,212,191,.06)}
+.hero h1{font-size:clamp(38px,6.5vw,68px);line-height:1.04;font-weight:900;letter-spacing:-.01em}
+.hero h1 .q{background:linear-gradient(100deg,var(--cyan),var(--teal) 60%,var(--amber));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.sub{color:var(--muted);max-width:620px;margin:20px auto 0;font-size:17px;line-height:1.65}
+.hero p.sub strong{color:var(--ink);font-weight:600}
+.cta-row{display:flex;gap:14px;justify-content:center;margin-top:30px;flex-wrap:wrap}
+.btn{display:inline-block;padding:13px 30px;border-radius:12px;font-weight:700;font-size:15px;text-decoration:none;transition:transform .15s,box-shadow .2s}
+.btn-solid{background:linear-gradient(100deg,var(--cyan),var(--teal));color:#03242b;box-shadow:0 8px 30px rgba(64,224,255,.25)}
+.btn-solid:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(64,224,255,.35)}
+.btn-ghost{border:1px solid var(--line);color:var(--ink);background:rgba(64,224,255,.04)}
+.btn-ghost:hover{border-color:var(--cyan)}
+section{padding:44px 0}
+.sec-title{font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
+.sec-head{font-size:clamp(24px,3.5vw,34px);font-weight:800;margin-bottom:6px}
+.sec-sub{color:var(--muted);max-width:640px;line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:26px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;backdrop-filter:blur(8px);transition:border-color .2s,transform .15s}
+.card:hover{border-color:rgba(64,224,255,.45);transform:translateY(-3px)}
+.card .k{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
+.card h3{font-size:19px;margin-bottom:8px}
+.card p{color:var(--muted);font-size:14.5px;line-height:1.6}
+.card p b{color:var(--ink);font-weight:600}
+.apps-empty{border:1px dashed var(--line);border-radius:16px;padding:44px 26px;text-align:center;color:var(--muted);margin-top:26px;line-height:1.7}
+.apps-empty strong{color:var(--ink)}
+.timeline{margin-top:26px;display:flex;flex-direction:column;gap:0}
+.tl-row{display:flex;gap:18px;padding:18px 0;border-bottom:1px solid rgba(64,224,255,.08)}
+.tl-date{flex:none;width:130px;color:var(--amber);font-weight:700;font-size:14px}
+.tl-body{color:var(--muted);font-size:15px;line-height:1.6}
+.tl-body strong{color:var(--ink)}
+footer{border-top:1px solid var(--line);margin-top:30px;padding:30px 0 44px;text-align:center;color:var(--muted);font-size:14px;line-height:1.9}
+footer a{color:var(--cyan);text-decoration:none}
+footer a:hover{text-decoration:underline}
+footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em}
+@media(max-width:640px){.nav-links{display:none}.tl-date{width:96px}}
+</style>
+</head>
+<body>
+<canvas id="field"></canvas>
+<div class="wrap">
+  <header class="nav">
+    <div class="brand">
+      <svg class="atom" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <circle cx="20" cy="20" r="3.4" fill="#40e0ff"/>
+        <ellipse cx="20" cy="20" rx="17" ry="6.5" stroke="#2dd4bf" stroke-width="1.6" transform="rotate(0 20 20)"/>
+        <ellipse cx="20" cy="20" rx="17" ry="6.5" stroke="#40e0ff" stroke-width="1.6" transform="rotate(60 20 20)"/>
+        <ellipse cx="20" cy="20" rx="17" ry="6.5" stroke="#fbbf24" stroke-width="1.6" transform="rotate(120 20 20)"/>
+      </svg>
+      <div>QUANTUS MUSE BUILDER<small>post-quantum tooling, built live</small></div>
+    </div>
+    <nav class="nav-links">
+      <a href="#chain">The Chain</a>
+      <a href="#apps">Apps</a>
+      <a href="#story">Story</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <span class="pill">Mainnet live &middot; Sept 9, 2026</span>
+    <h1>Apps for the <span class="q">quantum-era</span> chain</h1>
+    <p class="sub">Quantus is a proof-of-work Layer 1 that put <strong>post-quantum cryptography in the genesis block</strong> — every transaction signed with ML-DSA while the rest of crypto waits for the quantum threat to arrive. This builder ships the tooling the ecosystem needs.</p>
+    <div class="cta-row">
+      <a class="btn btn-solid" href="#apps">Browse the builds</a>
+      <a class="btn btn-ghost" href="https://github.com/Kshot3000/Quantus-Muse-Builder" target="_blank" rel="noopener">View the repo</a>
+    </div>
+  </div>
+
+  <section id="chain">
+    <div class="sec-title">The Chain</div>
+    <div class="sec-head">Built for when elliptic curves fall</div>
+    <p class="sec-sub">The facts the builder works from — re-verified against real sources before any claim ships.</p>
+    <div class="grid">
+      <div class="card"><div class="k">Signatures</div><h3>ML-DSA from block one</h3><p>Transactions are verified with <b>ML-DSA-65 and ML-DSA-87</b>, the post-quantum standard NIST finalized in 2024. No future migration, no address moves — quantum resistance is the foundation, not a retrofit.</p></div>
+      <div class="card"><div class="k">Consensus</div><h3>Proof-of-work</h3><p>Secured by <b>open mining</b> with no built-in advantage for Quantus Labs. Initial token distribution is through mining — earn it, don't buy it from insiders.</p></div>
+      <div class="card"><div class="k">Supply</div><h3>21M QTC cap</h3><p>The native coin <b>$QTC</b> is capped at <b>21 million</b>. Fixed, scarce, and distributed through work.</p></div>
+      <div class="card"><div class="k">Engineering</div><h3>7 KB txs, aggregated</h3><p>ML-DSA signatures are big — about <b>7 KB per transaction</b> vs ~100 bytes for Bitcoin. Quantus answers with <b>native transaction aggregation</b>, posting succinct proofs on-chain and getting more efficient as volume grows.</p></div>
+      <div class="card"><div class="k">Security</div><h3>Audited in the open</h3><p>Reviewed by <b>Neodyme, Eiger, Hashcloak, and V12</b>, with a public <b>Immunefi</b> audit competition before launch.</p></div>
+      <div class="card"><div class="k">Markets</div><h3>First venue: NEAR Intents</h3><p>Quantus named <b>NEAR Intents</b> as the first exchange venue for $QTC. No listing date confirmed yet — this page will say so when there is one.</p></div>
+    </div>
+  </section>
+
+  <section id="apps">
+    <div class="sec-title">The Builds</div>
+    <div class="sec-head">Shipped by the loop</div>
+    <p class="sec-sub">Every app below was tested in a real browser and verified live before it earned a place here. Nothing is demo data wearing a live badge.</p>
+    <div class="apps-empty">
+      <strong>The first builds are on the bench.</strong><br>
+      The hourly builder loop just started — wallets, mining calculators, network dashboards and explainers are queued. Check back soon, or watch the repo.
+    </div>
+  </section>
+
+  <section id="story">
+    <div class="sec-title">Why This Exists</div>
+    <div class="sec-head">Early chains need early tooling</div>
+    <div class="timeline">
+      <div class="tl-row"><div class="tl-date">Sept 9, 2026</div><div class="tl-body"><strong>Quantus mainnet goes live</strong> — the first major chain with post-quantum signatures from the genesis block. Open mining from day one.</div></div>
+      <div class="tl-row"><div class="tl-date">Sept 2026</div><div class="tl-body"><strong>First exchange venue named</strong> — NEAR Intents becomes the first announced trading venue for $QTC; listing date still to come.</div></div>
+      <div class="tl-row"><div class="tl-date">Sept 29, 2026</div><div class="tl-body"><strong>This builder opens for business</strong> — an hourly loop shipping real, verified apps for the Quantus ecosystem.</div></div>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a><br>
+    Independent builder work — not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER &middot; POST-QUANTUM TOOLING</div>
+  </footer>
+</div>
+<script>
+(function(){
+  const c=document.getElementById('field'),x=c.getContext('2d');
+  let W,H,pts=[];
+  function size(){W=c.width=innerWidth;H=c.height=innerHeight;}
+  size();addEventListener('resize',size);
+  const N=Math.min(90,Math.floor(innerWidth/14));
+  for(let i=0;i<N;i++)pts.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()*1.6+.4,h:Math.random()<.82});
+  function tick(){
+    x.clearRect(0,0,W,H);
+    for(const p of pts){
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>W)p.vx*=-1;
+      if(p.y<0||p.y>H)p.vy*=-1;
+      x.beginPath();x.arc(p.x,p.y,p.r,0,7);
+      x.fillStyle=p.h?'rgba(64,224,255,.5)':'rgba(251,191,36,.55)';
+      x.fill();
+    }
+    x.strokeStyle='rgba(64,224,255,.07)';x.lineWidth=1;
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+      const a=pts[i],b=pts[j],dx=a.x-b.x,dy=a.y-b.y,d=dx*dx+dy*dy;
+      if(d<150*150){x.globalAlpha=1-d/(150*150);x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke();}
+    }
+    x.globalAlpha=1;
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+</script>
+</body>
+</html>
