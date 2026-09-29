@@ -130,6 +130,7 @@ section{padding:48px 0}
 .app-card.network{--accent:#22d3ee}.app-card.network .app-ico{background:rgba(34,211,238,.1);border-color:rgba(34,211,238,.3)}
 .app-card.shield{--accent:#a78bfa}.app-card.shield .app-ico{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.35)}
 .app-card.tokenomics{--accent:#5eead4}.app-card.tokenomics .app-ico{background:rgba(94,234,212,.1);border-color:rgba(94,234,212,.3)}
+.app-card.explorer{--accent:#818cf8}.app-card.explorer .app-ico{background:rgba(129,140,248,.12);border-color:rgba(129,140,248,.35)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -238,7 +239,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
 
   <section id="apps">
     <div class="sec-title">The Builds</div>
-    <div class="sec-head">Five tools. Every claim verified.</div>
+    <div class="sec-head">Six tools. Every claim verified.</div>
     <p class="sec-sub">Each app was tested in a real browser and verified live before it earned a place here. Nothing is demo data wearing a live badge.</p>
     <div class="apps-grid">
       <a class="app-card mining" href="pages/mining-calculator/">
@@ -285,6 +286,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Tokenomics Explorer <span class="arrow" aria-hidden="true">→</span></h3>
         <p>Where the 21M QTC comes from: verified 27% genesis mint, interactive vesting clock (2026–2036), emission tail, wormhole fee-burn calculator, and funding history — every figure sourced.</p>
         <div class="meta">21/21 logic tests green</div>
+      </a>
+      <a class="app-card explorer" href="pages/block-explorer/" style="grid-column:1 / -1">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">&#9783;</div>
+          <span class="tag">Explorer</span>
+        </div>
+        <h3>QTC Block Explorer <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>Search block heights, 0x hashes, and qz&hellip; addresses on mainnet: block detail with extrinsics, expandable call arguments, and events; extrinsic pages with fees and status; account pages with balances, flags, transfers, and mined-block counts &mdash; live off the public indexer with a 15-second refresh.</p>
+        <div class="meta">12/12 logic tests + 30/30 browser checks green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets, mining guides, and explorer polish are queued.</div>

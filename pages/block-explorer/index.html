@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Block Explorer — Quantus Mainnet</title>
+<meta name="description" content="Search blocks, extrinsics, transfers and accounts on the Quantus post-quantum blockchain. Live data from the public Quantus indexer.">
+<link rel="stylesheet" href="styles.css?v=1.0.0">
+</head>
+<body>
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<header class="topbar">
+  <a class="brand" href="#/">
+    <span class="brand-mark" aria-hidden="true">&#9672;</span>
+    <span class="brand-text">QTC <b>Block Explorer</b></span>
+  </a>
+  <form class="search" id="searchForm" role="search" autocomplete="off">
+    <input id="searchInput" type="text" spellcheck="false"
+      placeholder="Search block height, 0x hash, or qz&hellip; address&hellip;" aria-label="Search the chain">
+    <button type="submit" aria-label="Search">&#8981;</button>
+  </form>
+  <div class="chain-badge" id="chainBadge" title="Latest indexed block height">
+    <span class="dot" id="chainDot"></span>
+    <span id="chainHeight">connecting&hellip;</span>
+  </div>
+</header>
+
+<main id="view" class="view" aria-live="polite"></main>
+
+<footer class="foot">
+  <div class="foot-src">Data: public Quantus Subsquid indexer (<code>sqm.quantus.com</code>). Indexer state may lag chain head; figures below are observed, not estimated.</div>
+  <div class="foot-built">Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a></div>
+  <div class="foot-donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></div>
+  <div class="foot-disc">Independent builder work — not affiliated with the Quantus team.</div>
+</footer>
+
+<script src="app.js?v=1.0.0"></script>
+</body>
+</html>
