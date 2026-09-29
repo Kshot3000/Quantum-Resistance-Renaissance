@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.8.0">
+<title>QTC Mining Studio — Quantus Muse Builder</title>
+<meta name="description" content="The complete Quantus mining command center: interactive setup wizard with copy-paste commands, rig builder with verified GPU hashrates, benchmark interpreter, wormhole explainer, security checklist, and troubleshooting.">
+<meta name="theme-color" content="#0b0a08">
+<link rel="stylesheet" href="styles.css?v=1.0.0">
+<style>:root{--focus:#f59e0b;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="embers" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Mining Studio</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com/guides/mining" target="_blank" rel="noopener">Official mining guide</a>
+      <a href="https://github.com/Quantus-Network/chain/releases" target="_blank" rel="noopener">Node releases</a>
+      <a href="https://github.com/Quantus-Network/quantus-miner/releases" target="_blank" rel="noopener">Miner releases</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">✧</span><span>Quantum Shield<span class="meta">PQC explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◈</span><span>Tokenomics Explorer<span class="meta">21M supply map</span></span></a>
+    <a href="../block-explorer/"><span class="ico">⚙</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/" class="current"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Mining command center</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow">Quantus mainnet &middot; QPoW &middot; verified against upstream docs 2026-09-29</p>
+    <h1>Your mining <span class="molten">command center</span></h1>
+    <p class="lede">Everything a Quantus miner needs in one forge: a setup wizard that writes your commands for you, a rig builder on verified hashrates, a benchmark interpreter, the wormhole system demystified, and the security checklist the docs insist on.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Miner's cut</span><span class="v">100% — no dev tax</span></div>
+      <div class="fact"><span class="k">Block time</span><span class="v">~12 sec</span></div>
+      <div class="fact"><span class="k">Emission</span><span class="v">(21M − supply) / 50M</span></div>
+      <div class="fact"><span class="k">Rewards go to</span><span class="v">wormhole address</span></div>
+      <div class="fact"><span class="k">Miner protocol</span><span class="v">quantus-miner/2</span></div>
+    </div>
+    <p class="ver-note" id="verNote"></p>
+  </section>
+
+  <nav class="studio-nav" aria-label="Studio sections">
+    <a href="#wizard" class="sn active">Setup Wizard</a>
+    <a href="#rig" class="sn">Rig Builder</a>
+    <a href="#bench" class="sn">Benchmark Check</a>
+    <a href="#wormhole" class="sn">Wormhole</a>
+    <a href="#security" class="sn">Security</a>
+    <a href="#fix" class="sn">Troubleshoot</a>
+    <a href="#pools" class="sn">Pools &amp; Software</a>
+    <a href="#monitor" class="sn">Monitoring</a>
+  </nav>
+
+  <!-- ============ SETUP WIZARD ============ -->
+  <section class="panel" id="wizard">
+    <div class="p-head">
+      <h2><span class="p-ico">⚙</span> Setup Wizard</h2>
+      <p>Pick your platform, tune the knobs, and every command below rewrites itself with your values. Paste them in order. Commands follow the upstream <code>MINING.md</code> and the official <code>quantus-miner</code> README; <code>--chain mainnet</code> per the mainnet guides.</p>
+    </div>
+    <div class="os-tabs" role="tablist" aria-label="Operating system">
+      <button class="os-tab active" data-os="linux" role="tab" aria-selected="true">Linux</button>
+      <button class="os-tab" data-os="macos" role="tab" aria-selected="false">macOS</button>
+      <button class="os-tab" data-os="windows" role="tab" aria-selected="false">Windows</button>
+      <button class="os-tab" data-os="docker" role="tab" aria-selected="false">Docker</button>
+    </div>
+    <div class="knobs">
+      <label>Node name <input id="kName" value="my-quantus-node" maxlength="40" spellcheck="false"></label>
+      <label>Base path <input id="kBase" value="~/.local/share/quantus-node" maxlength="80" spellcheck="false"></label>
+      <label>CPU workers <input id="kCpu" type="number" value="4" min="0" max="128"></label>
+      <label>GPU devices <input id="kGpu" type="number" value="1" min="0" max="16"></label>
+      <label class="check"><input id="kCuda" type="checkbox" checked> NVIDIA CUDA build (<code>--cuda-gpu</code>)</label>
+      <label class="check"><input id="kExt" type="checkbox" checked> External miner on this host (adds <code>--miner-listen-port 9833</code>)</label>
+    </div>
+    <div id="steps"></div>
+    <p class="src-line">Sources: <a href="https://github.com/Quantus-Network/chain/blob/HEAD/MINING.md" target="_blank" rel="noopener">chain/MINING.md</a> · <a href="https://github.com/Quantus-Network/quantus-miner" target="_blank" rel="noopener">quantus-miner README</a> · <a href="https://docs.quantus.com/guides/mining" target="_blank" rel="noopener">docs.quantus.com/guides/mining</a></p>
+  </section>
+
+  <!-- ============ RIG BUILDER ============ -->
+  <section class="panel" id="rig">
+    <div class="p-head">
+      <h2><span class="p-ico">🔥</span> Rig Builder</h2>
+      <p>Add your hardware. Hashrates come from published community benchmarks (labeled per row) — your mileage varies with driver, build, and thermals. The reward estimate uses the chain's real emission formula and is labeled an <em>estimate</em>, never a promise.</p>
+    </div>
+    <div class="rig-grid">
+      <div class="rig-left">
+        <h3>Your hardware</h3>
+        <div class="add-row">
+          <select id="gpuSel" aria-label="GPU model"></select>
+          <input id="gpuQty" type="number" value="1" min="1" max="32" aria-label="Quantity">
+          <button id="gpuAdd" class="btn">Add</button>
+        </div>
+        <div class="add-row">
+          <label class="cpu-row">CPU threads
+            <input id="cpuThreads" type="number" value="0" min="0" max="256">
+          </label>
+          <span class="hint">~15 MH/s per thread (official miner, per 0xmoei guide)</span>
+        </div>
+        <ul id="rigList" class="rig-list" aria-live="polite"></ul>
+        <div class="rig-total">Total hashrate <b id="rigHash">0 MH/s</b></div>
+      </div>
+      <div class="rig-right">
+        <h3>What could it earn?</h3>
+        <label>Network hashrate (GH/s) <input id="netHash" type="number" value="" min="0" placeholder="e.g. 50 — your estimate"></label>
+        <label>Current supply (QTC) <input id="curSupply" type="number" value="5720000" min="5670000" max="21000000"></label>
+        <p class="hint">Supply default is an estimate (~5.72M on 2026-09-29: 5.67M genesis + ~3 weeks of emission). Verify with the <a href="../block-explorer/">Block Explorer</a>.</p>
+        <div class="earn" id="earnBox">
+          <div class="earn-row"><span>Your share of network</span><b id="eShare">—</b></div>
+          <div class="earn-row"><span>Block reward now</span><b id="eReward">—</b></div>
+          <div class="earn-row"><span>Expected QTC / day</span><b id="eDay" class="big">—</b></div>
+          <div class="earn-row"><span>Expected blocks / day</span><b id="eBlocks">—</b></div>
+        </div>
+        <p class="disclaimer">Estimate only: assumes constant difficulty and 12-second blocks. Real results follow luck and network growth.</p>
+      </div>
+    </div>
+    <details class="bench-table">
+      <summary>Verified hashrate reference (click to expand)</summary>
+      <div class="tbl-wrap"><table id="gpuTable">
+        <thead><tr><th>GPU</th><th>Hashrate</th><th>Source</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="hint">Figures are community-observed on Quantus QPoW (Poseidon2) and vary by miner build, driver, and clocks. The longcipher row shows the official build vs. a tuned community build — official first.</p>
+    </details>
+  </section>
+
+  <!-- ============ BENCHMARK INTERPRETER ============ -->
+  <section class="panel" id="bench">
+    <div class="p-head">
+      <h2><span class="p-ico">📊</span> Benchmark Interpreter</h2>
+      <p>Run <code>./quantus-miner benchmark --gpu-devices 1 --duration 30</code>, then punch your number in. We grade it against the verified reference for your card class.</p>
+    </div>
+    <div class="bench-grid">
+      <label>Device
+        <select id="bDev"></select>
+      </label>
+      <label>Your benchmark (MH/s)
+        <input id="bRate" type="number" min="0" placeholder="e.g. 1100">
+      </label>
+      <button id="bGo" class="btn big-btn">Grade it</button>
+    </div>
+    <div id="bOut" class="b-out" aria-live="polite"></div>
+    <ul class="tips">
+      <li><b>CUDA vs WGSL:</b> upstream's own Clore benches show CUDA ~4.2× faster than the wgpu path on the same host — NVIDIA users should prefer the <code>--cuda-gpu</code> build.</li>
+      <li><b>Throttle:</b> mining while you work? Add <code>--gpu-throttle-ms 50</code> to give the desktop breathing room.</li>
+      <li><b>Keep-alive:</b> the node drops idle miner connections after 60 s — the bundled miner heartbeats every 5 s; third-party miners must too.</li>
+      <li><b>CPU is for the node, not the money:</b> ~15 MH/s per CPU thread vs 1+ GH/s on a modern GPU. A 16-core CPU adds roughly 2% to a single RTX 4090 rig.</li>
+    </ul>
+  </section>
+
+  <!-- ============ WORMHOLE ============ -->
+  <section class="panel" id="wormhole">
+    <div class="p-head">
+      <h2><span class="p-ico">🌀</span> The Wormhole System</h2>
+      <p>The single most important thing to understand before you mine: rewards are <em>never</em> sent to an address you paste in. They go to a privacy-preserving wormhole address derived from your preimage — automatically.</p>
+    </div>
+    <div class="wh-flow" aria-label="Wormhole derivation flow">
+      <div class="wh-step"><span class="wh-n">1</span><h3>Your preimage</h3><p>A 32-byte secret (<code>inner_hash</code>) generated on your machine by <code>quantus-node key quantus --scheme wormhole</code>. Never shared.</p></div>
+      <div class="wh-arrow" aria-hidden="true">→</div>
+      <div class="wh-step"><span class="wh-n">2</span><h3>Poseidon hash</h3><p>The node hashes your preimage with Poseidon — the same ZK-friendly hash behind QPoW. One way, quantum-resistant.</p></div>
+      <div class="wh-arrow" aria-hidden="true">→</div>
+      <div class="wh-step"><span class="wh-n">3</span><h3>Wormhole address</h3><p>Your reward address. The node derives it at startup and logs it. Rewards land here with no claim step — private by default.</p></div>
+    </div>
+    <div class="wh-facts">
+      <div class="wh-fact"><b>Save the <code>inner_hash</code>.</b> It is effectively your mining private key. Lose it and the rewards are unspendable. Back it up offline, encrypted.</div>
+      <div class="wh-fact"><b>Check the logs.</b> On startup the node prints <i>"Mining rewards will be sent to wormhole address …"</i> — confirm it matches the <code>Address</code> from key generation.</div>
+      <div class="wh-fact"><b>Exiting costs 0.04%.</b> Moving funds out of a wormhole address pays a volume fee (4 bps) — half burned, the rest to the miner of the exit block. High-security reversible transfers cost 1%, fully burned.</div>
+      <div class="wh-fact"><b>Can't find your rewards?</b> You're probably looking at the wrong place: rewards go to the wormhole <i>address</i>, not the preimage string. Query the address on the <a href="../block-explorer/">Block Explorer</a>.</div>
+    </div>
+    <p class="src-line">Sources: <a href="https://github.com/Quantus-Network/chain/blob/HEAD/MINING.md" target="_blank" rel="noopener">chain/MINING.md</a> (wormhole section) · <a href="https://github.com/Quantus-Network/docs/blob/main/docs/reference/tokenomics.md" target="_blank" rel="noopener">docs/reference/tokenomics.md</a> (fee schedule)</p>
+  </section>
+
+  <!-- ============ SECURITY ============ -->
+  <section class="panel" id="security">
+    <div class="p-head">
+      <h2><span class="p-ico">🛡</span> Security Checklist</h2>
+      <p>Straight from the upstream security guidance. Check each item off — progress is saved in your browser.</p>
+    </div>
+    <div class="sec-progress"><div class="sec-bar" id="secBar"></div><span id="secCount">0 / 8 hardened</span></div>
+    <ul class="sec-list" id="secList"></ul>
+  </section>
+
+  <!-- ============ TROUBLESHOOT ============ -->
+  <section class="panel" id="fix">
+    <div class="p-head">
+      <h2><span class="p-ico">🧰</span> Troubleshooter</h2>
+      <p>The failure modes the docs call out, in the order to check them. Start at the top.</p>
+    </div>
+    <div id="fixList" class="fix-list"></div>
+  </section>
+
+  <!-- ============ POOLS & SOFTWARE ============ -->
+  <section class="panel" id="pools">
+    <div class="p-head">
+      <h2><span class="p-ico">🏊</span> Pools &amp; Mining Software</h2>
+      <p>Solo mining with the official miner is the default. Third-party pools and miners exist — listed here for completeness, with their fees stated. They are <em>not</em> endorsed; do your own diligence before pointing hashrate at anyone's server.</p>
+    </div>
+    <div class="tbl-wrap"><table class="sw-table">
+      <thead><tr><th>Software / Pool</th><th>Type</th><th>Fee</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><b>quantus-miner</b> <span class="off">official</span></td><td>Solo (external miner)</td><td>None</td><td>From <a href="https://github.com/Quantus-Network/quantus-miner/releases" target="_blank" rel="noopener">Quantus-Network/quantus-miner</a>. QUIC + TLS pinning to your node; wgpu, CUDA, and CPU engines.</td></tr>
+        <tr><td><b>QuanPool</b></td><td>Pool</td><td>Check their terms</td><td>Endpoint <code>mainnet.quanpool.com:9834</code>. Community-run; verify payout terms yourself.</td></tr>
+        <tr><td><b>InnovLab</b></td><td>Pool</td><td>Check their terms</td><td>Endpoint <code>us.innovlab.cc:17601</code>. Community-run; verify payout terms yourself.</td></tr>
+        <tr><td><b>Fl4shMiner</b></td><td>Third-party miner</td><td><b>1.5% dev fee</b></td><td>Native CUDA kernels for RTX 30/40/50. Tested ~1.14 GH/s on RTX 4090, 458+ MH/s on RTX 3080 Ti.</td></tr>
+        <tr><td><b>SRBminer-Multi</b></td><td>Third-party miner</td><td>Check their terms</td><td>Reported ~765 MH/s on RTX 4080 SUPER (per bytwork). Fee schedule on their site.</td></tr>
+        <tr><td><b>HiveOS flight sheets</b></td><td>Farm OS</td><td>Varies</td><td>Community sheets exist for Quantus on HiveOS; useful for multi-rig farms.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="hint">Pool endpoints and third-party performance figures via community guides (bytwork, fl4shminer README, 0xmoei guide). Treat any pool's uptime and payout claims as unverified marketing until you test with small hashrate.</p>
+  </section>
+
+  <!-- ============ MONITORING ============ -->
+  <section class="panel" id="monitor">
+    <div class="p-head">
+      <h2><span class="p-ico">📡</span> Monitoring</h2>
+      <p>A miner who isn't watching isn't mining. Wire these up on day one.</p>
+    </div>
+    <div class="mon-grid">
+      <div class="mon"><h3>Node logs</h3><p>Watch for <code>Imported #…</code> — if block numbers stop climbing, you're stalled.</p><code class="cmd-inline">tail -f ~/.local/share/quantus-node/chains/mainnet/network/quantus-node.log</code></div>
+      <div class="mon"><h3>Prometheus</h3><p>Node metrics at <code>http://localhost:9616/metrics</code> (override with <code>--prometheus-port</code>).</p></div>
+      <div class="mon"><h3>Miner metrics</h3><p>The external miner exposes <code>http://localhost:9900/metrics</code> (override with <code>--metrics-port</code>).</p></div>
+      <div class="mon"><h3>Telemetry</h3><p><a href="https://telemetry.quantus.cat" target="_blank" rel="noopener">telemetry.quantus.cat</a> — find your <code>--name</code> to confirm the network sees you.</p></div>
+      <div class="mon"><h3>Local RPC</h3><p>Latest block, straight from your node:</p><code class="cmd-inline">curl -s -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"chain_getBlock","params":[]}' http://localhost:9944</code></div>
+      <div class="mon"><h3>Reward watch</h3><p>Query your wormhole address on the <a href="../block-explorer/">QTC Block Explorer</a> — rewards need no claim step.</p></div>
+    </div>
+    <p class="src-line">Sources: <a href="https://github.com/Quantus-Network/chain/blob/HEAD/MINING.md" target="_blank" rel="noopener">chain/MINING.md</a> (monitoring) · <a href="https://github.com/Quantus-Network/quantus-miner" target="_blank" rel="noopener">quantus-miner README</a></p>
+  </section>
+
+  <footer class="foot">
+    <div class="foot-built">Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a></div>
+    <div class="foot-donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></div>
+    <div class="foot-disc">Independent builder work — not affiliated with the Quantus team. Commands follow upstream docs; verify versions on the releases pages before downloading.</div>
+  </footer>
+</main>
+
+<script src="app.js?v=1.0.0"></script>
+</body>
+</html>
