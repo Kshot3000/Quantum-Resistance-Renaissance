@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.8.0">
+<title>QTC SafeSend Lab — Quantus Muse Builder</title>
+<meta name="description" content="Quantus reversible payments, made tangible: a real checkphrase address verifier (upstream algorithm, 1,171 test vectors green), an interactive reversible-transfer simulator, the high-security account system explained, and the pallet call reference.">
+<meta name="theme-color" content="#060d0b">
+<link rel="stylesheet" href="styles.css?v=1.0.0">
+<style>:root{--focus:#2ef2b8;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="vaultfield" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>SafeSend Lab</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/docs/blob/main/docs/deep-dives/safety.md" target="_blank" rel="noopener">Upstream safety deep-dive</a>
+      <a href="https://github.com/Quantus-Network/qp-human-checkphrase" target="_blank" rel="noopener">checkphrase repo</a>
+      <a href="https://github.com/Quantus-Network/chain/tree/main/pallets/reversible-transfers" target="_blank" rel="noopener">pallet source</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">✧</span><span>Quantum Shield<span class="meta">PQC explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◈</span><span>Tokenomics Explorer<span class="meta">21M supply map</span></span></a>
+    <a href="../block-explorer/"><span class="ico">⚙</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Mining command center</span></span></a>
+    <a href="../safesend/" class="current"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow">Quantus mainnet &middot; ReversibleTransfers pallet &middot; verified against upstream source 2026-09-29</p>
+    <h1>Send it like <span class="mint">it matters</span></h1>
+    <p class="lede">Quantus is the chain where a transfer can be <em>un-sent</em>. Attach a delay window, and the sender can cancel before the coins move. Verify any address with the real upstream checkphrase algorithm. Learn the high-security account system — the one-way vault with a guardian. Nothing here moves real funds: the transfer lab is a clearly-labeled simulation, the verifier runs the actual algorithm.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Min delay</span><span class="v">2 blocks</span></div>
+      <div class="fact"><span class="k">Default delay</span><span class="v">24 h · 7,200 blocks</span></div>
+      <div class="fact"><span class="k">Block time</span><span class="v">~12 sec</span></div>
+      <div class="fact"><span class="k">Checkphrase</span><span class="v">5 words · 2,048-word list</span></div>
+      <div class="fact"><span class="k">HS reversal fee</span><span class="v">1% · burned</span></div>
+      <div class="fact"><span class="k">Pallet calls</span><span class="v">ReversibleTransfers</span></div>
+    </div>
+    <p class="ver-note" id="verNote"></p>
+  </section>
+
+  <nav class="lab-nav" aria-label="Lab sections">
+    <a href="#verifier" class="sn active">Checkphrase Verifier</a>
+    <a href="#lab" class="sn">Transfer Lab</a>
+    <a href="#hs" class="sn">High-Security Accounts</a>
+    <a href="#calls" class="sn">Call Reference</a>
+  </nav>
+
+  <!-- ============ CHECKPHRASE VERIFIER ============ -->
+  <section class="panel" id="verifier">
+    <div class="p-head">
+      <h2><span class="p-ico">🔏</span> Checkphrase Verifier</h2>
+      <p>Paste any address and this page derives its human checkphrase with the <strong>actual upstream algorithm</strong> — PBKDF2-HMAC-SHA256, 40,000 iterations, salt <code>"human-readable-checksum"</code>, five 11-bit words from the 2,048-word list — validated byte-for-byte against all <strong>1,171 upstream test vectors</strong>. 100% client-side; your address never leaves this tab.</p>
+    </div>
+    <div class="ver-grid">
+      <div class="ver-input card">
+        <label for="addrInput">Address to verify</label>
+        <textarea id="addrInput" rows="2" spellcheck="false" placeholder="qzk…"></textarea>
+        <div class="btn-row">
+          <button class="btn primary" id="deriveBtn">Derive checkphrase</button>
+          <button class="btn ghost" id="exKyle">Kyle's donation address</button>
+          <button class="btn ghost" id="exGenesis">Genesis vesting address</button>
+        </div>
+        <div class="progress-wrap" id="progWrap" hidden>
+          <div class="progress"><div class="bar" id="progBar"></div></div>
+          <p class="prog-note" id="progNote">Deriving…</p>
+        </div>
+        <p class="hint">Tip: an address doesn't need to be yours — try any <code>qz…</code> address from the <a href="../block-explorer/">Block Explorer</a> or <a href="../address-toolkit/">Address Toolkit</a>.</p>
+      </div>
+      <div class="ver-result card" aria-live="polite">
+        <div class="res-head">Checkphrase</div>
+        <div class="words" id="wordRow"><span class="word empty">—</span><span class="word empty">—</span><span class="word empty">—</span><span class="word empty">—</span><span class="word empty">—</span></div>
+        <p class="res-note" id="resNote">Five friendly words, cryptographically bound to the address. Read them to the recipient — if they don't match their address, stop.</p>
+        <button class="btn warn" id="poisonBtn" disabled>Tamper with one character — show the poisoning demo</button>
+      </div>
+    </div>
+    <div class="poison card" id="poisonCard" hidden>
+      <div class="res-head">Address-poisoning demo</div>
+      <p>One character of the address was changed (highlighted). The checkphrase is <strong>completely different</strong> — that's the point. Attackers generate lookalike addresses hoping you won't notice; the phrase makes the swap obvious.</p>
+      <div class="addr-compare">
+        <div><span class="cap">Original</span><code class="addr-line" id="origAddr"></code></div>
+        <div class="words sm" id="origWords"></div>
+        <div><span class="cap">Tampered</span><code class="addr-line" id="tampAddr"></code></div>
+        <div class="words sm" id="tampWords"></div>
+      </div>
+    </div>
+    <details class="how">
+      <summary>How the algorithm works (and the 50k vs 40k footnote)</summary>
+      <ol>
+        <li>The address string is UTF-8 encoded and fed to PBKDF2-HMAC-SHA256 with salt <code>"human-readable-checksum"</code> and <strong>40,000 iterations</strong>, producing a 7-byte key.</li>
+        <li>The first 55 bits of that key are split into five 11-bit indices (2<sup>11</sup> = 2,048) into the curated positive wordlist.</li>
+        <li>The 40k-iteration KDF is what makes rainbow tables ~50,000× more expensive than a plain hash — an attacker can't cheaply grind vanity phrases.</li>
+        <li><strong>Footnote:</strong> the upstream safety deep-dive describes a 50,000-iteration KDF as the design parameter; the shipped reference implementation and all 1,171 test vectors use 40,000. This tool follows the implementation, and its output matches the test vectors exactly.</li>
+      </ol>
+    </details>
+  </section>
+
+  <!-- ============ TRANSFER LAB ============ -->
+  <section class="panel" id="lab">
+    <div class="p-head">
+      <h2><span class="p-ico">⏳</span> Reversible Transfer Lab <span class="sim-badge">Simulation</span></h2>
+      <p>This is an interactive <strong>simulation</strong> of the <code>ReversibleTransfers::schedule_transfer_with_delay</code> flow — no real QTC moves. Pick an amount and a delay window, watch the scheduled transfer ride the countdown, then cancel it (like a fat-fingered send) or let it execute. The right rail shows what each step means on mainnet.</p>
+    </div>
+    <div class="lab-grid">
+      <div class="card">
+        <h3>Schedule a transfer</h3>
+        <label for="simAddr">Recipient address</label>
+        <input id="simAddr" type="text" spellcheck="false" placeholder="qzk… (any string works in the sim)">
+        <label for="simAmt">Amount (QTC)</label>
+        <input id="simAmt" type="number" min="0.000001" step="any" value="100">
+        <label>Delay window</label>
+        <div class="delay-presets" role="radiogroup" aria-label="Delay presets">
+          <button class="preset" data-blocks="50">10 min</button>
+          <button class="preset" data-blocks="300">1 hour</button>
+          <button class="preset active" data-blocks="7200">24 h · default</button>
+          <button class="preset" data-blocks="50400">7 days</button>
+        </div>
+        <div class="custom-delay">
+          <label for="customBlocks">Custom (blocks, ≥ 2)</label>
+          <input id="customBlocks" type="number" min="2" step="1" placeholder="e.g. 14400">
+        </div>
+        <p class="err" id="simErr" role="alert" hidden></p>
+        <button class="btn primary big" id="scheduleBtn">Schedule transfer (simulated)</button>
+        <p class="hint">Demo clock: <strong>1 second = 1 block</strong>, so you can watch a full window in a coffee break. Real wall-clock times are shown in the rail.</p>
+      </div>
+      <div class="card sim-stage">
+        <h3>Live transfer <span class="live-dot" id="liveDot" hidden></span></h3>
+        <div class="sim-empty" id="simEmpty">Nothing scheduled yet.<br>Fill in the form and schedule your first reversible transfer.</div>
+        <div class="sim-active" id="simActive" hidden>
+          <div class="tx-line"><span class="tx-amt" id="txAmt">100 QTC</span><span class="tx-arrow">→</span><code class="tx-dest" id="txDest">qzk…</code></div>
+          <div class="timeline" aria-hidden="true">
+            <div class="tl-step" data-s="created"><span class="dot"></span><span class="lbl">Created</span></div>
+            <div class="tl-step" data-s="inblock"><span class="dot"></span><span class="lbl">In block</span></div>
+            <div class="tl-step" data-s="scheduled"><span class="dot"></span><span class="lbl">Scheduled</span></div>
+            <div class="tl-step" data-s="done"><span class="dot"></span><span class="lbl">Final</span></div>
+            <div class="tl-fill" id="tlFill"></div>
+          </div>
+          <div class="countdown">
+            <div class="cd-num" id="cdNum">–</div>
+            <div class="cd-lbl" id="cdLbl">blocks remaining</div>
+          </div>
+          <div class="sim-btns">
+            <button class="btn warn" id="cancelBtn">Cancel transfer — reclaim funds</button>
+            <button class="btn ghost" id="resetBtn">Reset lab</button>
+          </div>
+          <div class="sim-log" id="simLog" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="card rail">
+        <h3>On mainnet, each step means</h3>
+        <dl class="rail-list">
+          <div><dt><code>schedule_transfer_with_delay</code></dt><dd>Sender calls with <code>dest</code>, <code>amount</code>, and <code>delay</code> (blocks or ms). Funds move into the pallet's <strong>escrow hold</strong> — not yet credited to the recipient. A <code>tx_id</code> is emitted in the block's events.</dd></div>
+          <div><dt>In-block → scheduled</dt><dd>Wallets show a countdown; the recipient sees an incoming-but-not-final transfer. Cancellation is a second extrinsic: <code>cancel(tx_id)</code>.</dd></div>
+          <div><dt>Cancel (sender)</dt><dd>For a one-time transfer the sender cancels free: the full held amount returns — <strong>no reversal fee</strong>, only the cancel extrinsic's network fee.</dd></div>
+          <div><dt>Delay expires</dt><dd>The Scheduler pallet auto-executes the transfer to the recipient. Uses <code>transfer_allow_death</code> so it can't get stuck.</dd></div>
+          <div><dt>Your chosen delay</dt><dd id="railDelay">7,200 blocks ≈ 24 h on mainnet (12 s blocks). Below the 2-block runtime minimum is rejected by the chain.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HIGH-SECURITY ACCOUNTS ============ -->
+  <section class="panel" id="hs">
+    <div class="p-head">
+      <h2><span class="p-ico">🔐</span> High-Security Accounts</h2>
+      <p>Reversibility as a lifestyle: opt an account into high-security mode and <strong>every</strong> outgoing transfer carries a mandatory delay — plus a guardian who can cancel suspicious transfers or sweep the whole account. The catch that matters: <strong>it's one-way.</strong> Once enabled, the account can never send ordinary transfers again.</p>
+    </div>
+    <div class="hs-grid">
+      <div class="card hs-card">
+        <h3>⚠️ One-way door</h3>
+        <p>Enabling high-security is permanent. The runtime whitelist then rejects everything except <code>schedule_transfer</code>, <code>cancel</code>, <code>recover_funds</code>, and <code>batch_all</code> of those (≤ 16 calls, no nesting). No governance, no treasury, no tipping.</p>
+      </div>
+      <div class="card hs-card">
+        <h3>👁 Mandatory delay</h3>
+        <p>The delay you choose at enrollment applies to <em>all</em> outgoing transfers — one-time <code>schedule_transfer_with_delay</code> calls are rejected for enrolled accounts. Plan the window like a safe's time lock.</p>
+      </div>
+      <div class="card hs-card">
+        <h3>🛡 Guardian power</h3>
+        <p>A named guardian (hardware wallet, multisig, or trusted third party) can <strong>cancel</strong> any pending transfer during the window — and can call <code>recover_funds</code> to seize every pending hold <em>plus</em> the free balance. Choose it like a recovery key.</p>
+      </div>
+      <div class="card hs-card">
+        <h3>🔥 1% burn on guardian reversals</h3>
+        <p>When a <em>guardian</em> reverses funds, a 1% volume fee is burned (the remaining 99% goes to the guardian, not back to the sender). Sender-cancelled one-time transfers pay no reversal fee. The burn makes guardian seizure expensive to abuse.</p>
+      </div>
+      <div class="card hs-card">
+        <h3>📏 Quotas &amp; caps</h3>
+        <p>Max <strong>16 signed extrinsics per rolling 24 h</strong> window; <code>batch_all</code> ≤ 16 leaves; high-security signers <strong>cannot tip</strong>. Size and fee caps are enforced by the signed extension.</p>
+      </div>
+      <div class="card hs-card">
+        <h3>🔗 Daisy-chain guardians</h3>
+        <p>A guardian can itself be a high-security account with its own guardian — layered hierarchies where each layer has superior permissions. Upstream recommends a <strong>multisig guardian</strong>: a single-key HS guardian shares the 16/day quota and can be locked out of <code>cancel</code> for a day.</p>
+      </div>
+    </div>
+    <div class="card hs-flow">
+      <div class="res-head">What happens to a high-security transfer</div>
+      <div class="flow">
+        <div class="f-node">Sign <code>schedule_transfer</code></div><div class="f-arrow">→</div>
+        <div class="f-node">Whitelist check</div><div class="f-arrow">→</div>
+        <div class="f-node">Held for enrollment delay</div><div class="f-arrow">→</div>
+        <div class="f-node warn-node">Guardian cancels?<div class="f-sub">Yes → guardian gets 99%, 1% burned · No → executes</div></div>
+      </div>
+      <p class="hint">Sources: <a href="https://github.com/Quantus-Network/docs/blob/main/docs/deep-dives/safety.md" target="_blank" rel="noopener">User Safety Features deep-dive</a> · <a href="https://github.com/Quantus-Network/chain/tree/main/pallets/reversible-transfers" target="_blank" rel="noopener">pallet-reversible-transfers source</a> (verified 2026-09-29).</p>
+    </div>
+  </section>
+
+  <!-- ============ CALL REFERENCE ============ -->
+  <section class="panel" id="calls">
+    <div class="p-head">
+      <h2><span class="p-ico">📚</span> Call Reference</h2>
+      <p>The <code>ReversibleTransfers</code> pallet's dispatchables, straight from <code>chain/pallets/reversible-transfers/src/lib.rs</code> (indices included for anyone decoding extrinsics).</p>
+    </div>
+    <div class="table-wrap card">
+      <table class="calls">
+        <thead><tr><th>Call</th><th>Index</th><th>Parameters</th><th>Who</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>schedule_transfer_with_delay</code></td><td>4</td><td><code>dest</code>, <code>amount</code>, <code>delay</code> (blocks or ms)</td><td>Any non-HS account</td><td>One-time reversible transfer. Delay ≥ 2 blocks. Rejected for high-security accounts.</td></tr>
+          <tr><td><code>schedule_transfer</code></td><td>3</td><td><code>dest</code>, <code>amount</code></td><td>High-security accounts</td><td>Uses the enrollment delay. Default at enrollment: 7,200 blocks (24 h).</td></tr>
+          <tr><td><code>cancel</code></td><td>1</td><td><code>tx_id</code></td><td>Sender, or guardian for HS</td><td>Sender-cancelled one-time transfers return the full amount — no reversal fee. Guardian cancels burn 1%.</td></tr>
+          <tr><td><code>execute_transfer</code></td><td>2</td><td><code>tx_id</code></td><td>Pallet only</td><td>Dispatched automatically by the Scheduler pallet when the delay expires. Users never call this.</td></tr>
+          <tr><td><code>recover_funds</code></td><td>7</td><td><code>account</code></td><td>Guardian</td><td>Emergency sweep: cancels all pending holds (1% fee) and moves the free balance to the guardian. Repeatable. HS status stays.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER · SAFESEND LAB</div>
+  </footer>
+</main>
+
+<script src="js/wordlist.js?v=1.0.0"></script>
+<script src="js/checkphrase-core.js?v=1.0.0"></script>
+<script src="js/app.js?v=1.0.0"></script>
+</body>
+</html>

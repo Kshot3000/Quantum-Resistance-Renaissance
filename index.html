@@ -132,6 +132,7 @@ section{padding:48px 0}
 .app-card.tokenomics{--accent:#5eead4}.app-card.tokenomics .app-ico{background:rgba(94,234,212,.1);border-color:rgba(94,234,212,.3)}
 .app-card.explorer{--accent:#818cf8}.app-card.explorer .app-ico{background:rgba(129,140,248,.12);border-color:rgba(129,140,248,.35)}
 .app-card.studio{--accent:#f59e0b}.app-card.studio .app-ico{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.35)}
+.app-card.safesend{--accent:#2ef2b8}.app-card.safesend .app-ico{background:rgba(46,242,184,.1);border-color:rgba(46,242,184,.35)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -240,7 +241,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
 
   <section id="apps">
     <div class="sec-title">The Builds</div>
-    <div class="sec-head">Seven tools. Every claim verified.</div>
+    <div class="sec-head">Eight tools. Every claim verified.</div>
     <p class="sec-sub">Each app was tested in a real browser and verified live before it earned a place here. Nothing is demo data wearing a live badge.</p>
     <div class="apps-grid">
       <a class="app-card mining" href="pages/mining-calculator/">
@@ -305,6 +306,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Mining Studio <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Your mining command center: a setup wizard that writes personalized copy-paste commands for Linux/macOS/Windows/Docker, a rig builder on verified GPU hashrates with real emission-math estimates, a benchmark grader, the wormhole system demystified, an interactive security checklist, and a troubleshooter.</p>
         <div class="meta">54/54 logic tests green · browser QA green</div>
+      </a>
+      <a class="app-card safesend" href="pages/safesend/" style="grid-column:1 / -1">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🛡</div>
+          <span class="tag">Payments</span>
+        </div>
+        <h3>QTC SafeSend Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>Quantus reversible payments, made tangible: a real checkphrase address verifier running the upstream algorithm (1,171/1,171 test vectors green), an interactive reversible-transfer simulator with live countdown and cancel flow, the high-security guardian account system explained, and the pallet call reference.</p>
+        <div class="meta">1,171/1,171 vector tests + delay-math green · browser QA green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

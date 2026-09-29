@@ -15,6 +15,7 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `tokenomics/` — QTC tokenomics explorer (verified genesis vesting, unlock simulator, emission tail, fee-burn calculator, funding)
   - `block-explorer/` — QTC block explorer (mainnet block/extrinsic/account search)
   - `mining-studio/` — QTC mining command center (setup wizard, rig builder, benchmark grader, wormhole explainer, security checklist, troubleshooter)
+  - `safesend/` — QTC SafeSend Lab (checkphrase address verifier on the real upstream algorithm, reversible-transfer simulator, high-security accounts guide, pallet call reference)
 
 ## Live data
 
