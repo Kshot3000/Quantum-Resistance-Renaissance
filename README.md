@@ -17,6 +17,7 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `mining-studio/` — QTC mining command center (setup wizard, rig builder, benchmark grader, wormhole explainer, security checklist, troubleshooter)
   - `safesend/` — QTC SafeSend Lab (checkphrase address verifier on the real upstream algorithm, reversible-transfer simulator, high-security accounts guide, pallet call reference)
   - `benchmark-lab/` — QTC Benchmark Lab (Quantus vs Bitcoin/Ethereum/Solana/Ergo: consensus, PQ signatures, throughput math, fees, supply, launch fairness — every figure cited)
+  - `fee-throughput-lab/` — QTC Fee & Throughput Lab (exact length-fee estimator from the runtime polynomial, wormhole exit + high-security fee calculators, QTPS visualizer, aggregation explorer, signature-size lab — figures verified Sept 29, 2026)
 
 ## Live data
 

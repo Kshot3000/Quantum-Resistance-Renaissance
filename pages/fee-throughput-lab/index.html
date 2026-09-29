@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.11.0">
+<title>QTC Fee &amp; Throughput Lab — every planck accounted for</title>
+<meta name="description" content="Interactive lab for Quantus (QTC) fees and throughput: exact length-fee math from the runtime polynomial, wormhole exit and high-security fee calculators, throughput visualizer, aggregation explorer, and signature-size lab. Figures verified against Quantus docs and chain source, Sept 29, 2026.">
+<link rel="stylesheet" href="styles.css?v=1.13.0">
+<style>:root{--focus:#33ffc8;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="sigrain" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Fee &amp; Throughput Lab</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com" target="_blank" rel="noopener">Quantus docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">Explorer</a>
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">✧</span><span>Quantum Shield<span class="meta">PQC explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◈</span><span>Tokenomics Explorer<span class="meta">21M supply map</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Mainnet search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">⚙</span><span>Mining Studio<span class="meta">Command center</span></span></a>
+    <a href="../safesend/"><span class="ico">✉</span><span>SafeSend Lab<span class="meta">Secure transfers</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/" class="current"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Fees &amp; QTPS</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow">Independent lab console · math cited &amp; dated · verified Sept 29, 2026</p>
+    <h1>Every <span class="q">planck</span>, accounted for.</h1>
+    <p class="lede">Quantus fees aren't guessed — they come from a runtime polynomial you can read:
+    <strong>bytes × 100,000 plancks</strong>. This lab turns that polynomial, the wormhole exit fee, the
+    1% high-security fee, and the ~430 QTPS aggregation claim into instruments you can turn by hand.
+    Every number shows its arithmetic; estimates are labeled as estimates.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Block target</span><span class="v">12 s</span></div>
+      <div class="fact"><span class="k">Tx budget / block</span><span class="v">3.75 MB</span></div>
+      <div class="fact"><span class="k">Length fee</span><span class="v">100k/B</span></div>
+      <div class="fact"><span class="k">Fee dev tax</span><span class="v">0%</span></div>
+    </div>
+  </section>
+
+  <section class="card" id="estimator">
+    <div class="card-head">
+      <h2>Fee estimator</h2>
+      <p class="note">Three transfer modes, three fee models. 100% of fees and 100% of block rewards go to the miner —
+      there is no dev tax (<span class="badge b-measured">measured</span> from docs/reference/tokenomics.md).</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Transfer modes">
+      <button class="tab active" data-tab="std" role="tab" aria-selected="true">Standard transfer</button>
+      <button class="tab" data-tab="wh" role="tab" aria-selected="false">Wormhole exit</button>
+      <button class="tab" data-tab="hs" role="tab" aria-selected="false">High-security</button>
+    </div>
+
+    <div class="pane active" id="pane-std" role="tabpanel">
+      <div class="est-grid">
+        <div class="controls">
+          <div class="ctl">
+            <label for="std-bytes">Transaction size (bytes) <output id="std-bytes-out">7,500 B</output></label>
+            <input type="number" id="std-bytes" min="0" max="100000000" step="1" value="7500">
+            <p class="fine">A realistic ML-DSA-87 transfer: 2,592 B public key + 4,627 B signature + call data.</p>
+          </div>
+          <div class="ctl">
+            <label for="std-ref">ref_time (picoseconds) — <output>example</output></label>
+            <input type="number" id="std-ref" min="0" step="1000000" value="1000000000">
+            <p class="fine">WeightToFee = ScaledIdentityFee ≈ 0.1 planck per ps of ref_time. Actual ref_time is
+            benchmark- and hardware-dependent — enter your own from a benchmark; the weight fee below is an
+            <span class="badge b-estimate">estimate</span>, not a protocol quote.</p>
+          </div>
+          <div class="ctl">
+            <label for="std-tip">Priority tip <output id="std-tip-out">0.0002 QTC</output></label>
+            <input type="range" id="std-tip" min="0" max="0.01" step="0.0001" value="0.0002">
+            <p class="fine">Optional tip on top of weight + length fees — also goes to the miner.</p>
+          </div>
+        </div>
+        <div class="readout" aria-live="polite">
+          <div class="ro-row"><span class="rk">Length fee</span><span class="rv" id="std-len">—</span></div>
+          <div class="ro-math" id="std-len-math">—</div>
+          <div class="ro-row"><span class="rk">Weight fee <span class="badge b-estimate">estimate</span></span><span class="rv" id="std-w">—</span></div>
+          <div class="ro-math" id="std-w-math">—</div>
+          <div class="ro-row"><span class="rk">Tip</span><span class="rv" id="std-tip-v">—</span></div>
+          <div class="ro-row ro-total"><span class="rk">Total → miner</span><span class="rv" id="std-total">—</span></div>
+          <div class="ro-math" id="std-total-p">—</div>
+          <div class="honest">Existential deposit is <strong>0.001 QTC</strong> — dust accounts below it get reaped.
+          Length fee is exact from the runtime polynomial; the weight fee is a benchmark-dependent estimate.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-wh" role="tabpanel">
+      <div class="est-grid">
+        <div class="controls">
+          <div class="ctl">
+            <label for="wh-amount">Exit amount (QTC)</label>
+            <input type="number" id="wh-amount" min="0" step="any" value="100">
+            <p class="fine">Wormhole exit: 0.04% volume fee (4 bps). Settlement ceil-rounds per segment and small
+            segments pay ≥ 1 quantum (0.01 QTC) — tiny exits pay proportionally more.</p>
+          </div>
+        </div>
+        <div class="readout" aria-live="polite">
+          <div class="ro-row"><span class="rk">Wormhole fee (0.04%)</span><span class="rv" id="wh-fee">—</span></div>
+          <div class="ro-math" id="wh-fee-math">—</div>
+          <div class="ro-row"><span class="rk">Burned (ceil 50% of fee)</span><span class="rv" id="wh-burn">—</span></div>
+          <div class="ro-row"><span class="rk">To miner (remainder)</span><span class="rv" id="wh-miner">—</span></div>
+          <div class="honest">Privacy side-effect: the wormhole breaks the sender→receiver link (Tornado-Cash-like
+          mechanism), but <strong>amounts and exit addresses remain visible</strong>.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-hs" role="tabpanel">
+      <div class="est-grid">
+        <div class="controls">
+          <div class="ctl">
+            <label for="hs-amount">Transfer amount (QTC)</label>
+            <input type="number" id="hs-amount" min="0" step="any" value="50">
+            <p class="fine">High-security / reversible transfer: 1% volume fee, burned in full — buys the guardian
+            account and delay-window protection.</p>
+          </div>
+        </div>
+        <div class="readout" aria-live="polite">
+          <div class="ro-row ro-total"><span class="rk">Security fee — burned</span><span class="rv" id="hs-fee">—</span></div>
+          <div class="ro-math" id="hs-fee-math">—</div>
+          <div class="honest">The 1% fee is <strong>burned, not paid to the miner</strong>. Standard weight + length
+          fees still apply on top of the transfer itself.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="throughput">
+    <div class="card-head">
+      <h2>Throughput visualizer</h2>
+      <p class="note">QTPS is arithmetic: transfers per block ÷ 12&nbsp;s block time. All three Quantus figures are
+      <span class="badge b-claimed">claimed</span> design figures from docs/architecture.md — mainnet (Sept 9, 2026) has
+      seen nothing near them yet. Bitcoin's quantum-secure figure is a <span class="badge b-claimed">claimed</span>
+      Quantus whitepaper figure, not a measured one.</p>
+    </div>
+    <div id="mode-bars"></div>
+    <div class="cmp-wrap">
+      <p class="cmp-head" style="grid-column:1/-1">For reference — classical baselines</p>
+      <div id="cmp-row" style="display:contents"></div>
+    </div>
+  </section>
+
+  <section class="card" id="aggregation">
+    <div class="card-head">
+      <h2>Aggregation explorer</h2>
+      <p class="note">The answer to 7&nbsp;KB transactions: batch them. Drag N and watch the naive on-chain footprint
+      (N × 7,219 B) collapse against the aggregated mode's amortized cost (≈ 721 B/tx = 3.75 MB ÷ 5,200 transfers).</p>
+    </div>
+    <div class="ctl">
+      <label for="agg-n">Transfers to batch <output id="agg-n-out">1,000</output></label>
+      <input type="range" id="agg-n" min="10" max="50000" step="10" value="1000">
+    </div>
+    <canvas id="agg-canvas" aria-label="Animation: many transfers streaming into one compact proof"></canvas>
+    <div class="agg-stats">
+      <div class="agg-stat"><div class="k">Naive on-chain size</div><div class="v" id="agg-naive">—</div><div class="m" id="agg-naive-math">—</div></div>
+      <div class="agg-stat"><div class="k">Naive block budget</div><div class="v" id="agg-blocks">—</div><div class="m">of 3.75 MB per 12 s block</div></div>
+      <div class="agg-stat hl"><div class="k">Aggregated size</div><div class="v" id="agg-agg">—</div><div class="m" id="agg-agg-math">—</div></div>
+      <div class="agg-stat hl"><div class="k">Compression</div><div class="v" id="agg-ratio">—</div><div class="m">fewer bytes per transfer</div></div>
+    </div>
+    <div class="wsteps" id="worm-steps"></div>
+  </section>
+
+  <section class="card" id="siglab">
+    <div class="card-head">
+      <h2>Signature-size lab</h2>
+      <p class="note">Build a Quantus transaction out of its real parts — ML-DSA-87 public key
+      <strong>2,592 B</strong> + signature <strong>4,627 B</strong> (<span class="badge b-measured">measured</span> from
+      NIST FIPS 204 via docs/deep-dives/pqc.md) — against the ~98 B an ECDSA-style transfer costs.</p>
+    </div>
+    <div class="ctl" style="max-width:420px;margin-bottom:16px">
+      <label for="sig-call">Call data (bytes) <output id="sig-call-out">281 B</output></label>
+      <input type="number" id="sig-call" min="0" max="1000000" step="1" value="281">
+    </div>
+    <div id="sig-stack"></div>
+    <div class="sig-cmp" id="sig-cmp"></div>
+  </section>
+
+  <section class="card" id="sources">
+    <div class="card-head">
+      <h2>Sources</h2>
+      <p class="note">Every figure above traces to one of these upstream files. Re-verified <strong>Sept 29, 2026</strong>;
+      figures move — check the live chain before acting on them.</p>
+    </div>
+    <ol class="source-list" id="source-list"></ol>
+    <div class="honesty-box">
+      <strong>Honest-label policy.</strong> The length fee is computed exactly from the runtime polynomial.
+      The weight fee is a <span class="badge b-estimate">estimate</span> (ScaledIdentityFee ≈ 0.1 planck per ps of
+      ref_time — ref_time itself is benchmark/hardware-dependent). All QTPS figures are
+      <span class="badge b-claimed">claimed</span> design figures, not measured mainnet throughput. Bitcoin's
+      quantum-secure ~1.1 TPS is a Quantus whitepaper claim; classical BTC (~7) and ETH (~15) are
+      <span class="badge b-approx">approx</span> observed averages.
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team. Fee and throughput figures verified against Quantus docs and chain source, Sept 29, 2026. Not financial advice.
+  </footer>
+</main>
+
+<script src="app.js?v=1.13.0"></script>
+<script src="../../assets/app-nav.js?v=1.11.0"></script>
+</body>
+</html>
