@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QTC Mining Calculator — Quantus Muse Builder</title>
+<meta name="description" content="Estimate Quantus (QTC) mining rewards from your hashrate. Uses the real emission formula — (21M − supply) / 50,000,000 — with 12-second blocks and 100% of each block reward to the miner.">
+<link rel="stylesheet" href="styles.css?v=1.0.0">
+</head>
+<body>
+<canvas id="hashrain" aria-hidden="true"></canvas>
+
+<header class="nav">
+  <a class="back" href="../../index.html">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Mining Calculator</span></div>
+  <nav class="links">
+    <a href="https://docs.quantus.com/guides/mining" target="_blank" rel="noopener">Mining guide</a>
+    <a href="https://telemetry.quantus.cat" target="_blank" rel="noopener">Telemetry</a>
+    <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow">Quantus &middot; Proof of Work &middot; Mainnet live Sept 9, 2026</p>
+    <h1>How much <span class="gold">QTC</span> can your rig mine?</h1>
+    <p class="lede">Quantus pays <strong>100% of every block reward to the miner</strong> — no dev tax, no treasury cut. Punch in your hashrate and get an honest estimate built on the chain's real emission math.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Block time</span><span class="v">12 sec</span></div>
+      <div class="fact"><span class="k">Miner's cut</span><span class="v">100%</span></div>
+      <div class="fact"><span class="k">Supply cap</span><span class="v">21M QTC</span></div>
+      <div class="fact"><span class="k">PoW</span><span class="v">QPoW &middot; Poseidon2</span></div>
+      <div class="fact"><span class="k">Signatures</span><span class="v">ML-DSA-87</span></div>
+    </div>
+  </section>
+
+  <section class="card" id="calc">
+    <div class="card-head">
+      <h2>Reward estimator</h2>
+      <p class="note">Estimates only — real results move with difficulty retargets, luck, and pool fees. Never presented as a promise.</p>
+    </div>
+    <div class="calc-grid">
+      <div class="inputs">
+        <label>Your hashrate
+          <div class="row"><input id="in-user" type="number" min="0" step="any" value="500">
+          <select id="in-user-unit"><option>H/s</option><option>kH/s</option><option selected>MH/s</option><option>GH/s</option><option>TH/s</option></select></div>
+        </label>
+        <label>Network hashrate
+          <div class="row"><input id="in-net" type="number" min="0" step="any" value="10">
+          <select id="in-net-unit"><option>H/s</option><option>kH/s</option><option>MH/s</option><option selected>GH/s</option><option>TH/s</option></select></div>
+          <span class="hint">Example figure — check <a href="https://telemetry.quantus.cat" target="_blank" rel="noopener">telemetry.quantus.cat</a> for the live network rate and replace it.</span>
+        </label>
+        <label>Rig power draw (watts)
+          <input id="in-watts" type="number" min="0" step="any" value="450">
+        </label>
+        <label>Electricity rate ($/kWh)
+          <input id="in-kwh" type="number" min="0" step="any" value="0.12">
+        </label>
+        <label>Assumed QTC price ($)
+          <input id="in-price" type="number" min="0" step="any" placeholder="no public price yet">
+          <span class="hint">QTC has no public market price yet — NEAR Intents was announced as the first venue, no listing date. Leave blank to skip revenue math.</span>
+        </label>
+        <details class="adv">
+          <summary>Advanced: override chain state</summary>
+          <label>Current supply (QTC)
+            <input id="in-supply" type="number" min="0" step="any">
+            <span class="hint">Auto-estimated from mainnet launch (Sept 9, 2026). Override if you know the live supply — the block reward recalculates.</span>
+          </label>
+        </details>
+      </div>
+      <div class="results">
+        <div class="res-main">
+          <div class="res-big"><span class="num" id="r-qtcday">&mdash;</span><span class="lbl">QTC / day (expected)</span></div>
+          <div class="res-big"><span class="num" id="r-profit">&mdash;</span><span class="lbl">Net $ / day</span></div>
+        </div>
+        <dl class="res-list">
+          <div><dt>Network share</dt><dd id="r-share">&mdash;</dd></div>
+          <div><dt>Expected blocks / day</dt><dd id="r-blocks">&mdash;</dd></div>
+          <div><dt>Expected time per block</dt><dd id="r-ttp">&mdash;</dd></div>
+          <div><dt>Current block reward</dt><dd id="r-reward">&mdash;</dd></div>
+          <div><dt>Daily power cost</dt><dd id="r-cost">&mdash;</dd></div>
+          <div><dt>Daily revenue</dt><dd id="r-rev">&mdash;</dd></div>
+          <div><dt>Break-even QTC price</dt><dd id="r-breakeven">&mdash;</dd></div>
+        </dl>
+        <p class="warn" id="r-warn" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="emission">
+    <div class="card-head">
+      <h2>Emission schedule</h2>
+      <p class="note">No halvings — a smooth exponential decay: <code>block reward = (21,000,000 &minus; current supply) / 50,000,000</code>. Source: <a href="https://github.com/Quantus-Network/docs/blob/main/docs/reference/tokenomics.md" target="_blank" rel="noopener">Quantus docs &middot; tokenomics</a>.</p>
+    </div>
+    <canvas id="chart" width="900" height="360"></canvas>
+    <div class="stats">
+      <div class="stat"><span class="k">Today's block reward</span><span class="v" id="s-reward">&mdash;</span></div>
+      <div class="stat"><span class="k">Est. supply</span><span class="v" id="s-supply">&mdash;</span></div>
+      <div class="stat"><span class="k">Est. daily emission</span><span class="v" id="s-daily">&mdash;</span></div>
+      <div class="stat"><span class="k">Miners' share of cap</span><span class="v">73% &middot; 15.33M QTC</span></div>
+    </div>
+  </section>
+
+  <section class="card" id="howto">
+    <div class="card-head">
+      <h2>Start mining in six steps</h2>
+      <p class="note">Condensed from the <a href="https://docs.quantus.com/guides/mining" target="_blank" rel="noopener">official Quantus mining guide</a> — follow it for the full detail.</p>
+    </div>
+    <ol class="steps">
+      <li><strong>Get a Quantus wallet.</strong> It holds your funds and spends mining rewards.</li>
+      <li><strong>Generate a wormhole keypair.</strong> Rewards accumulate at wormhole addresses only: <code>./quantus-node key quantus --scheme wormhole --words</code>. Back up the 24-word phrase.</li>
+      <li><strong>Download node <b>v1.0.1+</b> and a matching miner</strong> from the <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network</a> GitHub releases (chain + quantus-miner). macOS or Linux x86_64 — there is no native Linux ARM64 miner.</li>
+      <li><strong>Start the node on mainnet</strong> (not <i>planck</i> — that testnet is retired):<br><code class="cmd">./quantus-node --chain mainnet --validator --miner-listen-port 9833 --rewards-inner-hash &lt;your-inner-hash&gt; --sync full</code><br><span class="hint">Wait for full sync (<i>Idle</i> at the tip) before mining — blocks found while syncing are orphans and earn nothing.</span></li>
+      <li><strong>Start the miner</strong> in a second terminal:<br><code class="cmd">./quantus-miner serve --cpu-workers 4 --gpu-devices 0 --node-addr 127.0.0.1:9833</code><br><span class="hint">Newer node/miner pairs need the auth + TLS-pin flags — the guide's automated script wires them: <code>curl -fsSL https://docs.quantus.com/scripts/quantus-mining.sh</code></span></li>
+      <li><strong>Watch rewards land</strong> at your wormhole address in the wallet app — no claiming step. Monitor at <a href="https://telemetry.quantus.cat" target="_blank" rel="noopener">telemetry.quantus.cat</a> or <code>localhost:9615/metrics</code>.</li>
+    </ol>
+  </section>
+
+  <section class="card" id="honesty">
+    <div class="card-head"><h2>Read before you ape in</h2></div>
+    <ul class="caveats">
+      <li><strong>Estimates, not income.</strong> Difficulty retargets, luck variance, stale/orphan blocks, and pool fees all move real results away from the math above.</li>
+      <li><strong>No public QTC price exists yet.</strong> NEAR Intents is announced as the first trading venue with no listing date — any revenue figure here uses <i>your</i> assumed price.</li>
+      <li><strong>Supply is estimated</strong> from the Sept 9, 2026 launch at 12-second blocks; the real chain may differ slightly. Override it in Advanced if you know the live figure.</li>
+      <li><strong>Mainnet is real money.</strong> Back up your seed phrase, keep miner auth files private, and never expose the miner port (9833) to the internet.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team. Chain facts verified against the official Quantus docs, Sept 29, 2026.
+  </footer>
+</main>
+
+<script src="app.js?v=1.0.0"></script>
+</body>
+</html>

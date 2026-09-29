@@ -54,6 +54,13 @@ section{padding:44px 0}
 .card p b{color:var(--ink);font-weight:600}
 .apps-empty{border:1px dashed var(--line);border-radius:16px;padding:44px 26px;text-align:center;color:var(--muted);margin-top:26px;line-height:1.7}
 .apps-empty strong{color:var(--ink)}
+.app-card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px;margin-top:26px;text-decoration:none;color:var(--ink);transition:border-color .2s,transform .15s;backdrop-filter:blur(8px)}
+.app-card:hover{border-color:rgba(64,224,255,.55);transform:translateY(-3px)}
+.app-card .tag{display:inline-block;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);border:1px solid rgba(251,191,36,.35);border-radius:999px;padding:4px 12px;margin-bottom:12px}
+.app-card h3{font-size:22px;margin-bottom:8px}
+.app-card h3 .arrow{color:var(--cyan)}
+.app-card p{color:var(--muted);font-size:15px;line-height:1.65;max-width:720px}
+.app-card .meta{margin-top:12px;font-size:13px;color:var(--teal)}
 .timeline{margin-top:26px;display:flex;flex-direction:column;gap:0}
 .tl-row{display:flex;gap:18px;padding:18px 0;border-bottom:1px solid rgba(64,224,255,.08)}
 .tl-date{flex:none;width:130px;color:var(--amber);font-weight:700;font-size:14px}
@@ -117,9 +124,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em}
     <div class="sec-title">The Builds</div>
     <div class="sec-head">Shipped by the loop</div>
     <p class="sec-sub">Every app below was tested in a real browser and verified live before it earned a place here. Nothing is demo data wearing a live badge.</p>
+    <a class="app-card" href="pages/mining-calculator/">
+      <span class="tag">Shipped &middot; Sept 29, 2026</span>
+      <h3>QTC Mining Calculator <span class="arrow">&rarr;</span></h3>
+      <p>Estimate your Quantus mining rewards from your hashrate — built on the chain's real emission formula (<b>(21M &minus; supply) / 50,000,000</b>), 12-second blocks, and 100% of every block reward to the miner. Includes the emission decay chart and a six-step mining quickstart from the official guide.</p>
+      <div class="meta">Verified in a real browser &middot; 8/8 logic tests green</div>
+    </a>
     <div class="apps-empty">
-      <strong>The first builds are on the bench.</strong><br>
-      The hourly builder loop just started — wallets, mining calculators, network dashboards and explainers are queued. Check back soon, or watch the repo.
+      <strong>More builds on the bench.</strong><br>
+      Wallets, network dashboards, and post-quantum explainers are queued for the next loop runs. Check back soon, or watch the repo.
     </div>
   </section>
 
