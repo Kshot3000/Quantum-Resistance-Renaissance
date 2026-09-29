@@ -23,3 +23,4 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
 
 - GitHub: [@Kshot3000](https://github.com/Kshot3000)
 - X: [@kshot9000](https://x.com/kshot9000)
+- Donations (QTC): `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`

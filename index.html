@@ -63,6 +63,9 @@ footer{border-top:1px solid var(--line);margin-top:30px;padding:30px 0 44px;text
 footer a{color:var(--cyan);text-decoration:none}
 footer a:hover{text-decoration:underline}
 footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em}
+.donate{font-size:13.5px}
+.addr{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--teal);background:rgba(45,212,191,.08);border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer;word-break:break-all}
+.addr:hover{border-color:var(--teal)}
 @media(max-width:640px){.nav-links{display:none}.tl-date{width:96px}}
 </style>
 </head>
@@ -132,6 +135,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em}
 
   <footer>
     Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
     Independent builder work — not affiliated with the Quantus team.
     <div class="sig">QUANTUS MUSE BUILDER &middot; POST-QUANTUM TOOLING</div>
   </footer>
@@ -164,6 +168,13 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em}
   }
   tick();
 })();
+document.querySelectorAll('.addr').forEach(function(b){
+  b.addEventListener('click',function(){
+    navigator.clipboard.writeText(b.dataset.copy).then(function(){
+      var t=b.textContent;b.textContent='Copied!';setTimeout(function(){b.textContent=t;},1200);
+    });
+  });
+});
 </script>
 </body>
 </html>
