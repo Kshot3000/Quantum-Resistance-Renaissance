@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QTC Network Dashboard — Live Quantus Chain Telemetry</title>
+<meta name="description" content="Live Quantus (QTC) chain stats: block height, TPS, accounts, transfers, recent blocks and 14-day activity — streamed from the public Quantus indexer.">
+<link rel="stylesheet" href="styles.css?v=1.5.0">
+</head>
+<body>
+<div class="aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
+
+<header class="topbar">
+  <a class="back" href="../../">&larr; Builder hub</a>
+  <div class="live-pill" id="livePill"><span class="dot"></span><span id="liveText">connecting…</span></div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>QTC Network Dashboard</h1>
+    <p class="sub">Live telemetry from the Quantus mainnet — every number below is read from the
+      public Subsquid indexer (<code>sqm.quantus.com</code>) when this page loads, and refreshes
+      every 15 seconds. If the indexer is unreachable, the page says so instead of guessing.</p>
+  </section>
+
+  <section class="stats" id="statsGrid">
+    <div class="stat"><div class="label">Block height</div><div class="value mono" id="stHeight">—</div><div class="foot" id="stHeightFoot">latest sealed block</div></div>
+    <div class="stat"><div class="label">Observed block time</div><div class="value mono" id="stBlockTime">—</div><div class="foot">last 12 blocks &middot; target 12s</div></div>
+    <div class="stat"><div class="label">TPS (last 24h)</div><div class="value mono" id="stTps">—</div><div class="foot" id="stTpsFoot">transactions / 86,400s</div></div>
+    <div class="stat"><div class="label">Accounts</div><div class="value mono" id="stAccounts">—</div><div class="foot">indexed accounts</div></div>
+    <div class="stat"><div class="label">Transfers</div><div class="value mono" id="stTxs">—</div><div class="foot">immediate + scheduled</div></div>
+    <div class="stat"><div class="label">Circulating supply</div><div class="value mono" id="stSupply">—</div><div class="foot" id="stSupplyFoot">est. from verified emission formula</div></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>14-day chain activity</h2>
+      <div class="legend"><span><i class="sw bars"></i>txs / day</span><span><i class="sw line"></i>blocks / day</span></div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="activityChart" width="960" height="280" aria-label="14-day transaction and block activity chart"></canvas>
+      <div class="chart-tip" id="chartTip" hidden></div>
+    </div>
+    <p class="note" id="chartNote">Loading daily activity…</p>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Latest blocks</h2>
+      <div class="legend"><span id="blocksUpdated">—</span></div>
+    </div>
+    <div class="table-scroll">
+      <table class="blocks">
+        <thead><tr><th>Height</th><th>Hash (click to copy)</th><th>Age</th><th>Reward</th></tr></thead>
+        <tbody id="blocksBody"><tr><td colspan="4" class="loading">Fetching blocks from the indexer…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel method">
+    <h2>How the numbers are made</h2>
+    <ul>
+      <li><b>Block height, accounts, transfers:</b> live GraphQL query to the public Quantus Subsquid indexer at <code>sqm.quantus.com</code> (the same backend powering the official explorer).</li>
+      <li><b>TPS (24h):</b> today's <code>tx_count</code> from <code>daily_chain_stats</code> ÷ 86,400.</li>
+      <li><b>Observed block time:</b> mean gap between the timestamps of the latest 12 blocks.</li>
+      <li><b>Circulating supply (est.):</b> <code>21M − (21M − 5.67M) · e<sup>−blocks/50,000,000</sup></code> — the emission formula verified against <code>docs/reference/tokenomics.md</code> (12s blocks, 27% genesis mint of 5.67M QTC). Marked "est." because vesting unlocks move inside the genesis share.</li>
+      <li><b>1 QTC = 10<sup>12</sup> planck.</b> Ages are computed from the block timestamps your clock reads.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="foot">
+  <p class="src">Data: <a href="https://sqm.quantus.com/v1/graphql" target="_blank" rel="noopener">public Quantus indexer</a> &middot; upstream reference: <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network</a></p>
+  <p class="attr">Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot;
+    <span class="donate">Tip in QTC: <button class="copy" id="donateCopy" title="Copy address">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span></p>
+  <p class="quiet">Not affiliated with Quantus Labs. This is community-built tooling.</p>
+</footer>
+
+<script src="app.js?v=1.5.0"></script>
+</body>
+</html>
