@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Supply Audit — Quantus Muse Builder</title>
+<meta name="description" content="The independent money-supply verifier for Quantus: the exact on-chain emission recurrence recomputed to the planck, recorded mints vs reported balances reconciled, the genesis allocation fully itemized — and one flagged anomaly, with evidence.">
+<meta name="theme-color" content="#070a08">
+<link rel="stylesheet" href="styles.css?v=1.27.0">
+<style>:root{--focus:#8fe3b0;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="ledger-rain" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Supply Audit</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="../emission-lab/">Emission Lab</a>
+      <a href="../whale-watch/">Whale Watch</a>
+      <a href="../tokenomics/">Tokenomics</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/" class="current"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow"><span class="dot" aria-hidden="true"></span><span id="data-badge">Quantus mainnet · monetary audit · <span id="data-mode">loading…</span></span></p>
+    <h1>Trust the <span class="mint">math</span>, audit the <span class="gold">money</span></h1>
+    <p class="lede">Every QTC in existence was minted by exactly two mechanisms: the 22 genesis transfers at block 1, and the per-block miner reward from <code>pallet_mining_rewards</code>. This desk recomputes the protocol's exact emission recurrence to the planck, tallies every recorded mint from the public indexer, and reconciles both against the indexer's reported balances. The protocol passes. The indexer's balance sheet does not — and the evidence is itemized below.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Protocol issuance</span><span class="v ok" id="f-protocol">…</span></div>
+      <div class="fact"><span class="k">Recorded mints</span><span class="v" id="f-recorded">…</span></div>
+      <div class="fact"><span class="k">Indexer reports</span><span class="v warn" id="f-reported">…</span></div>
+      <div class="fact"><span class="k">Unexplained gap</span><span class="v hot" id="f-gap">…</span></div>
+      <div class="fact"><span class="k">Audited at height</span><span class="v" id="f-height">…</span></div>
+    </div>
+  </section>
+
+  <nav class="tabnav" aria-label="Supply Audit sections">
+    <button data-tab="verdict" class="active"><span class="n">01</span>Verdict</button>
+    <button data-tab="ledgers"><span class="n">02</span>Ledgers</button>
+    <button data-tab="curve"><span class="n">03</span>Emission curve</button>
+    <button data-tab="genesis"><span class="n">04</span>Genesis audit</button>
+    <button data-tab="method"><span class="n">05</span>Method</button>
+    <button data-tab="scope"><span class="n">06</span>Scope</button>
+  </nav>
+
+  <section class="tab active" id="tab-verdict">
+    <h2>The auditor's verdict</h2>
+    <p class="standfirst">Three independent tallies of the same money supply. Two agree to the planck. The third is off by <strong id="v-gap-inline">…</strong> — and this desk shows exactly where the extra comes from.</p>
+    <div class="seals">
+      <div class="seal pass">
+        <div class="stamp">PASS</div>
+        <h3>Protocol issuance</h3>
+        <p>The exact on-chain recurrence — <code>reward = (21M − (supply + fees)) / 50,000,000</code>, quantized down to the 0.01&nbsp;QTC leaf quantum — reproduces the recorded block rewards. Known-answer check: the formula predicts the very first block reward at <strong>300,000,000,000 plancks</strong>; the indexer's first <code>MinerRewarded</code> event reads <strong id="v-first-reward">…</strong>. <span id="v-first-note"></span></p>
+      </div>
+      <div class="seal pass">
+        <div class="stamp">PASS</div>
+        <h3>Genesis allocation</h3>
+        <p>All <strong>22</strong> block-1 transfers total <strong id="v-genesis">…</strong> — exactly <strong>27.0000014%</strong> of the 21M cap. The vesting pool's balance reconciles to <code>vesting_total − claimed</code> plus the 0.001&nbsp;QTC genesis dust, within 0.0001&nbsp;QTC. Nothing minted outside these transfers.</p>
+      </div>
+      <div class="seal flag">
+        <div class="stamp">FLAG</div>
+        <h3>Indexer-reported balances</h3>
+        <p>Account balance sums exceed every provable mint by <strong id="v-gap2">…</strong> (<strong id="v-gap-pct">…</strong> of reported supply), growing ≈ one block reward per block. The chain cannot have created these tokens — Substrate issuance grows only via the recorded mints. <strong>The excess is an indexer accounting artifact.</strong> Evidence:</p>
+        <ul class="evidence">
+          <li>The canonical minting sentinel <code id="v-sentinel">…</code> reports <strong>free = 0</strong> while transfer proofs show <strong id="v-sentinel-out">…</strong> flowing out of it — the debit side of every reward proof vanishes from the indexer's books.</li>
+          <li>Non-genesis sentinel outflows are <strong id="v-sentinel-x">…</strong> the recorded miner rewards; the surplus matches wormhole exit proofs credited to users.</li>
+          <li>Spot check 2026-09-30: the top miner's balance (11,520.95&nbsp;QTC) ≈ its transfer-ins (11,507.28&nbsp;QTC), <em>not</em> 2× its rewards — the excess is concentrated in the indexer's global/pool accounting, not spread across miners.</li>
+          <li>The wormhole pallet source contains no <code>mint_into</code> path, so exits cannot be chain-side inflation.</li>
+        </ul>
+        <p class="caveat">Open item: ≈258&nbsp;QTC of the gap is unattributed (possible burns, e.g. the 0.03&nbsp;QTC multisig creation burn, fee dust, or indexer noise). The desk flags it rather than inventing a source.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <h3>What this means for you</h3>
+      <p>Use <strong id="v-true-supply">…</strong> (genesis + recorded block rewards) as the true circulating-supply money stock — not the indexer's inflated balance sum. Whale Watch percentages computed against the inflated sum understate concentration slightly; its rankings are unaffected.</p>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-ledgers">
+    <h2>Three ledgers, one money supply</h2>
+    <p class="standfirst">Every figure below is recomputed live in your browser from the snapshot (or a fresh indexer query when reachable). All arithmetic is exact <code>BigInt</code> planck math — no floats touch the money.</p>
+    <div class="ledger-grid">
+      <div class="ledger">
+        <h3><span class="ln">L1</span> Protocol-expected issuance</h3>
+        <p class="lsub">The runtime recurrence, iterated block by block (fees = 0 baseline)</p>
+        <div class="lrow"><span>Genesis S₀</span><b class="mono" id="l1-s0">…</b></div>
+        <div class="lrow"><span>Cap C</span><b class="mono">21,000,000.0000 QTC</b></div>
+        <div class="lrow"><span>Divisor D</span><b class="mono">50,000,000</b></div>
+        <div class="lrow"><span>Leaf quantum</span><b class="mono">0.01 QTC (10¹⁰ planck)</b></div>
+        <div class="lrow total"><span>Expected at height <span id="l1-h">…</span></span><b class="mono ok" id="l1-total">…</b></div>
+        <div class="lrow"><span>Current block subsidy</span><b class="mono" id="l1-reward">…</b></div>
+        <p class="lnote">Recurrence per block: <code>S ← S + Q((C − S) / D)</code>, <code>Q</code> = round down to the leaf quantum. Verified against <code>pallets/mining-rewards/src/lib.rs</code> <code>on_finalize</code> (Sept 30, 2026).</p>
+      </div>
+      <div class="ledger">
+        <h3><span class="ln">L2</span> Recorded mints</h3>
+        <p class="lsub">What the indexer proves was actually minted</p>
+        <div class="lrow"><span>Genesis transfers (22)</span><b class="mono" id="l2-genesis">…</b></div>
+        <div class="lrow"><span>Block rewards (<span id="l2-n">…</span> events)</span><b class="mono" id="l2-mined">…</b></div>
+        <div class="lrow"><span>Fee wedge (re-minted fees)</span><b class="mono" id="l2-fees">…</b></div>
+        <div class="lrow total"><span>Provable money stock</span><b class="mono ok" id="l2-total">…</b></div>
+        <p class="lnote">Fees are burned at execution, then re-minted to the miner at finalize (see pallet source) — so recorded rewards sit <em>above</em> the fee-free baseline by the recycled fees. Multisig creation burns (0.03&nbsp;QTC each) are unmodeled and bounded small.</p>
+      </div>
+      <div class="ledger">
+        <h3><span class="ln">L3</span> Indexer-reported balances</h3>
+        <p class="lsub">Σ of every account's free + reserved + frozen</p>
+        <div class="lrow"><span>Free</span><b class="mono" id="l3-free">…</b></div>
+        <div class="lrow"><span>Reserved</span><b class="mono" id="l3-res">…</b></div>
+        <div class="lrow"><span>Frozen</span><b class="mono" id="l3-fro">…</b></div>
+        <div class="lrow"><span>Accounts</span><b class="mono" id="l3-acct">…</b></div>
+        <div class="lrow total"><span>Reported supply</span><b class="mono warn" id="l3-total">…</b></div>
+        <p class="lnote">Includes the vesting pool's locked 5.498M&nbsp;QTC (unclaimed vesting sits in the pool account's <code>free</code>). Not spendable ≠ not counted.</p>
+      </div>
+    </div>
+    <div class="recon">
+      <h3>Reconciliation</h3>
+      <div class="lrow"><span>L3 reported − L2 provable</span><b class="mono hot" id="r-gap">…</b></div>
+      <div class="lrow"><span>Gap as % of reported</span><b class="mono hot" id="r-pct">…</b></div>
+      <div class="lrow"><span>Gap growth rate</span><b class="mono" id="r-rate">…</b></div>
+      <div class="lrow"><span>Sentinel outflow ÷ recorded rewards</span><b class="mono" id="r-mult">…</b></div>
+      <p class="lnote">The gap grows ≈ one block reward per block: each block's reward is booked once as a <code>MinerRewarded</code> mint <em>and</em> once as a transfer proof from the zero-balance minting sentinel. See the Verdict tab for the full evidence trail.</p>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-curve">
+    <h2>The emission curve, audited</h2>
+    <p class="standfirst">The protocol baseline is not a fitted trend — it is the runtime recurrence executed 140,000 times in exact integer math. The dot is what the indexer proves was minted. The wedge between them is recycled fees, exactly as the pallet source describes.</p>
+    <div class="chart-card">
+      <h3>Cumulative issuance: protocol baseline vs recorded mints</h3>
+      <canvas id="ch-curve" width="900" height="380"></canvas>
+      <p class="cnote"><span class="sw base"></span> protocol baseline (fee-free recurrence) &nbsp; <span class="sw dotm"></span> recorded mints at snapshot height &nbsp; <span class="sw wedge"></span> fee wedge (re-minted tx fees)</p>
+    </div>
+    <div class="chart-card">
+      <h3>Per-block reward now: formula vs recent blocks</h3>
+      <canvas id="ch-reward" width="900" height="300"></canvas>
+      <p class="cnote">Dots: the 15 most recent blocks' <code>reward</code> fields (indexer). Line: the protocol subsidy at current supply. Rewards sit on the 0.01&nbsp;QTC quantum grid — blocks above the line carried fees.</p>
+    </div>
+    <div class="stat-row" id="curve-stats"></div>
+  </section>
+
+  <section class="tab" id="tab-genesis">
+    <h2>Genesis audit: the 22 transfers</h2>
+    <p class="standfirst">An earlier pipeline snapshot truncated this list to 3 rows (<code>limit: 3</code>). The audit reads all of them. Block 1 minted <strong id="g-total">…</strong> and nothing has been minted outside block rewards since.</p>
+    <div class="table-wrap">
+      <table id="genesis-table">
+        <thead><tr><th>#</th><th>Amount (QTC)</th><th>From</th><th>To</th><th>Note</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><span class="k">Genesis ÷ 21M cap</span><span class="v mono" id="g-pct">…</span></div>
+      <div class="stat"><span class="k">Vesting schedules</span><span class="v mono" id="g-vest-n">…</span></div>
+      <div class="stat"><span class="k">Vesting claimed</span><span class="v mono" id="g-vest-c">…</span></div>
+      <div class="stat"><span class="k">Pool balance check</span><span class="v mono ok" id="g-pool">…</span></div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-method">
+    <h2>Method, sources, and honest limits</h2>
+    <div class="method-grid">
+      <div class="method-card">
+        <h3>Verified sources</h3>
+        <ul>
+          <li><span class="badge b-verified">verified</span><a href="https://github.com/Quantus-Network/chain/blob/main/pallets/mining-rewards/src/lib.rs" target="_blank" rel="noopener">Quantus-Network/chain — pallets/mining-rewards/src/lib.rs</a>: <code>on_finalize</code> computes <code>total_reward = (MaxSupply − (total_issuance + tx_fees)) / EmissionDivisor</code>, mints <code>tx_fees + total_reward</code> quantized down to the leaf quantum, retains dust in <code>CollectedFees</code>. Fees are burned at execution and re-minted to the miner.</li>
+          <li><span class="badge b-verified">verified</span><a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/configs/mod.rs" target="_blank" rel="noopener">runtime/src/configs/mod.rs</a>: <code>EmissionDivisor = ConstU128&lt;50_000_000&gt;</code>, <code>MintingAccount = AccountId::new([1u8; 32])</code>.</li>
+          <li><span class="badge b-verified">verified</span><a href="https://github.com/Quantus-Network/chain/blob/main/pallets/wormhole/src/lib.rs" target="_blank" rel="noopener">pallets/wormhole/src/lib.rs</a>: <code>SCALE_DOWN_FACTOR = 10_000_000_000</code> (12 → 2 decimal places) — the 0.01&nbsp;QTC leaf quantum; no <code>mint_into</code> path in the wormhole pallet.</li>
+          <li><span class="badge b-verified">verified</span><a href="https://github.com/Quantus-Network/docs/blob/main/docs/reference/tokenomics.md" target="_blank" rel="noopener">Quantus-Network/docs — tokenomics.md</a>: 21M cap, 27% genesis mint, 73% mining emissions.</li>
+          <li><span class="badge b-data">data</span>Public Subsquid indexer <code>sqm.quantus.com/v1/graphql</code> via same-origin snapshot <code>data/supply.json</code> (the indexer allowlists only official Quantus domains for browser CORS).</li>
+        </ul>
+      </div>
+      <div class="method-card">
+        <h3>Honest limits</h3>
+        <ul>
+          <li>The protocol baseline assumes zero fees per block; the real chain recycles fees into rewards, so the baseline is a lower bound and the fee wedge is the difference — not a per-block fee measurement.</li>
+          <li>The 42.9k&nbsp;QTC gap is measured against the <em>indexer's</em> tables. The chain's true <code>total_issuance</code> is not directly queryable from a browser; the desk treats recorded mints as the provable money stock.</li>
+          <li>Multisig creation burns (0.03&nbsp;QTC each, per the runtime constants used by the MultiSig Vault) and any other burns are not subtracted from recorded mints — bounded small, disclosed, not hidden.</li>
+          <li>Two candidate explanations for the gap are on the table: (A) indexer wormhole-exit accounting artifact (favored — no mint path exists in the wormhole pallet); (B) a chain-side exit-mint bug (would be real inflation — <em>not asserted</em>; requires chain-state access to rule out). The desk reports the evidence, not a verdict beyond what the evidence supports.</li>
+          <li>Snapshot staleness: figures are pinned to the snapshot's <code>fetched_at</code>; the app retries a live indexer query first and labels which source it used.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-scope">
+    <h2>Scope</h2>
+    <ul class="scope">
+      <li>This desk <strong>audits</strong> — it never moves funds, never asks for keys, and never signs anything. 100% client-side.</li>
+      <li>It is an independent builder's audit, not an official Quantus statement and not financial advice.</li>
+      <li>Refresh the snapshot with <code>node scripts/fetch-supply-data.mjs</code> and recommit to re-run the audit at a new height.</li>
+      <li>Found a discrepancy in the audit itself? The math is all in <code>app.js</code> — exact <code>BigInt</code>, no floats — and the unit tests pin the first-block known answer.</li>
+    </ul>
+    <footer class="fineprint">
+      Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+      Independent builder work — not affiliated with the Quantus team. Emission figures verified against the runtime source, Sept 30, 2026. Not financial advice.<br>
+      Donations (QTC): <code>qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code>
+    </footer>
+  </section>
+</main>
+
+<script src="js/audit-core.js?v=1.27.0"></script>
+<script src="app.js?v=1.27.0"></script>
+</body>
+</html>

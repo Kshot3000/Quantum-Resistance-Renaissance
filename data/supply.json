@@ -1,0 +1,147 @@
+{
+  "ok": true,
+  "source": "https://sqm.quantus.com/v1/graphql",
+  "fetched_at": "2026-09-30T13:07:33.119Z",
+  "block_height": 139888,
+  "accounts_total": 7004,
+  "mint_sentinel_id": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+  "genesis": {
+    "count": 22,
+    "total_plancks": "5670000301000000000",
+    "transfers": [
+      {
+        "amount_plancks": "5669940001000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzjpLEi51md3q9FpECBTxRuLQsP31N5NmT9CF3ovVXY2RVKWE"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzkmmtHL1XZ94LnDc43hTuUUW6o2jkjQBSgwSYF7Dm2JErapB"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qznYp4bk4YdA77tXqfokbwLcrzbDMLuKdNKTQs4s9EjLbx2rq"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qznivf7i8HDSqqb4uCSzeAypCPpKAHZASC2QPQa4D1zzYGsZu"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzk42WAmPUAbirA9SdAfpu9qr5UdTwU2PnLoifRFtX7GJLf5P"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzmHuteJKcKmyNdLrgS9WivKrsSv6AvwDC56ETf21YhastHXm"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzm2TcoDAyqycAmMuS91bXhPwWqEgaKcYGh5nQ3wqBqCzc9d5"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzoijuSKGJAgAbPChRc1LxxxjeZRpWGLBooHDUYzhPJ6ooTvw"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzpfF7tvw4nhTzhhAjifFGPRKqKTBfCk68dgvM5DwnDCSyXYJ"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzjeW1DVYmPUqYCiosKnr3Ssh8DVTjmXmYV6JHibiVQKiBveD"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzneDSjVt2Lbf2nq3UZFGG3cutFfkk5ktffaeJRamAb134obQ"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzjuYZSefPGu3DFgBfXDRgGXJ3YvdFwXBNTSbE8Fa7dk3aV8u"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzosrX14BSUfTsGYB3NmakBWBvJgLGwqboJCQAvL2V1Tm64UA"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzmQoa5gvngjmTafLJqCBnmmmNKFCuaVvZiZcdairrGWVCBjA"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzkBP7kRB9wh1dKozJK83Y4e6GqSFgWEhf69WEggay7wt5Ls7"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzmyhjrbKk9Nhtcq3gnNpX5p9CR8HnM92SUGBC2cVW6FpAzd2"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzmFVMW5f48c1cBNXTzNjAn9YbLhCfohXqEgofeCn3UhJUaMw"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzmdJBPzYdtBGLaJYjtT7FutNd47q79rjr63qhJTeQNzvBb9c"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzomCRTgMZHtdDWBBAqm5WLG8FwLKuYCJHgrAMznkKEhWG8qJ"
+      },
+      {
+        "amount_plancks": "3000000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qzmtKfCXKHvhg5agvp1XKgx8ymuShQzNhJ8ZrpKCqy4Y5z6HW"
+      },
+      {
+        "amount_plancks": "300000000000",
+        "from": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
+        "to": "qznyjZFnaE51zUN1jBmedTAceyrhPYoFdqxE7mZ1TdXU98vSR"
+      }
+    ]
+  },
+  "mined": {
+    "reward_events": 139888,
+    "total_plancks": "43144560000000000"
+  },
+  "balances_plancks": {
+    "free": "5756054104152033782",
+    "reserved": "2103500000000",
+    "frozen": "0"
+  },
+  "vesting": {
+    "schedules": 48,
+    "total_plancks": "5669940000000000000",
+    "claimed_plancks": "171475000000000000",
+    "pool_account": "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7",
+    "pool_free_plancks": "5498465001000000000"
+  },
+  "mint_sentinel": {
+    "free_plancks": "0",
+    "out_count": 176420,
+    "out_total_plancks": "5756314531000000000",
+    "out_nongenesis_count": 176398,
+    "out_nongenesis_plancks": "86314230000000000"
+  }
+}
