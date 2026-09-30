@@ -425,6 +425,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <p>Shared custody on the real custom multisig pallet (index 19): derive exact on-chain vault addresses from <code>blake2b-256(py/mltsg ‖ signers ‖ threshold ‖ nonce)</code> — cross-checked against an independent implementation — price every fee from runtime constants (0.03 QTC creation burn, exact per-signer proposal-fee formula), build byte-exact unsigned payloads for all seven dispatchables (propose / approve / execute / cancel / remove_expired / claim_deposits), and track proposals on a local board. Never touches keys.</p>
         <div class="meta">68/68 logic tests green · 24/24 browser checks green</div>
       </a>
+      <a class="app-card governance" href="pages/governance-tracker/" style="grid-column:1 / -1">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🏛</div>
+          <span class="tag">On-chain parliament</span>
+        </div>
+        <h3>QTC Governance Tracker <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>Every Quantus referendum, read live from the chain — referendum #0's full lifecycle from preimage note to confirmed runtime upgrade, with the 8 member votes and exact tally (80% support, 100% approval). The two-track map read from the runtime source (tech_collective_members 61%/60%, fast_upgrade 80%/80%), an interactive threshold lab on the real flat-curve math, the ranked-collective vote wiring (Linear weight, one member one vote), the 45-day timeout lifecycle, and an honest empty treasury — every constant verified against Quantus-Network/chain main.</p>
+        <div class="meta">25/25 logic tests green · 26/26 browser checks green</div>
+      </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>
   </section>

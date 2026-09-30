@@ -1,0 +1,216 @@
+{
+  "ok": true,
+  "source": "https://sqm.quantus.com/v1/graphql",
+  "fetched_at": "2026-09-30T09:02:52.160Z",
+  "data": {
+    "referenda": [
+      {
+        "referendum_index": 0,
+        "track": 1,
+        "track_name": "fast_upgrade",
+        "type": "SUBMITTED",
+        "title": null,
+        "description": null,
+        "origin": "FastUpgrade",
+        "is_runtime_upgrade": true,
+        "tally_ayes": null,
+        "tally_nays": null,
+        "tally_bare_ayes": null,
+        "proposal_preimage_hash": "0xb3de57a77b5ccde4cd2c6ac001333b3ac7abc0c10924d892f57d3017adee7524",
+        "proposal_size_bytes": 34,
+        "proposal_calls": "[{\"name\":\"System.authorize_upgrade\",\"pallet\":\"System\",\"method\":\"authorize_upgrade\",\"summary\":\"Authorize runtime upgrade\",\"category\":\"RUNTIME_UPGRADE\"}]",
+        "proposal_summary": "Authorize runtime upgrade",
+        "proposal_storage": "LOOKUP",
+        "timestamp": "2026-09-23T08:14:24.319+00:00",
+        "actor_id": "qzpfF7tvw4nhTzhhAjifFGPRKqKTBfCk68dgvM5DwnDCSyXYJ",
+        "block_id": "0000095606-92d35",
+        "extrinsic_id": "0xeee48ed4dba7d225686b17e4f756417e148e0f3224d52f43d4be7691f92fe5ca"
+      },
+      {
+        "referendum_index": 0,
+        "track": 1,
+        "track_name": "fast_upgrade",
+        "type": "DECISION_STARTED",
+        "title": null,
+        "description": null,
+        "origin": "FastUpgrade",
+        "is_runtime_upgrade": true,
+        "tally_ayes": "1",
+        "tally_nays": "0",
+        "tally_bare_ayes": "1",
+        "proposal_preimage_hash": "0xb3de57a77b5ccde4cd2c6ac001333b3ac7abc0c10924d892f57d3017adee7524",
+        "proposal_size_bytes": 34,
+        "proposal_calls": "[{\"name\":\"System.authorize_upgrade\",\"pallet\":\"System\",\"method\":\"authorize_upgrade\",\"summary\":\"Authorize runtime upgrade\",\"category\":\"RUNTIME_UPGRADE\"}]",
+        "proposal_summary": "Authorize runtime upgrade",
+        "proposal_storage": "LOOKUP",
+        "timestamp": "2026-09-23T08:25:54.209+00:00",
+        "actor_id": null,
+        "block_id": "0000095656-46cce",
+        "extrinsic_id": null
+      },
+      {
+        "referendum_index": 0,
+        "track": 1,
+        "track_name": "fast_upgrade",
+        "type": "CONFIRM_STARTED",
+        "title": null,
+        "description": null,
+        "origin": "FastUpgrade",
+        "is_runtime_upgrade": true,
+        "tally_ayes": null,
+        "tally_nays": null,
+        "tally_bare_ayes": null,
+        "proposal_preimage_hash": "0xb3de57a77b5ccde4cd2c6ac001333b3ac7abc0c10924d892f57d3017adee7524",
+        "proposal_size_bytes": 34,
+        "proposal_calls": "[{\"name\":\"System.authorize_upgrade\",\"pallet\":\"System\",\"method\":\"authorize_upgrade\",\"summary\":\"Authorize runtime upgrade\",\"category\":\"RUNTIME_UPGRADE\"}]",
+        "proposal_summary": "Authorize runtime upgrade",
+        "proposal_storage": "LOOKUP",
+        "timestamp": "2026-09-23T12:32:32.285+00:00",
+        "actor_id": null,
+        "block_id": "0000096617-694d0",
+        "extrinsic_id": null
+      },
+      {
+        "referendum_index": 0,
+        "track": 1,
+        "track_name": "fast_upgrade",
+        "type": "CONFIRMED",
+        "title": null,
+        "description": null,
+        "origin": "FastUpgrade",
+        "is_runtime_upgrade": true,
+        "tally_ayes": "8",
+        "tally_nays": "0",
+        "tally_bare_ayes": "8",
+        "proposal_preimage_hash": "0xb3de57a77b5ccde4cd2c6ac001333b3ac7abc0c10924d892f57d3017adee7524",
+        "proposal_size_bytes": 34,
+        "proposal_calls": "[{\"name\":\"System.authorize_upgrade\",\"pallet\":\"System\",\"method\":\"authorize_upgrade\",\"summary\":\"Authorize runtime upgrade\",\"category\":\"RUNTIME_UPGRADE\"}]",
+        "proposal_summary": "Authorize runtime upgrade",
+        "proposal_storage": "LOOKUP",
+        "timestamp": "2026-09-23T12:45:35.531+00:00",
+        "actor_id": null,
+        "block_id": "0000096667-459cf",
+        "extrinsic_id": null
+      }
+    ],
+    "extrinsics": [
+      {
+        "pallet": "Preimage",
+        "call": "note_preimage",
+        "timestamp": "2026-09-23T07:50:37.316+00:00",
+        "signer_id": "qzpfF7tvw4nhTzhhAjifFGPRKqKTBfCk68dgvM5DwnDCSyXYJ",
+        "block_id": "0000095526-b6b3e",
+        "success": true,
+        "args": "{\"bytes\":\"0x000978389c85e3698b7e24cf292907f2eec0657297fd8a4d82669cf357974f15ec56\"}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechReferenda",
+        "call": "submit",
+        "timestamp": "2026-09-23T08:14:24.319+00:00",
+        "signer_id": "qzpfF7tvw4nhTzhhAjifFGPRKqKTBfCk68dgvM5DwnDCSyXYJ",
+        "block_id": "0000095606-92d35",
+        "success": true,
+        "args": "{\"proposalOrigin\":{\"__kind\":\"Origins\",\"value\":{\"__kind\":\"FastUpgrade\"}},\"proposal\":{\"hash\":\"qzoX5FqazH4f2efu6Rs75z6UVeTDUCApNp9icztNDgdVfsMMw\",\"len\":34,\"__kind\":\"Lookup\"},\"enactmentMoment\":{\"__kind\":\"After\",\"value\":0}}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechReferenda",
+        "call": "place_decision_deposit",
+        "timestamp": "2026-09-23T08:18:04.096+00:00",
+        "signer_id": "qzpfF7tvw4nhTzhhAjifFGPRKqKTBfCk68dgvM5DwnDCSyXYJ",
+        "block_id": "0000095618-b67b1",
+        "success": true,
+        "args": "{\"index\":0}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechCollective",
+        "call": "vote",
+        "timestamp": "2026-09-23T08:19:15.465+00:00",
+        "signer_id": "qzpfF7tvw4nhTzhhAjifFGPRKqKTBfCk68dgvM5DwnDCSyXYJ",
+        "block_id": "0000095624-49737",
+        "success": true,
+        "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechCollective",
+        "call": "vote",
+        "timestamp": "2026-09-23T11:43:26.037+00:00",
+        "signer_id": "qzmdJBPzYdtBGLaJYjtT7FutNd47q79rjr63qhJTeQNzvBb9c",
+        "block_id": "0000096442-3aaaf",
+        "success": true,
+        "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechCollective",
+        "call": "vote",
+        "timestamp": "2026-09-23T11:46:21.938+00:00",
+        "signer_id": "qzjpLEi51md3q9FpECBTxRuLQsP31N5NmT9CF3ovVXY2RVKWE",
+        "block_id": "0000096452-bf52c",
+        "success": true,
+        "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechCollective",
+        "call": "vote",
+        "timestamp": "2026-09-23T11:47:25.447+00:00",
+        "signer_id": "qzoijuSKGJAgAbPChRc1LxxxjeZRpWGLBooHDUYzhPJ6ooTvw",
+        "block_id": "0000096457-c5120",
+        "success": true,
+        "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechCollective",
+        "call": "vote",
+        "timestamp": "2026-09-23T12:28:18.954+00:00",
+        "signer_id": "qzosrX14BSUfTsGYB3NmakBWBvJgLGwqboJCQAvL2V1Tm64UA",
+        "block_id": "0000096600-e4084",
+        "success": true,
+        "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechCollective",
+        "call": "vote",
+        "timestamp": "2026-09-23T12:29:02.226+00:00",
+        "signer_id": "qzmyhjrbKk9Nhtcq3gnNpX5p9CR8HnM92SUGBC2cVW6FpAzd2",
+        "block_id": "0000096603-0e0b4",
+        "success": true,
+        "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechCollective",
+        "call": "vote",
+        "timestamp": "2026-09-23T12:30:19.332+00:00",
+        "signer_id": "qzneDSjVt2Lbf2nq3UZFGG3cutFfkk5ktffaeJRamAb134obQ",
+        "block_id": "0000096607-33569",
+        "success": true,
+        "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 2
+      },
+      {
+        "pallet": "TechCollective",
+        "call": "vote",
+        "timestamp": "2026-09-23T12:32:15.259+00:00",
+        "signer_id": "qznivf7i8HDSqqb4uCSzeAypCPpKAHZASC2QPQa4D1zzYGsZu",
+        "block_id": "0000096616-e075f",
+        "success": true,
+        "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 1
+      }
+    ],
+    "upgrades": [
+      {
+        "id": "0000097141-94b40-000002",
+        "block_id": "0000097141-94b40",
+        "timestamp": "2026-09-23T14:49:17.407+00:00"
+      }
+    ]
+  }
+}

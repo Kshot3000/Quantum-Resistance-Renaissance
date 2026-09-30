@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Governance Tracker — the on-chain parliament, read live</title>
+<meta name="description" content="QTC Governance Tracker: every Quantus referendum with its full on-chain lifecycle, the exact two-track governance design read from the runtime source, an interactive threshold lab, and the ranked-collective vote mechanics — all from live indexer data.">
+<link rel="stylesheet" href="styles.css?v=1.23.0">
+<style>:root{--focus:#e8b93c;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="seal" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Governance Tracker</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/chain/tree/main/runtime/src/governance" target="_blank" rel="noopener">governance source</a>
+      <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">Upstream chain</a>
+    </nav>
+    <details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/" class="current"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="hero-seal" aria-hidden="true">◈</div>
+    <p class="kicker">Quantus on-chain governance · TechCollective lane</p>
+    <h1>The on-chain <span class="gold">parliament</span></h1>
+    <p class="lede">Every Quantus referendum, read live from the chain — its full lifecycle, who voted, what it proposed, and the exact two-track rules it had to clear. No token-weighted voting, no community lane: Quantus governance is a tech collective of at most 13 members voting with linear weight, and every constant below is read from the runtime source.</p>
+    <div class="stat-grid" id="stat-grid" aria-live="polite">
+      <div class="stat"><div class="stat-v" id="stat-refs">—</div><div class="stat-l">referenda on chain</div></div>
+      <div class="stat"><div class="stat-v" id="stat-confirmed">—</div><div class="stat-l">confirmed</div></div>
+      <div class="stat"><div class="stat-v">2</div><div class="stat-l">governance tracks</div></div>
+      <div class="stat"><div class="stat-v">10 → 13</div><div class="stat-l">genesis members → hard cap (floor 5)</div></div>
+      <div class="stat"><div class="stat-v">0.1 QTC</div><div class="stat-l">submission + decision deposits</div></div>
+      <div class="stat"><div class="stat-v" id="stat-snapshot">—</div><div class="stat-l">data snapshot</div></div>
+    </div>
+    <nav class="toc" aria-label="Sections">
+      <a href="#referenda">Referenda</a><a href="#tracks">Track map</a><a href="#lab">Threshold lab</a><a href="#voting">Voting</a><a href="#lifecycle">Lifecycle</a><a href="#treasury">Treasury</a><a href="#sources">Sources</a>
+    </nav>
+  </section>
+
+  <section id="referenda" class="panel">
+    <h2>Referenda board</h2>
+    <p class="sec-sub">Every referendum the indexer has ever seen, with the exact event trail. Timelines are derived from on-chain events — hovering shows wall-clock durations between milestones.</p>
+    <div id="ref-board"><p class="loading">Reading the on-chain record…</p></div>
+  </section>
+
+  <section id="tracks" class="panel">
+    <h2>The two-track map</h2>
+    <p class="sec-sub">Quantus removed the community/token-weighted lane — the tech-collective lane is the sole governance path (runtime/src/governance/definitions.rs, <code>TechCollectiveTracksInfo</code>). Windows assume the chain's 12-second block time. Curves are <em>constant</em>: thresholds never decay during the decision period.</p>
+    <div id="track-cards" class="track-cards"></div>
+  </section>
+
+  <section id="lab" class="panel">
+    <h2>Threshold lab</h2>
+    <p class="sec-sub">Try any tally against the real track math. Approval = ayes ÷ (ayes + nays) must clear the approval curve; support = ayes ÷ total members must clear the support curve. Both curves are flat, so the verdict never depends on timing — only on votes.</p>
+    <div class="lab-grid">
+      <div class="lab-controls">
+        <label>Track
+          <select id="lab-track">
+            <option value="1">fast_upgrade — 80% / 80%</option>
+            <option value="0">tech_collective_members — 61% / 60%</option>
+          </select>
+        </label>
+        <label>Collective members <span class="val" id="lab-members-v">10</span>
+          <input type="range" id="lab-members" min="5" max="13" step="1" value="10">
+        </label>
+        <label>Ayes <span class="val" id="lab-ayes-v">8</span>
+          <input type="range" id="lab-ayes" min="0" max="13" step="1" value="8">
+        </label>
+        <label>Nays <span class="val" id="lab-nays-v">0</span>
+          <input type="range" id="lab-nays" min="0" max="13" step="1" value="0">
+        </label>
+      </div>
+      <div class="lab-out" id="lab-out" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="voting" class="panel">
+    <h2>How votes actually work</h2>
+    <div class="two-col">
+      <div>
+        <h3>The ranked-collective tally</h3>
+        <p>Quantus wires <code>pallet_referenda</code> (Instance1, <code>TechReferenda</code>) to <code>pallet_ranked_collective</code>: <code>Votes = pallet_ranked_collective::Votes</code>, <code>Tally = pallet_ranked_collective::TallyOf</code>. Members don't call <code>TechReferenda.vote</code> — they vote through <code>TechCollective.vote</code> with <code>{"poll": &lt;referendum_index&gt;, "aye": true|false}</code>, and the collective's tally feeds the referendum. Vote weight is <strong>Linear</strong>: one member, one vote. Ranks are flat (promote/demote/exchange origins are disabled), and conviction multipliers are gone — bare ayes equal weighted ayes.</p>
+        <h3>Membership</h3>
+        <ul class="bullets">
+          <li>Genesis collective: <strong>10 members</strong> (the fast_upgrade curve commentary is calibrated to it: 8-of-10 ayes).</li>
+          <li>Floor: <strong>5 members</strong> — the runtime refuses seeds and removals that would drop below it.</li>
+          <li>Cap: <strong>13 members</strong> (<code>MaxMemberCount</code>).</li>
+          <li>Membership changes go through <strong>Root only</strong> — i.e. a passed TechReferenda vote. No member can add or remove others unilaterally.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Observed votes — referendum #0</h3>
+        <p class="sec-sub">All 8 votes were cast as <code>TechCollective.vote</code> extrinsics on 2026-09-23, each one aye:</p>
+        <div class="table-wrap"><table class="votes" id="votes-table">
+          <thead><tr><th>Time (UTC)</th><th>Voter</th><th>Vote</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="lifecycle" class="panel">
+    <h2>The referendum lifecycle</h2>
+    <div class="life-grid">
+      <div class="life-step"><div class="life-n">1</div><h3>Note the preimage</h3><p>The proposer uploads the exact call bytes with <code>Preimage.note_preimage</code> (deposit: 0.01 QTC + 0.00001 QTC/byte — referendum #0's 34-byte proposal locked 0.01035 QTC). Max proposal size: 4 KiB.</p></div>
+      <div class="life-step"><div class="life-n">2</div><h3>Submit</h3><p><code>TechReferenda.submit</code> with the proposal origin (Root → track 0, FastUpgrade → track 1) and the preimage hash. Submission deposit: <strong>0.1 QTC</strong> (refundable). Only Root or a collective member may submit.</p></div>
+      <div class="life-step"><div class="life-n">3</div><h3>Decision deposit</h3><p><code>TechReferenda.place_decision_deposit</code> moves the referendum into the track's deciding queue (deposit: another <strong>0.1 QTC</strong>). Without it, the referendum sits until the <strong>45-day undeciding timeout</strong> rejects it as timed-out.</p></div>
+      <div class="life-step"><div class="life-n">4</div><h3>Decide</h3><p>After the prepare window (10 min fast lane, 2 h tech lane), the collective votes. Approval and support must both clear their flat curves for the whole confirm period.</p></div>
+      <div class="life-step"><div class="life-n">5</div><h3>Confirm &amp; enact</h3><p>Once the tally holds above both curves through the confirm window (10 min fast lane, 24 h tech lane), the referendum is confirmed and enacts after the min-enactment delay. Runtime upgrades authorize the wasm hash via <code>System.authorize_upgrade</code> — the wasm itself is then applied permissionlessly and version-checked.</p></div>
+      <div class="life-step warn"><div class="life-n">✕</div><h3>Cancel / kill</h3><p>Only Root (i.e. a previously passed referendum) can cancel or kill. Slashed deposits are <strong>burned</strong>, not redirected.</p></div>
+    </div>
+    <p class="fine">Caps: 128 referenda chain-wide, 8 per account, 100 queued per track. The scheduler agenda slots each referendum's timeout and enactment — which is why stale submissions cost storage until they time out.</p>
+  </section>
+
+  <section id="treasury" class="panel">
+    <h2>Treasury</h2>
+    <div id="treasury-body">
+      <p class="sec-sub"><code>TreasuryPallet</code> (runtime pallet index 15) is active on chain with <code>propose_spend</code> for outflows. Treasury spends are authorized through the tech-collective governance lane above.</p>
+      <div class="honest-box" id="treasury-status"><p class="loading">Checking the on-chain record for treasury activity…</p></div>
+    </div>
+  </section>
+
+  <section id="sources" class="panel">
+    <h2>Sources &amp; method</h2>
+    <div class="two-col">
+      <div>
+        <h3>Upstream runtime source (Quantus-Network/chain, main)</h3>
+        <ul class="src-list">
+          <li><a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/governance/definitions.rs" target="_blank" rel="noopener">runtime/src/governance/definitions.rs</a> — both track windows, 61/60 and 80/80 curves, decision deposit, preimage fee model, FastUpgrade origin restriction</li>
+          <li><a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/configs/mod.rs" target="_blank" rel="noopener">runtime/src/configs/mod.rs</a> — submission deposit, 45-day timeout, member bounds, Votes/Tally wiring, slash-burn</li>
+          <li><a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/lib.rs" target="_blank" rel="noopener">runtime/src/lib.rs</a> — 12s block time, UNIT, fee scale 1/10</li>
+          <li><a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/genesis_config_presets/mod.rs" target="_blank" rel="noopener">runtime/src/genesis_config_presets/mod.rs</a> — 5-member floor, genesis seed design</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Chain data</h3>
+        <ul class="src-list">
+          <li>Referendum events, governance extrinsics, and runtime upgrades: public Subsquid indexer <code>sqm.quantus.com/v1/graphql</code>, snapshotted by <code>scripts/fetch-governance-data.mjs</code> into <code>data/governance.json</code>.</li>
+          <li>The indexer is allowlisted for official Quantus domains only, so this page reads the same-origin snapshot — the snapshot timestamp is shown in the header, and nothing is shown rather than invented when data is missing.</li>
+          <li>Tally units are displayed exactly as the indexer reports them (8 ayes / 0 nays on referendum #0 — eight member votes, one per member).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="chrome">
+  <div class="foot-grid">
+    <div>
+      <strong>QTC Governance Tracker</strong>
+      <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Quantus ecosystem. Governance constants verified against Quantus-Network/chain main on 2026-09-30; referendum data from the public Subsquid indexer.</p>
+    </div>
+    <div>
+      <strong>Support the build</strong>
+      <p class="mono donate">QTC: qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</p>
+      <p><a href="https://github.com/Kshot3000/Quantus-Muse-Builder" target="_blank" rel="noopener">Quantus-Muse-Builder on GitHub</a></p>
+    </div>
+  </div>
+</footer>
+
+<script src="js/gov-core.js?v=1.23.0"></script>
+<script src="js/app.js?v=1.23.0"></script>
+<script src="../../assets/app-nav.js?v=1.12.0"></script>
+</body>
+</html>
