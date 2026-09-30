@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Watchtower — Quantus Muse Builder</title>
+<meta name="description" content="The chain & wallet watcher desk for Quantus: watch any SS58 address, build balance/transfer/governance/chain-health alert rules, scan against live-first chain data, and get browser notifications — 100% client-side.">
+<meta name="theme-color" content="#07090f">
+<link rel="stylesheet" href="styles.css?v=1.30.0">
+<style>:root{--focus:#8fd6ff;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="scanfield" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Watchtower</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/docs" target="_blank" rel="noopener">upstream docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">official explorer</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/" class="current"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Quantus mainnet · Watcher desk · 100% client-side</p>
+    <h1>The eyes that <span class="glow">never blink</span> on the quantum chain</h1>
+    <p class="lede">Watch any Quantus address, arm rules — balance thresholds, big transfers, whale moves, new referenda, chain stalls — and scan them against live-first chain data. New hits land in your alert feed, and with one click they arrive as browser notifications too. Your watchlist never leaves this browser; nothing here moves funds.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Watched</span><span class="v cool" id="fact-watched">0 addresses</span></div>
+      <div class="fact"><span class="k">Rules armed</span><span class="v warm" id="fact-rules">0 active</span></div>
+      <div class="fact"><span class="k">Alerts</span><span class="v hot" id="fact-alerts">0 unread</span></div>
+      <div class="fact"><span class="k">Chain head</span><span class="v" id="fact-head">—</span></div>
+      <div class="fact"><span class="k">Data</span><span class="v" id="fact-source">loading…</span></div>
+    </div>
+  </section>
+
+  <section class="scanbar">
+    <span id="live-badge" class="badge live" hidden>● LIVE — indexer</span>
+    <span id="snap-badge" class="badge snap">◌ snapshot — loading…</span>
+    <span class="scan-meta" id="scan-meta">Last scan: never</span>
+    <button id="btn-scan" class="btn primary">⟳ Scan now</button>
+  </section>
+
+  <nav class="tabnav" aria-label="Watchtower sections">
+    <button class="tab active" data-tab="dash" aria-controls="tab-dash">Dashboard</button>
+    <button class="tab" data-tab="watch" aria-controls="tab-watch">Watchlist</button>
+    <button class="tab" data-tab="rules" aria-controls="tab-rules">Rules</button>
+    <button class="tab" data-tab="alerts" aria-controls="tab-alerts">Alerts <span id="alert-count" class="pill" hidden></span></button>
+    <button class="tab" data-tab="data" aria-controls="tab-data">Data sources</button>
+  </nav>
+
+  <section id="tab-dash" class="tabpane active" role="tabpanel" aria-label="Dashboard">
+    <div class="grid cards" id="dash-cards"></div>
+    <h2>Chain pulse <span class="sub">latest transfers in the data window</span></h2>
+    <div class="table-wrap"><table class="pulse" id="pulse-table">
+      <thead><tr><th>Block</th><th>From</th><th>To</th><th class="num">Amount (QTC)</th><th>Watch</th></tr></thead>
+      <tbody id="pulse-body"><tr><td colspan="5" class="muted">Loading chain data…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section id="tab-watch" class="tabpane" role="tabpanel" aria-label="Watchlist" hidden>
+    <div class="panel">
+      <h2>Watch an address</h2>
+      <p class="muted">SS58 addresses on prefix 189 are checksum-validated before they join the tower. Each watched address gets its human checkphrase — the same five-word upstream algorithm the Contact Vault uses — so you can confirm at a glance that the address on screen is the one you meant.</p>
+      <form id="watch-form" class="form-grid" autocomplete="off">
+        <label>Address
+          <input id="watch-address" name="address" placeholder="qz…" spellcheck="false" required>
+        </label>
+        <label>Nickname
+          <input id="watch-nick" name="nick" placeholder="e.g. Cold wallet" maxlength="40">
+        </label>
+        <label class="wide">Note
+          <input id="watch-note" name="note" placeholder="Why are you watching this?" maxlength="140">
+        </label>
+        <div class="wide form-actions">
+          <button type="submit" class="btn primary">＋ Add to watchlist</button>
+          <span id="watch-msg" class="form-msg" role="status"></span>
+        </div>
+      </form>
+    </div>
+    <div class="grid cards" id="watchlist"></div>
+  </section>
+
+  <section id="tab-rules" class="tabpane" role="tabpanel" aria-label="Rules" hidden>
+    <div class="panel">
+      <h2>Arm a rule</h2>
+      <p class="muted">Address rules watch one address from your list. Chain rules watch the whole network. Rules fire on <em>transitions and new events</em> — a balance that is already below your threshold does not re-alert on every scan; the moment it crosses does.</p>
+      <form id="rule-form" class="form-grid" autocomplete="off">
+        <label>Rule type
+          <select id="rule-type">
+            <optgroup label="Address rules">
+              <option value="balance_below">Balance drops below</option>
+              <option value="balance_above">Balance rises above</option>
+              <option value="balance_change">Balance moves by</option>
+              <option value="incoming_ge">Incoming transfer ≥</option>
+              <option value="outgoing_ge">Outgoing transfer ≥</option>
+              <option value="activity">Any new activity</option>
+            </optgroup>
+            <optgroup label="Chain rules">
+              <option value="whale_ge">Whale transfer ≥ (anywhere)</option>
+              <option value="new_referendum">New governance referendum</option>
+              <option value="new_upgrade">New runtime upgrade</option>
+              <option value="chain_stall">No new block for …</option>
+            </optgroup>
+          </select>
+        </label>
+        <label id="rule-addr-wrap">Address
+          <select id="rule-address"></select>
+        </label>
+        <label id="rule-thr-wrap">Threshold
+          <input id="rule-threshold" placeholder="e.g. 1000" spellcheck="false">
+        </label>
+        <label id="rule-mode-wrap" hidden>Measured as
+          <select id="rule-mode">
+            <option value="pct">percent of balance</option>
+            <option value="abs">absolute QTC</option>
+          </select>
+        </label>
+        <label>Severity
+          <select id="rule-severity">
+            <option value="info">info</option>
+            <option value="warn" selected>warning</option>
+            <option value="crit">critical</option>
+          </select>
+        </label>
+        <div class="wide form-actions">
+          <button type="submit" class="btn primary">⚡ Arm rule</button>
+          <button type="button" id="btn-selftest" class="btn">🧪 Self-test rules</button>
+          <span id="rule-msg" class="form-msg" role="status"></span>
+        </div>
+      </form>
+      <p class="muted small">Self-test runs every enabled rule against synthetic fixtures (labeled SELF-TEST, never chain data) so you can preview exactly what an alert looks like before the chain produces one.</p>
+    </div>
+    <h2>Armed rules</h2>
+    <div id="rules-list" class="rules-list"></div>
+  </section>
+
+  <section id="tab-alerts" class="tabpane" role="tabpanel" aria-label="Alerts" hidden>
+    <div class="panel alert-controls">
+      <div class="form-actions">
+        <button id="btn-notify" class="btn">🔔 Enable browser notifications</button>
+        <label class="inline">Auto-scan
+          <select id="poll-interval">
+            <option value="0">off</option>
+            <option value="5">every 5 min</option>
+            <option value="15">every 15 min</option>
+            <option value="60">every hour</option>
+          </select>
+        </label>
+        <label class="inline">Severity
+          <select id="alert-filter">
+            <option value="all">all</option>
+            <option value="crit">critical</option>
+            <option value="warn">warning</option>
+            <option value="info">info</option>
+          </select>
+        </label>
+        <button id="btn-read" class="btn">✓ Mark all read</button>
+        <button id="btn-clear" class="btn danger">Clear read</button>
+      </div>
+      <p class="muted small" id="notify-note">Notifications fire only while this tab is open. The tower never sends your watchlist anywhere — everything is evaluated in this browser.</p>
+    </div>
+    <div id="alerts-feed" class="alerts-feed"></div>
+  </section>
+
+  <section id="tab-data" class="tabpane" role="tabpanel" aria-label="Data sources" hidden>
+    <div class="panel">
+      <h2>Where the tower looks</h2>
+      <dl class="kv" id="data-kv"></dl>
+      <ul class="scope-list">
+        <li><strong><span class="tag-yes">DOES</span> — try the live indexer first</strong>Every scan attempts the public Subsquid endpoint (<code>sqm.quantus.com</code>) with an 8&nbsp;second timeout. When the browser is allowed to reach it, the LIVE badge lights up.</li>
+        <li><strong><span class="tag-yes">DOES</span> — fall back to the committed snapshot</strong>The indexer only allowlists official Quantus domains for browser CORS, so community Pages apps normally land here. The snapshot badge always shows when the data was captured and at which block height.</li>
+        <li><strong><span class="tag-no">DOES NOT</span> — know balances outside the rich-list snapshot</strong>Per-address balances come from the Whale Watch top-200 snapshot. An address outside it shows <em>balance unknown</em> — balance rules stay quiet rather than guess.</li>
+        <li><strong><span class="tag-no">DOES NOT</span> — see the future</strong>Transfers come from a 15,000-block window snapshot refreshed by the builder loop. A scan only sees what the latest snapshot contains; staleness is shown, never hidden.</li>
+      </ul>
+      <div class="form-actions">
+        <button id="btn-export" class="btn">⇩ Export watchlist</button>
+        <label class="btn file">⇧ Import watchlist<input type="file" id="file-import" accept="application/json" hidden></label>
+      </div>
+      <p class="muted small">Export carries your watchlist, rules, and baselines as JSON — handy for moving the tower to another browser. Import merges by address; nothing is uploaded.</p>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER · WATCHTOWER</div>
+  </footer>
+</main>
+
+<script src="js/wordlist.js?v=1.30.0"></script>
+<script src="js/checkphrase-core.js?v=1.30.0"></script>
+<script src="js/ss58.js?v=1.30.0"></script>
+<script src="js/watch-core.js?v=1.30.0"></script>
+<script src="js/app.js?v=1.30.0"></script>
+</body>
+</html>

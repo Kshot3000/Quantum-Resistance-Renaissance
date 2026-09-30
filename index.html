@@ -149,6 +149,7 @@ section{padding:48px 0}
 .app-card.audit{--accent:#8fe3b0}.app-card.audit .app-ico{background:rgba(143,227,176,.12);border-color:rgba(143,227,176,.4)}
 .app-card.vesting{--accent:#f5c453}.app-card.vesting .app-ico{background:rgba(245,196,83,.12);border-color:rgba(245,196,83,.4)}
 .app-card.flow{--accent:#7ef0c9}.app-card.flow .app-ico{background:rgba(126,240,201,.12);border-color:rgba(126,240,201,.4)}
+.app-card.watch{--accent:#8fd6ff}.app-card.watch .app-ico{background:rgba(143,214,255,.12);border-color:rgba(143,214,255,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -493,6 +494,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Flow Tracer <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Follow the money on the quantum chain: trace any address hop by hop through a live-first indexer query with snapshot fallback, and let the pattern radar flag peel chains, distribution fan-outs, consolidation fan-ins, round-amount moves and miner forwarding — 5,361 real transfers across 1,204 addresses, click-anywhere dossiers, zero simulated data.</p>
         <div class="meta">18/18 logic tests green · peel/fan detectors on real indexer rows · browser QA green</div>
+      </a>
+      <a class="app-card watch" href="pages/watchtower/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🛰</div>
+          <span class="tag">Chain &amp; wallet alerts</span>
+        </div>
+        <h3>QTC Watchtower <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>The eyes that never blink on the quantum chain: watch any Quantus address and arm rules — balance thresholds, big transfers, whale moves, new referenda, runtime upgrades, chain stalls — scanned against live-first chain data with browser notifications, self-test previews, and honest snapshot-staleness badges. 100% client-side; moves no funds.</p>
+        <div class="meta">17/17 logic tests green · 10 rule types on real indexer rows · browser QA green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>
