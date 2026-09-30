@@ -154,6 +154,7 @@ section{padding:48px 0}
 .app-card.portfolio{--accent:#6ee7b7}.app-card.portfolio .app-ico{background:rgba(110,231,183,.12);border-color:rgba(110,231,183,.4)}
 .app-card.mempool{--accent:#40e0ff}.app-card.mempool .app-ico{background:rgba(64,224,255,.12);border-color:rgba(64,224,255,.4)}
 .app-card.ledger{--accent:#4ade80}.app-card.ledger .app-ico{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.4)}
+.app-card.consensus{--accent:#6df2b8}.app-card.consensus .app-ico{background:rgba(109,242,184,.12);border-color:rgba(109,242,184,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -552,6 +553,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Ledger Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The miner &amp; holder tax ledger: watch your addresses with checkphrase read-back, auto-detect mining income from real chain snapshots via the verified emission model, run exact FIFO/LIFO/HIFO cost basis to the planck, keep your own price table (no market price exists yet — nothing invented), and export accountant-ready tax-year reports with CSV. 100% client-side.</p>
         <div class="meta">19/19 ledger tests green · 16/16 browser QA checks green · zero console errors</div>
+      </a>
+      <a class="app-card consensus" href="pages/consensus-lab/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">⚛</div>
+          <span class="tag">Difficulty laboratory</span>
+        </div>
+        <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+306,244% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <div class="meta">29/29 consensus tests green · full browser QA green · zero console errors</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

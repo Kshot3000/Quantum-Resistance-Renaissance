@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Consensus Lab — the difficulty &amp; proof-of-work laboratory</title>
+<meta name="description" content="QTC Consensus Lab: the exact per-block difficulty retarget of Quantus (read from the runtime source), difficulty history recomputed from real block timestamps, block-time observatory, Poseidon2 PoW anatomy, chain-selection rules, and an honest 51% cost lab.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.37.0">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">&#9673;</span>
+    <div><strong>QTC Consensus Lab</strong><span>The difficulty &amp; proof-of-work laboratory</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill" id="snapPill" title="Data provenance">loading snapshot&hellip;</span>
+  </div>
+</header>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/" class="current"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+
+<main>
+  <section class="hero panel">
+    <div class="hero-copy">
+      <p class="kicker">Quantus &middot; QTC &middot; consensus, read from the source</p>
+      <h1>Every block renegotiates<br>how hard the next one <em>is</em>.</h1>
+      <p class="lede">Quantus doesn't retarget every 2,016 blocks like Bitcoin. It retargets
+      <strong>every single block</strong> — an Ethereum-Homestead-style formula running inside
+      <code>pallet_qpow</code>, fed by the block's own timestamp. This lab replays that exact
+      algorithm over every real block timestamp since genesis, so the difficulty curve below is
+      the chain's actual difficulty curve &mdash; recomputed, not sampled.</p>
+      <div class="honesty">
+        <span class="badge warn">&#9888; Difficulty is <em>recomputed</em> from on-chain timestamps with the exact runtime algorithm &mdash; the indexer doesn't publish it directly.</span>
+        <span class="badge">All constants read from Quantus-Network/chain source (links in Method).</span>
+        <span class="badge ok">100% client-side &middot; nothing leaves your browser</span>
+      </div>
+    </div>
+    <div class="hero-stats" id="heroStats" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" id="sec-formula" aria-labelledby="h-formula">
+    <h2 id="h-formula">The retarget, exactly</h2>
+    <p class="sec-lede">One function, run at the end of every block (<code>on_finalize</code>).
+    Same formula as Ethereum's Homestead &mdash; rescaled to a 12-second target.</p>
+    <div class="formula-grid">
+      <div class="formula-card">
+        <div class="fc-title">pallet_qpow::calculate_difficulty</div>
+<pre class="code">block_time = max(observed_ms, 500)        // author-controlled floor
+divisor    = max(target * 10 / 12, 1)     // 12_000 -> 10_000 ms
+time_factor = block_time / divisor        // integer division
+adjustment  = max(1 - time_factor, -99)
+increment   = parent_difficulty / 2048
+new = parent + increment * adjustment      // clamped to [2^17, 2^512-1]</pre>
+        <div class="const-table" id="constTable"></div>
+      </div>
+      <div class="sim-card">
+        <div class="fc-title">Step simulator &mdash; drive one retarget yourself</div>
+        <label class="fld">Observed block time
+          <span class="fld-row"><input id="simTime" type="range" min="100" max="120000" step="100" value="12000">
+          <output id="simTimeOut" class="mono">12.0 s</output></span>
+        </label>
+        <label class="fld">Parent difficulty
+          <span class="fld-row"><input id="simDiff" type="text" inputmode="numeric" value="306344884677664" class="mono">
+          <button id="simUseLive" class="btn ghost" type="button">use live</button></span>
+        </label>
+        <div class="sim-steps" id="simSteps" aria-live="polite"></div>
+        <p class="fine">Integer math only &mdash; the same BigInt steps the runtime executes. The live default fills in when the snapshot loads.</p>
+      </div>
+    </div>
+    <h3 class="sub">Retarget zones at the 12&nbsp;s target</h3>
+    <div class="table-wrap"><table class="zones" id="zoneTable">
+      <thead><tr><th>Observed block time</th><th>time_factor</th><th>adjustment</th><th>Effect</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="callout asym">
+      <strong>Asymmetric by design:</strong> difficulty can only ever climb <strong>+1/2048 (&asymp;+0.049%)</strong>
+      per block &mdash; the 500&nbsp;ms floor caps the upside &mdash; but it can fall up to
+      <strong>&minus;99/2048 (&asymp;&minus;4.83%)</strong> per block. It falls fast and climbs slow:
+      after a stall, recovery is a long grind upward. The dead zone (10&ndash;20&nbsp;s) means small
+      jitter changes nothing.
+    </div>
+  </section>
+
+  <section class="panel" id="sec-history" aria-labelledby="h-history">
+    <h2 id="h-history">Difficulty history &mdash; recomputed from genesis</h2>
+    <p class="sec-lede">Every point below comes from replaying the retarget over the real timestamps of all
+    <span class="mono" id="histBlocks">&hellip;</span> indexed blocks. Toggle the scale; drag the recent window.</p>
+    <div class="chart-bar">
+      <div class="seg" role="group" aria-label="Chart range">
+        <button type="button" data-range="trend" class="on">Genesis &rarr; now</button>
+        <button type="button" data-range="recent">Last 1,500 blocks</button>
+      </div>
+      <div class="seg" role="group" aria-label="Y scale">
+        <button type="button" data-scale="log" class="on">log</button>
+        <button type="button" data-scale="lin">linear</button>
+      </div>
+    </div>
+    <canvas id="diffChart" height="300" aria-label="Difficulty history chart"></canvas>
+    <div class="stat-row" id="histStats"></div>
+    <p class="fine" id="histNote"></p>
+  </section>
+  <section class="panel" id="sec-blocktime" aria-labelledby="h-blocktime">
+    <h2 id="h-blocktime">Block-time observatory</h2>
+    <p class="sec-lede">What the chain actually felt like: inter-block times from the last
+    <span class="mono" id="btSample">&hellip;</span> blocks, against the memoryless ideal a perfect 12-second Poisson process would draw.</p>
+    <div class="bt-grid">
+      <div><canvas id="btChart" height="260" aria-label="Block time distribution chart"></canvas>
+        <p class="fine">Log-spaced buckets. The amber curve is the ideal exponential with &lambda; = 1/12&nbsp;s.</p></div>
+      <div class="bt-stats" id="btStats"></div>
+    </div>
+    <div class="callout">
+      <strong>Honest caveat:</strong> block time here is the <em>author-controlled timestamp delta</em> the runtime
+      feeds the retarget &mdash; not a measured network latency. The 500&nbsp;ms floor exists precisely because a
+      block author could otherwise lie the timestamp downward; flooring &ldquo;can only lower the adjustment, so it
+      can never stall the chain&rdquo; (source comment, <code>pallets/qpow/src/lib.rs</code>).
+    </div>
+  </section>
+
+  <section class="panel" id="sec-pow" aria-labelledby="h-pow">
+    <h2 id="h-pow">PoW anatomy: Poseidon2, not SHA-256</h2>
+    <p class="sec-lede">Quantus mining hashes with <strong>Poseidon2</strong> &mdash; a ZK-friendly algebraic hash &mdash;
+    instead of SHA-256. The 512-bit output is the whole point.</p>
+    <div class="pow-flow" aria-label="Proof of work data flow">
+      <div class="pow-node"><span class="pn-k">block_hash</span><span class="pn-v mono">32 bytes</span></div>
+      <div class="pow-op" aria-hidden="true">&#10799;</div>
+      <div class="pow-node"><span class="pn-k">nonce</span><span class="pn-v mono">64 bytes (512-bit)</span></div>
+      <div class="pow-op" aria-hidden="true">&rarr;</div>
+      <div class="pow-node glow"><span class="pn-k">Poseidon2 double-squeeze</span><span class="pn-v mono">512-bit digest</span></div>
+      <div class="pow-op" aria-hidden="true">&rarr;</div>
+      <div class="pow-node"><span class="pn-k">valid iff</span><span class="pn-v mono">digest &lt; 2<sup>512</sup> / D</span></div>
+    </div>
+    <div class="fact-grid">
+      <div class="fact"><span class="k">Expected hashes to win a block</span><span class="v mono">= difficulty D</span></div>
+      <div class="fact"><span class="k">Network hashrate</span><span class="v mono">&asymp; D / 12 s</span></div>
+      <div class="fact"><span class="k">Nonce space</span><span class="v mono">2<sup>512</sup> (zero nonce rejected)</span></div>
+      <div class="fact"><span class="k">Hash function</span><span class="v mono">qp_poseidon_core::hash_squeeze_twice</span></div>
+    </div>
+    <div class="callout quantum">
+      <strong>Why 512 bits matters post-quantum:</strong> Grover's algorithm halves the effective security of a hash
+      search. SHA-256 PoW (Bitcoin) drops to ~128-bit quantum security; Quantus's 512-bit Poseidon2 output keeps
+      ~256-bit quantum security for the mining puzzle itself. The signatures (ML-DSA) and the PoW were both sized
+      for the quantum era &mdash; read the math in <code>qpow-math/src/lib.rs</code>.
+    </div>
+  </section>
+
+  <section class="panel" id="sec-finality" aria-labelledby="h-finality">
+    <h2 id="h-finality">Chain selection &amp; settlement</h2>
+    <div class="two-col">
+      <div>
+        <h3 class="sub">Heaviest <em>target</em> chain wins</h3>
+        <p>Chain work is the <strong>sum of per-block target difficulties</strong> &mdash; deliberately <em>not</em>
+        the achieved difficulty of the winning hashes. From the source: every block at a given difficulty contributes
+        an identical, deterministic amount of work, &ldquo;so cumulative chain work tracks expended hash power instead
+        of being dominated by a single lucky hash.&rdquo; A freak lucky block buys no extra chain weight.</p>
+        <p>The runtime exposes this through <code>verify_and_get_achieved_difficulty</code> (legacy name kept on
+        purpose): it returns the block's <em>difficulty</em>, and the client accumulates
+        <code>parent_work + difficulty</code>. Because the metric lives on-chain, flipping the whole network to
+        target-based work needed only a Wasm upgrade &mdash; no coordinated node-binary rollout.</p>
+      </div>
+      <div>
+        <h3 class="sub">The 100-block reorg bound</h3>
+        <p><code>MaxReorgDepth = 100</code>: the protocol's own rule for how deep a reorganization may go.
+        Treat it as settlement guidance, not a promise:</p>
+        <div class="table-wrap"><table class="zones">
+          <thead><tr><th>Confirmations</th><th>Reading</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">1&ndash;12</td><td>Fresh; fine for pocket change, reorgable in principle</td></tr>
+            <tr><td class="mono">13&ndash;100</td><td>Deepening; a reorg here is expensive but protocol-legal</td></tr>
+            <tr><td class="mono">&gt; 100</td><td>Beyond the protocol's max reorg depth &mdash; the chain's own finality line</td></tr>
+          </tbody>
+        </table></div>
+        <p class="fine">Quantus has no GRANDPA-style deterministic finality on PoW blocks; &gt;100 confirmations is the
+        closest thing to &ldquo;settled&rdquo; the protocol defines. Exchanges and bridges should key their
+        confirmation requirements to this number.</p>
+      </div>
+    </div>
+  </section>
+  <section class="panel" id="sec-attack" aria-labelledby="h-attack">
+    <h2 id="h-attack">51% cost lab</h2>
+    <p class="sec-lede">What would it cost to out-hash the network? Enter your own hardware &mdash; the lab prices
+    the attack honestly, including the part most calculators skip: there is no public rental market for qpow hashrate.</p>
+    <div class="attack-grid">
+      <div class="attack-inputs">
+        <label class="fld">Your hashrate per rig <span class="fld-row"><input id="atkH" type="text" value="50" class="mono"><select id="atkHU"><option value="1e3">kH/s</option><option value="1e6" selected>MH/s</option><option value="1e9">GH/s</option></select></span></label>
+        <label class="fld">Rigs you could deploy <input id="atkN" type="number" value="100" min="1" class="mono"></label>
+        <label class="fld">Capex per rig (USD) <input id="atkCapex" type="number" value="2500" min="0" class="mono"></label>
+        <label class="fld">Power per rig (W) <input id="atkW" type="number" value="800" min="0" class="mono"></label>
+        <label class="fld">Electricity ($/kWh) <input id="atkKwh" type="number" value="0.10" step="0.01" min="0" class="mono"></label>
+        <label class="fld">Attack duration (hours) <input id="atkHrs" type="number" value="6" min="1" class="mono"></label>
+      </div>
+      <div class="attack-out" id="attackOut" aria-live="polite"></div>
+    </div>
+    <div class="callout">
+      <strong>Honest limits:</strong> qpow is CPU-mined Poseidon2 (see MINING.md upstream) &mdash; no ASICs, no known
+      GPU miners at scale, no NiceHash-style rental market to price against. Your rig numbers are <em>yours</em>; the
+      network hashrate is the recomputed live estimate. Sustaining &gt;50% also means outrunning the honest chain's
+      difficulty for the whole attack window while the retarget fights back downward on your private fork's slow start.
+    </div>
+  </section>
+
+  <section class="panel" id="sec-method" aria-labelledby="h-method">
+    <h2 id="h-method">Method &amp; sources</h2>
+    <div class="table-wrap"><table class="zones src">
+      <thead><tr><th>Claim on this page</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>Per-block Homestead-style retarget formula</td><td class="mono">pallets/qpow/src/lib.rs :: calculate_difficulty</td></tr>
+        <tr><td>Target block time 12,000 ms</td><td class="mono">runtime/src/lib.rs :: TARGET_BLOCK_TIME_MS</td></tr>
+        <tr><td>Genesis difficulty 99,999,999,999</td><td class="mono">runtime/src/configs/mod.rs :: QPoWInitialDifficulty</td></tr>
+        <tr><td>Minimum difficulty 2<sup>17</sup> = 131,072</td><td class="mono">pallets/qpow/src/lib.rs :: get_min_difficulty</td></tr>
+        <tr><td>500 ms retarget floor</td><td class="mono">pallets/qpow/src/lib.rs :: MIN_RETARGET_BLOCK_TIME_MS</td></tr>
+        <tr><td>Max reorg depth 100</td><td class="mono">runtime/src/configs/mod.rs :: MaxReorgDepth</td></tr>
+        <tr><td>Poseidon2 double-squeeze, validity = hash &lt; 2<sup>512</sup>/D</td><td class="mono">qpow-math/src/lib.rs :: is_valid_nonce</td></tr>
+        <tr><td>Target-based chain work (not achieved)</td><td class="mono">pallets/qpow/src/lib.rs :: verify_and_get_achieved_difficulty</td></tr>
+        <tr><td>Block timestamps &amp; heights</td><td class="mono">sqm.quantus.com/v1/graphql (public Subsquid indexer)</td></tr>
+      </tbody>
+    </table></div>
+    <p class="fine">Difficulty history is <strong>recomputed</strong>, not read: the indexer doesn't expose
+    <code>QPoW.CurrentDifficulty</code> storage, so <code>scripts/fetch-consensus-data.mjs</code> replays the exact
+    runtime algorithm over every real block timestamp (genesis block uses the 12&nbsp;s target, exactly as
+    <code>on_finalize</code> does). All 142k+ heights indexed with zero gaps at snapshot time; re-run the script and
+    commit to refresh. Verified against upstream 2026-09-30.</p>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work &mdash; not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER &middot; CONSENSUS LAB</div>
+  </footer>
+</main>
+
+<script src="app.js?v=1.37.0" type="module"></script>
+</body>
+</html>
