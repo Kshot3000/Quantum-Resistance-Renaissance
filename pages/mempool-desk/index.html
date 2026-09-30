@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Mempool Desk — Quantus Muse Builder</title>
+<meta name="description" content="The transaction-pool command center for Quantus: connect to any node, watch the live mempool, get txWatch zero-confirmation signals on your addresses, and estimate real fees — 100% client-side, nothing simulated.">
+<meta name="theme-color" content="#04070d">
+<link rel="stylesheet" href="styles.css?v=1.32.0">
+<style>:root{--focus:#40e0ff;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="poolfield" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Mempool Desk</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/chain/blob/HEAD/docs/rpc_additions/transaction_pool_listener.md" target="_blank" rel="noopener">txWatch upstream docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">official explorer</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/" class="current"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Quantus mainnet · Transaction-pool desk · 100% client-side</p>
+    <h1>Read the pool <span class="glow">before the block</span> does</h1>
+    <p class="lede">Connect to any Quantus node and watch its transaction pool in real time: pending-extrinsic gauges, live <code>txWatch</code> signals the second a transfer <em>requests</em> your address, and node-quoted fee estimates on what's actually waiting. No node, no data — nothing here is ever simulated.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Node</span><span class="v" id="fact-node" style="font-size:15px">offline</span></div>
+      <div class="fact"><span class="k">Pending</span><span class="v hot" id="fact-pending">—</span></div>
+      <div class="fact"><span class="k">Pool bytes</span><span class="v cool" id="fact-bytes">—</span></div>
+      <div class="fact"><span class="k">Watched</span><span class="v warm" id="fact-watchers">0 addresses</span></div>
+      <div class="fact"><span class="k">Signals</span><span class="v" id="fact-signals">0</span></div>
+    </div>
+  </section>
+
+  <section class="connbar">
+    <span id="conn-badge" class="badge off">○ OFFLINE</span>
+    <span class="scan-meta" id="pool-health-note">Connect a node to light up the desk.</span>
+  </section>
+
+  <nav class="tabnav" aria-label="Mempool Desk sections">
+    <button class="tab active" data-tab="connect" aria-selected="true">Connection</button>
+    <button class="tab" data-tab="mempool" aria-selected="false">Mempool</button>
+    <button class="tab" data-tab="watchers" aria-selected="false">Watchers <span id="watcher-count" class="pill" hidden></span></button>
+    <button class="tab" data-tab="signals" aria-selected="false">Signals <span id="signal-count" class="pill" hidden></span></button>
+    <button class="tab" data-tab="fees" aria-selected="false">Fee Desk</button>
+    <button class="tab" data-tab="learn" aria-selected="false">Learn</button>
+  </nav>
+
+  <section id="tab-connect" class="tabpane active" aria-label="Connection">
+    <div class="panel">
+      <h2>Connect a node</h2>
+      <p class="muted">Any Substrate WebSocket RPC works — your own node, or the upstream-documented public mainnet RPC. The endpoint is saved in this browser only.</p>
+      <form class="form-grid" onsubmit="return false" autocomplete="off">
+        <label class="wide">Node WebSocket endpoint
+          <input id="endpoint-input" class="mono" spellcheck="false" placeholder="wss://rpc.quantus.network">
+        </label>
+        <div class="form-actions">
+          <button id="btn-connect" class="btn primary">Connect</button>
+          <span id="conn-msg" class="form-msg" role="status"></span>
+        </div>
+      </form>
+    </div>
+    <div class="panel">
+      <h2>Socket status</h2>
+      <div id="conn-grid"></div>
+      <h2 style="margin-top:20px">Session log</h2>
+      <div id="conn-log" class="conn-log" aria-live="polite"></div>
+      <p class="muted small" style="margin-top:14px">Reconnects use exponential backoff (1s → 30s cap) and resubscribe every watcher automatically. Upstream notes the txWatch RPC is unauthenticated — operators exposing it publicly should front it with a reverse proxy or rate limits; if your node's pool RPCs are gated, the desk tells you exactly which calls the node refused instead of guessing.</p>
+    </div>
+  </section>
+
+  <section id="tab-mempool" class="tabpane" aria-label="Mempool" hidden>
+    <div class="connbar" style="margin-top:0">
+      <span id="pool-health" class="badge off">○ NO POOL DATA</span>
+      <span class="scan-meta" id="pool-meta">Waiting for a socket.</span>
+      <button id="btn-estimate-fees" class="btn">⚡ Estimate pool fees</button>
+      <span id="fee-msg" class="form-msg" role="status"></span>
+    </div>
+    <div id="pool-gauge" class="gauge-row"></div>
+    <canvas id="pool-spark" aria-label="Pending transaction history"></canvas>
+    <h2>Pending extrinsics <span class="sub">from author_pendingExtrinsics, newest poll</span></h2>
+    <div id="pool-body"></div>
+  </section>
+
+  <section id="tab-watchers" class="tabpane" aria-label="Watchers" hidden>
+    <div class="zero-conf">
+      <h3>⚠ Zero-confirmation signals — read this first</h3>
+      <ul>
+        <li>A signal means a transaction <strong>requesting</strong> a transfer to your address entered the node's pool with a valid signature. It does <strong>not</strong> mean the transfer happened, or ever will.</li>
+        <li>The transaction may be dropped, replaced, or fail at execution — and anyone can craft a convincing-looking signal that never moves funds.</li>
+        <li><strong>Never release goods, mark an invoice paid, or credit a balance on a signal alone.</strong> Confirm inclusion in a finalized block first (per the upstream txWatch docs).</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h2>Watch an address</h2>
+      <p class="muted">SS58 addresses on prefix 189 are checksum-validated before they join. One txWatch subscription per address covers every payment to it.</p>
+      <form id="watch-form" class="form-grid" autocomplete="off">
+        <label class="wide">Address
+          <input id="watch-address" spellcheck="false" placeholder="qz…" required>
+        </label>
+        <label class="wide">Label
+          <input id="watch-label" placeholder="e.g. Shop till" maxlength="40">
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn primary">＋ Watch address</button>
+          <button type="button" id="btn-notify" class="btn">🔔 Enable signal popups</button>
+          <span id="watch-msg" class="form-msg" role="status"></span>
+          <span id="notify-msg" class="form-msg" role="status"></span>
+        </div>
+      </form>
+    </div>
+    <h2>Watched addresses</h2>
+    <div id="watchers-list"></div>
+  </section>
+
+  <section id="tab-signals" class="tabpane" aria-label="Signals" hidden>
+    <h2>Pool signals <span class="sub">unconfirmed transfer requests, newest first</span></h2>
+    <div id="signal-feed"></div>
+  </section>
+
+  <section id="tab-fees" class="tabpane" aria-label="Fee Desk" hidden>
+    <div class="panel">
+      <h2>How fee quotes work here</h2>
+      <p class="muted">Every quote below comes from the connected node's <code>payment_queryInfo</code> — the same partialFee the runtime would charge at the current head. The desk never invents a fee. Amounts are shown in QTC (1 QTC = 10<sup>12</sup> planck, per upstream docs).</p>
+      <div id="fee-results"></div>
+    </div>
+    <div class="panel">
+      <h2>Quote a single extrinsic</h2>
+      <p class="muted">Paste any signed extrinsic hex (0x…) and the desk asks your node what it would cost.</p>
+      <form class="form-grid" onsubmit="return false" autocomplete="off">
+        <label class="wide">Extrinsic hex
+          <textarea id="fee-hex" rows="3" class="mono" spellcheck="false" placeholder="0x…"></textarea>
+        </label>
+        <div class="form-actions">
+          <button id="btn-fee-paste" class="btn primary">Get node quote</button>
+          <span id="fee-paste-msg" class="form-msg" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="tab-learn" class="tabpane" aria-label="Learn" hidden>
+    <div class="learn-grid">
+      <div class="learn-card">
+        <h3>Why the pool matters on Quantus</h3>
+        <p class="muted">Quantus transactions are large — post-quantum ML-DSA signatures push a typical transfer toward ~7 KB — and the chain handles that with native transaction aggregation (claimed ~430 TPS design throughput). A fat mempool is where fee pressure shows up first: this desk reads it raw.</p>
+        <div class="agg-facts">
+          <div class="fact"><span class="k">Typical tx size</span><span class="v cool">~7 KB</span></div>
+          <div class="fact"><span class="k">Design throughput</span><span class="v">~430 TPS</span></div>
+          <div class="fact"><span class="k">Signature scheme</span><span class="v warm">ML-DSA</span></div>
+          <div class="fact"><span class="k">Unit</span><span class="v">10¹² planck</span></div>
+        </div>
+        <p class="muted small">Size/throughput figures are Quantus's stated design claims (Sept 2026 coverage); the pool gauges above measure the live reality instead.</p>
+      </div>
+      <div class="learn-card">
+        <h3>txWatch — the pool-listener RPC</h3>
+        <p class="muted">A Quantus node addition (<code>chain/docs/rpc_additions/transaction_pool_listener.md</code>), built for point-of-sale payment detection:</p>
+        <ul>
+          <li><code>txWatch_watchAddress(address)</code> → subscription id</li>
+          <li><code>txWatch_transfer</code> notifications: <code>{tx_hash, from, amount, asset_id}</code></li>
+          <li><code>txWatch_unwatchAddress(subscriptionId)</code> to release</li>
+          <li>Watches native transfers, asset transfers, and <code>batch_all</code> nests up to 4 deep</li>
+          <li>Error 5011 = invalid SS58 address</li>
+        </ul>
+      </div>
+      <div class="learn-card">
+        <h3>The 5-step receive flow (per upstream)</h3>
+        <ol>
+          <li>Generate the invoice — QR with your address + expected amount.</li>
+          <li>Open the txWatch subscription for that address.</li>
+          <li>Wait for the signal — show “payment detected, confirming…”.</li>
+          <li><strong>Verify execution</strong> — wait for a finalized block and check the <code>Balances.Transfer</code> event or the balance.</li>
+          <li>Unsubscribe when the payment screen closes.</li>
+        </ol>
+      </div>
+      <div class="learn-card">
+        <h3>Node-operator notes</h3>
+        <ul>
+          <li>Reconnect with backoff — WebSockets drop; this desk does.</li>
+          <li>txWatch has no per-method cap, but nodes bound it at <code>--rpc-max-connections</code> (100) / <code>--rpc-max-subscriptions-per-connection</code> (1024).</li>
+          <li>Batch payments fire one notification per matching transfer inside the same <code>tx_hash</code> — call data, not execution outcome.</li>
+          <li>Only port 30333 (P2P) is meant to be public; keep RPC 9944 and the miner port private or proxied.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:18px">
+      <h2>Data honesty</h2>
+      <p class="muted">This desk has no demo mode and no fallback dataset. Every number on screen came from the socket you connected, in the last few seconds — or the desk says plainly that it has no data. If your node gates <code>author_pendingExtrinsics</code>, the Mempool tab says so instead of inventing a pool.</p>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER · MEMPOOL DESK</div>
+  </footer>
+</main>
+
+<script src="js/ss58.js?v=1.32.0"></script>
+<script src="js/rpc-core.js?v=1.32.0"></script>
+<script src="js/app.js?v=1.32.0"></script>
+</body>
+</html>
