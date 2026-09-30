@@ -22,6 +22,7 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `emission-lab/` — QTC Emission Lab (exact on-chain reward formula R = (21M − S) / 50,000,000 verified against the runtime source, live reward pulse, interactive decay simulator, milestone timeline, 80-year supply projections — no halvings, Sept 30, 2026)
   - `mining-observatory/` — QTC Mining Observatory (miner decentralization from real mainnet coinbase data: Nakamoto coefficient, Herfindahl index vs DOJ bands, 51% crossing curve, miner leaderboard with explorer deep-links, concentration-over-time charts — Sept 30, 2026)
   - `swap-desk/` — QTC Swap Desk (live NEAR Intents 1Click listing watch — probes the public token list for the QTC listing — plus real swap mechanics from the wallet team's integration docs: both directions, fee/slippage lab, order status lifecycle, deadlines/refunds/safety — Sept 30, 2026)
+  - `dev-hub/` — QTC Developer Hub (verified chain constants, full runtime pallet index map 0–23 incl. vacant indices, exact BigInt QTC/planck converter, SS58 + ML-DSA account primer, connection recipes, JSON-RPC request builder, upstream repo map — every constant read from Quantus-Network/chain source — Sept 30, 2026)
 
 ## Live data
 

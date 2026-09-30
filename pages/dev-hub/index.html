@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Developer Hub — build on Quantus</title>
+<meta name="description" content="QTC Developer Hub: verified chain constants, the full pallet index map, a QTC/planck converter, SS58 + ML-DSA account primer, connection recipes, a JSON-RPC request builder, and the upstream repo map — every constant sourced from Quantus-Network/chain.">
+<link rel="stylesheet" href="styles.css?v=1.18.0">
+<style>:root{--focus:#4df0a4;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="gridfield" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Developer Hub</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+      <a href="https://github.com/Quantus-Network/docs" target="_blank" rel="noopener">Docs</a>
+      <a href="../address-toolkit/">Address Toolkit</a>
+      <a href="../safesend/">SafeSend Lab</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/" class="current"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section class="hero">
+    <div class="hero-top">
+      <span class="pill"><span class="live-dot" aria-hidden="true"></span>constants verified against upstream source</span>
+      <span class="pill ghost">Quantus-Network/chain · checked 2026-09-30</span>
+    </div>
+    <h1>The developer console for the <span class="glow">quantum-era chain</span></h1>
+    <p class="lede">Every constant on this page was read out of the upstream chain source — chain_spec.rs and the runtime — not copied from memory. Build against it: pallet indices, fees, units, accounts, and working connection recipes.</p>
+  </section>
+
+  <section id="constants" class="panel" aria-labelledby="h-const">
+    <div class="sec-head">
+      <h2 id="h-const">Chain constants</h2>
+      <p>Read from <a href="https://github.com/Quantus-Network/chain/blob/main/node/src/chain_spec.rs" target="_blank" rel="noopener">node/src/chain_spec.rs</a> and <a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/lib.rs" target="_blank" rel="noopener">runtime/src/lib.rs</a> on 2026-09-30.</p>
+    </div>
+    <div id="constGrid" class="const-grid"></div>
+  </section>
+
+  <section id="pallets" class="panel" aria-labelledby="h-pallet">
+    <div class="sec-head">
+      <h2 id="h-pallet">Runtime pallet map</h2>
+      <p>The full index map from <code>#[frame_support::runtime]</code> in runtime/src/lib.rs — including the vacant indices where pallets were removed (kept empty so downstream indices stay stable). Type an index number to jump straight to it.</p>
+    </div>
+    <div class="pallet-tools">
+      <label class="lookup">Pallet index
+        <input id="palletLookup" type="number" min="0" max="99" placeholder="e.g. 11" inputmode="numeric" aria-label="Look up pallet by index">
+      </label>
+      <label class="search">Search
+        <input id="palletSearch" type="search" placeholder="balances, multisig, wormhole…" aria-label="Search pallets">
+      </label>
+    </div>
+    <div class="pallet-split">
+      <div class="pallet-list-wrap" role="region" aria-label="Pallet list">
+        <table class="pallet-table" id="palletTable">
+          <thead><tr><th scope="col">Index</th><th scope="col">Pallet</th><th scope="col">Status</th></tr></thead>
+          <tbody id="palletRows"></tbody>
+        </table>
+      </div>
+      <div class="pallet-detail" id="palletDetail" role="region" aria-live="polite" aria-label="Pallet detail">
+        <div class="detail-empty">Select a pallet to see its calls, notes, and source pointer.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="converter" class="panel" aria-labelledby="h-conv">
+    <div class="sec-head">
+      <h2 id="h-conv">Unit converter — exact to the planck</h2>
+      <p>QTC uses 12 decimals: 1 QTC = 10<sup>12</sup> plancks (runtime <code>UNIT</code>). Math runs on BigInt — no floating-point dust. The existential deposit is 0.001 QTC (1,000,000,000 plancks).</p>
+    </div>
+    <div class="conv-grid">
+      <label class="conv-box">Amount
+        <input id="convIn" type="text" inputmode="decimal" placeholder="0.001" value="1">
+        <span class="hint">up to 12 decimals</span>
+      </label>
+      <div class="conv-swap">
+        <button id="convFlip" class="btn ghost" type="button" aria-label="Swap direction">⇅</button>
+        <div class="dir" id="convDir">QTC → plancks</div>
+      </div>
+      <div class="conv-out">
+        <div class="conv-label">Result</div>
+        <output id="convOut" class="conv-result">1,000,000,000,000</output>
+        <div class="conv-sub" id="convSub">plancks</div>
+        <div class="conv-warn" id="convWarn" hidden>⚠ below the existential deposit (0.001 QTC) — a transfer this small cannot keep an account alive.</div>
+        <button id="convCopy" class="btn ghost small" type="button">Copy result</button>
+      </div>
+    </div>
+    <div class="conv-presets" role="group" aria-label="Presets">
+      <button type="button" data-v="0.001" data-u="qtc">ED = 0.001 QTC</button>
+      <button type="button" data-v="0.32" data-u="qtc">≈ 1 block reward</button>
+      <button type="button" data-v="21000000" data-u="qtc">21M cap</button>
+      <button type="button" data-v="100000" data-u="plancks">100,000 plancks (fee/byte)</button>
+    </div>
+  </section>
+
+  <section id="accounts" class="panel" aria-labelledby="h-acct">
+    <div class="sec-head">
+      <h2 id="h-acct">Accounts &amp; keys</h2>
+      <p>The part of Quantus that breaks Substrate muscle memory: accounts are keyed by post-quantum ML-DSA, not sr25519.</p>
+    </div>
+    <div class="acct-grid">
+      <div class="acct-card">
+        <h3>Address format</h3>
+        <ul>
+          <li><strong>SS58 prefix 189</strong> — every Quantus address starts with <code>qz…</code> (<span class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</span>)</li>
+          <li>32-byte public key + 2-byte blake2b checksum, base58-encoded (standard SS58)</li>
+          <li>Human-readable checkphrases come from <a href="https://github.com/Quantus-Network/qp-human-checkphrase" target="_blank" rel="noopener">qp-human-checkphrase</a> — the same encoding SafeSend verifies</li>
+        </ul>
+        <a class="btn ghost small" href="../address-toolkit/">Open the Address Toolkit →</a>
+      </div>
+      <div class="acct-card">
+        <h3>Key type</h3>
+        <ul>
+          <li>ML-DSA (Dilithium family) keys — ML-DSA-65 / ML-DSA-87 since the genesis block</li>
+          <li>Signatures are ~2.6–4.6 KB; that's why Quantus transactions are ~7 KB and need native aggregation</li>
+          <li><strong>Do not</strong> generate keys with polkadot-js's sr25519/ed25519 keyring — create them in the official wallet or <code>quantus-cli</code></li>
+        </ul>
+        <a class="btn ghost small" href="../safesend/">Open the SafeSend Lab →</a>
+      </div>
+      <div class="acct-card">
+        <h3>Balance rules</h3>
+        <ul>
+          <li>Existential deposit: <strong>0.001 QTC</strong> — accounts below it are reaped</li>
+          <li>Use <code>balances.transferKeepAlive</code> so you can't accidentally kill your own account</li>
+          <li>Reversible transfers (SafeSend) hold funds on a delay — the pallet can <code>recover_funds</code> to the sender if the receiver never claims</li>
+        </ul>
+        <a class="btn ghost small" href="../fee-throughput-lab/">Open the Fee &amp; Throughput Lab →</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="recipes" class="panel" aria-labelledby="h-rec">
+    <div class="sec-head">
+      <h2 id="h-rec">Connection recipes</h2>
+      <p>Copy-paste starting points. Honest limits are printed with each recipe — the indexer at <code>sqm.quantus.com</code> only accepts browser calls from allowlisted official domains, so browser apps should read the <a href="../../data/live.json">same-origin snapshot</a>; GraphQL works from servers. No public RPC endpoint is published in the docs as of Sept 2026 — run your own node from the <code>chain</code> repo for RPC.</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Recipes">
+      <button role="tab" aria-selected="true" data-tab="r-js" class="on">polkadot-js: read state</button>
+      <button role="tab" aria-selected="false" data-tab="r-tx">polkadot-js: send QTC</button>
+      <button role="tab" aria-selected="false" data-tab="r-batch">utility.batchAll</button>
+      <button role="tab" aria-selected="false" data-tab="r-gql">GraphQL indexer</button>
+      <button role="tab" aria-selected="false" data-tab="r-safesend">Reversible transfer</button>
+    </div>
+    <div class="recipe-body">
+      <pre class="code" id="recipeCode" tabindex="0"></pre>
+      <div class="recipe-foot">
+        <span class="note" id="recipeNote"></span>
+        <button id="recipeCopy" class="btn ghost small" type="button">Copy recipe</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="rpc" class="panel" aria-labelledby="h-rpc">
+    <div class="sec-head">
+      <h2 id="h-rpc">JSON-RPC request builder</h2>
+      <p>Point this at <strong>your own node</strong> (<code>http://localhost:9944</code> by default). Pick a method, fill the params, copy the JSON — paste into <code>curl</code> or your HTTP client.</p>
+    </div>
+    <div class="rpc-grid">
+      <label class="rpc-method">Method
+        <select id="rpcMethod">
+          <option value="system_chain">system_chain — chain name</option>
+          <option value="system_name">system_name — node name</option>
+          <option value="system_version">system_version — node version</option>
+          <option value="chain_getBlockHash">chain_getBlockHash — hash by number</option>
+          <option value="chain_getHeader">chain_getHeader — latest header</option>
+          <option value="chain_getBlock">chain_getBlock — full block by hash</option>
+          <option value="state_getStorage">state_getStorage — raw storage value</option>
+          <option value="state_getMetadata">state_getMetadata — runtime metadata</option>
+          <option value="payment_queryFeeDetails">payment_queryFeeDetails — fee breakdown</option>
+          <option value="author_pendingExtrinsics">author_pendingExtrinsics — tx pool</option>
+          <option value="rpc_methods">rpc_methods — list all methods</option>
+        </select>
+      </label>
+      <label class="rpc-params">Params (JSON array)
+        <input id="rpcParams" type="text" value="[]" spellcheck="false" aria-label="RPC params as JSON array">
+        <span class="hint">e.g. <code>[137536]</code> for chain_getBlockHash</span>
+      </label>
+    </div>
+    <div class="rpc-out">
+      <pre class="code small" id="rpcJson" tabindex="0"></pre>
+      <pre class="code small" id="rpcCurl" tabindex="0"></pre>
+    </div>
+    <div class="rpc-foot">
+      <span class="note" id="rpcNote"></span>
+      <button id="rpcCopy" class="btn ghost small" type="button">Copy JSON</button>
+    </div>
+  </section>
+
+  <section id="repos" class="panel" aria-labelledby="h-repo">
+    <div class="sec-head">
+      <h2 id="h-repo">Upstream repo map</h2>
+      <p>Key repos under <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network</a> — what each one is for. Activity checked 2026-09-30.</p>
+    </div>
+    <div id="repoGrid" class="repo-grid"></div>
+  </section>
+
+  <section id="node" class="panel" aria-labelledby="h-node">
+    <div class="sec-head">
+      <h2 id="h-node">Run a node</h2>
+      <p>Everything you need is in the <code>chain</code> repo — the README covers binary and Docker builds, and <code>MINING.md</code> covers mining setup. No command below is invented; click through to the source.</p>
+    </div>
+    <ol class="node-steps">
+      <li>Read <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">Quantus-Network/chain</a> — README (build), <a href="https://github.com/Quantus-Network/chain/blob/main/MINING.md" target="_blank" rel="noopener">MINING.md</a> (mining), <a href="https://github.com/Quantus-Network/chain/blob/main/Dockerfile" target="_blank" rel="noopener">Dockerfile</a> (container build)</li>
+      <li>Generate and manage accounts with <a href="https://github.com/Quantus-Network/quantus-cli" target="_blank" rel="noopener">quantus-cli</a> — keys are ML-DSA, keep the seed phrase offline</li>
+      <li>Point integrations at your node's HTTP-RPC (<code>localhost:9944</code>) and WS (<code>localhost:9945</code>) — or use the <a href="https://github.com/Quantus-Network/quantus-api-client" target="_blank" rel="noopener">quantus-api-client</a> WebSocket library</li>
+      <li>Mining: grab <a href="https://github.com/Quantus-Network/quantus-miner" target="_blank" rel="noopener">quantus-miner</a>; benchmark with <a href="https://github.com/Quantus-Network/qpow-benchmark" target="_blank" rel="noopener">qpow-benchmark</a>. Our <a href="../mining-studio/">Mining Studio</a> walks the whole setup.</li>
+    </ol>
+  </section>
+
+  <footer class="foot">
+    <div class="foot-row">
+      <span>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> · QTC donations: <button class="addr" id="donateCopy" type="button" title="Copy address">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span>
+      <a href="../../">Builder Hub</a>
+    </div>
+    <div class="foot-note">All constants read from <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">Quantus-Network/chain</a> source on 2026-09-30. Docs links may drift — the chain repo is ground truth.</div>
+  </footer>
+</main>
+
+<script src="../../assets/app-nav.js?v=1.11.0"></script>
+<script src="app.js?v=1.18.0"></script>
+</body>
+</html>
