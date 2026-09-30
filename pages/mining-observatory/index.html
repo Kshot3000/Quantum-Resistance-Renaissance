@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Mining Observatory — who mines Quantus, measured live</title>
+<meta name="description" content="Quantus Mining Observatory: miner decentralization measured from real mainnet coinbase data — Nakamoto coefficient, Herfindahl concentration index, top-miner leaderboard, and concentration over time. All figures computed from the public Subsquid indexer, labeled with their snapshot time.">
+<link rel="stylesheet" href="styles.css?v=1.16.0">
+<style>:root{--focus:#ff7849;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="sigrain" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Mining Observatory</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com" target="_blank" rel="noopener">Quantus docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">Explorer</a>
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="sweep" aria-hidden="true"></div>
+    <div class="eyebrow">📡 Deep-space radar · live coinbase telemetry</div>
+    <h1>QTC Mining <span class="hl">Observatory</span></h1>
+    <p class="lede">Who actually mines Quantus? This station sweeps recent mainnet blocks, reads every coinbase payout address, and measures mining decentralization with the same math regulators use for market concentration — the <strong>Nakamoto coefficient</strong> and the <strong>Herfindahl index</strong>. Every figure is computed from real indexer data, stamped with its snapshot time, and honest about what a coinbase address can and cannot prove.</p>
+    <div class="view-toggle" role="group" aria-label="Dataset">
+      <button id="view-window" class="on" aria-pressed="true">Recent window · 15,000 blocks</button>
+      <button id="view-alltime" aria-pressed="false">All-time</button>
+    </div>
+    <div class="facts">
+      <div class="fact"><span class="k">Nakamoto coefficient</span><span class="v" id="stat-nakamoto">—</span><span class="s" id="stat-nakamoto-sub">miners to pass 50%</span></div>
+      <div class="fact"><span class="k">Herfindahl index</span><span class="v" id="stat-hhi">—</span><span class="s" id="stat-hhi-band">concentration band</span></div>
+      <div class="fact"><span class="k">Largest miner share</span><span class="v" id="stat-top">—</span><span class="s">of blocks in scope</span></div>
+      <div class="fact"><span class="k">Distinct miners</span><span class="v" id="stat-distinct">—</span><span class="s" id="stat-distinct-sub">coinbase addresses</span></div>
+      <div class="fact"><span class="k">Blocks analyzed</span><span class="v" id="stat-blocks">—</span><span class="s">in current view</span></div>
+      <div class="fact"><span class="k">Snapshot</span><span class="v" id="stat-snapshot" style="font-size:14px">—</span><span class="s" id="stat-snapshot-sub">data freshness</span></div>
+    </div>
+    <p class="note" id="hero-note"></p>
+  </section>
+
+  <section class="card" id="curve-card">
+    <h2>The 51% line</h2>
+    <p class="card-sub">Cumulative share of blocks as miners stack up from largest to smallest. Where the curve crosses the dashed 51% line is the Nakamoto coefficient — the number of miners who would have to cooperate to control the chain. <strong id="curve-readout"></strong></p>
+    <canvas class="chart" id="curve-chart" role="img" aria-label="Cumulative miner share curve with the 51 percent line"></canvas>
+    <p class="chart-note" id="curve-note"></p>
+  </section>
+
+  <section class="card" id="leaderboard-card">
+    <h2>Miner leaderboard</h2>
+    <p class="card-sub">Coinbase payout addresses, ranked by blocks mined in the current view. Rows at or above the Nakamoto cutoff are lit — those addresses <em>are</em> the 51%. Identity is unknown unless the operator has labeled the address; one address is not proof of one entity.</p>
+    <div class="table-wrap">
+    <table class="miners" id="miner-table">
+      <thead><tr>
+        <th scope="col">#</th><th scope="col">Miner address</th><th scope="col">Blocks</th>
+        <th scope="col">Share</th><th scope="col">Cumulative</th>
+      </tr></thead>
+      <tbody id="miner-rows"></tbody>
+    </table>
+    </div>
+    <button class="ghost-btn" id="more-miners" hidden>Show all miners</button>
+    <p class="chart-note" id="leaderboard-note"></p>
+  </section>
+
+  <section class="card" id="timeline-card">
+    <h2>Concentration over time</h2>
+    <p class="card-sub">The recent window sliced into 500-block buckets (~1.8 hours each at the observed block time). Watch the Herfindahl index against the DOJ bands and the distinct-miner count — a healthy young chain should drift down-left as more miners join.</p>
+    <canvas class="chart" id="hhi-chart" role="img" aria-label="Herfindahl index over time with concentration bands"></canvas>
+    <canvas class="chart" id="field-chart" role="img" aria-label="Distinct miners and top miner share over time"></canvas>
+    <div class="legend" aria-hidden="true">
+      <span><i class="sw" style="background:#ff7849"></i>HHI</span>
+      <span><i class="sw" style="background:#2dd4bf"></i>Distinct miners</span>
+      <span><i class="sw" style="background:#ff3b5c"></i>Top-miner share</span>
+    </div>
+    <p class="chart-note" id="timeline-note"></p>
+  </section>
+
+  <section class="card" id="read">
+    <h2>How to read this station</h2>
+    <div class="read-grid">
+      <div class="read">
+        <h3>Nakamoto coefficient</h3>
+        <p>The smallest number of miners whose combined blocks exceed 50%. A coefficient of <strong>1</strong> means a single coinbase address mined more than half the blocks — the chain's liveness and finality rest, in practice, on one operator. Higher is better; Bitcoin's sits in the low single digits too, but on a vastly larger miner set.</p>
+      </div>
+      <div class="read">
+        <h3>Herfindahl index (HHI)</h3>
+        <p>Sum of squared market shares, 0–10,000. The US DOJ bands: <strong>&lt;1,500</strong> competitive, <strong>1,500–2,500</strong> moderately concentrated, <strong>&gt;2,500</strong> highly concentrated. HHI punishes dominance harder than a simple top-share number — two 25% miners score lower than one 50% miner.</p>
+      </div>
+      <div class="read">
+        <h3>Why 51% matters</h3>
+        <p>Proof-of-work security assumes no one controls a majority of hashpower. Past 51%, an operator can rewrite recent history, censor transactions, and double-spend. On a 20-day-old chain this is an <em>observed concentration</em>, not an attack — but it is the number to watch as the network grows.</p>
+      </div>
+      <div class="read">
+        <h3>What a coinbase address can't prove</h3>
+        <p>The indexer records which address <em>received</em> each block reward. A pool pays hundreds of rigs through one address (looks centralized, isn't). One operator can also split across many addresses (looks decentralized, isn't). Treat this as <strong>address-level</strong> concentration — a lower bound on entity concentration, never a roster of people.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="sources">
+    <h2>Data &amp; honesty</h2>
+    <ol class="source-list">
+      <li><strong>Source:</strong> the public Subsquid indexer at <code>https://sqm.quantus.com/v1/graphql</code> — per-block <code>mined_by_id</code> (coinbase) over the recent 15,000 blocks, plus the all-time <code>minedBlocks</code> aggregate per account.</li>
+      <li><strong>Snapshot, not live:</strong> the indexer allows browser requests only from explorer.quantus.com / quantus.com, so this page reads a same-origin snapshot (<code>data/miners.json</code>) refreshed by an hourly server-side fetch. The snapshot time is stamped above; stale data is labeled stale.</li>
+      <li><strong>Math:</strong> Nakamoto coefficient = smallest n with cumulative share &gt; 50%; HHI = Σ share² on a 0–100 share scale (0–10,000). Bands follow the DOJ Horizontal Merger Guidelines thresholds.</li>
+      <li><strong>Limits:</strong> unlabeled addresses carry no identity; pool payout addresses mask many miners; early-chain samples are small by nature. Nothing here is financial advice.</li>
+    </ol>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team. Concentration figures computed from the public indexer snapshot; address ≠ entity. Not financial advice.
+  </footer>
+</main>
+
+<script src="../../assets/app-nav.js?v=1.11.0"></script>
+<script src="app.js?v=1.16.0"></script>
+</body>
+</html>

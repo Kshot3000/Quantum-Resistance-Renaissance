@@ -14,7 +14,8 @@
 }
 
 html{scroll-behavior:smooth}
-body{font-family:var(--font-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{font-family:var(--font-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  color:#e9edf9;background:#05070e}
 code,.mono,pre,kbd{font-family:var(--font-mono)}
 
 /* Accessibility */

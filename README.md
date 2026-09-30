@@ -20,10 +20,11 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `fee-throughput-lab/` — QTC Fee & Throughput Lab (exact length-fee estimator from the runtime polynomial, wormhole exit + high-security fee calculators, QTPS visualizer, aggregation explorer, signature-size lab — figures verified Sept 29, 2026)
   - `threat-lab/` — QTC Threat Lab (Q-Day countdown across 2028/2029/2032 sourced horizons, 11-scenario wallet-exposure simulator for BTC/ETH/SOL/ADA/QTC, sourced chain-readiness table, Shor-vs-Grover explainer, quantum milestone timeline — every claim cited, Sept 29, 2026)
   - `emission-lab/` — QTC Emission Lab (exact on-chain reward formula R = (21M − S) / 50,000,000 verified against the runtime source, live reward pulse, interactive decay simulator, milestone timeline, 80-year supply projections — no halvings, Sept 30, 2026)
+  - `mining-observatory/` — QTC Mining Observatory (miner decentralization from real mainnet coinbase data: Nakamoto coefficient, Herfindahl index vs DOJ bands, 51% crossing curve, miner leaderboard with explorer deep-links, concentration-over-time charts — Sept 30, 2026)
 
 ## Live data
 
-The public Quantus indexer (`sqm.quantus.com`) only allowlists official Quantus domains for browser CORS. Community Pages apps therefore read a **same-origin snapshot** at `data/live.json` (produced by `node scripts/fetch-chain-data.mjs` from that indexer). Direct indexer calls are still attempted first. Re-run the script and commit to refresh the snapshot.
+The public Quantus indexer (`sqm.quantus.com`) only allowlists official Quantus domains for browser CORS. Community Pages apps therefore read a **same-origin snapshot** at `data/live.json` (produced by `node scripts/fetch-chain-data.mjs` from that indexer). The Mining Observatory additionally reads `data/miners.json` (produced by `node scripts/fetch-miner-data.mjs`: per-block coinbase addresses over the recent 15,000 blocks + the all-time mined-blocks aggregate). Direct indexer calls are still attempted first. Re-run the scripts and commit to refresh the snapshots.
 
 ## Standards
 
