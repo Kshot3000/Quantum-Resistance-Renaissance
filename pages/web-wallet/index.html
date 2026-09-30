@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Web Wallet — Self-Custody for the Quantum Chain · Quantus Muse Builder</title>
+<meta name="description" content="A real self-custody web wallet for Quantus (QTC): ML-DSA key generation in your browser, Poseidon2-derived addresses, encrypted local vault, live balances over RPC, and true on-chain transfers signed with the QUANTUS_EXTRINSIC context — 100% client-side, keys never leave your device.">
+<meta name="theme-color" content="#070510">
+<link rel="stylesheet" href="styles.css?v=1.34.0">
+<style>:root{--focus:#b78bff;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="vaultfield" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Web Wallet</span></div>
+  <div class="nav-end">
+    <span id="conn-pill" class="conn-pill" title="RPC connection state">● offline</span>
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">upstream chain</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">official explorer</a>
+    </nav>
+    <button id="lock-btn" class="btn ghost small" hidden>🔒 Lock</button>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ============ ONBOARDING ============ -->
+  <section id="view-onboard" class="view" hidden>
+    <div class="hero">
+      <h1>The vault for the <span class="grad">quantum chain</span></h1>
+      <p class="lede">Real self-custody for QTC. Keys are forged in <em>your</em> browser with post-quantum
+      ML-DSA signatures, addresses derive from the chain's own Poseidon2 hash, and the vault is
+      encrypted before it ever touches disk. No accounts, no servers, no seed ever leaves this page.</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h2>✨ Create a new wallet</h2>
+        <p>Forge a fresh 24-word recovery phrase and an ML-DSA keypair. Takes about a minute — write the words down.</p>
+        <label class="fld">Signature scheme
+          <select id="new-scheme">
+            <option value="65" selected>ML-DSA-65 — recommended (NIST level 3)</option>
+            <option value="87">ML-DSA-87 — maximum (NIST level 5, larger keys)</option>
+          </select>
+        </label>
+        <button id="btn-create" class="btn primary">Forge new wallet</button>
+      </div>
+      <div class="card">
+        <h2>📥 Import a wallet</h2>
+        <p>Bring a wallet you already made here — or anywhere that uses the documented derivation.</p>
+        <div class="tabs small" role="tablist" aria-label="Import method">
+          <button class="tab active" data-imp="mnemonic" role="tab">24 words</button>
+          <button class="tab" data-imp="seed" role="tab">Seed hex</button>
+          <button class="tab" data-imp="secret" role="tab">Secret key</button>
+        </div>
+        <label class="fld" id="imp-mnemonic-fld">Recovery phrase
+          <textarea id="imp-mnemonic" rows="3" placeholder="word word word … (24 words)" autocomplete="off" spellcheck="false"></textarea>
+        </label>
+        <label class="fld" id="imp-seed-fld" hidden>32-byte seed (hex)
+          <input id="imp-seed" placeholder="64 hex characters" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="fld" id="imp-secret-fld" hidden>ML-DSA secret key (hex)
+          <input id="imp-secret" placeholder="secret key hex" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="fld">Signature scheme
+          <select id="imp-scheme">
+            <option value="65" selected>ML-DSA-65</option>
+            <option value="87">ML-DSA-87</option>
+          </select>
+        </label>
+        <label class="fld">Passphrase (only for 24-word imports that used one)
+          <input id="imp-passphrase" type="password" placeholder="optional" autocomplete="off">
+        </label>
+        <button id="btn-import" class="btn">Import wallet</button>
+      </div>
+      <div class="card">
+        <h2>💾 Restore a vault file</h2>
+        <p>Load an encrypted vault backup you exported earlier. You'll still need its password.</p>
+        <label class="fld">Vault backup (.json)
+          <input id="vault-file" type="file" accept="application/json">
+        </label>
+        <button id="btn-restore-file" class="btn">Load vault file</button>
+      </div>
+    </div>
+    <div id="onboard-err" class="err" role="alert" hidden></div>
+
+    <!-- new-wallet reveal -->
+    <div id="reveal" class="card reveal" hidden>
+      <h2>📝 Write these 24 words down — now</h2>
+      <p class="warn">This is the <strong>only</strong> time they are shown. Anyone with these words owns the wallet.
+      Store them on paper or steel, never in a screenshot or cloud note.</p>
+      <ol id="reveal-words" class="words"></ol>
+      <div class="row">
+        <button id="btn-reveal-copy" class="btn ghost">Copy words</button>
+        <button id="btn-reveal-done" class="btn primary" disabled>I've written them down</button>
+      </div>
+      <label class="check"><input type="checkbox" id="reveal-ack"> I understand that losing these words means losing the wallet forever.</label>
+    </div>
+
+    <!-- password gate -->
+    <div id="pwgate" class="card" hidden>
+      <h2>🔐 Encrypt the vault</h2>
+      <p>Pick a strong password. It encrypts the vault on this device (PBKDF2-HMAC-SHA256, 250,000 rounds + AES-GCM-256).
+      It cannot recover your wallet — only the 24 words can.</p>
+      <label class="fld">Password
+        <input id="pw1" type="password" autocomplete="new-password">
+      </label>
+      <label class="fld">Repeat password
+        <input id="pw2" type="password" autocomplete="new-password">
+      </label>
+      <div id="pw-err" class="err" role="alert" hidden></div>
+      <button id="btn-pw-save" class="btn primary">Encrypt &amp; open wallet</button>
+    </div>
+  </section>
+
+  <!-- ============ UNLOCK ============ -->
+  <section id="view-unlock" class="view" hidden>
+    <div class="card narrow">
+      <h1>🔓 Unlock the vault</h1>
+      <p class="muted">Vault found on this device. Enter your password — decryption happens locally.</p>
+      <label class="fld">Password
+        <input id="unlock-pw" type="password" autocomplete="current-password">
+      </label>
+      <div id="unlock-err" class="err" role="alert" hidden></div>
+      <div class="row">
+        <button id="btn-unlock" class="btn primary">Unlock</button>
+        <button id="btn-forget" class="btn danger ghost">Forget this device</button>
+      </div>
+      <p class="tiny muted">Forgot the password? Re-import with your 24 words — but first remove the locked vault with “Forget this device”.</p>
+    </div>
+  </section>
+
+  <!-- ============ APP ============ -->
+  <section id="view-app" class="view" hidden>
+    <nav class="tabs" role="tablist" aria-label="Wallet sections">
+      <button class="tab active" data-view="dash" role="tab">💠 Wallet</button>
+      <button class="tab" data-view="send" role="tab">📤 Send</button>
+      <button class="tab" data-view="activity" role="tab">🧾 Activity</button>
+      <button class="tab" data-view="security" role="tab">🛡️ Security</button>
+    </nav>
+
+    <!-- DASHBOARD -->
+    <div id="tab-dash" class="tabpanel">
+      <div class="cards">
+        <div class="card addr-card">
+          <h2>Your address</h2>
+          <div class="addr-row">
+            <canvas id="qr" width="132" height="132" aria-label="Address QR code"></canvas>
+            <div class="addr-meta">
+              <code id="addr" class="addr mono"></code>
+              <div class="row">
+                <button id="btn-copy-addr" class="btn ghost small">Copy address</button>
+                <button id="btn-copy-hex" class="btn ghost small">Copy account hex</button>
+              </div>
+              <div class="scheme-line">Scheme <strong id="scheme-name">ML-DSA-65</strong> · SS58 prefix <strong>189</strong></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Balance <button id="btn-refresh" class="btn ghost small">↻ Refresh</button></h2>
+          <div class="bigbal"><span id="bal-total">—</span> <span class="unit">QTC</span></div>
+          <dl class="kv">
+            <div><dt>Transferable</dt><dd id="bal-free">—</dd></div>
+            <div><dt>Reserved</dt><dd id="bal-reserved">—</dd></div>
+            <div><dt>Frozen</dt><dd id="bal-frozen">—</dd></div>
+            <div><dt>Tx count (nonce)</dt><dd id="bal-nonce">—</dd></div>
+            <div><dt>Source</dt><dd id="bal-source" class="muted">—</dd></div>
+          </dl>
+          <p class="tiny muted">Read straight from chain storage (<code>System.Account</code>) over the RPC node below — never estimated.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>🔌 Node connection</h2>
+        <div class="row wrap">
+          <label class="fld grow">RPC endpoint
+            <input id="rpc-url" class="mono" spellcheck="false">
+          </label>
+          <button id="btn-connect" class="btn">Connect</button>
+        </div>
+        <dl class="kv" id="chain-facts">
+          <div><dt>Chain</dt><dd id="cf-chain">—</dd></div>
+          <div><dt>Block</dt><dd id="cf-block">—</dd></div>
+          <div><dt>Runtime</dt><dd id="cf-runtime">—</dd></div>
+        </dl>
+        <div id="conn-err" class="err" role="alert" hidden></div>
+      </div>
+    </div>
+
+    <!-- SEND -->
+    <div id="tab-send" class="tabpanel" hidden>
+      <div class="card">
+        <h2>📤 Send QTC</h2>
+        <p class="muted">Builds a real <code>Balances.transfer_keep_alive</code> extrinsic, signs it with your
+        ML-DSA key under the chain's <code>QUANTUS_EXTRINSIC</code> context, and broadcasts it to the connected node.</p>
+        <label class="fld">Recipient address (SS58, prefix 189)
+          <input id="send-to" class="mono" placeholder="qz…" autocomplete="off" spellcheck="false">
+        </label>
+        <div id="send-to-err" class="err" role="alert" hidden></div>
+        <div class="row wrap">
+          <label class="fld grow">Amount (QTC)
+            <input id="send-amount" inputmode="decimal" placeholder="0.00" autocomplete="off">
+          </label>
+          <button id="btn-max" class="btn ghost">Max − fee</button>
+        </div>
+        <div id="send-amount-err" class="err" role="alert" hidden></div>
+        <button id="btn-estimate" class="btn primary">1 · Build &amp; estimate fee</button>
+        <div id="estimate-box" hidden>
+          <h3>Review the transfer</h3>
+          <dl class="kv">
+            <div><dt>To</dt><dd id="est-to" class="mono small">—</dd></div>
+            <div><dt>Amount</dt><dd id="est-amount">—</dd></div>
+            <div><dt>Network fee (est.)</dt><dd id="est-fee">—</dd></div>
+            <div><dt>Total debit</dt><dd id="est-total">—</dd></div>
+            <div><dt>Nonce</dt><dd id="est-nonce">—</dd></div>
+            <div><dt>Era</dt><dd id="est-era">—</dd></div>
+          </dl>
+          <details class="inspector">
+            <summary>🔍 Extrinsic inspector — see exactly what gets signed</summary>
+            <dl class="kv mono small" id="ext-parts"></dl>
+            <label class="fld">Signing payload (hex)
+              <textarea id="ext-payload" rows="3" readonly class="mono"></textarea>
+            </label>
+          </details>
+          <p class="warn">⚠️ Broadcasting is <strong>final</strong>: once included, only the recipient can send it back.
+          Double-check the address — the first and last 6 characters are shown above.</p>
+          <div class="row">
+            <button id="btn-broadcast" class="btn danger">2 · Sign &amp; broadcast</button>
+            <button id="btn-cancel-send" class="btn ghost">Cancel</button>
+          </div>
+        </div>
+        <div id="send-result" hidden>
+          <h3>📡 Broadcast result</h3>
+          <dl class="kv">
+            <div><dt>Tx hash</dt><dd id="res-hash" class="mono small">—</dd></div>
+            <div><dt>Status</dt><dd id="res-status">—</dd></div>
+          </dl>
+          <div class="row">
+            <a id="res-explorer" class="btn ghost" target="_blank" rel="noopener" hidden>View in explorer</a>
+            <button id="btn-send-again" class="btn ghost">New transfer</button>
+          </div>
+        </div>
+        <div id="send-err" class="err" role="alert" hidden></div>
+      </div>
+    </div>
+
+    <!-- ACTIVITY -->
+    <div id="tab-activity" class="tabpanel" hidden>
+      <div class="card">
+        <h2>🧾 Recent transfers</h2>
+        <p class="muted">Pulled from the public Subsquid indexer. If it's unreachable, the wallet says so — it never invents history.</p>
+        <button id="btn-activity" class="btn ghost small">↻ Reload</button>
+        <div id="activity-list" class="txlist"><p class="muted">Not loaded yet.</p></div>
+        <div id="activity-err" class="err" role="alert" hidden></div>
+      </div>
+    </div>
+
+    <!-- SECURITY -->
+    <div id="tab-security" class="tabpanel" hidden>
+      <div class="cards">
+        <div class="card">
+          <h2>🗝️ Recovery phrase</h2>
+          <p class="muted">Reveals the 24 words. Never type them anywhere except a wallet you trust.</p>
+          <button id="btn-reveal-mnemonic" class="btn">Reveal (asks password)</button>
+          <ol id="sec-words" class="words" hidden></ol>
+        </div>
+        <div class="card">
+          <h2>📋 Key details</h2>
+          <dl class="kv">
+            <div><dt>Public key</dt><dd id="sec-pub" class="mono small wrap">—</dd></div>
+            <div><dt>Account id</dt><dd id="sec-acct" class="mono small wrap">—</dd></div>
+            <div><dt>Derivation</dt><dd class="small">BIP-39 24 words → PBKDF2-HMAC-SHA512(2048) → first 32 bytes → ML-DSA keygen (deterministic). Quantus-specific path, documented openly.</dd></div>
+            <div><dt>Signing context</dt><dd class="mono small">QUANTUS_EXTRINSIC (FIPS-204 domain separation, per upstream signing_context.rs)</dd></div>
+          </dl>
+        </div>
+        <div class="card">
+          <h2>💾 Backup &amp; danger zone</h2>
+          <div class="row wrap">
+            <button id="btn-export-vault" class="btn ghost">Export encrypted vault</button>
+            <button id="btn-wipe" class="btn danger ghost">Wipe this device</button>
+          </div>
+          <p class="tiny muted">Wiping deletes the encrypted vault from this browser only. Your 24 words still recover the wallet anywhere.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>📜 How the crypto was verified</h2>
+        <ul class="verify-list">
+          <li>Address = <code>Poseidon2(public_key)</code> (Goldilocks field) → SS58 prefix <code>189</code> — from <code>qp-dilithium-crypto 0.6.1 traits.rs</code> + <code>quantus-cli address_format.rs</code>.</li>
+          <li>Signature = <code>DilithiumSignatureScheme::Dilithium65([sig 3309 B ‖ pubkey 1952 B])</code> — <code>primitives/dilithium-crypto/src/types.rs</code>.</li>
+          <li>Signatures are FIPS-204 with context <code>QUANTUS_EXTRINSIC</code> — <code>signing_context.rs</code>; plain-context signatures are rejected on-chain.</li>
+          <li>Extrinsic = <code>Balances</code> (pallet 2) · <code>transfer_keep_alive</code> (call 3) — runtime <code>construct_runtime!</code> + <code>pallet-balances 46.0.0</code>.</li>
+          <li>Extension pipeline order (12 extensions) read from <code>runtime/src/lib.rs</code> <code>TxExtension</code>; payload layout matches <code>sp-runtime 45.0.0 SignedPayload</code>.</li>
+        </ul>
+        <p class="tiny muted">Upstream: <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">Quantus-Network/chain</a> · verified Sept 30, 2026.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="chrome">
+  <div class="attr">
+    <span>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></span>
+    <span class="sep">·</span>
+    <span>QTC tips: <code class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code> <button id="btn-copy-tip" class="btn ghost small">copy</button></span>
+  </div>
+  <div class="tiny muted">Self-custody: keys never leave your device. This page is not financial advice — verify every address before broadcasting.</div>
+</footer>
+
+<script src="vendor/qrcode.js?v=1.34.0"></script>
+<script type="module" src="js/app.js?v=1.34.0"></script>
+</body>
+</html>
