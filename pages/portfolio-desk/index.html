@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Portfolio Desk — Quantus Muse Builder</title>
+<meta name="description" content="The multi-wallet command center for Quantus: aggregate every QTC address you control into one portfolio — live-first balances, liquid vs vesting-locked splits, allocation chart, transfer activity, mining attribution, CSV/JSON export — 100% client-side.">
+<meta name="theme-color" content="#060d0b">
+<link rel="stylesheet" href="styles.css?v=1.31.0">
+<style>:root{--focus:#6ee7b7;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Portfolio Desk</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/docs" target="_blank" rel="noopener">upstream docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">official explorer</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/" class="current"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Quantus mainnet · Multi-wallet desk · 100% client-side</p>
+    <h1>Command your <span class="glow">whole QTC estate</span></h1>
+    <p class="lede">One desk for every Quantus address you control: balances read live-first from the indexer, liquid holdings split from vesting-locked allocations, an allocation chart across the portfolio, transfer activity, mining attribution — and human checkphrases on every address so you always know you're looking at the right one. Your vault never leaves this browser; nothing here signs or moves funds.</p>
+  </section>
+
+  <section class="scanbar">
+    <div id="desk-meta" class="scan-meta">Loading chain data…</div>
+    <div class="scan-actions">
+      <span class="meta-chip" id="vault-count">0 addresses</span>
+      <button id="btn-refresh" class="btn primary">⟳ Refresh all</button>
+    </div>
+  </section>
+  <p class="form-msg" id="desk-msg" role="status" aria-live="polite"></p>
+
+  <section id="pf-overview" class="grid cards" aria-label="Portfolio overview"></section>
+
+  <section class="panel two-col">
+    <div>
+      <h2>Add an address</h2>
+      <p class="muted">SS58 addresses on prefix 189 are checksum-validated, and each one gets its five-word human checkphrase — the same upstream algorithm the Contact Vault uses. Read the checkphrase back from your wallet before you confirm.</p>
+      <div class="form-grid">
+        <label>Address
+          <input id="in-addr" placeholder="qz…" spellcheck="false" autocomplete="off">
+        </label>
+        <label>Nickname
+          <input id="in-nick" placeholder="e.g. Cold wallet" maxlength="40" autocomplete="off">
+        </label>
+      </div>
+      <div class="row gap">
+        <button id="btn-validate" class="btn primary">Validate &amp; add address</button>
+      </div>
+      <div id="add-confirm" class="confirm-box" hidden>
+        <p class="muted small">Read these five words back from your wallet — they must match exactly:</p>
+        <div id="cf-words" class="pcheck big-words"></div>
+        <label class="check-line"><input type="checkbox" id="cf-verify"> The checkphrase matches the address in my wallet.</label>
+        <div class="row gap">
+          <button id="btn-add-confirm" class="btn primary" disabled>Confirm &amp; add</button>
+        </div>
+      </div>
+      <p class="form-msg" id="add-msg" role="status" aria-live="polite"></p>
+    </div>
+    <div>
+      <h2>Allocation</h2>
+      <div class="donut-wrap">
+        <canvas id="alloc-donut" role="img" aria-label="Portfolio allocation chart"></canvas>
+        <div id="alloc-legend" class="legend"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Holdings <span class="sub">live-first balances, per address</span></h2>
+    <div class="table-wrap"><table class="holdings">
+      <thead><tr>
+        <th>Address</th><th class="num">On-chain balance</th><th class="num">Claimable</th>
+        <th class="num">Locked</th><th class="num">Controlled</th><th class="num">Activity</th><th></th>
+      </tr></thead>
+      <tbody id="holdings-body"><tr><td colspan="7" class="muted center">Loading…</td></tr></tbody>
+    </table></div>
+    <p class="muted small">“Controlled” = on-chain balance + vesting-claimable (vested but unclaimed still sits in the genesis vesting-pool account until claimed). Balances load live first; when the indexer is unreachable the last snapshot is used and marked.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Vesting <span class="sub">locked allocations matched to your addresses</span></h2>
+    <div class="table-wrap"><table class="holdings">
+      <thead><tr>
+        <th>Beneficiary</th><th>Cohort</th><th class="num">Total</th>
+        <th class="num">Progress</th><th class="num">Claimable now</th><th class="num">Fully unlocked</th>
+      </tr></thead>
+      <tbody id="vesting-body"><tr><td colspan="6" class="muted center">Loading…</td></tr></tbody>
+    </table></div>
+    <p class="muted small">Vested amounts are recomputed with the pallet's exact linear formula (0 before the cliff, full after the end); claims are permissionless <code>Vesting.claim</code> calls on the real chain — this desk never signs them.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Recent activity <span class="sub">transfers touching your addresses</span></h2>
+    <div id="activity-list" class="activity"><div class="muted center pad">Loading…</div></div>
+  </section>
+
+  <section class="panel">
+    <h2>Vault tools</h2>
+    <p class="muted">The vault is stored in this browser's localStorage only. Export a backup before switching devices.</p>
+    <div class="row gap wrap">
+      <button id="btn-export-csv" class="btn" disabled>⤓ Export holdings (CSV)</button>
+      <button id="btn-export-json" class="btn" disabled>⤓ Export vault (JSON)</button>
+      <button id="btn-import" class="btn">⤒ Import vault (JSON)</button>
+      <input type="file" id="file-import" accept="application/json,.json" hidden>
+      <button id="btn-clear" class="btn danger">Clear vault</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Data sources</h2>
+    <ul class="sources">
+      <li><strong>Live:</strong> the public Quantus Subsquid indexer (<code>sqm.quantus.com/v1/graphql</code>) — per-address <code>account_by_pk</code> balances plus chain head. The indexer allowlists only official Quantus domains for browser CORS, so community Pages apps fall back to snapshots when the browser can't reach it.</li>
+      <li><strong>Snapshots</strong> (same-origin, refreshed server-side): <code>data/whales.json</code> (top-200 balances), <code>data/vesting.json</code> (all 48 vesting schedules), <code>data/flows.json</code> (transfers ≥ 1 QTC in the recent window + largest all-time), <code>data/miners.json</code> (coinbase attribution), <code>data/live.json</code> (chain head).</li>
+      <li><strong>On-chain semantics:</strong> address format SS58 prefix 189; human checkphrases from <code>Quantus-Network/qp-human-checkphrase</code>; vesting math from <code>Quantus-Network/chain</code> <code>pallets/vesting</code> + <code>mainnet_vesting.rs</code>.</li>
+    </ul>
+    <p class="muted small">Independent builder work — not affiliated with the Quantus team. Balances are read-only; this desk never asks for keys, seeds, or signatures.</p>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER · PORTFOLIO DESK</div>
+  </footer>
+</main>
+
+<script src="js/wordlist.js?v=1.31.0"></script>
+<script src="js/checkphrase-core.js?v=1.31.0"></script>
+<script src="js/ss58.js?v=1.31.0"></script>
+<script src="js/desk-core.js?v=1.31.0"></script>
+<script src="js/app.js?v=1.31.0"></script>
+<script>
+document.addEventListener("click", function (e) {
+  var b = e.target.closest("button[data-copy]");
+  if (!b) return;
+  var t = b.getAttribute("data-copy");
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(function () {});
+});
+</script>
+</body>
+</html>
