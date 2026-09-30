@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Whale Watch — supply concentration &amp; whale movements on Quantus</title>
+<meta name="description" content="QTC Whale Watch: where the Quantus supply actually sits — the genesis vesting pool, the circulating rich list, balance-bracket distribution, and the largest on-chain transfers, all computed from the public Subsquid indexer and labeled with snapshot time.">
+<link rel="stylesheet" href="styles.css?v=1.19.0">
+<style>:root{--focus:#22d3ee;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="abyss" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Whale Watch</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com" target="_blank" rel="noopener">Quantus docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">Explorer</a>
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/" class="current"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="eyebrow">Supply intelligence · on-chain</div>
+    <h1>Where the QTC <span class="glow">actually sits</span></h1>
+    <p class="lede">Every Quantus account, ranked. The genesis vesting pool, the circulating rich list,
+    how balances distribute across holders, and the largest transfers ever made — computed from the
+    public Subsquid indexer, with the snapshot time printed on everything.</p>
+    <div class="snap-row">
+      <span class="snap" id="snap-height">—</span>
+      <span class="snap" id="snap-time">—</span>
+      <span class="snap stale" id="snap-stale" hidden>snapshot older than 12h — figures may be dated</span>
+    </div>
+    <div class="mode-toggle" role="group" aria-label="Supply view">
+      <button class="mode-btn active" data-mode="all" aria-pressed="true">All QTC</button>
+      <button class="mode-btn" data-mode="circ" aria-pressed="false">Circulating only <span class="hint">excl. locked vesting</span></button>
+    </div>
+  </section>
+
+  <section class="stats" aria-label="Headline figures">
+    <div class="stat"><div class="k">Indexed supply</div><div class="v" id="st-supply">—</div><div class="s">QTC across all indexed accounts</div></div>
+    <div class="stat lock"><div class="k">Locked in genesis vesting</div><div class="v" id="st-locked">—</div><div class="s" id="st-locked-sub">—</div></div>
+    <div class="stat"><div class="k">Circulating supply</div><div class="v" id="st-circ">—</div><div class="s">liquid QTC outside the vesting pool</div></div>
+    <div class="stat"><div class="k">Accounts</div><div class="v" id="st-accts">—</div><div class="s" id="st-accts-sub">—</div></div>
+    <div class="stat"><div class="k">Vesting schedules</div><div class="v" id="st-vest">—</div><div class="s" id="st-vest-sub">—</div></div>
+    <div class="stat"><div class="k">Top-10 share <span class="of-circ">of circulating</span></div><div class="v" id="st-top10">—</div><div class="s" id="st-top10-sub">—</div></div>
+  </section>
+
+  <section class="panel" id="concentration">
+    <div class="sec-title">Concentration</div>
+    <h2>The shape of the supply</h2>
+    <div class="conc-grid">
+      <div class="card span2">
+        <h3>Locked vs circulating</h3>
+        <div class="supplybar" role="img" aria-label="Supply bar: locked versus circulating QTC">
+          <div class="seg locked" id="seg-locked"></div>
+          <div class="seg circ" id="seg-circ"></div>
+        </div>
+        <div class="supplybar-legend">
+          <span><i class="dot locked"></i><span id="leg-locked">—</span></span>
+          <span><i class="dot circ"></i><span id="leg-circ">—</span></span>
+        </div>
+        <p class="fine">The locked slice is the unclaimed genesis vesting pool, held by the block-1 allocation
+        account. Vesting beneficiaries hold <em>claimed</em> QTC only — unclaimed tokens never sit in their accounts.</p>
+      </div>
+      <div class="card">
+        <h3>Top-N share of <span class="mode-word">supply</span></h3>
+        <canvas id="curve" width="520" height="300" aria-label="Top-N holder share curve"></canvas>
+        <div class="curve-read" id="curve-read">—</div>
+      </div>
+      <div class="card">
+        <h3>Inequality, estimated</h3>
+        <div class="gini" id="gini">—</div>
+        <p class="fine">Gini coefficient estimated from the exact top-200 balances plus uniform-within-bracket
+        estimates for the rest — see methodology. <span id="gini-note"></span></p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Balance brackets <span class="mode-word-paren">(of <span class="mode-word">supply</span>)</span></h3>
+      <div class="table-wrap"><table class="brackets" id="bracket-table">
+        <thead><tr><th>Bracket</th><th class="num">Accounts</th><th class="num">QTC held</th><th class="num">Share</th><th class="barcol">Distribution</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="fine">Brackets are computed on <span class="mode-word">total</span> balances from the indexer aggregate.
+      In circulating view the whale bracket is reduced by the locked vesting pool, which sits entirely in one account.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="richlist">
+    <div class="sec-title">Rich list</div>
+    <h2>Top 200 accounts</h2>
+    <div class="rl-controls">
+      <label class="search">Search address <input id="rl-search" type="search" placeholder="paste or type part of an address…" autocomplete="off" spellcheck="false"></label>
+      <label class="sort">Sort by
+        <select id="rl-sort">
+          <option value="total">Total balance</option>
+          <option value="liquid">Liquid balance</option>
+        </select>
+      </label>
+    </div>
+    <div class="table-wrap"><table class="rich" id="rich-table">
+      <thead><tr>
+        <th class="num">#</th><th>Address</th><th class="num">Total QTC</th><th class="num">Locked</th>
+        <th class="num">Liquid QTC</th><th class="num">Share of <span class="mode-word">supply</span></th><th>Tags</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="pager">
+      <button id="pg-prev" class="pg-btn">&larr; Prev</button>
+      <span id="pg-info" class="pg-info">—</span>
+      <button id="pg-next" class="pg-btn">Next &rarr;</button>
+    </div>
+  </section>
+
+  <section class="panel" id="moves">
+    <div class="sec-title">Whale movements</div>
+    <h2>The biggest transfers on record</h2>
+    <div class="tabs" role="tablist" aria-label="Transfer lists">
+      <button class="tab active" data-tab="all" role="tab" aria-selected="true">Largest all-time</button>
+      <button class="tab" data-tab="recent" role="tab" aria-selected="false">Recent · last 7 days ≥ 10 QTC</button>
+    </div>
+    <div class="table-wrap"><table class="moves" id="moves-table">
+      <thead><tr><th class="num">Amount QTC</th><th>From</th><th>To</th><th class="num">Block</th><th>Age</th><th class="num">Fee</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="fine">Amounts are transfer values; fees are paid separately. “—” as a sender marks a mint/genesis allocation.</p>
+  </section>
+
+  <section class="panel" id="lookup">
+    <div class="sec-title">Address lookup</div>
+    <h2>Is this address a whale?</h2>
+    <div class="lookup-row">
+      <input id="lk-input" type="text" placeholder="qz… (Quantus SS58 address)" autocomplete="off" spellcheck="false" aria-label="Quantus address to look up">
+      <button id="lk-go" class="go">Look up</button>
+    </div>
+    <div id="lk-result" class="lk-result" aria-live="polite"></div>
+    <p class="fine">The address is checksum-validated locally (SS58, prefix 189 — same codec as the Address Toolkit) and
+    matched against this snapshot's top 200 plus every address seen in the whale-movement feeds. Full history lives in the
+    <a href="../block-explorer/">Block Explorer</a>.</p>
+  </section>
+
+  <section class="panel" id="method">
+    <div class="sec-title">Methodology</div>
+    <h2>How these numbers are made</h2>
+    <ul class="method">
+      <li><strong>Source.</strong> The public Subsquid indexer at <span class="mono">sqm.quantus.com/v1/graphql</span> — the same backend as the official explorer. The indexer allowlists only <span class="mono">explorer.quantus.com</span> / <span class="mono">quantus.com</span> for browser CORS, so this page reads a same-origin snapshot baked by a server-side script (<span class="mono">scripts/fetch-whale-data.mjs</span>) instead of querying live.</li>
+      <li><strong>Units.</strong> 1 QTC = 10<sup>12</sup> planck, verified against the runtime emission formula (see the Emission Lab). All QTC figures are exact BigInt conversions, not floats.</li>
+      <li><strong>Supply.</strong> “Indexed supply” = Σ(free + reserved + frozen) across all indexed accounts. “Locked” = unclaimed genesis vesting (vesting total − claimed), which sits in the block-1 allocation account. “Circulating” = indexed supply − locked.</li>
+      <li><strong>Honest limits.</strong> Balances move every block (~12s); the snapshot is a still photo, time-stamped above. Bracket aggregates are exact indexer counts; the Gini is an estimate. Nothing here is investment advice — concentration ≠ intent.</li>
+    </ul>
+  </section>
+
+  <footer class="foot">
+    <div class="foot-whale" aria-hidden="true">🐋</div>
+    <p>QTC Whale Watch · Quantus Muse Builder · data: Subsquid indexer, snapshot <span id="foot-time">—</span></p>
+    <p>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="disclaimer">On-chain data for research &amp; education — not financial advice.</span>
+    </p>
+  </footer>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="app.js?v=1.19.0"></script>
+</body>
+</html>
