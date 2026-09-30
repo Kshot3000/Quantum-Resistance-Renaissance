@@ -1,0 +1,107 @@
+/* QTC Emission Lab — warm gold "decay glow" identity on the shared dark chrome. */
+:root{
+  --gold:#ffd166; --gold-deep:#f59e0b; --gold-dim:rgba(255,209,102,.14);
+  --ink:#f4f7ff; --muted:#9aa3c0; --line:rgba(255,209,102,.16);
+  --panel:rgba(13,17,32,.78); --panel2:rgba(20,26,46,.6);
+}
+body{background:
+  radial-gradient(1100px 520px at 12% -6%, rgba(255,209,102,.10), transparent 60%),
+  radial-gradient(900px 600px at 95% 8%, rgba(245,158,11,.08), transparent 55%),
+  #070a14;}
+#sigrain{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5}
+.chrome .brand span{color:var(--gold)}
+
+.hero{position:relative;overflow:hidden;border:1px solid var(--line);
+  background:linear-gradient(160deg, rgba(30,24,10,.55), rgba(10,13,26,.7) 55%);}
+.hero::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(600px 240px at 85% 20%, rgba(255,209,102,.16), transparent 70%);}
+.eyebrow{color:var(--gold);letter-spacing:.22em;text-transform:uppercase;
+  font-size:12px;font-weight:700}
+.hero h1{font-size:clamp(34px,5.4vw,58px);line-height:1.04;margin:.4em 0 .35em;
+  letter-spacing:-.02em}
+.hero h1 .gold{background:linear-gradient(100deg,#ffe9ad,#ffd166 45%,#f59e0b);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{max-width:66ch;color:var(--muted);font-size:16.5px;line-height:1.7}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:10px;margin-top:26px}
+.fact{background:var(--panel2);border:1px solid var(--line);border-radius:14px;
+  padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.fact .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+.fact .v{font-size:21px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
+.fact .s{font-size:12px;color:var(--muted)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;
+  padding:30px clamp(18px,4vw,40px);margin:26px 0;backdrop-filter:blur(8px)}
+.card-head h2{font-size:clamp(22px,3vw,30px);margin:0 0 6px;letter-spacing:-.01em}
+.card-head h2 .gold{color:var(--gold)}
+.note{color:var(--muted);font-size:14.5px;line-height:1.65;max-width:78ch}
+.note code{background:rgba(255,209,102,.1);border:1px solid var(--line);
+  padding:1px 7px;border-radius:6px;font-size:13px;color:var(--gold)}
+
+.formula{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px}
+@media(max-width:820px){.formula{grid-template-columns:1fr}}
+.formula-main{background:rgba(255,209,102,.06);border:1px solid var(--line);
+  border-radius:16px;padding:26px;text-align:center}
+.formula-main .eq{font-size:clamp(20px,3vw,30px);font-weight:800;color:var(--gold);
+  font-variant-numeric:tabular-nums;margin:10px 0}
+.formula-main .eq small{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-top:8px}
+.formula-side ul{margin:0;padding-left:20px;color:var(--muted);font-size:14.5px;line-height:1.8}
+.formula-side li::marker{color:var(--gold)}
+.formula-side a{color:var(--gold)}
+
+canvas.chart{width:100%;display:block;background:rgba(6,9,20,.6);
+  border:1px solid var(--line);border-radius:16px;margin-top:16px}
+.chart-note{color:var(--muted);font-size:13.5px;margin-top:10px;line-height:1.6}
+
+.sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:20px}
+@media(max-width:860px){.sim-grid{grid-template-columns:1fr}}
+.slider-row{margin:18px 0}
+.slider-row label{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:14px;color:var(--muted);margin-bottom:8px}
+.slider-row label output{color:var(--gold);font-weight:800;font-size:16px;
+  font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--gold);height:28px;cursor:pointer}
+.sim-out{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.sim-cell{background:var(--panel2);border:1px solid var(--line);border-radius:14px;
+  padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.sim-cell .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.sim-cell .v{font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.sim-cell .v.hl{color:var(--gold)}
+.halving-line{margin-top:16px;color:var(--muted);font-size:14px;
+  border-left:3px solid var(--gold);padding:8px 14px;background:var(--gold-dim);
+  border-radius:0 10px 10px 0}
+
+table.miles{width:100%;border-collapse:collapse;margin-top:18px;font-size:14.5px}
+table.miles th{text-align:left;color:var(--muted);font-size:12px;text-transform:uppercase;
+  letter-spacing:.12em;padding:10px 12px;border-bottom:1px solid var(--line)}
+table.miles td{padding:13px 12px;border-bottom:1px solid rgba(255,209,102,.07);
+  vertical-align:top}
+table.miles tr:hover td{background:rgba(255,209,102,.05)}
+table.miles td.num{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
+table.miles td:first-child{color:var(--ink);font-weight:600}
+table.miles tr td:nth-child(2){color:var(--gold);font-weight:700}
+
+.scale-toggle{display:inline-flex;gap:6px;margin-top:14px}
+.scale-toggle button{background:transparent;border:1px solid var(--line);color:var(--muted);
+  border-radius:10px;padding:8px 16px;font-size:13.5px;cursor:pointer;font-weight:700}
+.scale-toggle button.active{background:var(--gold-dim);border-color:var(--gold);color:var(--gold)}
+
+.source-list{margin:14px 0 0;padding-left:22px;color:var(--muted);font-size:14.5px;line-height:1.9}
+.source-list a{color:var(--gold)}
+.source-list li::marker{color:var(--gold)}
+.badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;border-radius:6px;padding:2px 8px;margin-right:6px}
+.b-verified{background:rgba(52,255,136,.12);color:#34ff88;border:1px solid rgba(52,255,136,.35)}
+.b-model{background:rgba(255,209,102,.12);color:var(--gold);border:1px solid var(--line)}
+.b-live{background:rgba(34,211,238,.12);color:#22d3ee;border:1px solid rgba(34,211,238,.35)}
+.honesty-box{margin-top:20px;border:1px dashed var(--line);border-radius:14px;
+  padding:16px 18px;color:var(--muted);font-size:14px;line-height:1.7;background:rgba(255,209,102,.04)}
+.honesty-box strong{color:var(--gold)}
+
+footer{margin-top:34px;padding:26px 6px 10px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:14px;line-height:2;text-align:center}
+footer a{color:var(--gold)}
+footer .addr{background:rgba(255,209,102,.08);border:1px solid var(--line);color:var(--gold);
+  border-radius:8px;padding:3px 10px;font-family:ui-monospace,monospace;font-size:12.5px;
+  cursor:pointer}
+footer .addr:hover{background:rgba(255,209,102,.16)}

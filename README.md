@@ -19,6 +19,7 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `benchmark-lab/` — QTC Benchmark Lab (Quantus vs Bitcoin/Ethereum/Solana/Ergo: consensus, PQ signatures, throughput math, fees, supply, launch fairness — every figure cited)
   - `fee-throughput-lab/` — QTC Fee & Throughput Lab (exact length-fee estimator from the runtime polynomial, wormhole exit + high-security fee calculators, QTPS visualizer, aggregation explorer, signature-size lab — figures verified Sept 29, 2026)
   - `threat-lab/` — QTC Threat Lab (Q-Day countdown across 2028/2029/2032 sourced horizons, 11-scenario wallet-exposure simulator for BTC/ETH/SOL/ADA/QTC, sourced chain-readiness table, Shor-vs-Grover explainer, quantum milestone timeline — every claim cited, Sept 29, 2026)
+  - `emission-lab/` — QTC Emission Lab (exact on-chain reward formula R = (21M − S) / 50,000,000 verified against the runtime source, live reward pulse, interactive decay simulator, milestone timeline, 80-year supply projections — no halvings, Sept 30, 2026)
 
 ## Live data
 

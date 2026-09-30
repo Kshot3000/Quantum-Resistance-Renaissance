@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.11.0">
+<title>QTC Emission Lab — the exponential tail of a 21M supply</title>
+<meta name="description" content="Quantus Emission Lab: the exact on-chain block-reward formula R = (21M − S) / 50,000,000 verified against the runtime source, live reward pulse from the indexer, an interactive decay simulator, milestone timeline, and 80-year supply projections. No halvings — smooth exponential decay.">
+<link rel="stylesheet" href="styles.css?v=1.15.0">
+<style>:root{--focus:#ffd166;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="sigrain" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Emission Lab</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com" target="_blank" rel="noopener">Quantus docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">Explorer</a>
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">✧</span><span>Quantum Shield<span class="meta">PQC explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◈</span><span>Tokenomics Explorer<span class="meta">21M supply map</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">⚙</span><span>Mining Studio<span class="meta">Mining command center</span></span></a>
+    <a href="../safesend/"><span class="ico">✉</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Fees &amp; QTPS</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/" class="current"><span class="ico">◐</span><span>Emission Lab<span class="meta">Supply decay model</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero">
+    <p class="eyebrow">Emission model &middot; verified against the runtime source &middot; Sept 30, 2026</p>
+    <h1>Every block mints a <span class="gold">shrinking</span> reward</h1>
+    <p class="lede">Quantus has no halvings and no dev tax. Each block pays the miner
+    <strong>(21,000,000 − current supply) / 50,000,000</strong> — a smooth exponential decay
+    straight out of the runtime. This lab inverts the formula live from indexer rewards, then
+    projects the full 21M supply curve: when rewards cross 0.10 QTC, when daily issuance drops
+    under 100 QTC, and what the tail looks like eighty years out.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Current block reward</span><span class="v" id="stat-reward">—</span><span class="s">mean of recent blocks · QTC</span></div>
+      <div class="fact"><span class="k">Remaining to mine</span><span class="v" id="stat-remaining">—</span><span class="s">model-derived · QTC</span></div>
+      <div class="fact"><span class="k">Implied supply</span><span class="v" id="stat-supply">—</span><span class="s">21M − remaining · QTC</span></div>
+      <div class="fact"><span class="k">Mining emissions done</span><span class="v" id="stat-mined">—</span><span class="s">of the 15.33M miner share</span></div>
+      <div class="fact"><span class="k">Anchor</span><span class="v" id="stat-snapshot" style="font-size:14px">—</span><span class="s">data freshness</span></div>
+    </div>
+    <p class="note" id="hero-note" style="margin-top:18px"></p>
+  </section>
+
+  <section class="card" id="formula">
+    <div class="card-head">
+      <h2>The <span class="gold">formula</span></h2>
+      <p class="note">Read straight from <code>pallet_mining_rewards</code> — not from a whitepaper summary.</p>
+    </div>
+    <div class="formula">
+      <div class="formula-main">
+        <div class="eq">reward = (21,000,000 − S) / 50,000,000
+          <small>S = total issuance (+ included tx fees) in QTC, per block</small></div>
+        <p class="note" style="text-align:left">Closed form from block n:
+        S(n) = 21M − R₀·(1 − 1/50M)ⁿ. The reward halves every
+        ln(½)/ln(1 − 1/50M) ≈ <strong>34.66M blocks</strong> — the exponential
+        analogue of a halving, with no cliffs.</p>
+      </div>
+      <div class="formula-side">
+        <ul>
+          <li><strong>Emission divisor 50,000,000</strong> — hardcoded in <code>runtime/src/configs/mod.rs</code>
+          (<span class="badge b-verified">verified</span> chain source).</li>
+          <li><strong>100% to the miner.</strong> No dev tax, no treasury cut of block rewards — each block's
+          reward and standard fees go entirely to the block author.</li>
+          <li><strong>Quantized to 0.01 QTC</strong> (the wormhole leaf quantum) before minting — hence the
+          alternating pulse you see below.</li>
+          <li><strong>Burned fees bend the curve up.</strong> The 1% high-security volume fee and wormhole-exit
+          burns destroy issuance, which raises remaining supply and slightly lifts future rewards vs. the pure model.</li>
+          <li><strong>Smooth decay, no halvings.</strong> Supply approaches 21M asymptotically; it never "completes"
+          at a fixed date.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="pulse">
+    <div class="card-head">
+      <h2>The reward <span class="gold">pulse</span> <span class="badge b-live">live</span></h2>
+      <p class="note">Recent indexer-reported block rewards. The dashed line is the model's true value —
+      the bars snap to 0.30 / 0.31 because of leaf-quantum quantization.</p>
+    </div>
+    <canvas class="chart" id="reward-pulse" role="img" aria-label="Recent block rewards alternating around the model value"></canvas>
+    <p class="chart-note" id="pulse-note"></p>
+  </section>
+
+  <section class="card" id="simulator">
+    <div class="card-head">
+      <h2>Decay <span class="gold">simulator</span> <span class="badge b-model">model</span></h2>
+      <p class="note">Drag through time. Every figure is computed from the closed-form decay anchored on live rewards.</p>
+    </div>
+    <div class="sim-grid">
+      <div>
+        <div class="slider-row">
+          <label>Project forward <output id="sim-years-val">10.0 years</output></label>
+          <input type="range" id="sim-years" min="0" max="60" step="0.5" value="10" aria-label="Years to project forward">
+        </div>
+        <div class="slider-row">
+          <label>Block-time assumption <output id="sim-bt-val">—</output></label>
+          <input type="range" id="sim-blocktime" min="8" max="20" step="0.01" value="13.7" aria-label="Assumed seconds per block">
+        </div>
+        <div class="halving-line" id="sim-halving"></div>
+      </div>
+      <div class="sim-out">
+        <div class="sim-cell"><span class="k">Block height</span><span class="v" id="sim-height">—</span></div>
+        <div class="sim-cell"><span class="k">Date</span><span class="v" id="sim-date">—</span></div>
+        <div class="sim-cell"><span class="k">Block reward</span><span class="v hl" id="sim-reward">—</span></div>
+        <div class="sim-cell"><span class="k">Daily issuance</span><span class="v" id="sim-daily">—</span></div>
+        <div class="sim-cell"><span class="k">Annual issuance</span><span class="v" id="sim-annual">—</span></div>
+        <div class="sim-cell"><span class="k">Annual inflation</span><span class="v" id="sim-inflation">—</span></div>
+        <div class="sim-cell"><span class="k">Total supply</span><span class="v" id="sim-supply">—</span></div>
+        <div class="sim-cell"><span class="k">Remaining to mine</span><span class="v" id="sim-remaining">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="milestones">
+    <div class="card-head">
+      <h2>Milestone <span class="gold">timeline</span> <span class="badge b-model">model</span></h2>
+      <p class="note">When the decay crosses the markers miners actually care about.</p>
+    </div>
+    <table class="miles">
+      <thead><tr><th>Milestone</th><th>Projected date</th><th>Blocks away</th><th>Reward then</th></tr></thead>
+      <tbody id="milestone-rows"></tbody>
+    </table>
+    <p class="chart-note" id="milestone-note"></p>
+  </section>
+
+  <section class="card" id="supply">
+    <div class="card-head">
+      <h2>Eighty years of <span class="gold">supply</span> <span class="badge b-model">model</span></h2>
+      <p class="note">The supply curve S(n) = 21M − R₀·(1 − 1/50M)ⁿ. Log scale shows the long tail;
+      linear scale shows how fast the early years move.</p>
+      <div class="scale-toggle" id="scale-toggle" role="group" aria-label="Chart scale">
+        <button data-scale="linear" class="active">Linear</button>
+        <button data-scale="log">Log</button>
+      </div>
+    </div>
+    <canvas class="chart" id="supply-curve" role="img" aria-label="Projected QTC supply curve over eighty years"></canvas>
+    <p class="chart-note" id="supply-note"></p>
+  </section>
+
+  <section class="card" id="compare">
+    <div class="card-head">
+      <h2>Why <span class="gold">no halvings</span>?</h2>
+      <p class="note">Bitcoin-style halvings cut the reward in a cliff every four years. Quantus decays
+      continuously — the same halving <em>time</em> (~16 years at current block time) but no shock dates
+      for miners to front-run. The purple curve is a hypothetical halving schedule drawn only for comparison.</p>
+    </div>
+    <canvas class="chart" id="decay-compare" role="img" aria-label="Exponential decay versus hypothetical four-year halvings"></canvas>
+  </section>
+
+  <section class="card" id="sources">
+    <div class="card-head">
+      <h2>Sources</h2>
+      <p class="note">Every number above traces to one of these. Re-verified <strong>Sept 30, 2026</strong>.</p>
+    </div>
+    <ol class="source-list" id="source-list">
+      <li><span class="badge b-verified">verified</span><a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/configs/mod.rs" target="_blank" rel="noopener">Quantus-Network/chain — runtime/src/configs/mod.rs</a>: <code>EmissionDivisor = ConstU128&lt;50_000_000&gt;</code>.</li>
+      <li><span class="badge b-verified">verified</span><a href="https://github.com/Quantus-Network/chain/blob/main/pallets/mining-rewards/src/lib.rs" target="_blank" rel="noopener">pallet_mining_rewards</a>: reward = remaining supply / divisor, quantized to the leaf quantum, 100% to the miner; burned fees excluded from issuance.</li>
+      <li><span class="badge b-verified">verified</span><a href="https://github.com/Quantus-Network/docs/blob/main/docs/reference/tokenomics.md" target="_blank" rel="noopener">Quantus-Network/docs — tokenomics.md</a>: 21M cap, 27% genesis mint (5.67M), 73% mining emissions (15.33M), smooth exponential decay, no halvings.</li>
+      <li><span class="badge b-live">live</span>Public Subsquid indexer (<code>sqm.quantus.com</code>) via the repo's same-origin snapshot <code>data/live.json</code> — block rewards, heights, and timestamps the model anchors on.</li>
+      <li><span class="badge b-model">model</span>All projections are the closed-form decay above. They ignore future fee burns, block-time drift, and governance changes — treat dates as model outputs, not promises.</li>
+    </ol>
+    <div class="honesty-box">
+      <strong>Honest-label policy.</strong> Live rewards and snapshot-derived figures wear the
+      <span class="badge b-live">live</span> badge; protocol constants read from chain source wear
+      <span class="badge b-verified">verified</span>; everything computed from the decay formula wears
+      <span class="badge b-model">model</span>. Nothing here is financial advice.
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team. Emission figures verified against the runtime source, Sept 30, 2026. Not financial advice.
+  </footer>
+</main>
+
+<script src="app.js?v=1.15.0"></script>
+<script src="../../assets/app-nav.js?v=1.11.0"></script>
+</body>
+</html>
