@@ -143,6 +143,7 @@ section{padding:48px 0}
 .app-card.whalewatch{--accent:#2dd4bf}.app-card.whalewatch .app-ico{background:rgba(45,212,191,.12);border-color:rgba(45,212,191,.4)}
 .app-card.keyforge{--accent:#c084fc}.app-card.keyforge .app-ico{background:rgba(192,132,252,.12);border-color:rgba(192,132,252,.4)}
 .app-card.distplanner{--accent:#a78bfa}.app-card.distplanner .app-ico{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4)}
+.app-card.vanity{--accent:#f5a623}.app-card.vanity .app-ico{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -433,6 +434,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Governance Tracker <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Every Quantus referendum, read live from the chain — referendum #0's full lifecycle from preimage note to confirmed runtime upgrade, with the 8 member votes and exact tally (80% support, 100% approval). The two-track map read from the runtime source (tech_collective_members 61%/60%, fast_upgrade 80%/80%), an interactive threshold lab on the real flat-curve math, the ranked-collective vote wiring (Linear weight, one member one vote), the 45-day timeout lifecycle, and an honest empty treasury — every constant verified against Quantus-Network/chain main.</p>
         <div class="meta">25/25 logic tests green · 26/26 browser checks green</div>
+      </a>
+      <a class="app-card vanity" href="pages/vanity-forge/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">✦</div>
+          <span class="tag">Brandable addresses</span>
+        </div>
+        <h3>QTC Vanity Forge <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>Grind a brandable Quantus address — <span class="mono">qzkshot…</span>, <span class="mono">qzmint…</span> — with real in-browser ML-DSA-65/87 keypairs on the exact upstream address derivation (Poseidon2 account-ID + SS58-189). Honest difficulty math (expected/median/luck percentiles), a machine benchmark that grounds every ETA, a responsive forge console with a luck meter, a localStorage results vault with export, and a no-illusions safety brief — 100% client-side, keys never leave the page.</p>
+        <div class="meta">20/20 logic tests green · browser QA green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Vanity Forge — brand your quantum-safe address</title>
+<meta name="description" content="QTC Vanity Forge: grind a brandable Quantus address (qzYOURNAME…) with real in-browser ML-DSA-65/87 keypairs and exact upstream address derivation. Honest difficulty math, machine benchmark, results vault — 100% client-side.">
+<link rel="stylesheet" href="styles.css?v=1.24.0">
+<style>:root{--focus:#f5a623;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="embers" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Vanity Forge</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">Upstream chain</a>
+      <a href="../key-forge/">Key Forge</a>
+    </nav>
+    <details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/" class="current"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="hero-seal" aria-hidden="true">⚒</div>
+    <p class="kicker">Brandable post-quantum addresses · 100% client-side</p>
+    <h1>Forge a <span class="gold">name</span> into your address</h1>
+    <p class="lede">Every Quantus address starts with <span class="mono">qz…</span> — the rest is random. Vanity Forge grinds real ML-DSA-65/87 keypairs right in your browser until your address starts with your project, your handle, or your word: <span class="mono">qzkshot…</span>, <span class="mono">qzmint…</span>, <span class="mono">qz…MINT</span>. Same audited FIPS-204 keygen and exact upstream address derivation as Key Forge — nothing is sent anywhere, keys never leave this page.</p>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-v">58</div><div class="stat-l">base58 alphabet — no 0, O, I, l</div></div>
+      <div class="stat"><div class="stat-v mono">qz</div><div class="stat-l">automatic SS58-189 lead on every address</div></div>
+      <div class="stat"><div class="stat-v" id="stat-rate">—</div><div class="stat-l">your measured grind rate (benchmark below)</div></div>
+      <div class="stat"><div class="stat-v">2</div><div class="stat-l">schemes: ML-DSA-65 / ML-DSA-87</div></div>
+    </div>
+    <nav class="toc" aria-label="Sections">
+      <a href="#design">Design</a><a href="#difficulty">Difficulty</a><a href="#benchmark">Benchmark</a><a href="#forge">The forge</a><a href="#vault">Vault</a><a href="#safety">Safety</a><a href="#sources">Sources</a>
+    </nav>
+  </section>
+
+  <section id="design" class="panel">
+    <h2>Design your vanity</h2>
+    <p class="sec-sub">Pick the characters you want. The readout below shows the exact grind math — expected attempts, median luck, and wall-clock at your machine's measured rate — before you spend a single keypair. One quirk of the chain to know up front: the SS58-189 prefix bytes pin the character right after <span class="mono">qz</span> to just seven possible symbols (<span class="mono">j k m n o p q</span>, unevenly likely) — the forge rejects anything else there instead of grinding forever.</p>
+    <div class="card">
+      <div class="field">
+        <label for="pattern">Pattern (1–6 base58 characters)</label>
+        <input type="text" id="pattern" maxlength="10" autocomplete="off" spellcheck="false" placeholder="e.g. KSHOT" aria-describedby="patternMsg">
+        <div class="msg" id="patternMsg" role="status"></div>
+        <div class="preview" id="preview" aria-live="polite"></div>
+      </div>
+      <div class="opts">
+        <fieldset class="opt-group">
+          <legend class="lg">Signature scheme</legend>
+          <label class="radio-row"><input type="radio" name="scheme" value="65" checked> ML-DSA-65 <span class="dim">— faster grind</span></label>
+          <label class="radio-row"><input type="radio" name="scheme" value="87"> ML-DSA-87 <span class="dim">— higher security margin, slower</span></label>
+        </fieldset>
+        <fieldset class="opt-group">
+          <legend class="lg">Match position</legend>
+          <label class="radio-row"><input type="radio" name="position" value="prefix" checked> Starts with <span class="dim mono">— qzPATTERN…</span></label>
+          <label class="radio-row"><input type="radio" name="position" value="suffix"> Ends with <span class="dim mono">— …PATTERN (approximate math)</span></label>
+        </fieldset>
+        <div class="opt-group">
+          <div class="lg">Matching</div>
+          <label class="check-row"><input type="checkbox" id="caseSens" checked> <span>Case-sensitive <span class="dim">— uncheck to also accept the other case (~2× faster per letter)</span></span></label>
+        </div>
+      </div>
+      <div id="diffOut" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="difficulty" class="panel">
+    <h2>Difficulty explorer</h2>
+    <p class="sec-sub">How the grind scales: the first character after <span class="mono">qz</span> is pinned to seven symbols (worst case: <span class="mono">q</span> at ~1-in-24); each further character multiplies the expected attempts by 58. Grinding is a geometric process — the <em>median</em> find lands at ~69% of the expected attempts, and one unlucky run in ten takes more than ~2.3× expected.</p>
+    <div class="card">
+      <table class="ladder">
+        <thead><tr><th>Chars</th><th style="text-align:right">Expected attempts</th><th style="text-align:right">Median attempts</th><th style="text-align:right">Expected time</th><th>Scale</th></tr></thead>
+        <tbody id="ladder"></tbody>
+      </table>
+      <p class="hint" id="ladderNote"></p>
+    </div>
+  </section>
+
+  <section id="benchmark" class="panel">
+    <h2>Benchmark your machine</h2>
+    <p class="sec-sub">Measures real keygen + address-derivation throughput on this device (120 keypairs per scheme, ~a minute or two). The difficulty times and forge ETAs use your measured rate from then on — saved in this browser.</p>
+    <div class="card">
+      <button class="btn" id="benchBtn">▶ Run benchmark</button>
+      <div id="benchOut" style="margin-top:.8rem"><p class="hint">No benchmark yet. ~2 minutes of number-crunching; the grind math gets honest after.</p></div>
+    </div>
+  </section>
+
+  <section id="forge" class="panel">
+    <h2>The forge</h2>
+    <p class="sec-sub">Grinds keypairs in batches and checks every address against your pattern. The page stays responsive; stop any time — attempts so far are never wasted, they're just draws from the same distribution.</p>
+    <div class="card">
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap;align-items:center">
+        <button class="btn" id="grindBtn" disabled>▶ Start grinding</button>
+        <label class="check-row" style="margin:0"><input type="checkbox" id="stopFirst" checked> <span>Stop on first find</span></label>
+        <label class="check-row" style="margin:0"><input type="checkbox" id="storeSecret" checked> <span>Store found secret keys in this browser's vault <span class="dim">(export to paper ASAP — see Safety)</span></span></label>
+      </div>
+      <p class="forge-status" id="forgeStatus">Load a pattern above, then start the forge.</p>
+      <div class="grind-stats">
+        <div class="gstat"><div class="gv" id="gAttempts">0</div><div class="gl">attempts</div></div>
+        <div class="gstat"><div class="gv" id="gElapsed">00:00:00</div><div class="gl">elapsed</div></div>
+        <div class="gstat"><div class="gv" id="gRate">—</div><div class="gl">current rate</div></div>
+        <div class="gstat"><div class="gv" id="gEta">—</div><div class="gl">ETA to expected</div></div>
+      </div>
+      <div class="luck-wrap">
+        <div class="luck-track" role="progressbar" aria-label="Probability a match would have been found by now"><div id="luckBar"></div></div>
+        <div id="luckPct">0.0% likely found by now</div>
+      </div>
+      <div id="foundList" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="vault" class="panel">
+    <h2>Vault</h2>
+    <p class="sec-sub">Every find lands here automatically. This is <strong>browser localStorage, not a vault</strong> — convenient, not secure. Export finds to Key Forge's paper card or a proper backup, then delete them here.</p>
+    <div class="card">
+      <div id="vaultList"></div>
+      <div class="vault-tools">
+        <button class="btn ghost" id="exportVault">Export vault JSON</button>
+        <button class="btn ghost danger" id="wipeVault">Delete all</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="safety" class="panel">
+    <h2>Forge safety</h2>
+    <div class="card">
+      <ul class="safety-list">
+        <li><strong>A vanity prefix weakens nothing.</strong> The address is a Poseidon2 hash of the public key — hunting for a prefix is just re-rolling the hash. Key entropy is identical to a random address.</li>
+        <li><strong>Keys never leave this page.</strong> Keygen uses the OS CSPRNG via the audited noble FIPS-204 implementation; there are no network calls. Verify in devtools: the Network tab stays empty while grinding.</li>
+        <li><strong>Don't grind on machines you don't own.</strong> A VPS, a shared laptop, or a browser with sketchy extensions can exfiltrate the secret key. Forge on your own hardware.</li>
+        <li><strong>Back up before funding.</strong> Reveal the secret, copy it to your paper backup (Key Forge prints a receive card), <em>then</em> send funds. A vanity address with a lost secret is a donation to nobody.</li>
+        <li><strong>The vault is localStorage.</strong> Any site-level XSS or anyone with your browser profile can read it. Treat it as a clipboard with memory, not custody.</li>
+        <li><strong>Know when to stop.</strong> Four characters is a long weekend on a fast machine; five is months; six is a datacenter's problem. The difficulty table above is the honest version of "wen lambo".</li>
+        <li><strong>The third character is pinned — some patterns are impossible.</strong> The SS58-189 prefix bytes only allow <span class="mono">j k m n o p q</span> right after <span class="mono">qz</span> (with uneven odds: <span class="mono">q</span> is ~4× rarer than <span class="mono">k</span>). The forge tells you up front instead of grinding forever; every character after that is a fair 1-in-58 draw.</li>
+        <li><strong>Suffix mode is approximate.</strong> The trailing characters encode the SS58 checksum, which is derived from the account ID rather than drawn independently — the published suffix odds assume near-uniformity over many draws.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="sources" class="panel">
+    <h2>Sources</h2>
+    <div class="card">
+      <p class="sources">
+        Address derivation: <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">Quantus-Network/chain</a> — <span class="mono">qp-dilithium-crypto</span> <span class="mono">into_account() = hash_bytes(pubkey)</span> (Poseidon2-Goldilocks, qp-poseidon-core) → SS58check prefix 189 (<span class="mono">quantus-cli/src/cli/address_format.rs</span>), verified against crate test vectors in Key Forge.<br>
+        Keygen: vendored <span class="mono">@noble/post-quantum</span> FIPS-204 ML-DSA-65/87 implementation (same code Key Forge ships).<br>
+        Difficulty math: geometric distribution over the 58-symbol base58 alphabet; median = ln 2 × expected; percentiles from 1 − (1 − 1/E)ⁿ. Unit-tested in <span class="mono">tests/vanity.test.mjs</span>.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer class="chrome">
+  <div class="foot-grid">
+    <div>
+      <strong>QTC Vanity Forge</strong>
+      <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Quantus ecosystem. Keygen and address derivation run entirely in your browser — verify the Network tab stays empty.</p>
+    </div>
+    <div>
+      <strong>Support the build</strong>
+      <p class="mono donate">QTC: qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</p>
+      <p><a href="https://github.com/Kshot3000/Quantus-Muse-Builder" target="_blank" rel="noopener">Quantus-Muse-Builder on GitHub</a></p>
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="js/app.js?v=1.24.0"></script>
+</body>
+</html>
