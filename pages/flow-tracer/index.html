@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Flow Tracer — Quantus Muse Builder</title>
+<meta name="description" content="Follow the money on the quantum chain: trace any Quantus address across hops, detect peel chains, distribution fan-outs and consolidation fan-ins, and inspect the largest real transfers — from the live Subsquid indexer or a same-origin snapshot, 100% client-side.">
+<meta name="theme-color" content="#07090f">
+<link rel="stylesheet" href="styles.css?v=1.29.0">
+<script src="js/flow-core.js?v=1.29.0"></script>
+<script src="js/ss58.js?v=1.29.0"></script>
+<style>:root{--focus:#7ef0c9;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="flow-drift" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Flow Tracer</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="../whale-watch/">Whale Watch</a>
+      <a href="../block-explorer/">Block Explorer</a>
+      <a href="../supply-audit/">Supply Audit</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/" class="current"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="kicker"><span class="dot"></span>MONEY-FLOW FORENSICS &middot; LIVE INDEXER + SNAPSHOT &middot; 100% CLIENT-SIDE</div>
+      <h1>QTC Flow Tracer</h1>
+      <p class="lede">Follow the money on the quantum chain. Paste any address and walk its transfers hop by hop — or let the pattern radar surface peel chains, distribution fan-outs, consolidation fan-ins and miner forwarding straight from real indexer data. Every edge below is a real on-chain transfer; nothing here is simulated.</p>
+      <div class="hero-badges">
+        <span class="badge" id="snap-badge">loading snapshot&hellip;</span>
+        <span class="badge live" id="live-badge" hidden>live indexer</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="trace-panel" aria-label="Trace console">
+    <h2><span class="sec-ico">&#128269;</span> Trace console</h2>
+    <p class="panel-sub">Enter a Quantus address (<code>qz&hellip;</code>, SS58 prefix 189 — checksum-validated). The console tries the live indexer first (8s), then falls back to the snapshot graph. Tracing is limited to the transfers in the active dataset; see Methodology.</p>
+    <form id="trace-form" class="trace-form" autocomplete="off">
+      <input id="trace-addr" class="addr-input" type="text" spellcheck="false"
+             placeholder="qz… address" aria-label="Address to trace">
+      <select id="trace-dir" aria-label="Direction">
+        <option value="both" selected>both directions</option>
+        <option value="out">outgoing only</option>
+        <option value="in">incoming only</option>
+      </select>
+      <label class="hops-label">hops <input id="trace-hops" type="range" min="1" max="3" value="2" aria-label="Hops"><b id="hops-val">2</b></label>
+      <button type="submit" class="btn primary" id="trace-btn">Trace</button>
+    </form>
+    <div class="quick-picks" id="quick-picks" aria-label="Notable starting points"></div>
+    <div class="trace-status" id="trace-status" role="status">No trace yet — pick a starting point above, or paste an address.</div>
+    <div class="graph-wrap" id="graph-wrap" hidden>
+      <svg id="graph" role="img" aria-label="Transfer flow graph"></svg>
+    </div>
+    <div class="legend" id="graph-legend" hidden>
+      <span><i class="sw seed"></i>seed</span>
+      <span><i class="sw sender"></i>sent funds</span>
+      <span><i class="sw receiver"></i>received funds</span>
+      <span><i class="sw both"></i>both</span>
+      <span><i class="sw sentinel"></i>mint sentinel</span>
+      <span class="edge-note">edge width &prop; log(amount) — hover an edge for details, click a node for its dossier</span>
+    </div>
+  </section>
+
+  <section class="panel" id="dossier-panel" aria-label="Address dossier" hidden>
+    <h2><span class="sec-ico">&#9673;</span> Address dossier <button class="btn ghost small" id="dossier-close">close</button></h2>
+    <div class="dossier-head">
+      <code id="dossier-addr" class="addr-full"></code>
+      <button class="btn ghost small" id="dossier-copy">copy</button>
+      <button class="btn small" id="dossier-trace">trace from here</button>
+    </div>
+    <div class="stat-grid" id="dossier-stats"></div>
+    <div class="dossier-cols">
+      <div>
+        <h3>Top senders</h3>
+        <div id="dossier-senders" class="cplist"></div>
+      </div>
+      <div>
+        <h3>Top recipients</h3>
+        <div id="dossier-recipients" class="cplist"></div>
+      </div>
+    </div>
+    <p class="fine" id="dossier-window"></p>
+  </section>
+
+  <section class="panel" id="radar-panel" aria-label="Pattern radar">
+    <h2><span class="sec-ico">&#9783;</span> Pattern radar</h2>
+    <p class="panel-sub">Heuristics run over the full snapshot graph. They flag <em>shapes</em>, not wrongdoing — a peel chain can be an exchange sweeping change; a fan-out can be payroll. Click any row to load it into the trace console.</p>
+    <div class="tabs" role="tablist" id="radar-tabs">
+      <button role="tab" data-tab="peel" class="active">Peel chains</button>
+      <button role="tab" data-tab="fanout">Distribution</button>
+      <button role="tab" data-tab="fanin">Consolidation</button>
+      <button role="tab" data-tab="round">Round amounts</button>
+      <button role="tab" data-tab="miner">Miner forwarding</button>
+    </div>
+    <div id="radar-body"></div>
+  </section>
+
+  <section class="panel" id="notable-panel" aria-label="Notable transfers">
+    <h2><span class="sec-ico">&#9733;</span> Largest transfers in the dataset</h2>
+    <p class="panel-sub">The 25 biggest moves by amount. Genesis block-1 rows are the TGE allocation; everything else is organic chain activity.</p>
+    <div class="table-wrap">
+      <table class="data-table" id="notable-table">
+        <thead><tr><th>#</th><th>Amount</th><th>From</th><th>To</th><th>Block</th><th>Time</th><th></th></tr></thead>
+        <tbody id="notable-body"><tr><td colspan="7" class="empty">loading&hellip;</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="method-panel" aria-label="Methodology">
+    <h2><span class="sec-ico">&#9432;</span> Methodology &amp; honest limits</h2>
+    <ul class="method-list">
+      <li><b>Source.</b> The public Subsquid indexer at <code>sqm.quantus.com/v1/graphql</code> (<code>transfer</code> entity: amount, from/to, block height, timestamp, fee, extrinsic). The browser build tries it live first; GitHub Pages is not on the indexer's CORS allowlist, so the app falls back to the same-origin snapshot.</li>
+      <li><b>Snapshot contents.</b> <span id="method-window">Every transfer &ge; 1 QTC in the 15,000 blocks before capture, plus the 600 largest transfers of all time, plus the full 22-transfer block-1 genesis allocation</span> (merged from the supply-audit snapshot, same indexer). Miner-reward dust (&lt; 1 QTC) is excluded by design.</li>
+      <li><b>What tracing misses.</b> Transfers below 1 QTC, transfers outside the window, and any move after the snapshot was captured. A trace that ends is a trace that ran out of <em>dataset</em>, not necessarily out of chain.</li>
+      <li><b>Patterns are shapes.</b> Peel chains, fan-outs and fan-ins are structural heuristics. They do not identify owners and do not allege anything about intent.</li>
+      <li><b>Refresh.</b> <code>node scripts/fetch-flow-data.mjs</code> regenerates <code>data/flows.json</code>; commit it to refresh the snapshot.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="chrome">
+  <div class="foot-inner">
+    <div>Built by <a href="https://x.com/kshot9000" rel="noopener">@kshot9000</a> &middot; Quantus Muse Builder</div>
+    <div class="donate">Donate QTC: <code id="donate-addr">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code> <button class="copy" id="donate-copy" aria-label="Copy donation address">copy</button></div>
+    <div class="fine">Flow data: Quantus Subsquid indexer (sqm.quantus.com) via snapshot &middot; patterns are heuristics, not accusations</div>
+  </div>
+</footer>
+
+<script src="app.js?v=1.29.0"></script>
+</body>
+</html>

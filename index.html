@@ -148,6 +148,7 @@ section{padding:48px 0}
 .app-card.legacy{--accent:#e8b04b}.app-card.legacy .app-ico{background:rgba(232,176,75,.12);border-color:rgba(232,176,75,.4)}
 .app-card.audit{--accent:#8fe3b0}.app-card.audit .app-ico{background:rgba(143,227,176,.12);border-color:rgba(143,227,176,.4)}
 .app-card.vesting{--accent:#f5c453}.app-card.vesting .app-ico{background:rgba(245,196,83,.12);border-color:rgba(245,196,83,.4)}
+.app-card.flow{--accent:#7ef0c9}.app-card.flow .app-ico{background:rgba(126,240,201,.12);border-color:rgba(126,240,201,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -483,6 +484,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Vesting Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The unlock calendar for Quantus's locked genesis supply: all 48 real vesting schedules from the chain indexer (5,669,940 QTC, ~96% still locked behind the one-year cliff), the pallet's exact linear formula recomputed to the planck, a monthly unlock curve to 2030, per-schedule claimable estimates with the 25-QTC payout alignment, and the permissionless <code>Vesting.claim</code> path — 100% client-side.</p>
         <div class="meta">26/26 logic tests green · every schedule's vested amount recomputed from snapshot · browser QA green</div>
+      </a>
+      <a class="app-card flow" href="pages/flow-tracer/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🔎</div>
+          <span class="tag">Money-flow forensics</span>
+        </div>
+        <h3>QTC Flow Tracer <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>Follow the money on the quantum chain: trace any address hop by hop through a live-first indexer query with snapshot fallback, and let the pattern radar flag peel chains, distribution fan-outs, consolidation fan-ins, round-amount moves and miner forwarding — 5,361 real transfers across 1,204 addresses, click-anywhere dossiers, zero simulated data.</p>
+        <div class="meta">18/18 logic tests green · peel/fan detectors on real indexer rows · browser QA green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>
