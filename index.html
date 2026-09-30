@@ -147,6 +147,7 @@ section{padding:48px 0}
 .app-card.contactvault{--accent:#ff5a5a}.app-card.contactvault .app-ico{background:rgba(255,90,90,.12);border-color:rgba(255,90,90,.4)}
 .app-card.legacy{--accent:#e8b04b}.app-card.legacy .app-ico{background:rgba(232,176,75,.12);border-color:rgba(232,176,75,.4)}
 .app-card.audit{--accent:#8fe3b0}.app-card.audit .app-ico{background:rgba(143,227,176,.12);border-color:rgba(143,227,176,.4)}
+.app-card.vesting{--accent:#f5c453}.app-card.vesting .app-ico{background:rgba(245,196,83,.12);border-color:rgba(245,196,83,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -473,6 +474,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Supply Audit <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The independent money-supply verifier: the exact on-chain emission recurrence recomputed to the planck (verified against <code>pallet_mining_rewards</code>), every recorded mint tallied from the indexer, and the full 22-transfer genesis allocation itemized — reconciled against reported balances. The protocol passes; the indexer's balance sheet is flagged +0.75% with the evidence itemized. Exact BigInt math, no floats.</p>
         <div class="meta">38/38 logic tests green · first-block known answer exact · browser QA green</div>
+      </a>
+      <a class="app-card vesting" href="pages/vesting-desk/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">⏳</div>
+          <span class="tag">Unlock calendar</span>
+        </div>
+        <h3>QTC Vesting Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>The unlock calendar for Quantus's locked genesis supply: all 48 real vesting schedules from the chain indexer (5,669,940 QTC, ~96% still locked behind the one-year cliff), the pallet's exact linear formula recomputed to the planck, a monthly unlock curve to 2030, per-schedule claimable estimates with the 25-QTC payout alignment, and the permissionless <code>Vesting.claim</code> path — 100% client-side.</p>
+        <div class="meta">26/26 logic tests green · every schedule's vested amount recomputed from snapshot · browser QA green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

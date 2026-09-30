@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Vesting Desk — Quantus Muse Builder</title>
+<meta name="description" content="The unlock calendar for Quantus's locked genesis supply: all 48 real vesting schedules from the chain indexer, the exact pallet vesting math, monthly unlock projections to 2030, per-schedule claim estimates, and the permissionless claim path — 100% client-side.">
+<meta name="theme-color" content="#0a0c12">
+<link rel="stylesheet" href="styles.css?v=1.28.0">
+<script src="js/vesting-core.js?v=1.28.0"></script>
+<script src="js/ss58.js?v=1.28.0"></script>
+<style>:root{--focus:#f5c453;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="tick-rain" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Vesting Desk</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="../whale-watch/">Whale Watch</a>
+      <a href="../supply-audit/">Supply Audit</a>
+      <a href="../tokenomics/">Tokenomics</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/" class="current"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="kicker"><span class="dot"></span>GENESIS VESTING &middot; 48 SCHEDULES &middot; ON-CHAIN MATH</div>
+      <h1>QTC Vesting Desk</h1>
+      <p class="lede">The unlock calendar for Quantus's locked genesis supply. Every schedule below is a real row from the chain's Subsquid indexer — <strong>5,669,940 QTC</strong> of the 27% TGE mint, still <strong>96% locked</strong> behind a one-year cliff. The unlock math is the pallet's own formula, recomputed to the planck, in your browser.</p>
+      <div class="hero-badges">
+        <span class="badge" id="snap-badge">loading snapshot&hellip;</span>
+        <span class="badge live" id="live-badge" hidden>live indexer</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="now-panel" aria-label="Right now">
+    <h2><span class="sec-ico">&#9201;</span> Right now</h2>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-label">Vested so far</div><div class="stat-value" id="st-vested">&mdash;</div><div class="stat-sub" id="st-vested-sub"></div></div>
+      <div class="stat"><div class="stat-label">Claimed on-chain</div><div class="stat-value" id="st-claimed">&mdash;</div><div class="stat-sub">only the liquidity schedule has moved</div></div>
+      <div class="stat warn"><div class="stat-label">Claimable now (est.)</div><div class="stat-value" id="st-unclaimed">&mdash;</div><div class="stat-sub">25-QTC aligned &middot; permissionless claim, anyone can ping</div></div>
+      <div class="stat"><div class="stat-label">Still locked</div><div class="stat-value" id="st-locked">&mdash;</div><div class="stat-sub">behind the 2027-09-09 cliff</div></div>
+    </div>
+    <div class="count-grid">
+      <div class="count"><div class="count-label">Grants start unlocking</div><div class="count-value" id="cd-grant">&mdash;</div><div class="count-sub">Sep 9, 2027 &middot; 46 schedules, 5.42M QTC</div></div>
+      <div class="count"><div class="count-label">Intents grant fully vested</div><div class="count-value" id="cd-intents">&mdash;</div><div class="count-sub">Sep 9, 2027 &middot; 42,000 QTC</div></div>
+      <div class="count"><div class="count-label">All grants fully vested</div><div class="count-value" id="cd-end">&mdash;</div><div class="count-sub">Sep 8, 2030 &middot; the full 5.42M QTC</div></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Unlock calendar">
+    <h2><span class="sec-ico">&#128197;</span> The unlock calendar</h2>
+    <p class="panel-note">Aggregate vested supply across all 48 schedules, computed with the pallet's exact linear formula at each month boundary — TGE through the end of vesting. Toggle between the cumulative curve and monthly unlock inflow.</p>
+    <div class="chart-tabs" role="tablist" aria-label="Chart mode">
+      <button class="chart-tab active" data-mode="cumulative" role="tab" aria-selected="true">Cumulative vested</button>
+      <button class="chart-tab" data-mode="inflow" role="tab" aria-selected="false">Monthly inflow</button>
+    </div>
+    <div class="chart-wrap"><canvas id="unlock-chart" height="320" aria-label="Vesting unlock chart" role="img"></canvas></div>
+    <div class="chart-legend" id="chart-legend"></div>
+    <p class="fine">Chart math: at each month boundary, vested = &sum; floor(total &middot; (t&minus;start) / (end&minus;start)) per schedule (0 before cliff, total after end) — the same rounding the runtime uses. Grants dominate: ~4,940 QTC/day per schedule for 3 years.</p>
+  </section>
+
+  <section class="panel" aria-label="Vesting cohorts">
+    <h2><span class="sec-ico">&#9776;</span> The three cohorts</h2>
+    <p class="panel-note">Genesis wrote three kinds of schedule (verified in <code>runtime/src/genesis_config_presets/mainnet_vesting.rs</code>). Every row has <code>cliff == start</code> — nothing unlocks as a lump.</p>
+    <div class="cohort-grid" id="cohort-grid"></div>
+  </section>
+
+  <section class="panel" aria-label="Schedule explorer">
+    <h2><span class="sec-ico">&#9775;</span> Schedule explorer</h2>
+    <p class="panel-note">All 48 schedules. Click a row for its unlock calendar and claim details. Claimable estimates use the snapshot's chain time and the pallet's 25-QTC non-final payout alignment — the chain decides at the claim block's timestamp, and at most one claim per schedule per day.</p>
+    <div class="table-tools">
+      <input id="sched-search" type="search" placeholder="Search by id or address&hellip;" aria-label="Search schedules">
+      <select id="sched-cohort" aria-label="Filter by cohort">
+        <option value="all">All cohorts</option>
+        <option value="grant">Genesis grants</option>
+        <option value="intents">Intents grant</option>
+        <option value="liquidity">Treasury liquidity</option>
+      </select>
+      <select id="sched-sort" aria-label="Sort schedules">
+        <option value="total-desc">Largest grant first</option>
+        <option value="total-asc">Smallest grant first</option>
+        <option value="progress-desc">Most vested first</option>
+        <option value="claimable-desc">Most claimable first</option>
+        <option value="id-asc">Schedule id</option>
+      </select>
+      <label class="check"><input type="checkbox" id="sched-unclaimed"> vested-but-unclaimed only</label>
+    </div>
+    <div class="table-scroll">
+      <table id="sched-table">
+        <thead><tr>
+          <th>Id</th><th>Beneficiary</th><th>Cohort</th><th>Total</th><th>Vested</th><th>Claimed</th><th>Claimable&thinsp;*</th><th>Progress</th>
+        </tr></thead>
+        <tbody id="sched-body"><tr><td colspan="8" class="empty">loading schedules&hellip;</td></tr></tbody>
+      </table>
+    </div>
+    <div id="sched-detail" class="detail" hidden></div>
+  </section>
+
+  <section class="panel" aria-label="Track my grant">
+    <h2><span class="sec-ico">&#9673;</span> Track my grant</h2>
+    <p class="panel-note">Paste a <code>qz&hellip;</code> address to find its vesting schedules. Checksum-validated (SS58 prefix 189) before anything is looked up. Everything stays in your browser.</p>
+    <div class="lookup-row">
+      <input id="lookup-addr" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="qz&hellip;" aria-label="Quantus address">
+      <button id="lookup-btn" class="btn">Look up</button>
+    </div>
+    <div id="lookup-msg" class="lookup-msg" role="status"></div>
+    <div id="lookup-results"></div>
+  </section>
+
+  <section class="panel" aria-label="How vesting works">
+    <h2><span class="sec-ico">&#9881;</span> Vesting 101 — the exact rules</h2>
+    <div class="cols">
+      <div class="col">
+        <h3>The unlock formula</h3>
+        <p>From <code>pallets/vesting/src/lib.rs</code> (<code>vested_amount</code>), times in milliseconds since the unix epoch:</p>
+        <ul class="rules">
+          <li>Before <code>cliff</code>: <strong>0</strong> claimable.</li>
+          <li>At or after <code>end</code>: the <strong>full total</strong>.</li>
+          <li>Between: <code>floor(total &times; (now &minus; start) / (end &minus; start))</code> — linear, rounded <strong>down</strong>, measured from <code>start</code>.</li>
+        </ul>
+        <h3>How to claim</h3>
+        <p><code>Vesting.claim(schedule_id)</code> — pallet index <strong>22</strong>, call index <strong>0</strong>. Claim is <strong>permissionless</strong>: any signed account can call it for any schedule, and the payout always goes to the stored beneficiary. This is the only claim path for beneficiaries that cannot sign (wormhole addresses, high-security accounts) — a third-party "ping" is all it takes.</p>
+      </div>
+      <div class="col">
+        <h3>Payout quirks</h3>
+        <ul class="rules">
+          <li><strong>25-QTC chunks:</strong> non-final claims pay down to multiples of 2,500 &times; the 0.01-QTC payout quantum. The leftover rides to a later claim; the final claim pays the exact remainder.</li>
+          <li><strong>One claim per day</strong> per schedule (<code>MinClaimInterval = MILLIS_PER_DAY</code>).</li>
+          <li><strong>Pull-based pot:</strong> the unclaimed allocation sits in the pallet's sovereign pot; no locks or freezes ever touch a beneficiary account — any address, even keyless, can be a beneficiary.</li>
+          <li><strong>Admin powers</strong> (treasury origin): create schedules, end early (vested part to beneficiary, rest back to treasury), retarget a beneficiary (lost-key remedy — everything unclaimed follows the schedule to the new wallet).</li>
+        </ul>
+        <h3>Genesis audit</h3>
+        <p>The 27% TGE mint is <strong>5,670,000 QTC</strong> (<code>mainnet_vesting.rs</code>, compile-time asserted): spreadsheet grants 4,957,502 + intents grant 42,000 + treasury liquidity 210,000 + treasury vesting remainder + 3-QTC seed endowments for each treasurer and tech-collective member. The indexer shows <strong>5,669,940 QTC</strong> across 48 schedules — the rest is seeds and the pot's existential-deposit buffer.</p>
+      </div>
+    </div>
+    <p class="fine">Sources: <a href="https://github.com/Quantus-Network/chain/blob/main/pallets/vesting/src/lib.rs" rel="noopener">pallets/vesting/src/lib.rs</a> &middot; <a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/genesis_config_presets/mainnet_vesting.rs" rel="noopener">mainnet_vesting.rs</a> &middot; <a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/configs/mod.rs" rel="noopener">configs/mod.rs</a> (all read from a fresh clone, 2026-09-30). Data: <a href="https://sqm.quantus.com/v1/graphql" rel="noopener">sqm.quantus.com</a> <code>vesting_schedule</code>.</p>
+  </section>
+
+  <section class="panel" aria-label="Methodology and honesty">
+    <h2><span class="sec-ico">&#9873;</span> Methodology &amp; honesty</h2>
+    <ul class="rules">
+      <li>Live data is attempted from the public Subsquid indexer first; GitHub Pages is not on the indexer's CORS allowlist, so the app falls back to the baked <code>data/vesting.json</code> snapshot — the badge above always says which one you are seeing.</li>
+      <li>"Claimable" is an <strong>estimate</strong>: the chain evaluates vesting at the claim block's own timestamp, and only one claim per schedule per day is accepted. Treat the estimate as a lower bound, not a promise.</li>
+      <li>Unlock projections assume the pallet math stays as audited; an admin <code>end_schedule</code> or <code>retarget_schedule</code> can change any schedule. The desk never moves funds and never asks for keys.</li>
+      <li>All QTC math is BigInt plancks (1 QTC = 10<sup>12</sup> plancks) — no floating point anywhere.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="chrome">
+  <div class="foot-inner">
+    <div>Built by <a href="https://x.com/kshot9000" rel="noopener">@kshot9000</a> &middot; Quantus Muse Builder</div>
+    <div class="donate">Donate QTC: <code id="donate-addr">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code> <button class="copy" id="donate-copy" aria-label="Copy donation address">copy</button></div>
+    <div class="foot-note">Vesting math audited against Quantus-Network/chain (2026-09-30) &middot; data via the public Subsquid indexer</div>
+  </div>
+</footer>
+
+<script src="app.js?v=1.28.0"></script>
+</body>
+</html>
