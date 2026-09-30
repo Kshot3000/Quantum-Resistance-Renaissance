@@ -144,6 +144,7 @@ section{padding:48px 0}
 .app-card.keyforge{--accent:#c084fc}.app-card.keyforge .app-ico{background:rgba(192,132,252,.12);border-color:rgba(192,132,252,.4)}
 .app-card.distplanner{--accent:#a78bfa}.app-card.distplanner .app-ico{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4)}
 .app-card.vanity{--accent:#f5a623}.app-card.vanity .app-ico{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.4)}
+.app-card.contactvault{--accent:#ff5a5a}.app-card.contactvault .app-ico{background:rgba(255,90,90,.12);border-color:rgba(255,90,90,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -443,6 +444,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Vanity Forge <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Grind a brandable Quantus address — <span class="mono">qzkshot…</span>, <span class="mono">qzmint…</span> — with real in-browser ML-DSA-65/87 keypairs on the exact upstream address derivation (Poseidon2 account-ID + SS58-189). Honest difficulty math (expected/median/luck percentiles), a machine benchmark that grounds every ETA, a responsive forge console with a luck meter, a localStorage results vault with export, and a no-illusions safety brief — 100% client-side, keys never leave the page.</p>
         <div class="meta">20/20 logic tests green · browser QA green</div>
+      </a>
+      <a class="app-card contactvault" href="pages/contact-vault/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🚨</div>
+          <span class="tag">Anti-poisoning desk</span>
+        </div>
+        <h3>QTC Contact Vault <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>The address book with a built-in poisoning alarm: save Quantus contacts with human checkphrases derived by the real upstream algorithm (1,171 test vectors green), verify any paste against your vault, run a spoken-checkphrase challenge, grind real lookalike addresses in the poisoning simulator to see how the words refuse to match, batch-verify address lists, and keep PBKDF2+AES-GCM encrypted backups. 100% client-side — the vault never leaves your browser.</p>
+        <div class="meta">1171/1171 checkphrase vectors green · 33/33 browser checks green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

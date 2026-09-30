@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Contact Vault — Quantus Muse Builder</title>
+<meta name="description" content="The address book with a built-in poisoning alarm: save Quantus contacts with human checkphrases, verify pastes against the vault, simulate address-poisoning and clipboard-swap attacks, batch-verify address lists, and keep encrypted backups. 100% client-side.">
+<meta name="theme-color" content="#0a0c0e">
+<link rel="stylesheet" href="styles.css?v=1.25.0">
+<style>:root{--focus:#ff4545;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="scanfield" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Contact Vault</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/qp-human-checkphrase" target="_blank" rel="noopener">checkphrase repo</a>
+      <a href="https://github.com/Quantus-Network/docs/blob/main/docs/deep-dives/safety.md" target="_blank" rel="noopener">Upstream safety deep-dive</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/" class="current"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Quantus mainnet · Security desk · 100% client-side</p>
+    <h1>The address book with a built-in <span class="alarm">poisoning alarm</span></h1>
+    <p class="lede">Every contact you save gets a <strong>human checkphrase</strong> — five words derived from the address by the real upstream Quantus algorithm. Paste an address anywhere and this desk instantly tells you whether it matches someone you trust. One swapped character screams through the words long before your eyes catch it. Nothing here moves funds; your vault never leaves this browser.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Checkphrase</span><span class="v warm">5 words · 2,048-word list</span></div>
+      <div class="fact"><span class="k">Combinations</span><span class="v hot">2<sup>55</sup> · ~36 quadrillion</span></div>
+      <div class="fact"><span class="k">Address format</span><span class="v cool">SS58 prefix 189 · blake2b</span></div>
+      <div class="fact"><span class="k">Your vault</span><span class="v">localStorage only · never synced</span></div>
+      <div class="fact"><span class="k">Cost to use</span><span class="v">free · moves no funds</span></div>
+    </div>
+  </section>
+
+  <nav class="tabnav" aria-label="Vault sections">
+    <button data-tab="vault" class="active"><span class="n">01</span>Vault</button>
+    <button data-tab="verify"><span class="n">02</span>Verify on paste</button>
+    <button data-tab="lab"><span class="n">03</span>Poisoning lab</button>
+    <button data-tab="batch"><span class="n">04</span>Batch verify</button>
+    <button data-tab="xfer"><span class="n">05</span>Export / Import</button>
+    <button data-tab="scope"><span class="n">06</span>Scope</button>
+  </nav>
+
+  <!-- ============ 01 VAULT ============ -->
+  <section class="panel" id="tab-vault">
+    <div class="grid2">
+      <div class="card">
+        <h2><span class="p-ico">📇</span>Add contact</h2>
+        <p class="sub">The address is checksum-validated (SS58, prefix 189) and its checkphrase is derived with the upstream algorithm before anything is stored.</p>
+        <form id="addForm" autocomplete="off">
+          <label class="f" for="nc-label">Label</label>
+          <input type="text" id="nc-label" maxlength="80" placeholder="e.g. Exchange hot wallet" required>
+          <label class="f" for="nc-addr">Quantus address (qz…)</label>
+          <input type="text" class="mono" id="nc-addr" placeholder="qz…" spellcheck="false" required>
+          <label class="f" for="nc-note">Note (optional)</label>
+          <input type="text" id="nc-note" maxlength="500" placeholder="Where you got this address">
+          <div class="msg" id="addMsg" role="status"></div>
+          <div class="row" style="margin-top:12px">
+            <button type="submit" class="btn primary" id="addBtn">Validate &amp; add contact</button>
+          </div>
+        </form>
+        <p class="hint">Only well-formed Quantus mainnet addresses are accepted. A valid checksum does not prove who owns the address — it proves the string wasn't corrupted.</p>
+      </div>
+      <div class="card">
+        <h2><span class="p-ico">🗄</span>Your vault</h2>
+        <div class="vault-tools">
+          <input type="text" id="vaultSearch" placeholder="Search label, address, note…" aria-label="Search contacts">
+          <span id="vaultCount">0 contacts</span>
+        </div>
+        <div id="vaultList"></div>
+        <div class="empty" id="vaultEmpty">Your vault is empty. Add your first contact — every entry gets its five-word checkphrase, computed locally.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 02 VERIFY ============ -->
+  <section class="panel" id="tab-verify" hidden>
+    <div class="card">
+      <h2><span class="p-ico">🔍</span>Verify on paste</h2>
+      <p class="sub">Paste any address — from a chat, an invoice, your clipboard — and this desk derives its checkphrase and checks it against your vault. If it matches a saved contact, you get a name. If it doesn't, you get the words to read back.</p>
+      <label class="f" for="vAddr">Address to verify</label>
+      <textarea class="mono" id="vAddr" rows="2" placeholder="Paste a qz… address here" spellcheck="false"></textarea>
+      <div id="vVerdict"><div class="verdict idle"><div class="v-title">Awaiting input</div><div class="v-sub">Paste an address above — the verdict lands here.</div></div></div>
+      <div id="vPhrase"></div>
+      <div id="vSim"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn amber" id="vAddBtn" hidden>＋ Save this address to the vault</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="p-ico">🗣</span>Spoken checkphrase</h2>
+      <p class="sub">On a call and they read you five words? Type the words below and the address they claim to belong to. The desk compares them word-by-word — no trust in your ears required.</p>
+      <div class="grid2">
+        <div>
+          <label class="f" for="sAddr">Claimed address</label>
+          <input type="text" class="mono" id="sAddr" placeholder="qz…" spellcheck="false">
+        </div>
+        <div>
+          <label class="f" for="sWords">Five words they read out</label>
+          <input type="text" id="sWords" placeholder="e.g. exit until obtain enchant toddler" spellcheck="false" autocomplete="off">
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="sCheckBtn">Compare words</button>
+      </div>
+      <div id="sResult" style="margin-top:12px"></div>
+      <p class="hint">Separate the words with spaces or hyphens — order matters, case doesn't.</p>
+    </div>
+  </section>
+
+  <!-- ============ 03 POISONING LAB ============ -->
+  <section class="panel" id="tab-lab" hidden>
+    <div class="card">
+      <h2><span class="p-ico">🎓</span>How address poisoning works</h2>
+      <div class="explainer">
+        <h4>1 · Dust from a doppelgänger</h4>
+        <p>On account-based chains like Quantus, anyone can send a tiny transaction <strong>from any address they control</strong>. An attacker grinds a keypair until the address shares the first and last few characters with <em>yours</em>, then sends your wallet dust. Their lookalike now sits in your transaction history — and when you next copy "your" address from history instead of your vault, you copy <strong>theirs</strong>.</p>
+        <h4>2 · Clipboard hijackers</h4>
+        <p>Malware watches the clipboard for anything shaped like an address and silently swaps in the attacker's lookalike between your copy and your paste. You pasted <span class="mono">qz…</span> — but is it the <span class="mono">qz…</span> you copied?</p>
+        <h4>3 · Why five words beat two eyes</h4>
+        <p>Humans check the start and end of an address and skim the middle — exactly the parts an attacker keeps identical. A checkphrase is different: it is a 55-bit checksum, so <strong>any</strong> change anywhere in the address avalanches into completely different words. There are 2<sup>55</sup> — about <strong>36 quadrillion</strong> — possible five-word combinations.</p>
+        <blockquote>"Each of the words has 2048 (2^11) choices so if we choose 5 words, we have a total set of 2^55 ~ 36 quadrillion possible combinations… With PBKDF2 (40,000 iterations)… a rainbow table would take 2^55 * 14ms ≈ 16 million years. A high-end GPU… Even then: 2^55 * 1.4ms ≈ 1.6 million years per GPU. With a cluster of 1,000 GPUs working in parallel: ~1,600 years."
+        <cite>— Quantus-Network/qp-human-checkphrase README, Security Analysis (quoted verbatim)</cite></blockquote>
+        <p>Be honest with yourself: attackers <em>can</em> grind similar-looking prefixes — grinding is cheap for a few characters. That is exactly why you verify <strong>words</strong>, not prefixes. A matching prefix proves nothing; matching words prove the exact address.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="p-ico">🧪</span>Poisoning simulator</h2>
+      <p class="sub">Pick a saved contact. The desk grinds <strong>real, valid Quantus addresses</strong> (fresh random keys, encoded locally — nothing leaves this page) that share the contact's visible prefix, exactly like an attacker's doppelgänger. Watch how identical they look — and how the checkphrases refuse to match.</p>
+      <div class="row">
+        <div>
+          <label class="f" for="simContact">Contact to impersonate</label>
+          <select id="simContact"></select>
+        </div>
+        <div>
+          <label class="f" for="simK">Matching chars after qz</label>
+          <select id="simK">
+            <option value="2" selected>2 — instant demo</option>
+            <option value="3">3 — a few seconds</option>
+            <option value="4">4 — up to a minute</option>
+          </select>
+        </div>
+        <div>
+          <label class="f" for="simWant">Lookalikes</label>
+          <select id="simWant">
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn primary" id="simGrind">⚠ Grind lookalikes</button>
+        <button class="btn danger-ghost" id="simStop" hidden>Stop</button>
+      </div>
+      <div class="progress" id="simProgWrap" hidden><i id="simProg"></i></div>
+      <div class="prog-line" id="simProgLine"></div>
+      <div id="simResults"></div>
+    </div>
+    <div class="card">
+      <h2><span class="p-ico">⚡</span>One-character avalanche</h2>
+      <p class="sub">The smallest possible tamper: a single character in the middle of the address is changed. The checksum still validates as a string — but all five words change.</p>
+      <div class="row">
+        <div>
+          <label class="f" for="avContact">Contact</label>
+          <select id="avContact"></select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn amber" id="avRun">Mutate one character</button>
+      </div>
+      <div id="avOut" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ============ 04 BATCH ============ -->
+  <section class="panel" id="tab-batch" hidden>
+    <div class="card">
+      <h2><span class="p-ico">📋</span>Batch verify</h2>
+      <p class="sub">One address per line — an airdrop list, a payout sheet, a CSV column. Each row gets checksum validation, its checkphrase, and a verdict against your vault.</p>
+      <label class="f" for="bAddrs">Addresses (one per line, max 200)</label>
+      <textarea class="mono" id="bAddrs" rows="7" placeholder="qz…&#10;qz…&#10;qz…" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="bRun">Verify all</button>
+        <span class="prog-line" id="bProg"></span>
+      </div>
+      <div class="batch-summary" id="bSummary"></div>
+      <div style="overflow-x:auto">
+      <table class="batch" id="bTable" hidden>
+        <thead><tr><th>#</th><th>Address</th><th>Checksum</th><th>Checkphrase</th><th>Verdict</th></tr></thead>
+        <tbody id="bBody"></tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 05 EXPORT / IMPORT ============ -->
+  <section class="panel" id="tab-xfer" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2><span class="p-ico">📤</span>Export</h2>
+        <p class="sub">Take your vault with you. Plain JSON for convenience, or a password-encrypted backup (PBKDF2-SHA256, 200,000 iterations → AES-GCM-256) for anything that leaves this machine.</p>
+        <div class="row">
+          <button class="btn" id="xShow">Show JSON</button>
+          <button class="btn" id="xDl">Download JSON</button>
+        </div>
+        <h3>Encrypted backup</h3>
+        <label class="f" for="xPass">Password (min 8 characters)</label>
+        <input type="password" id="xPass" autocomplete="new-password">
+        <label class="f" for="xPass2">Confirm password</label>
+        <input type="password" id="xPass2" autocomplete="new-password">
+        <div class="row" style="margin-top:12px">
+          <button class="btn amber" id="xEnc">Create encrypted backup</button>
+          <button class="btn" id="xEncDl" disabled>Download encrypted</button>
+        </div>
+        <div class="msg" id="xMsg" role="status"></div>
+        <label class="f" for="xOut">Backup output</label>
+        <textarea class="mono" id="xOut" rows="7" readonly placeholder="Your backup appears here — copy it or download it."></textarea>
+        <p class="hint">Lose the password and the encrypted backup is unrecoverable — by design. Pick something a password manager remembers for you.</p>
+      </div>
+      <div class="card">
+        <h2><span class="p-ico">📥</span>Import</h2>
+        <p class="sub">Paste a backup below. Every address is re-validated (checksum + prefix 189) and every stored checkphrase is recomputed and compared before anything enters your vault. Duplicates are skipped.</p>
+        <label class="f" for="iIn">Backup JSON (plain or encrypted)</label>
+        <textarea class="mono" id="iIn" rows="7" placeholder='Paste {"app":"qtc-contact-vault",…} here' spellcheck="false"></textarea>
+        <label class="f" for="iPass">Password (only for encrypted backups)</label>
+        <input type="password" id="iPass" autocomplete="current-password">
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="iRun">Validate &amp; import</button>
+        </div>
+        <div class="msg" id="iMsg" role="status"></div>
+        <h3 class="danger" style="color:#ff8f8f">Danger zone</h3>
+        <p class="hint">Wipe every contact from this browser. Export first if you want them back.</p>
+        <button class="btn danger-ghost" id="wipeBtn">Delete all contacts</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 SCOPE ============ -->
+  <section class="panel" id="tab-scope" hidden>
+    <div class="card">
+      <h2><span class="p-ico">📜</span>Honest scope</h2>
+      <p class="sub">What this desk can and cannot do for you — no fine print anywhere else.</p>
+      <ul class="scope-list">
+        <li><strong><span class="tag-yes">DOES</span> — detect swapped or mistyped addresses</strong>A checkphrase is a checksum rendered as words. If the address you pasted isn't byte-identical to the one you saved, the words change. That is the whole alarm.</li>
+        <li><strong><span class="tag-no">DOES NOT</span> — prove who owns an address</strong>A checkphrase is public: anyone can compute the five words for any address — that is the point. Matching words prove the address is the one you saved, not that the label you gave it is true. Verify ownership out-of-band.</li>
+        <li><strong><span class="tag-yes">DOES</span> — keep your vault on this machine</strong>Contacts live in this browser's localStorage. No account, no sync, no server ever sees them. Clear site data and the vault is gone — keep an encrypted backup.</li>
+        <li><strong><span class="tag-no">DOES NOT</span> — secure your keys</strong>This tool never asks for, sees, or touches private keys or seed phrases. If any page claiming to be this desk asks for them, it is a scam.</li>
+        <li><strong><span class="tag-no">DOES NOT</span> — make you invincible</strong>Malware that can read your screen can read the words too. The desk raises the cost of fooling you enormously; pair it with a clean machine and out-of-band confirmation for large transfers.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER · CONTACT VAULT</div>
+  </footer>
+</main>
+
+<div id="qrModal" hidden role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+  <div class="qr-box">
+    <h3 id="qrTitle">Share card</h3>
+    <div id="qrImg"></div>
+    <div class="qr-addr" id="qrAddr"></div>
+    <div class="chips" id="qrPhrase"></div>
+    <p class="qr-note">Hand them this card — or read the five words aloud. If <strong>any</strong> word they read back differs, stop: the address was swapped.</p>
+    <button class="btn primary" id="qrClose">Close</button>
+  </div>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+
+<script src="js/wordlist.js?v=1.25.0"></script>
+<script src="js/checkphrase-core.js?v=1.25.0"></script>
+<script src="js/ss58.js?v=1.25.0"></script>
+<script src="js/qrcode.js?v=1.25.0"></script>
+<script src="js/vault-logic.js?v=1.25.0"></script>
+<script src="js/app.js?v=1.25.0"></script>
+</body>
+</html>
