@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Distribution Planner — batch airdrops &amp; payouts, planned to the byte</title>
+<meta name="description" content="QTC Distribution Planner: validate recipient SS58 addresses, compute exact planck amounts, split payouts into utility.batch_all batches, estimate fees from the runtime polynomial, and export CLI-ready batch files for quantus batch send.">
+<link rel="stylesheet" href="styles.css?v=1.21.0">
+<style>:root{--focus:#a78bfa;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="abyss" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Distribution Planner</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com" target="_blank" rel="noopener">Quantus docs</a>
+      <a href="https://github.com/Quantus-Network/quantus-cli" target="_blank" rel="noopener">quantus-cli</a>
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/" class="current"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="eyebrow">Payout operations · batch planning</div>
+    <h1>Pay a hundred people <span class="glow">without fat-fingering it</span></h1>
+    <p class="lede">Paste a recipient list — airdrop, payroll, grants, validator rewards. Every
+    address is checksum-validated against the real SS58 codec, amounts convert to plancks with
+    exact BigInt math, the list is split into atomic <code>utility.batch_all</code> batches sized
+    for the chain limit, fees are estimated from the runtime polynomial, and you download
+    CLI-ready batch files plus the exact <code>quantus batch send</code> commands. This page
+    plans; it never touches the chain or your keys.</p>
+    <div class="src-row">
+      <span class="src">Batch format + atomicity: <code>quantus-cli</code> <code>src/cli/send.rs</code></span>
+      <span class="src">Batch sizing: CLI README airdrop example (Sept 30, 2026)</span>
+      <span class="src">Length fee: runtime polynomial, 100,000 plancks/byte</span>
+    </div>
+  </section>
+
+  <section class="panel" id="step1">
+    <div class="sec-title">Step 1 · Recipients</div>
+    <h2>Who gets paid</h2>
+    <p class="fine">One recipient per line: <code>&lt;address&gt; &lt;amount in QTC&gt;</code> —
+    space, comma, or tab separated. A header row (<code>address,amount</code>), blank lines, and
+    <code>#</code> comments are skipped. Amounts are decimal QTC (up to 12 places).</p>
+    <div class="input-row">
+      <textarea id="recipients" rows="9" spellcheck="false"
+        placeholder="qz…address  12.5&#10;qz…address, 0.75&#10;# lines starting with # are ignored"></textarea>
+    </div>
+    <div class="btn-row">
+      <label class="file-btn">Upload list (.txt / .csv)
+        <input type="file" id="file-input" accept=".txt,.csv,.tsv" hidden>
+      </label>
+      <button class="ghost" id="load-sample" type="button">Load sample</button>
+      <button class="ghost" id="clear" type="button">Clear</button>
+      <span class="rowcount" id="rowcount">0 lines</span>
+    </div>
+  </section>
+
+  <section class="panel" id="step2">
+    <div class="sec-title">Step 2 · Validation review</div>
+    <h2>Every row, checked</h2>
+    <div class="chips" id="chips" aria-live="polite">
+      <span class="chip">—</span>
+    </div>
+    <p class="fine" id="checkphrase-note">Each valid address gets its human checkphrase — the same
+    five-word phrase the <code>quantus</code> CLI prints next to payout destinations — so you can
+    verify recipients out of band. <span id="cp-progress"></span></p>
+    <div class="table-wrap">
+      <table id="review-table">
+        <thead>
+          <tr><th>Line</th><th>Recipient</th><th>Checkphrase</th><th>Amount (QTC)</th><th>Plancks</th><th>Status</th></tr>
+        </thead>
+        <tbody id="review-body">
+          <tr class="empty"><td colspan="6">Paste a recipient list above to start the review.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine" id="table-cap" hidden></p>
+  </section>
+
+  <section class="panel" id="step3">
+    <div class="sec-title">Step 3 · Batch plan</div>
+    <h2>Batches sized for the chain</h2>
+    <div class="controls">
+      <label>Transfers per batch
+        <input type="number" id="batch-size" value="256" min="1" max="100000">
+      </label>
+      <label>Sender wallet name <span class="hint">(for the generated commands)</span>
+        <input type="text" id="wallet" value="my_wallet" spellcheck="false">
+      </label>
+      <label>Tip per batch (QTC, optional)
+        <input type="text" id="tip" value="" placeholder="0" spellcheck="false">
+      </label>
+      <label>Signing scheme <span class="hint">(signature size → length fee)</span>
+        <select id="scheme">
+          <option value="ml-dsa-65" selected>ML-DSA-65 · 3,309 B sig</option>
+          <option value="ml-dsa-87">ML-DSA-87 · 4,627 B sig</option>
+        </select>
+      </label>
+    </div>
+    <p class="fine">Default 256 comes from the Quantus team's own airdrop example
+    (<q>up to 256 transfer(s) each</q>, CLI README Sept 30, 2026). The chain's live limits win:
+    run <code>quantus batch config --limits</code> and match this box to the safe limit it prints.</p>
+    <div class="totals" id="totals"></div>
+    <div class="batch-cards" id="batch-cards"></div>
+    <div class="card fee-math">
+      <h3>How the fee floor is computed</h3>
+      <div id="fee-breakdown"></div>
+      <p class="fine">This is the <strong>length-fee floor only</strong>: bytes × 100,000 plancks.
+      It excludes the weight-based fee component, which the CLI quotes exactly before you confirm.
+      Treat the floor as the minimum the sender must hold <em>on top of</em> the recipient total.</p>
+    </div>
+    <div class="card balance-check">
+      <h3>Sender balance check</h3>
+      <div class="controls">
+        <label>Sender balance (QTC)
+          <input type="text" id="sender-balance" placeholder="e.g. 1000" spellcheck="false">
+        </label>
+      </div>
+      <p id="balance-verdict" class="fine">Enter the funding wallet's balance to check it covers recipients + fee floor.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="step4">
+    <div class="sec-title">Step 4 · Export</div>
+    <h2>Take the plan to the CLI</h2>
+    <p class="fine">Batch files use the exact format <code>quantus batch send --batch-file</code>
+    expects: <code>[{"to":"&lt;SS58&gt;","amount":"&lt;plancks&gt;"}, …]</code>, amounts as raw
+    smallest-unit integer strings.</p>
+    <div class="btn-row" id="export-btns">
+      <span class="fine">Validate a recipient list first.</span>
+    </div>
+    <h3>Run script preview</h3>
+    <pre id="script-preview" class="script"><code>—</code></pre>
+    <div class="btn-row">
+      <button class="ghost" id="copy-script" type="button">Copy run script</button>
+      <button class="ghost" id="copy-cmds" type="button">Copy commands only</button>
+    </div>
+    <h3>Command reference</h3>
+    <div class="cmdref">
+      <div><code>quantus batch config --limits</code><span>Print the chain's live safe/recommended batch limits — match the planner's batch size to it.</span></div>
+      <div><code>quantus batch send --from &lt;wallet&gt; --batch-file transfers-batch-1.json</code><span>Submit one batch. Amounts are raw plancks; the CLI validates them again before signing.</span></div>
+      <div><code>quantus batch send --from &lt;wallet&gt; --batch-file f.json --tip 0.1</code><span>Optional tip (QTC) per batch extrinsic to prioritize inclusion.</span></div>
+    </div>
+  </section>
+
+  <section class="panel safety">
+    <div class="sec-title">Safety</div>
+    <h2>Read before you run</h2>
+    <ul class="safety-list">
+      <li><strong>Atomic batches.</strong> The CLI builds <code>utility.batch_all</code>: every transfer in a batch succeeds, or the whole batch fails — no partial payouts. (Asserted by the CLI's own unit test.)</li>
+      <li><strong>Test with batch 1.</strong> Pay the first batch alone, verify it on the explorer, then run the rest.</li>
+      <li><strong>Never re-run blind.</strong> A timed-out or failed submission may still have landed on chain. Check the sender's nonce / the explorer before re-running, or recipients get paid twice.</li>
+      <li><strong>No passwords on the command line.</strong> The CLI reads wallet passwords from a hidden prompt or <code>--password-file</code> — never paste one into a terminal command or a file you share.</li>
+      <li><strong>Verify checkphrases out of band.</strong> Confirm each recipient's five-word phrase with them directly before the run — the phrase is the last line of defense against a pasted wrong address.</li>
+      <li><strong>This page is a planner.</strong> It never signs, never submits, never sees your keys. Execution happens in your own <code>quantus</code> CLI.</li>
+    </ul>
+  </section>
+
+  <footer class="foot">
+    <div class="foot-ico" aria-hidden="true">📤</div>
+    <p>QTC Distribution Planner · Quantus Muse Builder · batch semantics: Quantus-Network/quantus-cli (main, Sept 30, 2026)</p>
+    <p>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="disclaimer">Planning tool for research &amp; education — verify everything against the CLI before moving funds. Not financial advice.</span>
+    </p>
+  </footer>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="js/wordlist.js?v=1.21.0"></script>
+<script src="js/checkphrase-core.js?v=1.21.0"></script>
+<script src="js/ss58.js?v=1.21.0"></script>
+<script src="js/core.js?v=1.21.0"></script>
+<script src="js/app.js?v=1.21.0"></script>
+</body>
+</html>

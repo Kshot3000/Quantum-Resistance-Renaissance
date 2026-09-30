@@ -25,6 +25,7 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `dev-hub/` — QTC Developer Hub (verified chain constants, full runtime pallet index map 0–23 incl. vacant indices, exact BigInt QTC/planck converter, SS58 + ML-DSA account primer, connection recipes, JSON-RPC request builder, upstream repo map — every constant read from Quantus-Network/chain source — Sept 30, 2026)
   - `whale-watch/` — QTC Whale Watch (supply concentration from real indexer data: genesis vesting pool 95.5% locked, circulating rich list top-200 with liquid balances, balance brackets, estimated Gini, largest all-time + recent whale transfers, checksum-validated address lookup — Sept 30, 2026)
   - `key-forge/` — QTC Quantum Key Forge (real ML-DSA-65/87 keypair generation in-browser via audited FIPS-204 implementation; exact upstream address derivation — Poseidon2-Goldilocks account-ID hash + SS58 prefix 189 — validated against 45 upstream test vectors; address inspector, sign & verify lab, printable paper card — 100% client-side, Sept 30, 2026)
+  - `distribution-planner/` — QTC Distribution Planner (plan airdrops/payroll/grants: checksum-validated SS58 addresses with human checkphrases, exact BigInt QTC→planck math, atomic utility.batch_all batching sized to the chain limit, length-fee-floor estimates from the runtime polynomial, CLI-ready batch files + exact `quantus batch send` run script — plans only, never signs; batch semantics from Quantus-Network/quantus-cli main, Sept 30, 2026)
 
 ## Live data
 
