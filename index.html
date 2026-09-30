@@ -416,6 +416,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <p>Plan airdrops, payroll, and grant payouts without fat-fingering them: checksum-validated SS58 addresses with human checkphrases for out-of-band verification, exact BigInt QTC→planck conversion, atomic <code>utility.batch_all</code> batching sized to the chain limit, length-fee-floor estimates from the runtime polynomial, and CLI-ready batch files plus the exact <code>quantus batch send</code> run script. Plans only — never touches keys or the chain.</p>
         <div class="meta">14/14 logic tests green · 29/29 browser checks green</div>
       </a>
+      <a class="app-card multisigvault" href="pages/multisig-vault/" style="grid-column:1 / -1">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🔐</div>
+          <span class="tag">Shared custody</span>
+        </div>
+        <h3>QTC MultiSig Vault <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>Shared custody on the real custom multisig pallet (index 19): derive exact on-chain vault addresses from <code>blake2b-256(py/mltsg ‖ signers ‖ threshold ‖ nonce)</code> — cross-checked against an independent implementation — price every fee from runtime constants (0.03 QTC creation burn, exact per-signer proposal-fee formula), build byte-exact unsigned payloads for all seven dispatchables (propose / approve / execute / cancel / remove_expired / claim_deposits), and track proposals on a local board. Never touches keys.</p>
+        <div class="meta">68/68 logic tests green · 24/24 browser checks green</div>
+      </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>
   </section>

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC MultiSig Vault — shared custody on the real pallet, byte-exact</title>
+<meta name="description" content="QTC MultiSig Vault: derive exact on-chain multisig addresses from the real Quantus pallet-19 derivation, price every fee from runtime constants, build byte-exact unsigned call payloads for propose/approve/execute, and track proposals.">
+<link rel="stylesheet" href="styles.css?v=1.22.0">
+<style>:root{--focus:#f5b942;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="abyss" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>MultiSig Vault</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/chain/tree/main/pallets/multisig" target="_blank" rel="noopener">multisig pallet</a>
+      <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">Upstream chain</a>
+    </nav>
+    <details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/" class="current"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="eyebrow">Shared custody · pallet 19 · byte-exact</div>
+    <h1>No single key <span class="glow">holds the treasury</span></h1>
+    <p class="lede">Derive the exact on-chain address of a Quantus multisig from its signers —
+    the real <code>blake2b-256(py/mltsg ‖ signers ‖ threshold ‖ nonce)</code> derivation,
+    straight from <code>Quantus-Network/chain</code>. Price every fee from runtime constants,
+    build byte-exact unsigned payloads for the pallet's seven dispatchables, and track
+    proposals through approval and execution. This page never sees a private key.</p>
+    <div class="hero-facts">
+      <div><span class="k">Pallet</span><span class="v">Multisig · index 19</span></div>
+      <div><span class="k">Derivation</span><span class="v">blake2b-256 · sorted signers</span></div>
+      <div><span class="k">Create fee</span><span class="v">0.03 QTC burned</span></div>
+      <div><span class="k">Proposal deposit</span><span class="v">0.01 QTC · refunded</span></div>
+    </div>
+  </section>
+
+  <!-- ============ 1. VAULT FACTORY ============ -->
+  <section class="card" id="factory">
+    <h2><span class="n">01</span> Vault factory</h2>
+    <p class="sub">Add signer addresses. The chain sorts them byte-wise before hashing, so input
+    order never changes the vault address — the nonce does, giving you unlimited fresh vaults
+    from the same member set.</p>
+    <div class="factory-grid">
+      <div class="f-col">
+        <label class="fld-label" for="signer-input">Signer addresses (SS58, prefix 189) — one per line, paste or type</label>
+        <textarea id="signer-input" rows="6" spellcheck="false" placeholder="qznY…&#10;qznY…&#10;qznY…"></textarea>
+        <div class="signer-hint" id="signer-hint">Paste 2–100 addresses. Each is checksum-verified as you type.</div>
+        <div class="threshold-row">
+          <div class="fld">
+            <label class="fld-label" for="threshold">Threshold — approvals required</label>
+            <div class="thr-wrap">
+              <input type="range" id="threshold" min="1" max="2" value="2" step="1">
+              <span class="thr-val" id="threshold-val">2</span>
+            </div>
+            <div class="thr-scale"><span>1 — any one signer</span><span id="thr-max-label">N — unanimous</span></div>
+          </div>
+          <div class="fld">
+            <label class="fld-label" for="nonce">Nonce <span class="muted">(u64 — fresh address per nonce)</span></label>
+            <input type="number" id="nonce" min="0" max="18446744073709551615" value="0" step="1">
+          </div>
+        </div>
+      </div>
+      <div class="f-col result" id="vault-result" aria-live="polite">
+        <div class="empty-state">Your vault address appears here once the signers validate.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. COST ENGINE ============ -->
+  <section class="card" id="costs">
+    <h2><span class="n">02</span> Cost engine</h2>
+    <p class="sub">Every figure below is a runtime constant from
+    <code>runtime/src/configs/mod.rs</code> — no estimates, no rounding games.</p>
+    <div class="cost-grid">
+      <div class="cost-table-wrap">
+        <table class="cost-table">
+          <thead><tr><th>Cost</th><th>Amount</th><th>Fate</th></tr></thead>
+          <tbody>
+            <tr><td>Vault creation</td><td class="amt">0.03 QTC</td><td><span class="tag burn">burned</span></td></tr>
+            <tr><td>Proposal base fee</td><td class="amt">0.05 QTC</td><td><span class="tag burn">burned</span></td></tr>
+            <tr><td>Proposal deposit</td><td class="amt">0.01 QTC</td><td><span class="tag back">returned</span></td></tr>
+            <tr><td>Per-signer step</td><td class="amt">+1% of base × N</td><td><span class="tag burn">burned</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cost-side">
+        <div class="fld">
+          <label class="fld-label" for="cost-n">Signers in the vault</label>
+          <input type="number" id="cost-n" min="2" max="100" value="3">
+        </div>
+        <div class="budget" id="budget" aria-live="polite"></div>
+        <p class="note">Proposal fee formula (from the pallet source):
+        <code>base + Permill(1%).mul_floor(base × N)</code>. The deposit comes back on execute
+        or cancel; the fees never do. Normal extrinsic length fees apply on top.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. CALL BUILDER ============ -->
+  <section class="card" id="builder">
+    <h2><span class="n">03</span> Call builder</h2>
+    <p class="sub">Build the exact inner call, then the exact unsigned payloads for the pallet's
+    dispatchables. Sign them with <code>quantus-cli</code> or your wallet — nothing here signs.</p>
+    <div class="builder-grid">
+      <div class="b-col">
+        <div class="fld">
+          <label class="fld-label" for="b-vault">Vault address (SS58)</label>
+          <input type="text" id="b-vault" spellcheck="false" placeholder="paste the address from §01, or type one">
+          <div class="field-err" id="b-vault-err"></div>
+        </div>
+        <div class="fld">
+          <label class="fld-label" for="b-recipient">Recipient (SS58)</label>
+          <input type="text" id="b-recipient" spellcheck="false" placeholder="who gets paid">
+          <div class="field-err" id="b-recipient-err"></div>
+        </div>
+        <div class="two">
+          <div class="fld">
+            <label class="fld-label" for="b-amount">Amount (QTC)</label>
+            <input type="text" id="b-amount" inputmode="decimal" placeholder="e.g. 25.5" value="10">
+          </div>
+          <div class="fld">
+            <label class="fld-label" for="b-kind">Payout kind</label>
+            <select id="b-kind">
+              <option value="keep_alive">transfer_keep_alive</option>
+              <option value="transfer_all">transfer_all (sweep)</option>
+            </select>
+          </div>
+        </div>
+        <div class="fld" id="b-keepalive-wrap">
+          <label class="check"><input type="checkbox" id="b-keepalive" checked>
+          <span>Keep vault alive <span class="muted">(transfer_all keep_alive=true)</span></span></label>
+        </div>
+        <div class="two">
+          <div class="fld">
+            <label class="fld-label" for="b-height">Current chain height</label>
+            <input type="number" id="b-height" min="1" step="1" placeholder="from the block explorer">
+          </div>
+          <div class="fld">
+            <label class="fld-label" for="b-window">Proposal window</label>
+            <select id="b-window">
+              <option value="7200">1 day (7,200 blocks)</option>
+              <option value="21600">3 days (21,600 blocks)</option>
+              <option value="50400" selected>7 days (50,400 blocks)</option>
+              <option value="100800">14 days — max (100,800 blocks)</option>
+            </select>
+          </div>
+        </div>
+        <div class="fld">
+          <label class="fld-label" for="b-proposal">Proposal id <span class="muted">(for approve / execute / cancel)</span></label>
+          <input type="number" id="b-proposal" min="0" step="1" value="0">
+        </div>
+        <button class="btn primary" id="b-build">Build payloads</button>
+      </div>
+      <div class="b-col" id="builder-out" aria-live="polite">
+        <div class="empty-state">Payloads appear here — inner call, propose, approve, execute, cancel.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. PROPOSAL BOARD ============ -->
+  <section class="card" id="board">
+    <h2><span class="n">04</span> Proposal board</h2>
+    <p class="sub">Track proposals against the real lifecycle — Active → Approved → executed,
+    with expiry blocks and the blake2b-256 call fingerprint. This board lives only in your
+    browser (localStorage); it is not chain state. Verify everything on the block explorer.</p>
+    <div class="board-head">
+      <button class="btn" id="board-add">+ Log a proposal</button>
+      <button class="btn ghost" id="board-clear">Clear board</button>
+    </div>
+    <div id="board-list"></div>
+    <div class="board-form hidden" id="board-form">
+      <h3>Log proposal</h3>
+      <div class="two">
+        <div class="fld"><label class="fld-label" for="bp-vault">Vault address</label><input type="text" id="bp-vault" spellcheck="false"></div>
+        <div class="fld"><label class="fld-label" for="bp-id">Proposal id</label><input type="number" id="bp-id" min="0" step="1" value="0"></div>
+      </div>
+      <div class="fld"><label class="fld-label" for="bp-call">Inner call hex (0x…)</label><input type="text" id="bp-call" spellcheck="false" placeholder="from §03"></div>
+      <div class="two">
+        <div class="fld"><label class="fld-label" for="bp-expiry">Expiry block</label><input type="number" id="bp-expiry" min="1" step="1"></div>
+        <div class="fld"><label class="fld-label" for="bp-thr">Threshold</label><input type="number" id="bp-thr" min="1" step="1" value="2"></div>
+      </div>
+      <div class="form-err" id="bp-err"></div>
+      <div class="form-actions">
+        <button class="btn primary" id="bp-save">Save</button>
+        <button class="btn ghost" id="bp-cancel">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. SECURITY BRIEF ============ -->
+  <section class="card" id="security">
+    <h2><span class="n">05</span> Security brief</h2>
+    <div class="brief-grid">
+      <div class="brief">
+        <h3>🔒 Vaults are permanent</h3>
+        <p>There is no dissolve or close extrinsic — by design, to kill griefing games around
+        dust balances. Fund a vault only when you intend to keep it. "Closing" a vault means
+        sweeping it out with <code>transfer_all</code> and walking away.</p>
+      </div>
+      <div class="brief">
+        <h3>✍️ Approvals bind to the bytes</h3>
+        <p><code>approve</code> forces each signer to resubmit the proposal's inner call, and the
+        pallet rejects it unless it is <em>byte-equal</em> to the stored payload. A signer always
+        sees exactly what they are approving — the signature covers the call, not an opaque id.</p>
+      </div>
+      <div class="brief">
+        <h3>💰 Fees are the spam filter</h3>
+        <p>0.03 QTC burns on creation, ~0.05 QTC burns per proposal, 0.01 QTC reserved per proposal
+        until cleanup. Approving is cheap; proposing is priced. Runaway proposals expire —
+        anyone can then <code>remove_expired</code>, and the proposer reclaims deposits in bulk
+        with <code>claim_deposits</code>.</p>
+      </div>
+      <div class="brief">
+        <h3>⏳ Expiry has a ceiling</h3>
+        <p>Proposals live at most 100,800 blocks — about 14 days at 12-second blocks. Pick a window
+        that outlasts your slowest signer but doesn't park deposits forever. Expired proposals can
+        never execute.</p>
+      </div>
+      <div class="brief">
+        <h3>🛡️ High-security vaults exist</h3>
+        <p>A vault address can opt into high-security mode, where the pallet enforces a call
+        whitelist — only pre-approved call types may be proposed. Check a vault's mode before
+        proposing anything exotic.</p>
+      </div>
+      <div class="brief">
+        <h3>🎲 Nonce = unlimited vaults</h3>
+        <p>Same signers, same threshold, different nonce → different address. Use the nonce to mint
+        fresh vaults per project, per quarter, per counterparty — no address reuse, no collisions,
+        ever.</p>
+      </div>
+    </div>
+    <p class="source-line">All claims read from <code>Quantus-Network/chain</code> @ 2026-09-30 —
+    <code>pallets/multisig/src/lib.rs</code>, <code>runtime/src/configs/mod.rs</code>,
+    <code>runtime/src/lib.rs</code>. If the pallet changes upstream, re-verify here first.</p>
+  </section>
+
+  <footer class="foot">
+    <div class="foot-ico" aria-hidden="true">🔐</div>
+    <p>QTC MultiSig Vault · Quantus Muse Builder · pallet math: Quantus-Network/chain (main, Sept 30, 2026)</p>
+    <p>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="disclaimer">Research &amp; education tool — this page never signs or broadcasts. Verify every payload against the runtime before moving funds. Not financial advice.</span>
+    </p>
+  </footer>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="js/msig-core.js?v=1.22.0"></script>
+<script src="js/app.js?v=1.22.0"></script>
+<script src="../../assets/app-nav.js?v=1.12.0"></script>
+</body>
+</html>
