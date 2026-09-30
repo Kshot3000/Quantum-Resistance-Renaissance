@@ -138,6 +138,7 @@ section{padding:48px 0}
 .app-card.threatlab{--accent:#ff5470}.app-card.threatlab .app-ico{background:rgba(255,84,112,.12);border-color:rgba(255,84,112,.4)}
 .app-card.emission{--accent:#ffd166}.app-card.emission .app-ico{background:rgba(255,209,102,.12);border-color:rgba(255,209,102,.4)}
 .app-card.observatory{--accent:#ff7849}.app-card.observatory .app-ico{background:rgba(255,120,73,.12);border-color:rgba(255,120,73,.4)}
+.app-card.swapdesk{--accent:#ffc357}.app-card.swapdesk .app-ico{background:rgba(255,195,87,.12);border-color:rgba(255,195,87,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -365,6 +366,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Mining Observatory <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Who actually mines Quantus? A deep-space radar sweep over 15,000 recent mainnet blocks plus the all-time aggregate: Nakamoto coefficient, Herfindahl concentration index against DOJ bands, the 51% crossing curve, a miner leaderboard with explorer deep-links, and concentration-over-time charts — every figure computed from real coinbase data and stamped with its snapshot time.</p>
         <div class="meta">11/11 logic tests green · 30/30 browser checks green</div>
+      </a>
+      <a class="app-card swapdesk" href="pages/swap-desk/" style="grid-column:1 / -1">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">⇄</div>
+          <span class="tag">Exchange venue</span>
+        </div>
+        <h3>QTC Swap Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>NEAR Intents is Quantus's first exchange venue — and the listing itself is the only missing piece. This desk probes the live 1Click token list every 5 minutes for the moment QTC appears, and meanwhile lays out the real swap mechanics from the wallet team's integration docs: both swap directions, fee math (20–25 bps inside amountOut), slippage presets, deposit deadlines, the full order status lifecycle, and the safety rules — no quotes invented, listing status read live.</p>
+        <div class="meta">13/13 logic tests green · 41/41 browser checks green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

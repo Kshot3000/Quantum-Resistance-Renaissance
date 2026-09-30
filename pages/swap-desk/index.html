@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Swap Desk — NEAR Intents listing watch & swap mechanics</title>
+<meta name="description" content="QTC Swap Desk: a live watch for the Quantus (QTC) listing on NEAR Intents 1Click — the chain's first exchange venue — plus the real swap mechanics, fee math, status lifecycle and safety rules, all sourced from the official wallet team's integration docs.">
+<link rel="stylesheet" href="styles.css?v=1.17.0">
+<style>:root{--focus:#ffc357;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="sigrain" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Swap Desk</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com" target="_blank" rel="noopener">Quantus docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">Explorer</a>
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/" class="current"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="sweep" aria-hidden="true"></div>
+    <div class="eyebrow">⇄ Exchange venue watch · NEAR Intents 1Click</div>
+    <h1>QTC <span class="hl">Swap Desk</span></h1>
+    <p class="lede">NEAR Intents is Quantus's first exchange venue — and the official wallet already ships a two-way swap flow for it. The only missing piece is the <strong>listing itself</strong>: QTC isn't on Intents yet. This desk watches the live 1Click token list for the moment that changes, and meanwhile lays out exactly how the swaps will work — the real steps, the real fee math, the real failure modes — sourced from the wallet team's own integration docs.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Listing status</span><span class="v" id="stat-status">—</span><span class="s" id="stat-status-sub">live 1Click probe</span></div>
+      <div class="fact"><span class="k">Tokens scanned</span><span class="v" id="stat-tokens">—</span><span class="s">on the 1Click list</span></div>
+      <div class="fact"><span class="k">Platform fee (observed)</span><span class="v">20 bps</span><span class="s">inside amountOut</span></div>
+      <div class="fact"><span class="k">Swap directions</span><span class="v">2</span><span class="s">in &amp; out, in the wallet</span></div>
+    </div>
+    <p class="hero-note" id="hero-note">Probing the live 1Click API…</p>
+  </section>
+
+  <!-- ============ LIVE LISTING WATCH ============ -->
+  <section class="card" id="watch-card" aria-labelledby="watch-h">
+    <div class="card-head">
+      <h2 id="watch-h">Live listing watch</h2>
+      <div class="card-tools">
+        <button id="probe-now" class="btn">Probe now</button>
+        <span class="auto" id="auto-note">auto-refreshes every 5 min</span>
+      </div>
+    </div>
+    <div class="watch-grid">
+      <div class="watch-main">
+        <div class="status-pill" id="status-pill"><span class="dot"></span><span id="status-text">Probing…</span></div>
+        <p class="status-sub" id="status-detail">Asking the 1Click API for its token list.</p>
+        <div class="watch-meta">
+          <div><span class="k">Asset ID watched</span><code id="watch-asset">nep141:qtc.omft.near</code></div>
+          <div><span class="k">Last checked</span><span id="watch-checked">—</span></div>
+          <div><span class="k">Probe latency</span><span id="watch-latency">—</span></div>
+        </div>
+      </div>
+      <div class="watch-side">
+        <h3>What flips on listing day</h3>
+        <ul class="ticks">
+          <li>This card turns green and shows QTC's decimals + live USD price from the listing.</li>
+          <li>The wallet's swap screen (behind its <code>enableSwap</code> flag) starts returning real quotes instead of <code>tokenIn is not valid</code>.</li>
+          <li>Solvers can bid on QTC intents — that is when liquidity actually exists, not before.</li>
+        </ul>
+        <p class="fine">The watch reads <code>GET https://1click.chaindefuser.com/v0/tokens</code> — the same public list the wallet reads. No API key, no account. A listing appearing here is necessary for swaps, not sufficient for deep liquidity: quotes still come from a solver auction.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW A SWAP WORKS ============ -->
+  <section class="card" aria-labelledby="how-h">
+    <div class="card-head"><h2 id="how-h">How a swap will work</h2></div>
+    <div class="dir-toggle" role="group" aria-label="Swap direction">
+      <button id="dir-out" class="on" aria-pressed="true">Swap out of QTC &rarr; other chain</button>
+      <button id="dir-in" aria-pressed="false">&larr; Swap into QTC from other chain</button>
+    </div>
+    <ol class="steps" id="steps-list"></ol>
+    <div class="honest" id="how-note"></div>
+  </section>
+
+  <!-- ============ FEE & SLIPPAGE LAB ============ -->
+  <section class="card" aria-labelledby="fee-h">
+    <div class="card-head">
+      <h2 id="fee-h">Fee &amp; slippage lab</h2>
+      <span class="badge b-estimate">illustrative</span>
+    </div>
+    <p class="card-lede">The 1Click platform fee lives <strong>inside</strong> <code>amountOut</code> — nothing is charged on top of what you send. Slippage sets your guaranteed minimum. Plug in a hypothetical solver offer and see what the documented parameters do to it. <strong>This is not a quote.</strong> Real quotes come from the live solver auction, which only runs once QTC is listed.</p>
+    <div class="lab-grid">
+      <div class="lab-inputs">
+        <label>Payout token
+          <select id="fee-token">
+            <option value="usdc" selected>USDC (6 decimals)</option>
+            <option value="eth">ETH (18 decimals)</option>
+            <option value="sol">SOL (9 decimals)</option>
+            <option value="btc">BTC (8 decimals)</option>
+          </select>
+        </label>
+        <label>Hypothetical solver offer (payout tokens)
+          <input id="fee-offer" type="number" min="0" step="any" value="1000">
+        </label>
+        <label>Platform fee
+          <select id="fee-mode">
+            <option value="observed" selected>Observed in live probes — 20 bps</option>
+            <option value="documented">Documented default — 25 bps</option>
+            <option value="partner">With partner key — 20 bps</option>
+            <option value="stable">Stablecoin / same-asset route — 1 bp</option>
+          </select>
+        </label>
+        <fieldset class="slip">
+          <legend>Slippage tolerance</legend>
+          <div class="slip-row" role="group" aria-label="Slippage presets">
+            <button data-slip="0.5">0.5%</button>
+            <button data-slip="1" class="on">1%</button>
+            <button data-slip="2">2%</button>
+            <button data-slip="3">3%</button>
+          </div>
+        </fieldset>
+      </div>
+      <div class="lab-out">
+        <div class="ro-row"><span class="rk">Solver offer (gross)</span><span class="rv" id="fee-gross">—</span></div>
+        <div class="ro-row"><span class="rk">Platform fee</span><span class="rv" id="fee-take">—</span></div>
+        <div class="ro-row"><span class="rk">You receive (net)</span><span class="rv hl2" id="fee-net">—</span></div>
+        <div class="ro-row ro-total"><span class="rk">Guaranteed minimum</span><span class="rv" id="fee-min">—</span></div>
+        <div class="ro-math" id="fee-math">—</div>
+        <p class="fine">If a live quote guarantees less than the minimum you reviewed, the wallet shows the new terms and asks you to confirm again — it never silently accepts a worse price.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STATUS LIFECYCLE ============ -->
+  <section class="card" aria-labelledby="life-h">
+    <div class="card-head"><h2 id="life-h">Order status lifecycle</h2></div>
+    <p class="card-lede">After the deposit, the wallet polls <code>GET /v0/status</code> every 5 seconds. Click any state to see what it means and who acts next.</p>
+    <div class="states" id="states" role="list"></div>
+    <div class="state-detail" id="state-detail"><p class="fine">Select a state above.</p></div>
+  </section>
+
+  <!-- ============ DEADLINES & REFUNDS ============ -->
+  <section class="card" aria-labelledby="safe-h">
+    <div class="card-head"><h2 id="safe-h">Deadlines, refunds &amp; safety rules</h2></div>
+    <div class="safe-grid">
+      <div class="safe"><h3>⏳ Deposit deadlines</h3><p>A live quote reserves its deposit address until <strong>deadline</strong> — the wallet requests now&nbsp;+&nbsp;20&nbsp;minutes and refuses any quote whose deadline is under 5 minutes away. Slow chains get more room: <strong>2 hours</strong> from BTC, LTC, DOGE, BCH, DASH and ZEC.</p></div>
+      <div class="safe"><h3>↩️ Refund paths</h3><p>Deposit less than quoted: refunded to <code>refundTo</code> after the deadline, minus a <code>refundFee</code> (0.30&nbsp;USDC on ETH in the live probes). Deposit more: the swap still executes and the excess goes to <code>refundTo</code>. No fill or price past slippage: <code>REFUNDED</code>.</p></div>
+      <div class="safe"><h3>🔏 Tamper-proof quotes</h3><p>Every quote carries an Ed25519 signature from the 1Click manager key. The wallet verifies it, checks the echoed request repeats your amount, assets, addresses, slippage and deadline, and rejects anything that doesn't match — a <code>SwapQuoteIntegrityException</code>, not a silent accept.</p></div>
+      <div class="safe"><h3>📬 Addresses are validated early</h3><p>1Click validates <code>refundTo</code> against the origin chain at quote time, so a bad refund address never reaches the deposit step. Swapping out of QTC, the wallet itself signs the deposit transfer — only transparent accounts whose key lives in the app can swap; encrypted, Keystone and watch-only accounts see the button disabled.</p></div>
+      <div class="safe"><h3>🗂 Orders aren't persisted (yet)</h3><p>Close the progress screen and the app forgets the order — a swap-in's deposit address lives on in your other wallet, a swap-out's deposit shows as an ordinary transfer in activity, and 1Click keeps processing regardless. Save the deposit address yourself if you navigate away.</p></div>
+      <div class="safe"><h3>🧪 No testnet for Intents</h3><p>There is no NEAR Intents testnet — the wallet team's docs were verified against the <strong>live</strong> API. Until QTC is listed, every quote attempt fails with <code>tokenIn/tokenOut is not valid</code>, and the swap UI stays behind the <code>enableSwap</code> remote flag.</p></div>
+    </div>
+  </section>
+
+  <!-- ============ ROAD TO LISTING ============ -->
+  <section class="card" aria-labelledby="road-h">
+    <div class="card-head"><h2 id="road-h">Road to listing</h2></div>
+    <ol class="timeline" id="timeline"></ol>
+  </section>
+
+  <!-- ============ MEANWHILE ============ -->
+  <section class="card" aria-labelledby="mean-h">
+    <div class="card-head"><h2 id="mean-h">While you wait</h2></div>
+    <div class="mean-grid">
+      <a class="mean" href="../mining-studio/"><span class="mi">🔥</span><span><strong>Mine it.</strong> Open mining has no built-in advantage for anyone — the Mining Studio walks through setup, rigs and benchmarks.</span></a>
+      <a class="mean" href="../network-dashboard/"><span class="mi">◉</span><span><strong>Watch the chain.</strong> Live mainnet telemetry — height, accounts, transfers — from the public indexer snapshot.</span></a>
+      <a class="mean" href="../emission-lab/"><span class="mi">◐</span><span><strong>Know the supply.</strong> The exact reward formula, decay simulator and 80-year supply curve — no halvings, ever.</span></a>
+      <a class="mean" href="#watch-card"><span class="mi">🔔</span><span><strong>Watch this page.</strong> The listing watch above auto-refreshes every 5 minutes and will flip the moment QTC appears on 1Click.</span></a>
+    </div>
+  </section>
+
+  <!-- ============ SOURCES ============ -->
+  <section class="card" aria-labelledby="src-h">
+    <div class="card-head"><h2 id="src-h">Sources</h2></div>
+    <ul class="source-list" id="source-list"></ul>
+    <p class="fine">Figures labeled <span class="badge b-estimate">illustrative</span> are computed from documented parameters, not live quotes. Listing status is probed live from the 1Click API each visit. Last source review: Sept 30, 2026.</p>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team or NEAR Intents. Listing status is read live from the public 1Click API; mechanics are summarized from the official wallet docs. Not financial advice.
+  </footer>
+</main>
+
+<script src="../../assets/app-nav.js?v=1.11.0"></script>
+<script src="app.js?v=1.17.0"></script>
+</body>
+</html>
