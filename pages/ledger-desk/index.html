@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Ledger Desk — the miner &amp; holder tax ledger</title>
+<meta name="description" content="QTC Ledger Desk: track mining income from real chain data, run FIFO/LIFO/HIFO cost basis to the planck, and export accountant-ready tax-year reports. 100% client-side.">
+<link rel="stylesheet" href="styles.css?v=1.0.0">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">&#402;</span>
+    <div><strong>QTC Ledger Desk</strong><span>The miner &amp; holder tax ledger</span></div>
+  </div>
+  <div class="top-actions">
+    <button id="btnExportAll" class="btn ghost" type="button">Export vault JSON</button>
+    <button id="btnWipe" class="btn danger-ghost" type="button">Wipe vault</button>
+  </div>
+</header>
+
+<main>
+  <section class="hero panel">
+    <div class="hero-copy">
+      <p class="kicker">Quantus &middot; QTC &middot; accounting, done honestly</p>
+      <h1>Every satoshi of QTC,<br>accounted to the <em>planck</em>.</h1>
+      <p class="lede">Ledger Desk watches your addresses, detects mining rewards from real
+      chain snapshots, matches every disposal against FIFO / LIFO / HIFO lots with exact
+      integer math, and builds a tax-year report you can hand to an accountant. Your keys,
+      your data, your browser &mdash; nothing leaves this page.</p>
+      <div class="honesty">
+        <span class="badge warn">&#9888; QTC has no public market price yet (no exchange listing as of Sept 2026) &mdash; every USD figure comes from prices <em>you</em> enter.</span>
+        <span class="badge">Mining rewards are <em>modeled</em> from the verified on-chain emission formula, anchored at a real indexer-observed reward &mdash; reconcile with your miner logs.</span>
+        <span class="badge ok">100% client-side &middot; vault lives in your browser's localStorage</span>
+      </div>
+    </div>
+    <div class="hero-stats" id="heroStats" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" id="sec-vault" aria-labelledby="h-vault">
+    <h2 id="h-vault">1 &middot; Wallet vault</h2>
+    <p class="sec-sub">Addresses you control. Each one is checksum-validated (SS58 prefix 189)
+    and you read its human checkphrase back before it is stored.</p>
+    <form id="addrForm" class="form-row" autocomplete="off">
+      <input id="addrInput" class="mono" type="text" spellcheck="false"
+        placeholder="qz&hellip; Quantus address" aria-label="Quantus address" size="52">
+      <input id="addrLabel" type="text" placeholder="Label (e.g. DGX rig wallet)" aria-label="Label" size="22">
+      <button class="btn" type="submit">Verify &amp; add</button>
+    </form>
+    <div id="addrCheck" class="checkline" aria-live="polite"></div>
+    <div id="addrList" class="addr-list"></div>
+  </section>
+
+  <section class="panel" id="sec-detect" aria-labelledby="h-detect">
+    <h2 id="h-detect">2 &middot; Auto-detect from chain snapshots</h2>
+    <p class="sec-sub">Scans the repo's chain snapshots for your vault addresses and proposes
+    dated events for your review &mdash; nothing is added until you confirm it.</p>
+    <div class="detect-method">
+      <strong>Method.</strong> Mining: per-500-block bucket counts from
+      <code>data/miners.json</code> &times; the model reward at the bucket midpoint
+      (<code>R<sub>n+1</sub> = R<sub>n</sub> &middot; (1 &minus; 1/50,000,000)</code>, quantized to the
+      0.01 QTC leaf quantum, anchored at the indexer-observed 0.32 QTC reward at block 137536).
+      Bucket dates are interpolated from block height at the observed 13.2&nbsp;s block time.
+      Pre-window mining (blocks 1&ndash;122,536) is one clearly-labeled aggregate &mdash; split it by
+      tax year from your miner logs. Transfers: every &ge; 1 QTC move touching your addresses
+      in <code>data/flows.json</code> (the snapshot floor &mdash; dust below 1 QTC is not captured).
+    </div>
+    <div class="form-row">
+      <button id="btnScan" class="btn" type="button">Scan snapshots</button>
+      <span id="scanStatus" class="muted" aria-live="polite"></span>
+    </div>
+    <div id="detectList"></div>
+    <div class="form-row" id="detectActions" hidden>
+      <button id="btnAddSelected" class="btn" type="button">Add selected to ledger</button>
+      <button id="btnDetectNone" class="btn ghost" type="button">Clear</button>
+    </div>
+  </section>
+
+  <section class="panel" id="sec-events" aria-labelledby="h-events">
+    <h2 id="h-events">3 &middot; Event ledger</h2>
+    <p class="sec-sub">The single source of truth. Inflows create cost-basis lots; outflows
+    consume them. Edit anything &mdash; the report recomputes instantly.</p>
+    <form id="eventForm" class="event-form" autocomplete="off">
+      <label>Date <input id="evDate" type="date" required></label>
+      <label>Type
+        <select id="evType">
+          <option value="mining_income">Mining income</option>
+          <option value="buy">Buy</option>
+          <option value="sell">Sell</option>
+          <option value="airdrop">Airdrop / reward</option>
+          <option value="transfer_in">Transfer in</option>
+          <option value="transfer_out">Transfer out</option>
+          <option value="gift_in">Gift received</option>
+          <option value="gift_out">Gift sent</option>
+          <option value="fee">Fee paid</option>
+        </select>
+      </label>
+      <label>Address
+        <select id="evAddress"></select>
+      </label>
+      <label>Amount (QTC) <input id="evQty" type="text" inputmode="decimal" placeholder="12.5" required></label>
+      <label>Price (USD/QTC) <input id="evPrice" type="text" inputmode="decimal" placeholder="optional"></label>
+      <label class="wide">Note <input id="evNote" type="text" placeholder="pool payout, exchange, invoice #&hellip;"></label>
+      <label class="chk"><input id="evInternal" type="checkbox"> Internal move (not a disposal)</label>
+      <button class="btn" type="submit">Add event</button>
+    </form>
+    <div class="form-row">
+      <input type="file" id="csvFile" accept=".csv" hidden>
+      <button id="btnCsvImport" class="btn ghost" type="button">Import events CSV</button>
+      <button id="btnCsvExport" class="btn ghost" type="button">Export events CSV</button>
+      <span class="muted">CSV columns: date, type, address, amount_qtc, price_usd_per_qtc, fee_qtc, internal, note</span>
+    </div>
+    <div class="table-wrap"><table class="ledger-table" id="eventTable">
+      <thead><tr><th>Date</th><th>Type</th><th>Address</th><th class="num">Amount</th>
+      <th class="num">Price</th><th>Note</th><th>Source</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div id="ledgerWarnings" class="warnings" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" id="sec-prices" aria-labelledby="h-prices">
+    <h2 id="h-prices">4 &middot; Price table</h2>
+    <p class="sec-sub">QTC is not listed anywhere yet, so there is no market feed to pull.
+    Enter the USD price you actually used &mdash; the price on your exchange receipt, your
+    OTC trade, or your own good-faith estimate &mdash; and the desk applies the latest entry
+    on or before each event's date. Events with no applicable price are <strong>flagged, never
+    silently zeroed</strong>.</p>
+    <form id="priceForm" class="form-row" autocomplete="off">
+      <label>Date <input id="pxDate" type="date" required></label>
+      <label>USD per QTC <input id="pxValue" type="text" inputmode="decimal" placeholder="e.g. 4.25" required></label>
+      <button class="btn" type="submit">Add price</button>
+      <button id="btnPxCsv" class="btn ghost" type="button">Export CSV</button>
+    </form>
+    <div id="priceList" class="price-list"></div>
+  </section>
+
+  <section class="panel" id="sec-basis" aria-labelledby="h-basis">
+    <h2 id="h-basis">5 &middot; Cost basis</h2>
+    <p class="sec-sub">Exact integer math on plancks and microdollars &mdash; no floating-point
+    drift. Pick the method your jurisdiction expects; the report follows it.</p>
+    <div class="form-row" role="radiogroup" aria-label="Cost basis method">
+      <label class="method"><input type="radio" name="method" value="FIFO" checked>
+        <span><strong>FIFO</strong> <em>first in, first out</em></span></label>
+      <label class="method"><input type="radio" name="method" value="LIFO">
+        <span><strong>LIFO</strong> <em>last in, first out</em></span></label>
+      <label class="method"><input type="radio" name="method" value="HIFO">
+        <span><strong>HIFO</strong> <em>highest cost, first out</em></span></label>
+    </div>
+    <div class="table-wrap"><table class="ledger-table" id="lotTable">
+      <thead><tr><th>#</th><th>Acquired</th><th>Source</th><th class="num">Qty (QTC)</th>
+      <th class="num">Unit cost</th><th class="num">Basis</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel" id="sec-report" aria-labelledby="h-report">
+    <h2 id="h-report">6 &middot; Tax-year report</h2>
+    <div class="form-row">
+      <label>Tax year <input id="repYear" type="number" min="2026" max="2030" value="2026"></label>
+      <button id="btnReport" class="btn" type="button">Build report</button>
+      <button id="btnRepCsv" class="btn ghost" type="button">Export report CSV</button>
+      <button id="btnRepJson" class="btn ghost" type="button">Export report JSON</button>
+      <button id="btnPrint" class="btn ghost" type="button">Print</button>
+    </div>
+    <div id="reportOut" class="report"></div>
+  </section>
+
+  <section class="panel" id="sec-learn" aria-labelledby="h-learn">
+    <h2 id="h-learn">7 &middot; How crypto taxes work (U.S. primer)</h2>
+    <div class="learn-grid">
+      <div>
+        <h3>Mining income</h3>
+        <p>Under long-standing IRS guidance (Notice 2014-21), mined coins are ordinary income
+        at their fair market value on the day you receive them &mdash; and that FMV becomes your
+        cost basis for later disposals. Record the date, amount, and FMV of every payout.</p>
+      </div>
+      <div>
+        <h3>Disposals</h3>
+        <p>Selling, spending, or trading QTC is a disposal: gain or loss = proceeds &minus; basis.
+        Hold more than a year and it is generally long-term (lower rates); a year or less is
+        short-term. Moving coins between your own wallets is not a disposal &mdash; mark it
+        <em>internal</em> above.</p>
+      </div>
+      <div>
+        <h3>Gifts</h3>
+        <p>Gifting crypto generally does not trigger gain for you; your basis carries over to
+        the recipient. The desk removes gifted lots with no gain recorded &mdash; keep the
+        recipient's records too.</p>
+      </div>
+      <div>
+        <h3>Record-keeping</h3>
+        <ul class="checklist">
+          <li>Every acquisition: date, amount, FMV, source (pool, buyer, block)</li>
+          <li>Every disposal: date, amount, proceeds, which lots it came from</li>
+          <li>Miner logs for pre-window rewards the snapshots cannot itemize</li>
+          <li>Export this ledger yearly and keep it with your return</li>
+        </ul>
+      </div>
+    </div>
+    <p class="disclaimer"><strong>Not tax advice.</strong> This page is general information for
+    record-keeping. Tax rules vary by jurisdiction and change; for filing decisions, talk to a
+    qualified tax professional.</p>
+  </section>
+
+  <footer class="footer">
+    <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a>
+    for the Quantus ecosystem. Tips in QTC:
+    <code class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code></p>
+    <p class="muted">Mining rewards modeled from the verified on-chain emission formula &middot;
+    transfers from the repo's Subsquid snapshots &middot; prices entered by you &middot; 100% client-side.</p>
+  </footer>
+</main>
+
+<script src="../contact-vault/js/wordlist.js?v=1.25.0"></script>
+<script src="../contact-vault/js/checkphrase-core.js?v=1.25.0"></script>
+<script src="../contact-vault/js/ss58.js?v=1.25.0"></script>
+<script src="ledger-core.js?v=1.0.0"></script>
+<script src="app.js?v=1.0.0"></script>
+</body>
+</html>

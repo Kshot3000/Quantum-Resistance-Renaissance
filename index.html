@@ -153,6 +153,7 @@ section{padding:48px 0}
 .app-card.watch{--accent:#8fd6ff}.app-card.watch .app-ico{background:rgba(143,214,255,.12);border-color:rgba(143,214,255,.4)}
 .app-card.portfolio{--accent:#6ee7b7}.app-card.portfolio .app-ico{background:rgba(110,231,183,.12);border-color:rgba(110,231,183,.4)}
 .app-card.mempool{--accent:#40e0ff}.app-card.mempool .app-ico{background:rgba(64,224,255,.12);border-color:rgba(64,224,255,.4)}
+.app-card.ledger{--accent:#4ade80}.app-card.ledger .app-ico{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -542,6 +543,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Airgap Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Sign QTC transfers on a machine that never touches the network: the hot desk issues a chain ticket (genesis, runtime, nonce, era window) as one QR, the cold desk builds and signs the transfer_keep_alive offline with real ML-DSA keys, and the hot desk re-verifies the signature locally before quoting the exact node fee and broadcasting. Chunked QR transport, checkphrase read-back, key wipe after signing.</p>
         <div class="meta">21/21 protocol tests green · full sign→verify round-trip in browser QA green</div>
+      </a>
+      <a class="app-card ledger" href="pages/ledger-desk/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🧾</div>
+          <span class="tag">Tax &amp; accounting ledger</span>
+        </div>
+        <h3>QTC Ledger Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>The miner &amp; holder tax ledger: watch your addresses with checkphrase read-back, auto-detect mining income from real chain snapshots via the verified emission model, run exact FIFO/LIFO/HIFO cost basis to the planck, keep your own price table (no market price exists yet — nothing invented), and export accountant-ready tax-year reports with CSV. 100% client-side.</p>
+        <div class="meta">19/19 ledger tests green · 16/16 browser QA checks green · zero console errors</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>
