@@ -145,7 +145,7 @@ section{padding:48px 0}
 .app-card.distplanner{--accent:#a78bfa}.app-card.distplanner .app-ico{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4)}
 .app-card.vanity{--accent:#f5a623}.app-card.vanity .app-ico{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.4)}
 .app-card.contactvault{--accent:#ff5a5a}.app-card.contactvault .app-ico{background:rgba(255,90,90,.12);border-color:rgba(255,90,90,.4)}
-.app-card.wallet{--accent:#b78bff}.app-card.wallet .app-ico{background:rgba(183,139,255,.12);border-color:rgba(183,139,255,.4)}
+.app-card.wallet{--accent:#b78bff}.app-card.airgap{--accent:#ffb02e}.app-card.airgap .app-ico{background:rgba(255,176,46,.12);border-color:rgba(255,176,46,.4)}.app-card.wallet .app-ico{background:rgba(183,139,255,.12);border-color:rgba(183,139,255,.4)}
 .app-card.legacy{--accent:#e8b04b}.app-card.legacy .app-ico{background:rgba(232,176,75,.12);border-color:rgba(232,176,75,.4)}
 .app-card.audit{--accent:#8fe3b0}.app-card.audit .app-ico{background:rgba(143,227,176,.12);border-color:rgba(143,227,176,.4)}
 .app-card.vesting{--accent:#f5c453}.app-card.vesting .app-ico{background:rgba(245,196,83,.12);border-color:rgba(245,196,83,.4)}
@@ -533,6 +533,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Web Wallet <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The vault for the quantum chain: forge ML-DSA-65/87 keys from a 24-word phrase in your browser, get your Poseidon2-derived qz… address, encrypt the vault with AES-GCM, read live balances from chain storage, and broadcast real transfer_keep_alive extrinsics signed under the chain's QUANTUS_EXTRINSIC context. Keys never leave your device.</p>
         <div class="meta">21/21 crypto tests green · extrinsic format verified against chain source · 22/22 browser QA green</div>
+      </a>
+      <a class="app-card airgap" href="pages/airgap-desk/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🧊</div>
+          <span class="tag">Offline signing lab</span>
+        </div>
+        <h3>QTC Airgap Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>Sign QTC transfers on a machine that never touches the network: the hot desk issues a chain ticket (genesis, runtime, nonce, era window) as one QR, the cold desk builds and signs the transfer_keep_alive offline with real ML-DSA keys, and the hot desk re-verifies the signature locally before quoting the exact node fee and broadcasting. Chunked QR transport, checkphrase read-back, key wipe after signing.</p>
+        <div class="meta">21/21 protocol tests green · full sign→verify round-trip in browser QA green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

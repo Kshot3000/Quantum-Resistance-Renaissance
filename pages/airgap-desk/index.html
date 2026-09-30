@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Airgap Desk — Offline Signing Lab · Quantus Muse Builder</title>
+<meta name="description" content="Sign QTC transfers on a machine that never touches the network: issue a chain ticket on your hot device, build and sign the extrinsic offline with real ML-DSA keys, then verify the signature locally and broadcast. 100% client-side.">
+<meta name="theme-color" content="#04060d">
+<link rel="stylesheet" href="styles.css?v=1.35.0">
+<style>:root{--focus:#ffb02e;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="frostfield" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Airgap Desk</span></div>
+  <div class="nav-end">
+    <span id="conn-pill" class="conn-pill" title="RPC connection state">● offline</span>
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/chain" target="_blank" rel="noopener">upstream chain</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">official explorer</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/" class="current"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="kicker">Offline signing lab · post-quantum custody</div>
+    <h1>Sign in the cold.<br><span class="grad">Broadcast from the heat.</span></h1>
+    <p class="lede">Your keys live on a machine that never touches the network. The hot machine issues a
+    <strong>chain ticket</strong> with everything the cold side needs — genesis hash, runtime versions, your next
+    nonce — you sign the transfer offline with real ML-DSA keys, and the hot side
+    <strong>re-verifies the signature locally</strong> before anything reaches the chain.</p>
+    <div class="proto-steps">
+      <div class="pstep"><div class="pnum hot">1</div><div><strong>Hot desk issues a ticket</strong><span>Chain facts for one transfer, packed into a single QR.</span></div></div>
+      <div class="parrow" aria-hidden="true">&rarr;</div>
+      <div class="pstep"><div class="pnum cold">2</div><div><strong>Cold desk signs offline</strong><span>24 words in, signed extrinsic out — chunked QRs, keys wiped after.</span></div></div>
+      <div class="parrow" aria-hidden="true">&rarr;</div>
+      <div class="pstep"><div class="pnum hot">3</div><div><strong>Hot desk verifies &amp; broadcasts</strong><span>Signature re-checked against the ticket, fee quoted, then sent.</span></div></div>
+    </div>
+  </section>
+
+  <div class="notice amber" role="note">
+    <strong>The airgap is a procedure, not a promise this page can prove.</strong>
+    For real cold storage, the cold side should run on a machine with no Wi-Fi, no Bluetooth, no Ethernet —
+    ideally booted from read-only media. This page can't verify your machine is offline; that's on you.
+  </div>
+
+  <div class="tabs big" role="tablist" aria-label="Desk role">
+    <button class="tab active" data-role="hot" role="tab" aria-selected="true">🔥 Hot desk <span class="tab-sub">online machine</span></button>
+    <button class="tab" data-role="cold" role="tab" aria-selected="false">❄️ Cold desk <span class="tab-sub">offline machine</span></button>
+  </div>
+
+  <!-- ================= HOT DESK ================= -->
+  <section id="role-hot" class="role">
+    <div class="card">
+      <h2><span class="step">1</span> Issue a chain ticket</h2>
+      <p class="muted">Connects to a node, reads the chain facts a cold signer needs, and packs them into one QR.
+      The ticket binds the signature to a specific genesis, runtime, nonce and era window.</p>
+      <div class="grid2">
+        <label class="fld">Node WebSocket URL
+          <input id="rpc-url" value="wss://rpc.quantus.network" spellcheck="false" autocomplete="off">
+        </label>
+        <label class="fld">Sender address (yours)
+          <input id="ticket-addr" placeholder="qz…" spellcheck="false" autocomplete="off">
+        </label>
+      </div>
+      <div class="row">
+        <button id="btn-issue" class="btn primary">Issue ticket</button>
+        <span class="hint">needs a live node — no node, no ticket (nothing is fabricated)</span>
+      </div>
+      <p class="err" id="issue-err" hidden></p>
+      <div id="ticket-out" hidden>
+        <dl class="kv" id="ticket-summary"></dl>
+        <div class="ticket-flex">
+          <canvas id="ticket-qr" width="232" height="232" class="qr"></canvas>
+          <div class="ticket-side">
+            <label class="fld">Ticket text (copy to the cold machine)
+              <textarea id="ticket-text" rows="4" readonly spellcheck="false"></textarea>
+            </label>
+            <div class="row">
+              <button id="btn-ticket-copy" class="btn ghost small">Copy ticket</button>
+              <button id="btn-ticket-download" class="btn ghost small">Download .qtcticket</button>
+            </div>
+            <p class="hint">The ticket stays saved on this hot desk — step 2 uses it to verify the signature.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">2</span> Receive, verify &amp; broadcast</h2>
+      <p class="muted">Bring the signed package back from the cold machine — scan the chunk QRs, drop images,
+      paste the text blocks, or load the file. The desk reassembles, decodes, and
+      <strong>re-verifies the ML-DSA signature locally</strong> before offering broadcast.</p>
+      <label class="fld">Paste signed package (chunk lines or full hex)
+        <textarea id="pkg-paste" rows="4" spellcheck="false" placeholder="QAGX:… lines, or one 0x… extrinsic"></textarea>
+      </label>
+      <div class="row wrap">
+        <button id="btn-pkg-paste" class="btn primary">Assemble &amp; verify</button>
+        <label class="btn ghost small filebtn">Upload file / QR images
+          <input type="file" id="pkg-file" accept=".qagx,.txt,.png,.jpg,.jpeg,.webp" multiple hidden>
+        </label>
+        <button id="btn-pkg-camera" class="btn ghost small">📷 Scan chunks with camera</button>
+        <button id="btn-pkg-camera-stop" class="btn ghost small" hidden>Stop camera</button>
+      </div>
+      <video id="pkg-video" class="cam" playsinline muted hidden></video>
+      <p class="hint" id="pkg-progress" hidden></p>
+      <p class="err" id="receive-err" hidden></p>
+      <div id="verify-out" hidden>
+        <div id="sig-badge" class="sigbadge"></div>
+        <dl class="kv" id="verify-summary"></dl>
+        <div class="card sub">
+          <h3>Verification ticket</h3>
+          <p class="muted small">The signature is re-derived from the ticket it was built against.
+          This hot desk remembers the ticket it issued; if the package came from another session, paste that ticket here.</p>
+          <label class="fld">Chain ticket (QAGT1:…)
+            <textarea id="verify-ticket" rows="2" spellcheck="false" placeholder="defaults to the ticket issued above"></textarea>
+          </label>
+          <button id="btn-reverify" class="btn ghost small">Re-verify against this ticket</button>
+        </div>
+        <div class="row wrap">
+          <button id="btn-quote-fee" class="btn ghost">Quote exact fee from node</button>
+          <button id="btn-broadcast" class="btn primary" disabled>Broadcast to chain</button>
+        </div>
+        <p class="hint" id="fee-quote" hidden></p>
+        <p class="err" id="broadcast-err" hidden></p>
+        <div id="broadcast-result" hidden>
+          <div class="okbox">✅ <strong>Accepted by node.</strong><br>
+          Extrinsic hash: <code id="res-hash"></code><br>
+          <a id="res-explorer" href="#" target="_blank" rel="noopener" hidden>Track it in the explorer ↗</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🛡 What the hot desk guarantees — and what it can't</h2>
+      <ul class="checklist">
+        <li><strong>Byte-exact payload:</strong> the signature is verified against a payload re-derived from the <em>ticket</em>, not from values inside the package — a package that claims a different genesis, runtime, nonce or amount fails.</li>
+        <li><strong>Nonce freshness:</strong> before broadcast, the desk compares the package nonce with the chain's <code>accountNextIndex</code>. A stale nonce means something else was sent first — re-issue the ticket.</li>
+        <li><strong>Era window:</strong> the mortal era (64 blocks) is checked against the current head; an expired package is refused, not retried.</li>
+        <li><strong>What it can't do:</strong> prove the cold machine was offline, or that the 24 words were never photographed. Cold hygiene is physical.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= COLD DESK ================= -->
+  <section id="role-cold" class="role" hidden>
+    <div class="notice red" role="note">
+      <strong>Cold-side rules.</strong> The 24-word phrase or seed you type below lives in this page's memory
+      only and is <strong>wiped the moment signing finishes</strong>. Never paste keys here on a machine you
+      wouldn't trust with your life savings — and never let this machine touch a network afterwards without
+      wiping it. Keys are never transmitted, stored, or logged.
+    </div>
+
+    <div class="card">
+      <h2><span class="step">1</span> Import the chain ticket</h2>
+      <p class="muted">Scan the ticket QR from the hot desk, drop its image, paste the text, or load the file.
+      The ticket is validated strictly — wrong network, bad checksum, or malformed fields are refused.</p>
+      <label class="fld">Ticket text (QAGT1:…)
+        <textarea id="cold-ticket-paste" rows="3" spellcheck="false" placeholder="QAGT1:…"></textarea>
+      </label>
+      <div class="row wrap">
+        <button id="btn-cold-ticket" class="btn primary">Validate ticket</button>
+        <label class="btn ghost small filebtn">Upload ticket file / QR image
+          <input type="file" id="cold-ticket-file" accept=".qtcticket,.txt,.png,.jpg,.jpeg,.webp" hidden>
+        </label>
+        <button id="btn-cold-camera" class="btn ghost small">📷 Scan ticket QR</button>
+        <button id="btn-cold-camera-stop" class="btn ghost small" hidden>Stop camera</button>
+      </div>
+      <video id="cold-video" class="cam" playsinline muted hidden></video>
+      <p class="err" id="cold-ticket-err" hidden></p>
+      <div id="cold-ticket-out" hidden>
+        <dl class="kv" id="cold-ticket-summary"></dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">2</span> Build the transfer</h2>
+      <p class="muted">Everything is constructed locally — no network calls, ever, on this side.</p>
+      <label class="fld">Destination address
+        <input id="cold-dest" spellcheck="false" autocomplete="off" placeholder="qz…">
+      </label>
+      <p class="err" id="cold-dest-err" hidden></p>
+      <div id="cp-box" hidden>
+        <p class="muted small">Read these five checkphrase words back before the desk will sign — this is your
+        last defense against a poisoned or mistyped address.</p>
+        <div class="cp-words" id="cp-words"></div>
+        <label class="fld">Type the five words, in order, separated by spaces
+          <input id="cp-answer" spellcheck="false" autocomplete="off" placeholder="word word word word word">
+        </label>
+        <p class="hint" id="cp-hint"></p>
+      </div>
+      <div class="grid3">
+        <label class="fld">Amount (QTC)
+          <input id="cold-amount" inputmode="decimal" placeholder="0.00" autocomplete="off">
+        </label>
+        <label class="fld">Nonce
+          <input id="cold-nonce" inputmode="numeric" autocomplete="off">
+          <span class="hint">prefilled from the ticket — only change it if you broadcast something else since</span>
+        </label>
+        <label class="fld">Signature scheme
+          <select id="cold-scheme">
+            <option value="65" selected>ML-DSA-65 (NIST level 3)</option>
+            <option value="87">ML-DSA-87 (NIST level 5)</option>
+          </select>
+        </label>
+      </div>
+      <div class="card sub">
+        <h3>Signing key — memory only, wiped after signing</h3>
+        <div class="tabs small" role="tablist" aria-label="Key import method">
+          <button class="tab active" data-ck="mnemonic" role="tab">24 words</button>
+          <button class="tab" data-ck="seed" role="tab">Seed hex</button>
+        </div>
+        <label class="fld" id="ck-mnemonic-fld">Recovery phrase
+          <textarea id="cold-mnemonic" rows="2" spellcheck="false" autocomplete="off" placeholder="24 words…"></textarea>
+        </label>
+        <label class="fld" id="ck-seed-fld" hidden>Seed (64 hex chars)
+          <input id="cold-seed" spellcheck="false" autocomplete="off" placeholder="64 hex characters">
+        </label>
+      </div>
+      <p class="err" id="cold-build-err" hidden></p>
+      <div class="row"><button id="btn-cold-review" class="btn primary">Review &amp; continue</button></div>
+      <div id="cold-review" hidden>
+        <dl class="kv" id="cold-review-summary"></dl>
+        <p class="hint">Offline, the exact fee can't be quoted — the hot desk quotes it from the node before broadcast.
+        Byte length of the final extrinsic is shown so you know what you're carrying.</p>
+        <div class="row"><button id="btn-cold-sign" class="btn danger">Sign offline</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">3</span> Signed package</h2>
+      <p class="muted">Carry these chunk QRs (or the text/file) to the hot machine. Scan in any order — the hot
+      desk reassembles them. ML-DSA signatures are kilobytes, so chunking is the practical path.</p>
+      <div id="stepper-mount"><p class="muted">Nothing signed yet.</p></div>
+      <label class="fld">Package text
+        <textarea id="pkg-hex" rows="3" readonly spellcheck="false" placeholder="the full signed extrinsic appears here after signing"></textarea>
+      </label>
+      <div class="row wrap">
+        <button id="btn-pkg-copy" class="btn ghost small" disabled>Copy chunk text</button>
+        <button id="btn-pkg-download" class="btn ghost small" disabled>Download .qagx file</button>
+      </div>
+      <p class="hint" id="cold-wipe-note" hidden>🔒 Signing key wiped from memory.</p>
+      <p class="err" id="cold-err" hidden></p>
+    </div>
+  </section>
+
+  <section class="card wide">
+    <h2>⚙ How the protocol works</h2>
+    <div class="grid2">
+      <div>
+        <h3>The chain ticket</h3>
+        <p class="muted small">A signed-by-nobody JSON blob: sender address, next nonce, genesis hash, spec &amp;
+        transaction versions, head number+hash, and the mortal-era window (birth block + hash). Serialized as
+        <code>QAGT1:&lt;base64url&gt;</code> — small enough for one QR. The cold side refuses tickets with a bad
+        SS58 checksum, a non-189 prefix, or malformed chain fields.</p>
+        <h3>The signed package</h3>
+        <p class="muted small">A complete signed extrinsic — version byte <code>0x84</code>, AccountId32 sender,
+        variant-tagged ML-DSA signature + pubkey, mortal era, nonce, tip, and the
+        <code>Balances.transfer_keep_alive</code> call. Transported as numbered chunks
+        <code>QAGX:&lt;session&gt;:&lt;i&gt;/&lt;n&gt;:&lt;base64url&gt;</code>; reassembly tolerates any scan
+        order and duplicates, and refuses mixed sessions or missing chunks.</p>
+      </div>
+      <div>
+        <h3>Hot-side verification</h3>
+        <p class="muted small">The desk decodes the extrinsic, pulls the ticket's genesis/spec/tx-version/era-birth,
+        re-derives the exact signing payload (<code>QUANTUS_EXTRINSIC</code> context), and verifies the ML-DSA
+        signature locally. Only then is a node fee quoted and broadcast offered. Tamper with one byte and the
+        badge goes red.</p>
+        <h3>Honest limits</h3>
+        <ul class="muted small tight">
+          <li>No page can prove its machine is offline — the airgap is your procedure.</li>
+          <li>Fees are quoted by the node at broadcast time; the cold side only knows byte length.</li>
+          <li>The era window is 64 blocks — dawdle and the package expires; re-issue the ticket.</li>
+          <li>If the sender's nonce moved (another transfer went out), the ticket's nonce is stale — the hot desk checks <code>accountNextIndex</code> and warns.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> · <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> · <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER · OFFLINE SIGNING LAB</div>
+  </footer>
+</main>
+
+<script src="js/vendor/qrcode.js?v=1.35.0"></script>
+<script src="js/vendor/jsqr.js?v=1.35.0"></script>
+<script src="js/vendor/checkphrase-core.js?v=1.35.0"></script>
+<script src="js/vendor/checkphrase-wordlist.js?v=1.35.0"></script>
+<script type="module" src="js/app.js?v=1.35.0"></script>
+</body>
+</html>
