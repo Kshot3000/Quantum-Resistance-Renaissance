@@ -135,6 +135,7 @@ section{padding:48px 0}
 .app-card.safesend{--accent:#2ef2b8}.app-card.safesend .app-ico{background:rgba(46,242,184,.1);border-color:rgba(46,242,184,.35)}
 .app-card.benchmark{--accent:#c084fc}.app-card.benchmark .app-ico{background:rgba(192,132,252,.12);border-color:rgba(192,132,252,.35)}
 .app-card.feelab{--accent:#33ffc8}.app-card.feelab .app-ico{background:rgba(51,255,200,.1);border-color:rgba(51,255,200,.35)}
+.app-card.threatlab{--accent:#ff5470}.app-card.threatlab .app-ico{background:rgba(255,84,112,.12);border-color:rgba(255,84,112,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -335,6 +336,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Fee &amp; Throughput Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Every planck, accounted for: an exact length-fee estimator from the runtime polynomial (bytes × 100,000 plancks), wormhole exit and 1% high-security fee calculators, a QTPS visualizer with the honest claimed/estimate badges, an animated aggregation explorer, and a signature-size lab — all figures cited, Sept 29, 2026.</p>
         <div class="meta">16/16 logic tests green · browser QA green</div>
+      </a>
+      <a class="app-card threatlab" href="pages/threat-lab/" style="grid-column:1 / -1">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">☢</div>
+          <span class="tag">Threat Intel</span>
+        </div>
+        <h3>QTC Threat Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>The Q-Day countdown for crypto: a live clock across three sourced estimate horizons (2028 / 2029 / 2032), an 11-scenario wallet-exposure simulator for Bitcoin, Ethereum, Solana, Cardano and Quantus, a sourced chain-readiness table, the Shor-vs-Grover explainer, and a verified quantum milestone timeline.</p>
+        <div class="meta">13/13 logic tests green · browser QA green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

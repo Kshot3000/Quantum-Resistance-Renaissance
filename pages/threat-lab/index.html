@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.11.0">
+<title>QTC Threat Lab — the Q-Day countdown for crypto</title>
+<meta name="description" content="Quantus Threat Lab: a live Q-Day countdown with honest scenario horizons, a wallet-exposure simulator for Bitcoin/Ethereum/Solana/Cardano/Quantus, a sourced chain-readiness table, the Shor-vs-Grover explainer, and a verified quantum milestone timeline. Every claim sourced, Sept 29, 2026.">
+<link rel="stylesheet" href="styles.css?v=1.14.0">
+<style>:root{--focus:#ff5470;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="sigrain" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Threat Lab</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://docs.quantus.com" target="_blank" rel="noopener">Quantus docs</a>
+      <a href="https://explorer.quantus.com" target="_blank" rel="noopener">Explorer</a>
+      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Upstream</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">✧</span><span>Quantum Shield<span class="meta">PQC explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◈</span><span>Tokenomics Explorer<span class="meta">21M supply map</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">⚙</span><span>Mining Studio<span class="meta">Mining command center</span></span></a>
+    <a href="../safesend/"><span class="ico">✉</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Fees &amp; QTPS</span></span></a>
+    <a href="../threat-lab/" class="current"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero">
+    <p class="eyebrow">Threat intelligence &middot; every claim sourced &middot; verified Sept 29, 2026</p>
+    <h1>Counting down to <span class="alert">Q-Day</span></h1>
+    <p class="lede">Q-Day is the day a cryptographically-relevant quantum computer can run Shor's algorithm against
+    real elliptic-curve keys — the day exposed public keys become spendable private keys. Nobody knows the date.
+    This lab gives you the honest horizon: sourced estimates, a wallet-exposure simulator, and where every major
+    chain actually stands. Quantus was built for this day. Most chains are still scheduling the meeting.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">NIST standard</span><span class="v">FIPS 204 (ML-DSA), Aug 2024</span></div>
+      <div class="fact"><span class="k">BTC pubkey-exposed</span><span class="v">&gt;34% of supply</span></div>
+      <div class="fact"><span class="k">Google horizon</span><span class="v">Q-Day by 2029</span></div>
+      <div class="fact"><span class="k">Quantus sigs</span><span class="v">ML-DSA from genesis</span></div>
+    </div>
+  </section>
+
+  <section class="card" id="clock">
+    <div class="card-head">
+      <h2>The Q-Day clock</h2>
+      <p class="note">Pick a scenario. The clock counts to a <em>planning horizon</em>, not a prediction —
+      estimates span 2028 to &ldquo;maybe never&rdquo;, and every marker below is sourced.</p>
+    </div>
+    <div class="scenario-tabs" role="tablist" aria-label="Q-Day scenarios" id="scenario-tabs"></div>
+    <div class="clock-grid" id="clock-grid" aria-live="off">
+      <div class="clock-cell"><span class="cv" id="cd-d">—</span><span class="cl">days</span></div>
+      <div class="clock-cell"><span class="cv" id="cd-h">—</span><span class="cl">hours</span></div>
+      <div class="clock-cell"><span class="cv" id="cd-m">—</span><span class="cl">minutes</span></div>
+      <div class="clock-cell"><span class="cv" id="cd-s">—</span><span class="cl">seconds</span></div>
+    </div>
+    <div class="scenario-note" id="scenario-note"></div>
+    <div class="honesty-box"><strong>Honest-label policy.</strong> No single Q-Day date is &ldquo;the&rdquo; estimate.
+    IonQ publicly targets a cryptographically-relevant machine by 2028 (the most aggressive claim); Google/Microsoft/IBM
+    cluster around 2029; Justin Drake puts a &ge;10% chance on exposed-key recovery by 2032; many researchers say later,
+    some say never. The default view shows the 2029 industry-benchmark horizon.</div>
+  </section>
+
+  <section class="card" id="simulator">
+    <div class="card-head">
+      <h2>Wallet-exposure simulator</h2>
+      <p class="note">Would <em>your</em> coins survive Q-Day? Pick a chain, describe the wallet, enter an amount —
+      the lab scores the exposure from the public-key rules that actually matter. Nothing here touches a real wallet.</p>
+    </div>
+    <div class="chain-picker" id="chain-picker" role="radiogroup" aria-label="Chain"></div>
+    <div class="sim-controls">
+      <label class="ctl"><span>Wallet state</span>
+        <select id="wallet-select"></select>
+      </label>
+      <label class="ctl"><span>Amount held</span>
+        <span class="amount-row"><input id="sim-amount" type="number" min="0" step="any" value="1" inputmode="decimal"><span class="unit" id="sim-unit">BTC</span></span>
+      </label>
+      <button class="btn" id="sim-run">Assess exposure</button>
+    </div>
+    <div class="verdict" id="verdict" aria-live="polite">
+      <div class="verdict-head"><span class="badge" id="verdict-badge">—</span><span class="verdict-title" id="verdict-title">Run the simulator</span></div>
+      <div class="verdict-grid">
+        <div class="vrow"><span class="vk">At risk at Q-Day</span><span class="vr" id="verdict-risk">—</span></div>
+        <div class="vrow"><span class="vk">Why</span><span class="vr" id="verdict-why">—</span></div>
+        <div class="vrow"><span class="vk">Crack-time framing</span><span class="vr" id="verdict-crack">—</span></div>
+        <div class="vrow"><span class="vk">What to do</span><span class="vr" id="verdict-do">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="readiness">
+    <div class="card-head">
+      <h2>Chain readiness table</h2>
+      <p class="note">Where the majors stand on post-quantum signatures, as of Sept 29, 2026. Statuses reflect
+      production reality, not roadmaps.</p>
+    </div>
+    <div class="table-wrap"><table class="ready-table" id="ready-table">
+      <thead><tr><th>Chain</th><th>Signatures today</th><th>Status</th><th>The plan</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section class="card" id="breaks">
+    <div class="card-head">
+      <h2>What actually breaks</h2>
+      <p class="note">Two quantum algorithms, two very different threat levels. The signature is the weak link — not the hash.</p>
+    </div>
+    <div class="algo-grid">
+      <div class="algo algo-bad">
+        <div class="algo-name">Shor's algorithm</div>
+        <div class="algo-sub">Existential for exposed keys</div>
+        <p>Breaks RSA, ECDSA, Schnorr and EdDSA by solving the discrete-log / factoring problems in polynomial time.
+        Given an exposed secp256k1 public key, a fast-clock cryptographically-relevant machine could derive the private
+        key in roughly <strong>9–12 minutes</strong> (Google's on-spend-attack analysis) — and for keys exposed years ago,
+        there is no time limit at all. This is the attack that ends coins at P2PK outputs, reused addresses, Taproot
+        outputs, and any EOA that has ever spent.</p>
+      </div>
+      <div class="algo algo-ok">
+        <div class="algo-name">Grover's algorithm</div>
+        <div class="algo-sub">Annoying, not catastrophic</div>
+        <p>Quadratic speedup on unstructured search: SHA-256 goes from 256-bit to an effective 128-bit. Still the
+        standard security floor everywhere else. Proof-of-work survives. Never-spent hashed addresses survive. The 21M
+        supply cap survives — quantum enables <em>theft</em> of exposed coins, never minting of new ones. Hash-based
+        schemes (SLH-DSA, Winternitz one-time signatures) are built on exactly this hardness, which is why NIST
+        standardized them as the conservative backup.</p>
+      </div>
+    </div>
+    <div class="rule-callout">The rule: <strong>never-spent P2PKH / P2WPKH addresses are quantum-safe today</strong> — only a
+    hash is on-chain. The public key is revealed the moment you spend, and from that moment the exposure never expires.</div>
+  </section>
+
+  <section class="card" id="timeline">
+    <div class="card-head">
+      <h2>Quantum milestone timeline</h2>
+      <p class="note">From quantum supremacy to the 2030s horizon — past milestones verified, future ones are the
+      industry's own stated targets.</p>
+    </div>
+    <div class="tl" id="tl"></div>
+  </section>
+
+  <section class="card" id="sources">
+    <div class="card-head">
+      <h2>Sources</h2>
+      <p class="note">Every claim above traces to one of these. Re-verified <strong>Sept 29, 2026</strong>;
+      estimates and roadmaps move — check the live sources before acting on them.</p>
+    </div>
+    <ol class="source-list" id="source-list"></ol>
+    <div class="honesty-box">
+      <strong>Honest-label policy.</strong> Q-Day dates are <span class="badge b-estimate">estimates</span> made by the
+      cited parties, never this lab's prediction. Bitcoin's &gt;34% exposure figure is from BIP-361 (Mar 1, 2026 data);
+      CryptoQuant's independent estimate is ~6.9M BTC. Chain statuses reflect production reality as of Sept 29, 2026.
+      Crack-time figures describe a hypothetical fast-clock machine, not hardware that exists today.
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team. Threat estimates verified against cited sources, Sept 29, 2026. Not financial advice.
+  </footer>
+</main>
+
+<script src="app.js?v=1.14.0"></script>
+<script src="../../assets/app-nav.js?v=1.11.0"></script>
+</body>
+</html>

@@ -18,6 +18,7 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
   - `safesend/` — QTC SafeSend Lab (checkphrase address verifier on the real upstream algorithm, reversible-transfer simulator, high-security accounts guide, pallet call reference)
   - `benchmark-lab/` — QTC Benchmark Lab (Quantus vs Bitcoin/Ethereum/Solana/Ergo: consensus, PQ signatures, throughput math, fees, supply, launch fairness — every figure cited)
   - `fee-throughput-lab/` — QTC Fee & Throughput Lab (exact length-fee estimator from the runtime polynomial, wormhole exit + high-security fee calculators, QTPS visualizer, aggregation explorer, signature-size lab — figures verified Sept 29, 2026)
+  - `threat-lab/` — QTC Threat Lab (Q-Day countdown across 2028/2029/2032 sourced horizons, 11-scenario wallet-exposure simulator for BTC/ETH/SOL/ADA/QTC, sourced chain-readiness table, Shor-vs-Grover explainer, quantum milestone timeline — every claim cited, Sept 29, 2026)
 
 ## Live data
 
