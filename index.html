@@ -141,6 +141,7 @@ section{padding:48px 0}
 .app-card.swapdesk{--accent:#ffc357}.app-card.swapdesk .app-ico{background:rgba(255,195,87,.12);border-color:rgba(255,195,87,.4)}
 .app-card.devhub{--accent:#4df0a4}.app-card.devhub .app-ico{background:rgba(77,240,164,.12);border-color:rgba(77,240,164,.4)}
 .app-card.whalewatch{--accent:#2dd4bf}.app-card.whalewatch .app-ico{background:rgba(45,212,191,.12);border-color:rgba(45,212,191,.4)}
+.app-card.keyforge{--accent:#c084fc}.app-card.keyforge .app-ico{background:rgba(192,132,252,.12);border-color:rgba(192,132,252,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -395,6 +396,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Whale Watch <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Where the QTC actually sits: the genesis vesting pool (95.5% of indexed supply, locked), the circulating rich list with liquid-vs-locked balances, balance-bracket distribution, an estimated Gini, the largest transfers ever made, and a checksum-validated address lookup — all computed from the public Subsquid indexer with the snapshot time printed on everything.</p>
         <div class="meta">15/15 logic tests green · 30/30 browser checks green</div>
+      </a>
+      <a class="app-card keyforge" href="pages/key-forge/" style="grid-column:1 / -1">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">⚒</div>
+          <span class="tag">Key management</span>
+        </div>
+        <h3>QTC Quantum Key Forge <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>Forge real ML-DSA-65/87 post-quantum keypairs in your browser and watch the exact upstream derivation run: Poseidon2-Goldilocks account-ID hash into SS58 (prefix 189) <code>qz…</code> addresses — validated against 45 upstream test vectors. Address inspector, sign &amp; verify lab, printable paper card. Zero network calls; keys never leave the tab.</p>
+        <div class="meta">45/45 vector tests green · 32/32 browser checks green</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

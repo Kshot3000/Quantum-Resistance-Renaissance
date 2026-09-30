@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Quantum Key Forge — Real ML-DSA Keypairs for Quantus</title>
+<meta name="description" content="Forge real post-quantum keypairs for Quantus in your browser: ML-DSA-65/87 key generation, Poseidon2-Goldilocks account-ID derivation and SS58 (prefix 189) address encoding — the exact upstream derivation, verified against 45 test vectors. Inspect addresses, sign and verify messages. 100% client-side.">
+<meta name="theme-color" content="#0b0616">
+<link rel="stylesheet" href="styles.css?v=1.0.0">
+<style>:root{--focus:#c084fc;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="forgefield" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Quantum Key Forge</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="https://github.com/Quantus-Network/quantus-cli/tree/main/src/wallet" target="_blank" rel="noopener">quantus-cli wallet</a>
+      <a href="https://crates.io/crates/qp-dilithium-crypto" target="_blank" rel="noopener">qp-dilithium-crypto</a>
+      <a href="https://crates.io/crates/qp-poseidon-core" target="_blank" rel="noopener">qp-poseidon-core</a>
+      <a href="https://csrc.nist.gov/pubs/fips/204/ipd" target="_blank" rel="noopener">FIPS 204</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/" class="current"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow">Quantus mainnet &middot; real ML-DSA keypairs &middot; exact upstream address derivation &middot; 100% client-side</p>
+    <h1>Forge keys the <span class="violet">quantum era</span> deserves</h1>
+    <p class="lede">Generate genuine <strong>ML-DSA-65 / ML-DSA-87</strong> post-quantum keypairs right here in your browser — then watch this page derive your <code>qz…</code> address with the <strong>exact algorithm the Quantus CLI uses</strong>: the 1,952-byte public key hashed through the Poseidon2-Goldilocks sponge into a 32-byte account ID, SS58-encoded with prefix 189. Verified byte-for-byte against the upstream crates' own test vectors. Inspect any address, sign and verify messages, print a paper card. Your keys never leave this tab — there is no server to send them to.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">ML-DSA-65 pubkey</span><span class="v">1,952 B</span></div>
+      <div class="fact"><span class="k">ML-DSA-87 pubkey</span><span class="v">2,592 B</span></div>
+      <div class="fact"><span class="k">Account ID</span><span class="v">Poseidon2 hash</span></div>
+      <div class="fact"><span class="k">SS58 prefix</span><span class="v">189 · qz…</span></div>
+      <div class="fact"><span class="k">Network calls</span><span class="v">zero</span></div>
+      <div class="fact"><span class="k">Vector tests</span><span class="v">45/45 green</span></div>
+    </div>
+    <p class="ver-note">Derivation verified against qp-dilithium-crypto 0.6.1 (account-ID rule) and qp-poseidon-core 3.1.0 (permutation + sponge test vectors), Sept 30 2026. ML-DSA by the audited @noble/post-quantum implementation of FIPS 204.</p>
+  </section>
+
+  <nav class="lab-nav" aria-label="Forge sections">
+    <a href="#forge" class="sn active">Key Forge</a>
+    <a href="#inspect" class="sn">Address Inspector</a>
+    <a href="#sign" class="sn">Sign &amp; Verify</a>
+    <a href="#paper" class="sn">Paper Card</a>
+    <a href="#security" class="sn">Security</a>
+  </nav>
+
+  <!-- ============ KEY FORGE ============ -->
+  <section class="panel" id="forge">
+    <div class="p-head">
+      <h2><span class="p-ico">⚒</span> Key Forge</h2>
+      <p>Pick a parameter set and forge. Randomness comes from your OS cryptographic RNG (<code>crypto.getRandomValues</code>) — the same source the CLI uses. Key generation, hashing, and address encoding all run locally in this page.</p>
+    </div>
+
+    <div class="scheme-row" role="radiogroup" aria-label="Signature scheme">
+      <button class="scheme-card selected" data-scheme="65" role="radio" aria-checked="true">
+        <span class="sc-name">ML-DSA-65</span>
+        <span class="sc-tag">Chain default · NIST level 3</span>
+        <span class="sc-spec">pub 1,952 B · sig 3,309 B</span>
+        <span class="sc-note">What quantus-cli generates for new wallets</span>
+      </button>
+      <button class="scheme-card" data-scheme="87" role="radio" aria-checked="false">
+        <span class="sc-name">ML-DSA-87</span>
+        <span class="sc-tag">Maximum strength · NIST level 5</span>
+        <span class="sc-spec">pub 2,592 B · sig 4,627 B</span>
+        <span class="sc-note">Larger keys, strongest lattice parameters</span>
+      </button>
+    </div>
+
+    <div class="forge-stage card">
+      <div class="forge-idle" id="forgeIdle">
+        <div class="anvil" aria-hidden="true">⚒</div>
+        <p>No keypair yet. The forge is cold.</p>
+        <button class="btn primary big" id="forgeBtn">Forge keypair</button>
+        <p class="hint">Takes about a second. Watch the derivation pipeline run: lattice keygen → Poseidon2 account hash → SS58 address.</p>
+      </div>
+      <div class="forge-busy" id="forgeBusy" hidden>
+        <div class="forge-steps" id="forgeSteps" aria-live="polite">
+          <div class="fstep" data-step="0"><span class="dot"></span>Sampling 256-bit entropy from OS CSPRNG</div>
+          <div class="fstep" data-step="1"><span class="dot"></span>Generating ML-DSA keypair (FIPS 204)</div>
+          <div class="fstep" data-step="2"><span class="dot"></span>Hashing public key → Poseidon2-Goldilocks account ID</div>
+          <div class="fstep" data-step="3"><span class="dot"></span>Encoding SS58 address (prefix 189)</div>
+        </div>
+      </div>
+      <div class="forge-result" id="forgeResult" hidden>
+        <div class="addr-showcase">
+          <div class="qr-box" id="qrBox" title="Address QR code"></div>
+          <div class="addr-meta">
+            <span class="cap">Your Quantus address</span>
+            <code class="addr-big" id="resAddress"></code>
+            <div class="btn-row">
+              <button class="btn primary" id="copyAddr">Copy address</button>
+              <button class="btn ghost" id="forgeAgain">Forge a new one</button>
+            </div>
+          </div>
+        </div>
+        <div class="kv-grid">
+          <div class="kv"><span class="k">Scheme</span><span class="v" id="resScheme"></span></div>
+          <div class="kv"><span class="k">Account ID (hex)</span><span class="v mono sm" id="resAccountId"></span><button class="btn mini" data-copytarget="resAccountId">Copy</button></div>
+          <div class="kv"><span class="k">Public key (<span id="resPkLen"></span> bytes)</span><span class="v mono sm trunc" id="resPubkey"></span>
+            <span class="btn-row"><button class="btn mini" data-copytarget="resPubkeyFull" hidden id="pkFullHolder">Copy</button><button class="btn mini" id="copyPubkey">Copy full</button><button class="btn mini" id="dlPubkey">Download .txt</button></span></div>
+          <div class="kv secret"><span class="k">Secret key (<span id="resSkLen"></span> bytes) — never share, never screenshot</span>
+            <span class="v mono sm" id="resSecretMasked">••••••••••••••••••••••••••••••••</span>
+            <span class="btn-row">
+              <button class="btn mini warn" id="revealSecret">Reveal</button>
+              <button class="btn mini" id="copySecret" disabled>Copy</button>
+              <button class="btn mini" id="dlSecret">Download backup .json</button>
+            </span>
+            <p class="hint">The backup file is raw key material. Store it encrypted and offline. Anyone with this file owns the address.</p>
+          </div>
+        </div>
+        <details class="how">
+          <summary>How this address was derived (the exact upstream pipeline)</summary>
+          <ol>
+            <li><strong>Keygen:</strong> ML-DSA keypair from 256-bit OS randomness, per FIPS 204 (NIST's post-quantum signature standard).</li>
+            <li><strong>Account ID:</strong> <code>hash_bytes(public_key)</code> — the rule in <code>qp-dilithium-crypto</code>'s <code>IdentifyAccount for DilithiumSigner</code> — where <code>hash_bytes</code> is the <code>qp-poseidon-core</code> Poseidon2 sponge over the Goldilocks field (width 12, rate 8, 8 external + 22 internal rounds), producing a 32-byte account ID.</li>
+            <li><strong>Address:</strong> standard SS58check with Quantus prefix <strong>189</strong> (that's why every address starts with <code>qz</code>), blake2b-512 <code>SS58PRE</code> checksum.</li>
+            <li>This page's implementation is validated against the crates' own published test vectors — permutation outputs, sponge digests, and a live mainnet address round-trip — 45/45 green in <code>tests/run-tests.mjs</code>.</li>
+          </ol>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INSPECTOR ============ -->
+  <section class="panel" id="inspect">
+    <div class="p-head">
+      <h2><span class="p-ico">🔍</span> Address Inspector</h2>
+      <p>Validate any Quantus address — checksum, prefix, and account ID — or go the other way, from a 32-byte account ID to its <code>qz…</code> address. Same SS58check rules the CLI enforces.</p>
+    </div>
+    <div class="insp-grid">
+      <div class="card">
+        <label for="inspAddr">Address to inspect</label>
+        <textarea id="inspAddr" rows="2" spellcheck="false" placeholder="qz…"></textarea>
+        <div class="btn-row">
+          <button class="btn primary" id="inspBtn">Inspect address</button>
+          <button class="btn ghost" id="inspKyle">Kyle's donation address</button>
+        </div>
+        <div id="inspResult" class="insp-result" aria-live="polite"><p class="hint">Paste an address above.</p></div>
+      </div>
+      <div class="card">
+        <label for="inspHex">…or account ID hex → address</label>
+        <textarea id="inspHex" rows="2" spellcheck="false" placeholder="32 bytes as hex (64 chars)"></textarea>
+        <div class="btn-row"><button class="btn primary" id="hexBtn">Encode address</button></div>
+        <div id="hexResult" class="insp-result" aria-live="polite"><p class="hint">The account ID is what the chain actually stores; the address is just its SS58 costume.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SIGN & VERIFY ============ -->
+  <section class="panel" id="sign">
+    <div class="p-head">
+      <h2><span class="p-ico">✒</span> Sign &amp; Verify</h2>
+      <p>Feel what a post-quantum signature actually is. Sign a message with your forged key — then verify it. Notice the size: a single ML-DSA-65 signature is <strong>3,309 bytes</strong>, which is exactly why Quantus built native transaction aggregation. Verification needs only the public key.</p>
+    </div>
+    <div class="sign-grid">
+      <div class="card">
+        <div class="res-head">Sign a message</div>
+        <label for="signMsg">Message</label>
+        <textarea id="signMsg" rows="3" spellcheck="false" placeholder="Type anything — e.g. 'Quantus is quantum-safe from genesis'"></textarea>
+        <div class="btn-row">
+          <button class="btn primary" id="signBtn" disabled>Sign with forged key</button>
+        </div>
+        <p class="hint" id="signNeedKey">Forge a keypair above first — signing needs a secret key.</p>
+        <div id="signResult" class="insp-result" aria-live="polite"></div>
+      </div>
+      <div class="card">
+        <div class="res-head">Verify a signature</div>
+        <label for="verPubkey">Public key (hex) <span class="hint-inline">— or <button class="linklike" id="useForgedPk">use forged key</button></span></label>
+        <textarea id="verPubkey" rows="2" spellcheck="false" placeholder="1,952-byte (ML-DSA-65) or 2,592-byte (ML-DSA-87) public key as hex"></textarea>
+        <label for="verMsg">Message</label>
+        <textarea id="verMsg" rows="2" spellcheck="false" placeholder="The exact message that was signed"></textarea>
+        <label for="verSig">Signature (hex)</label>
+        <textarea id="verSig" rows="2" spellcheck="false" placeholder="Signature hex from the signer"></textarea>
+        <div class="btn-row"><button class="btn primary" id="verifyBtn">Verify signature</button></div>
+        <div id="verifyResult" class="insp-result" aria-live="polite"><p class="hint">Anyone can verify — no secret needed. That's the whole point of signatures.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAPER CARD ============ -->
+  <section class="panel" id="paper">
+    <div class="p-head">
+      <h2><span class="p-ico">🃏</span> Paper Card</h2>
+      <p>A printable receive card for your forged address: QR code plus the address in full. The secret key is <strong>never</strong> printed — this card is safe to share, stick on a mining rig, or hand to someone who owes you QTC.</p>
+    </div>
+    <div class="paper-wrap">
+      <div class="paper-card" id="paperCard">
+        <div class="pc-head"><span class="pc-brand">QTC · Quantum Key Forge</span><span class="pc-scheme" id="pcScheme">ML-DSA-65</span></div>
+        <div class="pc-qr" id="pcQr"><span class="hint">Forge a keypair to generate the QR code</span></div>
+        <code class="pc-addr" id="pcAddr">—</code>
+        <div class="pc-foot"><span>Receive-only · secret key stored separately</span><span id="pcDate"></span></div>
+      </div>
+      <div class="paper-actions">
+        <button class="btn primary" id="printBtn" disabled>Print / Save PDF</button>
+        <p class="hint">Tip: print to PDF and keep it with your records. For cold storage of the actual key, use the encrypted backup download from the forge — stored offline — or import the address as a watch-only wallet in quantus-cli.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SECURITY ============ -->
+  <section class="panel" id="security">
+    <div class="p-head">
+      <h2><span class="p-ico">🛡</span> Security, honestly</h2>
+      <p>This tool does real cryptography, and real cryptography deserves straight talk.</p>
+    </div>
+    <ul class="sec-list">
+      <li><strong>Your keys never leave this tab.</strong> There is no backend, no analytics beacon, no network call anywhere in this app — open DevTools and watch: the Network tab stays silent.</li>
+      <li><strong>Randomness is OS-grade.</strong> Key material comes from <code>crypto.getRandomValues</code>, the same system CSPRNG browsers reserve for TLS keys.</li>
+      <li><strong>But this is builder tooling, not audited wallet software.</strong> The derivation math is verified against upstream test vectors, and ML-DSA comes from an audited library — but the page around it hasn't had a security audit. Treat forged keys as experimental: great for learning, testing, and small amounts.</li>
+      <li><strong>For meaningful funds, use the official <a href="https://github.com/Quantus-Network/quantus-cli" target="_blank" rel="noopener">quantus-cli</a>.</strong> Before funding any address forged here, sanity-check it: decode it in the Inspector above and compare against the CLI's output for the same key.</li>
+      <li><strong>Backups are your responsibility.</strong> If you download a secret-key backup and lose it, the funds are gone — no password reset exists on any blockchain. Store backups encrypted, offline, in two places.</li>
+      <li><strong>Beware the clipboard.</strong> Malware that watches clipboards for crypto addresses is real. When pasting an address to receive funds, verify the first and last 6 characters match.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    Independent builder work — not affiliated with the Quantus team.
+    <div class="sig">QUANTUS MUSE BUILDER · KEY FORGE</div>
+  </footer>
+</main>
+
+<script src="vendor/qrcode.js?v=1.0.0"></script>
+<script type="module" src="js/app.js?v=1.0.0"></script>
+</body>
+</html>
