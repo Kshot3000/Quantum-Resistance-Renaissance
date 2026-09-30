@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<title>QTC Legacy Vault — Quantus Muse Builder</title>
+<meta name="description" content="The inheritance desk for the quantum era: split your Quantus secret with real Shamir's Secret Sharing (GF(2^8), cross-checked against an independent implementation), build a beneficiary plan, and print a letter your heirs can actually follow. 100% client-side — secrets never leave this browser.">
+<meta name="theme-color" content="#0b0906">
+<link rel="stylesheet" href="styles.css?v=1.26.0">
+<style>:root{--focus:#e8b04b;}</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<canvas id="embers" aria-hidden="true"></canvas>
+
+<header class="nav chrome">
+  <a class="back" href="../../">&larr; Builder Hub</a>
+  <div class="brand">QTC <span>Legacy Vault</span></div>
+  <div class="nav-end">
+    <nav class="links" aria-label="External links">
+      <a href="../key-forge/">Key Forge</a>
+      <a href="../multisig-vault/">MultiSig Vault</a>
+      <a href="../safesend/">SafeSend Lab</a>
+    </nav>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/" class="current"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Quantus mainnet · Inheritance desk · 100% client-side</p>
+    <h1>The vault your <span class="gold">grandchildren</span> open</h1>
+    <p class="lede">Quantus was built for the long haul — post-quantum signatures from the genesis block, an 80-year emission tail. Your custody plan should last as long as the chain. This desk splits your secret with <strong>real Shamir's Secret Sharing</strong>, helps you write a beneficiary plan a non-crypto person can follow, and prints the letter your heirs will actually need. Nothing here moves funds; your secrets never leave this browser.</p>
+    <div class="facts">
+      <div class="fact"><span class="k">Splitting math</span><span class="v warm">Shamir over GF(2⁸) · t-of-n</span></div>
+      <div class="fact"><span class="k">Cross-checked</span><span class="v cool">45 vectors vs independent Python impl</span></div>
+      <div class="fact"><span class="k">Your plan</span><span class="v">localStorage only · never synced</span></div>
+      <div class="fact"><span class="k">Moves funds?</span><span class="v hot">Never · planning desk only</span></div>
+      <div class="fact"><span class="k">Cost to use</span><span class="v">free · no chain fees</span></div>
+    </div>
+  </section>
+
+  <nav class="tabnav" aria-label="Legacy Vault sections">
+    <button data-tab="why" class="active"><span class="n">01</span>Why</button>
+    <button data-tab="shamir"><span class="n">02</span>Shamir Lab</button>
+    <button data-tab="plan"><span class="n">03</span>Plan</button>
+    <button data-tab="letter"><span class="n">04</span>Letter</button>
+    <button data-tab="methods"><span class="n">05</span>Methods</button>
+    <button data-tab="scope"><span class="n">06</span>Scope</button>
+  </nav>
+
+  <!-- ============ 01 WHY ============ -->
+  <section class="tabpage active" id="tab-why">
+    <h2>Why inheritance planning is the missing wallet feature</h2>
+    <p class="standfirst">Every chain ships key generation. Almost none ship a plan for what happens when the key holder is gone. The graveyard is expensive:</p>
+    <div class="cards3">
+      <div class="card">
+        <div class="card-k">Lost keys, estimated</div>
+        <div class="bignum">~20%</div>
+        <p>of all bitcoin is believed permanently lost — mostly lost keys and dead owners with no plan. An old Chainalysis estimate (2017), still widely cited because nothing about human nature has changed.</p>
+      </div>
+      <div class="card">
+        <div class="card-k">The Quadriga lesson</div>
+        <div class="bignum">~C$190M</div>
+        <p>reportedly became inaccessible when QuadrigaCX's founder died in 2019 as the sole holder of the exchange's keys. One person, one secret, zero plan — customer funds locked.</p>
+      </div>
+      <div class="card">
+        <div class="card-k">The Quantus angle</div>
+        <div class="bignum">80<span class="unit">yrs</span></div>
+        <p>of emission tail and quantum-safe signatures from genesis: this chain is engineered to outlive its first holders. ML-DSA-65 secret keys are 4,032 bytes per FIPS 204 — kilobytes, not 32 bytes. Your backup medium and your succession plan both matter more here.</p>
+      </div>
+    </div>
+    <div class="twocol">
+      <div class="panel">
+        <h3>What this desk does</h3>
+        <ul class="ticks">
+          <li><strong>Splits</strong> any text secret (seed phrase, checkphrase, instructions) into <em>n</em> shares where any <em>t</em> recover it — real GF(2⁸) Shamir math, in your browser.</li>
+          <li><strong>Structures</strong> your plan: who gets what, where each piece lives, how it's accessed.</li>
+          <li><strong>Drafts</strong> a printable letter of instruction your heirs can follow without being crypto-native.</li>
+          <li><strong>Compares</strong> the real custody methods available on Quantus today — with honest costs and trade-offs.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>What it doesn't do</h3>
+        <ul class="crosses">
+          <li>Move funds, sign anything, or touch the chain — it can't. There is no wallet here.</li>
+          <li>Provide legal advice. Crypto inheritance law varies by jurisdiction; talk to an attorney.</li>
+          <li>Offer an on-chain dead-man switch — <strong>no such pallet exists</strong> on Quantus today. Anyone selling you one is selling fiction.</li>
+          <li>Store or transmit your secrets. Everything lives in this page's memory and your browser's localStorage.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">
+      <strong>The one rule:</strong> a plan nobody can find is the same as no plan. At least one trusted person must know this plan <em>exists</em> and where the letter lives — without holding enough pieces to steal it alone.
+    </div>
+  </section>
+
+  <!-- ============ 02 SHAMIR LAB ============ -->
+  <section class="tabpage" id="tab-shamir">
+    <h2>Shamir Lab — split a secret, recover it, trust the math</h2>
+    <p class="standfirst">Shamir's Secret Sharing (1979) splits a secret into <em>n</em> shares so that any <em>t</em> of them reconstruct it — and any <em>t−1</em> reveal <strong>nothing</strong>, information-theoretically. No single location ever holds your whole secret. The implementation below works over GF(2⁸) and every vector it produces is cross-checked against an independent Python implementation (<span class="mono">tests/vectors/shamir-vectors.json</span>).</p>
+
+    <div class="twocol">
+      <div class="panel">
+        <h3>Split a secret</h3>
+        <label class="fld"><span>Secret text <em>(seed phrase, checkphrase, or instructions — never paste this on a networked machine you don't trust)</em></span>
+          <textarea id="sh-secret" rows="4" placeholder="e.g. your 24-word seed phrase, or recovery instructions" autocomplete="off" spellcheck="false"></textarea>
+        </label>
+        <div class="row3">
+          <label class="fld"><span>Total shares (n)</span>
+            <select id="sh-n"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>16</option></select>
+          </label>
+          <label class="fld"><span>Threshold (t)</span>
+            <select id="sh-t"><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option></select>
+          </label>
+          <div class="fld"><span>&nbsp;</span><button id="sh-split" class="btn gold">Split into shares</button></div>
+        </div>
+        <p class="hint" id="sh-hint">Threshold can't exceed the share count — pick any <em>t</em> ≤ <em>n</em>. Common setups: 2-of-3 (spouse + lawyer + safe), 3-of-5 (family quorum).</p>
+        <div id="sh-out" class="shares" aria-live="polite"></div>
+        <div class="btnrow" id="sh-actions" hidden>
+          <button id="sh-copyall" class="btn ghost">Copy all shares</button>
+          <button id="sh-print" class="btn ghost">Print share cards</button>
+          <button id="sh-wipe" class="btn danger-ghost">Wipe secret from page</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Recover from shares</h3>
+        <label class="fld"><span>Paste shares <em>(one per line — any t of the n)</em></span>
+          <textarea id="sh-combine-in" rows="6" placeholder="LV1-2of3-#1-9f02ab…&#10;LV1-2of3-#3-41cd77…" autocomplete="off" spellcheck="false"></textarea>
+        </label>
+        <div class="btnrow">
+          <button id="sh-combine" class="btn gold">Recover secret</button>
+          <button id="sh-tamper" class="btn ghost">Demo: corrupt one character</button>
+        </div>
+        <div id="sh-recovered" class="recovered" aria-live="polite" hidden>
+          <div class="card-k">Recovered secret</div>
+          <div class="mono secret" id="sh-recovered-text"></div>
+          <div class="btnrow"><button id="sh-copyrec" class="btn ghost">Copy</button></div>
+        </div>
+        <p class="hint">The tamper demo flips one hex character in the first share, then recovers — watch the output turn to garbage. That's why share integrity matters: store shares where they can't be silently altered.</p>
+        <h3 class="sub">Rules that keep this safe</h3>
+        <ul class="ticks small">
+          <li>Generate shares on an <strong>offline</strong> machine. Never photograph, screenshot, or cloud-sync a share.</li>
+          <li>One share per location: home safe, bank box, lawyer, trusted heir — never two in the same drawer.</li>
+          <li>Anyone holding <em>t</em> shares owns the secret. Choose holders you'd trust with the money directly.</li>
+          <li>Test recovery once with a <em>small</em> amount before trusting the setup with everything.</li>
+          <li>This page never sends anything anywhere — but your printer, clipboard history, and disk might. Plan for that.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 03 PLAN ============ -->
+  <section class="tabpage" id="tab-plan">
+    <h2>Your plan — who, what, where</h2>
+    <p class="standfirst">A plan in your head helps no one. Write it down here; it saves to this browser's localStorage only, and feeds the printable letter in the next tab.</p>
+    <div class="panel">
+      <h3>Beneficiaries</h3>
+      <table class="edittable" id="ben-table">
+        <thead><tr><th>Name</th><th>Relationship</th><th>Share %</th><th>Contact</th><th>Notes</th><th></th></tr></thead>
+        <tbody id="ben-body"></tbody>
+      </table>
+      <div class="btnrow"><button id="ben-add" class="btn ghost">+ Add beneficiary</button></div>
+      <div id="ben-msg" class="msg" aria-live="polite"></div>
+    </div>
+    <div class="panel">
+      <h3>Where things are <em class="subtle">(the register your heirs will actually read)</em></h3>
+      <table class="edittable" id="hold-table">
+        <thead><tr><th>Item</th><th>Location</th><th>How to access</th><th></th></tr></thead>
+        <tbody id="hold-body"></tbody>
+      </table>
+      <div class="btnrow"><button id="hold-add" class="btn ghost">+ Add item</button></div>
+      <div id="hold-msg" class="msg" aria-live="polite"></div>
+      <p class="hint">Examples: "Share #1 of seed — bank safe-deposit box #412, First National"; "Hardware wallet — bedroom safe, PIN in sealed envelope with lawyer". Never write the secret itself here — only where it is and how to reach it.</p>
+    </div>
+    <div class="twocol">
+      <div class="panel">
+        <h3>If you go quiet <em class="subtle">(dead-man arrangement)</em></h3>
+        <p class="hint">Quantus has no on-chain dead-man or timelock pallet — every workable design is off-chain procedure. Pick the shape of yours:</p>
+        <div class="radios" id="deadman-radios">
+          <label><input type="radio" name="deadman" value="trusted"><span><strong>Trusted person + sealed instructions.</strong> One person knows the plan exists and where the letter is; they act only if you go silent.</span></label>
+          <label><input type="radio" name="deadman" value="lawyer"><span><strong>Lawyer-held letter.</strong> Your attorney holds the letter (not the keys) with written release conditions.</span></label>
+          <label><input type="radio" name="deadman" value="checkin"><span><strong>Periodic check-in.</strong> You confirm you're alive every N months to your designated person; missed check-ins trigger the plan.</span></label>
+          <label><input type="radio" name="deadman" value="shares"><span><strong>Distributed shares.</strong> Heirs and counsel each hold Shamir shares; any threshold quorum can reconstruct without you.</span></label>
+        </div>
+        <label class="fld"><span>Your arrangement, in your words</span>
+          <textarea id="deadman-text" rows="4" placeholder="e.g. If my sister hasn't heard from me in 90 days, she opens the sealed envelope in the study desk…"></textarea>
+        </label>
+      </div>
+      <div class="panel">
+        <h3>Legacy readiness score</h3>
+        <div class="scorebar"><div id="score-fill"></div></div>
+        <div class="score-line"><span id="score-pct">0%</span><span id="score-band" class="band">Exposed</span></div>
+        <div id="checklist" class="checks"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Owner &amp; backup</h3>
+      <div class="row3">
+        <label class="fld"><span>Your full legal name <em>(for the letter)</em></span><input id="owner-name" type="text" placeholder="Jane A. Doe" autocomplete="off"></label>
+        <label class="fld"><span>Extra notes <em>(optional)</em></span><input id="extra-notes" type="text" placeholder="Anything else your heirs must know" autocomplete="off"></label>
+        <div class="fld"><span>&nbsp;</span>
+          <div class="btnrow"><button id="plan-export" class="btn ghost">Export plan (JSON)</button><button id="plan-import-btn" class="btn ghost">Import</button><input id="plan-import" type="file" accept="application/json" hidden></div>
+        </div>
+      </div>
+      <p class="hint">Autosaves to this browser as you type. Export keeps an offline copy — store it like you'd store the plan itself.</p>
+    </div>
+  </section>
+
+  <!-- ============ 04 LETTER ============ -->
+  <section class="tabpage" id="tab-letter">
+    <h2>The letter — what your heirs actually read</h2>
+    <p class="standfirst">A letter a non-crypto person can follow, generated from your plan. Print it, sign it, store it with your will — <strong>never</strong> email it, photograph it, or keep it on a phone.</p>
+    <div class="panel">
+      <div class="row3">
+        <div class="fld"><span>&nbsp;</span>
+          <div class="btnrow"><button id="letter-gen" class="btn gold">Generate letter from plan</button><button id="letter-print" class="btn ghost" disabled>Print letter</button></div>
+        </div>
+      </div>
+      <div id="letter-preview" class="letter-preview" aria-live="polite"><p class="hint">Fill in the Plan tab, then generate. The letter pulls your beneficiaries, holdings register, and dead-man arrangement automatically.</p></div>
+    </div>
+    <div class="callout"><strong>Print discipline:</strong> use a printer you own, on paper that lasts. Shred misprints. A letter that says where the shares are is itself sensitive — store it sealed, separately from any share.</div>
+  </section>
+
+  <!-- ============ 05 METHODS ============ -->
+  <section class="tabpage" id="tab-methods">
+    <h2>Methods — every honest way to pass QTC on</h2>
+    <p class="standfirst">No method is perfect. Pick with open eyes; many holders combine two.</p>
+    <div class="tablewrap"><table class="compare">
+      <thead><tr><th>Method</th><th>How it works</th><th>Strengths</th><th>Weaknesses</th><th>Cost on Quantus</th></tr></thead>
+      <tbody>
+        <tr class="pick">
+          <td><strong>Shamir shares</strong><span class="tagline">this lab</span></td>
+          <td>Secret split into <em>n</em> shares; any <em>t</em> recover it. Shares live with different people/places.</td>
+          <td>No single point of failure; works with any wallet; no chain interaction needed.</td>
+          <td>Lose too many shares and it's locked forever; shares must be guarded like keys; printer/clipboard hygiene matters.</td>
+          <td>Free</td>
+        </tr>
+        <tr>
+          <td><strong>Multisig vault</strong><span class="tagline">pallet 19</span></td>
+          <td>On-chain <em>m</em>-of-<em>n</em> account; heirs hold signer keys. Built on Quantus's custom multisig pallet (index 19).</td>
+          <td>Enforced by the chain; no single key can move funds; heirs transact normally once set up.</td>
+          <td>Heirs must be able to sign on-chain; setup mistakes are on-chain mistakes; pallet is new.</td>
+          <td>0.03 QTC burned to create; 0.01 QTC reserved per proposal (refunded); ~0.05 QTC per proposal burned <span class="src">— per the <a href="../multisig-vault/">MultiSig Vault</a> desk, read from Quantus-Network/chain</span></td>
+        </tr>
+        <tr>
+          <td><strong>Paper / steel backup</strong><span class="tagline">simplest</span></td>
+          <td>Seed written down (steel for fire), stored in a safe. Heirs get the location via your letter.</td>
+          <td>Simple; no software; no fees.</td>
+          <td>Single point of failure — fire, theft, or one curious visitor ends it. Paper degrades; ML-DSA seeds are long.</td>
+          <td>Free (+ safe / steel plate)</td>
+        </tr>
+        <tr>
+          <td><strong>Lawyer-held instructions</strong><span class="tagline">legal process</span></td>
+          <td>Attorney holds your letter (not keys) with written release conditions; probate handles the rest.</td>
+          <td>Professional custody; fits existing estate process.</td>
+          <td>Legal fees; the lawyer must understand crypto custody; slower than direct handoff.</td>
+          <td>Attorney fees</td>
+        </tr>
+        <tr>
+          <td><strong>Exchange beneficiary</strong><span class="tagline">not available</span></td>
+          <td>Some exchanges let you name a beneficiary for custodial balances.</td>
+          <td>—</td>
+          <td>No exchange lists QTC yet (NEAR Intents announced as first venue; no listing date as of Sept 30, 2026) — nothing to evaluate.</td>
+          <td>N/A</td>
+        </tr>
+        <tr class="nope">
+          <td><strong>"Dead-man smart contract"</strong><span class="tagline">doesn't exist</span></td>
+          <td>An on-chain contract that releases funds if you stop checking in.</td>
+          <td>—</td>
+          <td><strong>No timelock or dead-man pallet exists in the Quantus runtime.</strong> Anyone selling you one is selling fiction. Use off-chain procedure (Plan tab).</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table></div>
+    <div class="twocol">
+      <div class="panel">
+        <h3>Combinations that work well</h3>
+        <ul class="ticks">
+          <li><strong>Shamir 2-of-3 + letter:</strong> spouse holds share 1, lawyer holds share 2, bank box holds share 3. Letter explains the quorum.</li>
+          <li><strong>Multisig 2-of-3 + Shamir backup:</strong> daily custody in multisig; a Shamir-split paper backup of one signer key in deep storage.</li>
+          <li><strong>Steel + lawyer:</strong> seed on steel in a safe; lawyer holds the safe's location and the letter. Simplest credible setup.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Quantus-specific notes</h3>
+        <ul class="ticks small">
+          <li>Verify every heir receiving address with its <strong>five-word human checkphrase</strong> before it goes in the plan — one poisoned address in a will is catastrophic. See the <a href="../safesend/">SafeSend Lab</a>.</li>
+          <li>Generate keys on the <a href="../key-forge/">Key Forge</a> and print its paper card — the card plus a Shamir split is a complete backup story.</li>
+          <li>Reversible transfers (<a href="../safesend/">SafeSend</a>) are sender-cancelable payments, <em>not</em> a dead-man switch — don't confuse the two.</li>
+          <li>Keep the plan's <em>existence</em> known and its <em>contents</em> compartmentalized.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 SCOPE ============ -->
+  <section class="tabpage" id="tab-scope">
+    <h2>Scope — read before trusting any of this</h2>
+    <div class="twocol">
+      <div class="panel">
+        <h3>Honest limits</h3>
+        <ul class="crosses">
+          <li><strong>Not legal or financial advice.</strong> Inheritance law, probate, and crypto tax treatment vary by jurisdiction and change. Talk to a licensed attorney before finalizing anything.</li>
+          <li><strong>Not a wallet.</strong> This desk never holds keys, never signs, never broadcasts. It plans; your wallet and the chain do the rest.</li>
+          <li><strong>Client-side only.</strong> Your plan autosaves to this browser's localStorage. Clear your browser data without an export and it's gone. Browsers are not vaults — export and print.</li>
+          <li><strong>Shamir is mathematics, not magic.</strong> It protects against loss and single-point theft; it does not protect against <em>t</em> colluding holders, coercion, or you splitting the secret on a compromised machine.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>How the math was checked</h3>
+        <ul class="ticks small">
+          <li>GF(2⁸) field axioms tested exhaustively in Node (all 255 non-zero inverses, distributivity samples).</li>
+          <li>45 known-answer vectors generated by an <strong>independent Python implementation</strong> (<span class="mono">tests/gen-vectors.py</span>) — the JS <span class="mono">combine()</span> recovers every one.</li>
+          <li>Deterministic round-trips across share counts 2–16 and thresholds 2–<em>n</em>; tamper and too-few-shares cases covered.</li>
+          <li>Real-browser QA in headless Chromium: split → recover → tamper demo → plan → letter → print sheet, zero console errors.</li>
+          <li>Source is on GitHub — read <span class="mono">js/shamir.js</span> before trusting it with anything real.</li>
+        </ul>
+        <h3 class="sub">Attribution</h3>
+        <p class="hint">Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> · Shamir's Secret Sharing: Adi Shamir, 1979 · Field arithmetic: the AES field GF(2⁸).</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="print-sheet" aria-hidden="true"></div>
+
+<footer>
+  <div class="foot-built">Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> · <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> · <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a></div>
+  <div class="foot-donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button> <span class="copied" hidden>copied ✓</span></div>
+  <div class="foot-disc">Independent builder work — not affiliated with the Quantus team. Not legal or financial advice.</div>
+  <div class="sig">QUANTUS MUSE BUILDER · LEGACY VAULT · SHAMIR OVER GF(2⁸)</div>
+</footer>
+
+<script src="js/shamir.js?v=1.26.0"></script>
+<script src="js/plan-logic.js?v=1.26.0"></script>
+<script src="js/app.js?v=1.26.0"></script>
+</body>
+</html>

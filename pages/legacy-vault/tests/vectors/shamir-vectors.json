@@ -1,0 +1,544 @@
+{
+ "generator": "tests/gen-vectors.py (independent Python reference)",
+ "count": 45,
+ "vectors": [
+  {
+   "id": 0,
+   "secret_hex": "9dd60b198defdc0d14fe2b5ab227c0a421ce177c038ee333675489b2d58d4a5c11c914fc878706a761af87ae5f2245b9",
+   "n": 5,
+   "t": 3,
+   "shares": [
+    "LV1-3of5-#1-c3b65c96266802161357394ac8cbc5321d681b4da7293ac17ce2a350025d08ec8f9f7f470ffbac020444b5bd40d50d58",
+    "LV1-3of5-#2-d513ab6124bd6ce76e69be0e3e467a108e3c848290321d5cdf83fddce01c3f7db14cb14a78a493fb314a032fadd17a97",
+    "LV1-3of5-#3-8b73fcee8f3ab2fc69c0ac1e44aa7f86b29a88b33495c4aec435d73e37cc7dcd2f1adaf1f0d8395e54a1313cb2263276",
+    "LV1-3of5-#4-f0536806794cfb9f2b9ee8394a5b59ed159330dd1364439b0257e19c891c496d607c92ca9f80722b9fde391dbdc7b114",
+    "LV1-3of5-#5-ae333f89d2cb25842c37fa2930b75c7b29353cecb7c39a6919e1cb7e5ecc0bddfe2af97117fcd88efa350b0ea230f9f5"
+   ]
+  },
+  {
+   "id": 1,
+   "secret_hex": "d4dc1fb7c551734f1ff41cd4ee53b93a4446bbcb8b4a753a73abd6a27caf00c0d8329f5cd1648241fcf26d30a33a34d1da0ab2a3edb539695668492738d03275",
+   "n": 2,
+   "t": 2,
+   "shares": [
+    "LV1-2of2-#1-19097eab9e6c47f9813b86189ed040524ce3ec1afc3019c4845963959fcf05de98561904e3df166d9854ff723f3963052d92935cdbecdb0d6f48cb05084dd6a2",
+    "LV1-2of2-#2-556ddd8f732b1b38387133570e4e50ea5417157265beaddd8654a7cca16f0afc58fa88ecb509b11934a552b4803c9a622f21f0468107e6a12428566358f1e1c0"
+   ]
+  },
+  {
+   "id": 2,
+   "secret_hex": "1b46f10719",
+   "n": 2,
+   "t": 2,
+   "shares": [
+    "LV1-2of2-#1-293bb4f8b1",
+    "LV1-2of2-#2-7fbc7be252"
+   ]
+  },
+  {
+   "id": 3,
+   "secret_hex": "eb46f0817f247c3da3a5c9a3c48e37202dff0d5080335a23c12fd3e1da72814578a226daff367623d73122aea2964c48",
+   "n": 2,
+   "t": 2,
+   "shares": [
+    "LV1-2of2-#1-fafa7e05bec11e5e7ced9f6ac71c0f81fb2bf6da46d0b85011c7f49262400f2b2cf8f009be65ef80b1e8fa17e054c937",
+    "LV1-2of2-#2-c925f792e6f5b8fb0635652ac2b147799a4ce05f17ee85c57ae49d07b1168699d01691677d905f7e1b9889c726095db6"
+   ]
+  },
+  {
+   "id": 4,
+   "secret_hex": "19",
+   "n": 3,
+   "t": 2,
+   "shares": [
+    "LV1-2of3-#1-2a",
+    "LV1-2of3-#2-7f",
+    "LV1-2of3-#3-4c"
+   ]
+  },
+  {
+   "id": 5,
+   "secret_hex": "e6ee9229d66692a563266be9cec3b804",
+   "n": 6,
+   "t": 3,
+   "shares": [
+    "LV1-3of6-#1-5d69d6a6c884291defc9b40a0b972548",
+    "LV1-3of6-#2-fea739e2f1b8e966224051ae00209d52",
+    "LV1-3of6-#3-45207d6def5a52deaeaf8e4dc574001e",
+    "LV1-3of6-#4-191753b1f4c53caef25055392e29e2bd",
+    "LV1-3of6-#5-a290173eea2787167ebf8adaeb7d7ff1",
+    "LV1-3of6-#6-015ef87ad31b476db3366f7ee0cac7eb"
+   ]
+  },
+  {
+   "id": 6,
+   "secret_hex": "ab313b5bc663eb987b7227fc6c3c6ce477cf98f2d1233b7b3e0122da7bfa8bc2841c13517a89a68c21b916c0fedb4167499eabeaeed717c43117ba3551e8ea7f",
+   "n": 2,
+   "t": 2,
+   "shares": [
+    "LV1-2of2-#1-1fc6c5520a0d4a13b142374ae9c83f04fff966e50b31b2cc17a74e9063b891e285910b60a650c8cb79f1ec921855df9bda3114405586a6f49f2d4f00796e3139",
+    "LV1-2of2-#2-d8c4dc4945bfb295f412078b7dcfca3f7ca37fdc7e07320e6c56fa4e4b7ebf82861d2333d9207a029129f96429dc668474dbcea583756ea476634b5f01ff47f3"
+   ]
+  },
+  {
+   "id": 7,
+   "secret_hex": "0f",
+   "n": 5,
+   "t": 5,
+   "shares": [
+    "LV1-5of5-#1-fc",
+    "LV1-5of5-#2-fa",
+    "LV1-5of5-#3-94",
+    "LV1-5of5-#4-5f",
+    "LV1-5of5-#5-cf"
+   ]
+  },
+  {
+   "id": 8,
+   "secret_hex": "65c33e043dd72f6a025fc08b448434dbfd9983f32e2c732db7c6f2305b5efbb42c77b8c9a7ee903952ffd90b0011d41d",
+   "n": 6,
+   "t": 5,
+   "shares": [
+    "LV1-5of6-#1-898a6220ac8c0b26a94c5bae88f6e1586d0a8f4839ebd0127903cdff5490b4f6ccd7d48f35eeacab7b53f65762bbb810",
+    "LV1-5of6-#2-f9adede05bfcfbc5b4274c5e4b87b8ce6923d2a596cf448f787c6e107b00a28c0b0445bae73587aa8ec51228ca0d8c48",
+    "LV1-5of6-#3-2c954c56e0089cbe69305fc7436c0ebda6278623c4bb01e87d10b59b2dcccbbcbf4af0c73417abf33a11b8037a457dc2",
+    "LV1-5of6-#4-23520ccbc912d14377c7d83fe5236e05acbecf7fe6cc951582c9b68f256b2140f5f18e727ace22bd03844550dd515692",
+    "LV1-5of6-#5-592668aea48664bdf3cc5ebf872aea90e572084a748c54e1c0d7e7c3e7a9ba35f60302ae75027ea349235925658159a0",
+    "LV1-5of6-#6-6c9976d3e4362b4f5c9f787d9084d7d1f6d068da40c0d3414f4c4bb9fb2553c544b3e1c2041eb52c5b53cae6dd1c8a93"
+   ]
+  },
+  {
+   "id": 9,
+   "secret_hex": "e24e50936621a618d7e329e3b8966b1f99483e0f3d11622da8aa45003edaba1e10f7708cc48167f9ecaed8d61d49ec51",
+   "n": 5,
+   "t": 3,
+   "shares": [
+    "LV1-3of5-#1-ed375beea1d51189fab15cd3db232ebec878407312d8435a7cbf6f0a0747ef0a1c4c1c1926c24f1194f60af8999f7276",
+    "LV1-3of5-#2-4e93a15d8f60cdb9f0a965d9dc635db3a109ca088baa4debb7d21591f34c2db9980dd78d71fded2b620c945752f1bde7",
+    "LV1-3of5-#3-41eaaa2048947a28ddfb10e9bfd61812f039b474a4636c9c63c73f9bcad178ad94b6bb1893bec5c31a544679d62723c0",
+    "LV1-3of5-#4-5f5318c4445d081776e21fe4ce41c1a5b74eedd0c7b4931a1009f51b75077b416d72c24e06bc2d2208b9a196e81e8deb",
+    "LV1-3of5-#5-502a13b983a9bf865bb06ad4adf48404e67e93ace87db26dc41cdf114c9a2e5561c9aedbe4ff05ca70e173b86cc813cc"
+   ]
+  },
+  {
+   "id": 10,
+   "secret_hex": "676c702d37c99036edfb89fab088ec69",
+   "n": 3,
+   "t": 3,
+   "shares": [
+    "LV1-3of3-#1-1e65bfc70ba1a1a487156d0715f1d3a0",
+    "LV1-3of3-#2-015cbe18563f7e39c70f5edde6c50ac7",
+    "LV1-3of3-#3-785571f26a574fabade1ba2043bc350e"
+   ]
+  },
+  {
+   "id": 11,
+   "secret_hex": "12",
+   "n": 3,
+   "t": 3,
+   "shares": [
+    "LV1-3of3-#1-86",
+    "LV1-3of3-#2-c0",
+    "LV1-3of3-#3-54"
+   ]
+  },
+  {
+   "id": 12,
+   "secret_hex": "76136c0f9a1d7638d7dbd5a0414a94f5",
+   "n": 3,
+   "t": 2,
+   "shares": [
+    "LV1-2of3-#1-72c6f4136600337e7be9fbebb5375128",
+    "LV1-2of3-#2-7ea247377927fcb494bf8936b2b00554",
+    "LV1-2of3-#3-7a77df2b853ab9f2388da77d46cdc089"
+   ]
+  },
+  {
+   "id": 13,
+   "secret_hex": "cc93ebee06fc19690ff79ea58ac8f1e65b4908cee6d3097822ae16db26c931cae2d13aa090df4673326c4137e69bb93d74b13fb3114e005d1025e3137b8a7de2",
+   "n": 4,
+   "t": 3,
+   "shares": [
+    "LV1-3of4-#1-722a9e497cbd1195a009b2edbb9207091502f0e1347c4cca4e56457c35f21b045ed190b71a052eedfdb2438790b70114b4b67a6c337d2fa93c0df62107850d67",
+    "LV1-3of4-#2-bd99009abe8d3c91767dc8bafd1e40417b5bde342fa73b7d6e128b47dbd49279e78c043f0279fe1d8853bd964cbf8a9725f9c2c2be444f9012b2928fa931fa8c",
+    "LV1-3of4-#3-0320753dc4cc346dd983e4f2cc44b6ae3510261bfd087ecf02ead8e0c8efb8b75b8cae2888a39683478dbf263a9332bee5fe871d9c7760643e9a87bdd53e8a09",
+    "LV1-3of4-#4-7610228246ff87ee0d570a9130ec8b20dd4b4b87acffbb81dc8adbf186449d676b049977edac9690a1446f2baa38a4bfd322192cd5f1da24672176fd6c45efd9"
+   ]
+  },
+  {
+   "id": 14,
+   "secret_hex": "be0a",
+   "n": 3,
+   "t": 2,
+   "shares": [
+    "LV1-2of3-#1-7650",
+    "LV1-2of3-#2-35be",
+    "LV1-2of3-#3-fde4"
+   ]
+  },
+  {
+   "id": 15,
+   "secret_hex": "381c3e0365be7b09d88aa2e28ba5c357ab5c2e349c867a78ce3f3598808cd9d2",
+   "n": 3,
+   "t": 2,
+   "shares": [
+    "LV1-2of3-#1-8bd47ab90a18ce4d41df208939687006bc363f9ae130248a76c7d8e0c1841c27",
+    "LV1-2of3-#2-4597b66cbbe90a81f120bd34f424bef585880c7366f1c687a5d4f468029c4823",
+    "LV1-2of3-#3-f65ff2d6d44fbfc568753f5f46e90da492e21ddd1b4798751d2c191043948dd6"
+   ]
+  },
+  {
+   "id": 16,
+   "secret_hex": "494b8c395d868c03a2e5c0fdba1e41617e5cbbdae4f03a7af705ecfce3f05ae5e456e51e8a2b5e5fdecd1a820d3e15254b8d9ba5c40e5bea3a1fbf49a4125a82",
+   "n": 6,
+   "t": 4,
+   "shares": [
+    "LV1-4of6-#1-66ae9b6c8412146d3006e5c49f25d4580f01abd99fe1c941f0fe57404d897e7adb926085212e82b9540264df9aa92f403f18a5b8bfb43430c734b0edb6f8fe97",
+    "LV1-4of6-#2-ac87243f311a4c79d6cd98de406b3f61352b9e4af2c062e4df989bb2e060a9dd130bc35d1210f76b77134285d53f3daffd01e6126d05daf38f2d73817f2c88ed",
+    "LV1-4of6-#3-4a6ccc4c3f1160bd87d8eda4a4c26b4b0814a106412ba72efbbe3d1f21a2a3ea45d6859891831c48b3a746ea007e428e957e219182974cc157aef7aced5f0675",
+    "LV1-4of6-#4-6f64517d1256c589d84014af2e6517d5fd429f345c24bdb0b5d9d59be3c713197616d0cfce54be4b961b1e8b60561d16f4eba5bf0f85e5b9f2082bc23686e959",
+    "LV1-4of6-#5-c0a572fc0fadc836f6a1ca07bb1f32863f486d8ea11ffa9b78da20413409d35b2484e98b9508d005a3d5677a6003a2f0c834bbcb21cfaa25d1fe337d0917b14f",
+    "LV1-4of6-#6-98d840509c5ed2d4ee99faa286ec3b4de008d9ea50854ee79ef64a5db5f88b16e483b44a0db3b40d7930bb079ebd2b8aa27651946ad5eda1740dd32e811c7032"
+   ]
+  },
+  {
+   "id": 17,
+   "secret_hex": "8674",
+   "n": 6,
+   "t": 3,
+   "shares": [
+    "LV1-3of6-#1-d1b4",
+    "LV1-3of6-#2-ed5a",
+    "LV1-3of6-#3-ba9a",
+    "LV1-3of6-#4-69ca",
+    "LV1-3of6-#5-3e0a",
+    "LV1-3of6-#6-02e4"
+   ]
+  },
+  {
+   "id": 18,
+   "secret_hex": "0a3f3c2757f99a6a75fc9bbefdc76c251fafc1c253fb2022",
+   "n": 2,
+   "t": 2,
+   "shares": [
+    "LV1-2of2-#1-bfd2eb5ae33b5e5ffdcd2ad33421ba647d9a49f3ae382d7e",
+    "LV1-2of2-#2-7bfe89dd246609007e9ee2647410dba7dbc5caa0b2663a9a"
+   ]
+  },
+  {
+   "id": 19,
+   "secret_hex": "2b",
+   "n": 6,
+   "t": 5,
+   "shares": [
+    "LV1-5of6-#1-db",
+    "LV1-5of6-#2-6a",
+    "LV1-5of6-#3-99",
+    "LV1-5of6-#4-48",
+    "LV1-5of6-#5-b2",
+    "LV1-5of6-#6-11"
+   ]
+  },
+  {
+   "id": 20,
+   "secret_hex": "0a",
+   "n": 3,
+   "t": 2,
+   "shares": [
+    "LV1-2of3-#1-4e",
+    "LV1-2of3-#2-82",
+    "LV1-2of3-#3-c6"
+   ]
+  },
+  {
+   "id": 21,
+   "secret_hex": "63c38bccc9cb05759e67b160bf479c0d834907fd19c97371c2fe049f2cad421178b4184d88ff46108d75e55d0073eb4c",
+   "n": 3,
+   "t": 2,
+   "shares": [
+    "LV1-2of3-#1-7b187006a10508fcd25a30fd4b788df5a0a34871f1fbc6df001b0c859607c3c930d26f0108b0b9386c2b105e03de7f6c",
+    "LV1-2of3-#2-536e6643194c1f7c061da8414c39bee6c58699fed2ad02365d2f14ab43e25bbae878f6d59361a34054c9145b0632d80c",
+    "LV1-2of3-#3-4bb59d89718212f54a2029dcb806af1ee66cd6723a9fb7989fca1cb1f948da62a01e8199132e5c68b597e158059f4c2c"
+   ]
+  },
+  {
+   "id": 22,
+   "secret_hex": "1e",
+   "n": 3,
+   "t": 3,
+   "shares": [
+    "LV1-3of3-#1-70",
+    "LV1-3of3-#2-99",
+    "LV1-3of3-#3-f7"
+   ]
+  },
+  {
+   "id": 23,
+   "secret_hex": "44f7a972663d33c52a64e70379794f0bc15149f61cd5d6b1cec56e27341e59316ab89f3202ddddeaba2ce89499b93903e682c456741e71d9a7a20c58734c3728",
+   "n": 6,
+   "t": 6,
+   "shares": [
+    "LV1-6of6-#1-5a721f999adb0af59642a39c041ab4e58d1e112195be6f8af639c202dfe803e16335d724fe9643fde715a8e3eee0cac7db05ec738c7e8388d6f9844d7e79ec62",
+    "LV1-6of6-#2-316b83f114448f45c1371a69aa6401a44521cddfe87a46b72fc6b701c632a106c9ae1d8624716ad54b7aebf04d461581c0c19c4eeeafea8ca41d53a1b3a31ff7",
+    "LV1-6of6-#3-a3a2c78ecc41b021175229b89a7f3d3c9c3cfa8f6ee3ccfa84b0473a0671079cd287e81fab772b0e8d36ad4207ece2065ed5983aca7fd69226c7d58c50ea7927",
+    "LV1-6of6-#4-1cc40926c033199b662b27b6dd861543fb141020bdc4b0904e23c32385d5c81c277ef01b92d42282a91ab866b10ccda6ea896c9c5b06d1d5e3245f33f5668b45",
+    "LV1-6of6-#5-b64e884c21aef3ec826a436b5091387004b3d73ed0a6710952bb1fccee3f832f7e959c1ec14e00263c22f34dd1e4e46be0e001acee0c6fdb01e396b4a35fd4f8",
+    "LV1-6of6-#6-1c6da8da181d00de8ea15d7bda88dd8e60fc16aaa69c1c0a9df691f2c023cfc56c02f88326eea7dd8981b583bf6b5e2118770ef10695c7193c8aba15167a7231"
+   ]
+  },
+  {
+   "id": 24,
+   "secret_hex": "c58551d4fb",
+   "n": 6,
+   "t": 2,
+   "shares": [
+    "LV1-2of6-#1-e2409c626e",
+    "LV1-2of6-#2-8b14d0a3ca",
+    "LV1-2of6-#3-acd11d155f",
+    "LV1-2of6-#4-59bc483a99",
+    "LV1-2of6-#5-7e79858c0c",
+    "LV1-2of6-#6-172dc94da8"
+   ]
+  },
+  {
+   "id": 25,
+   "secret_hex": "92",
+   "n": 4,
+   "t": 2,
+   "shares": [
+    "LV1-2of4-#1-30",
+    "LV1-2of4-#2-cd",
+    "LV1-2of4-#3-6f",
+    "LV1-2of4-#4-2c"
+   ]
+  },
+  {
+   "id": 26,
+   "secret_hex": "7e5ae1698e8581e3b1229ed96af430c1",
+   "n": 3,
+   "t": 2,
+   "shares": [
+    "LV1-2of3-#1-6c98c98574216abaea2679257ae26323",
+    "LV1-2of3-#2-5ac5b1aa61d64c51072a4b3a4ad8961e",
+    "LV1-2of3-#3-480799469b72a7085c2eacc65acec5fc"
+   ]
+  },
+  {
+   "id": 27,
+   "secret_hex": "7af6b1a40f77161d682063ef633873b9cb53bae62417ea1dbc3b013884f82d247804c75ea4844a50d6acd05612ffa368aa52de7d9f01cc81826f248363baaa70",
+   "n": 4,
+   "t": 2,
+   "shares": [
+    "LV1-2of4-#1-3d0dc5c692014b9c52a5b20bced3e945c4c61c0527dd01a94fa57709b9acbbfada9d7071b9a1c9efb37dbbff7ff12543ff770baff1e9612d8f400447c34a0359",
+    "LV1-2of4-#2-f41b59602e9bac041c31da3c22f55c5ad562ed3b2298276e411ced5afe501a83272db2009ece57351c15061fc8e3b43e00186fc243ca8dc2983164103841e322",
+    "LV1-2of4-#3-b3e02d02b3edf18526b40bd88f1ec6a6daf74bd82152ccdab2829b6bc3048c5d85b4052f83ebd48a79c46db6a5ed3215553dba102d22206e951e44d498b14a0b",
+    "LV1-2of4-#4-7d377a374db4792f80020a52e1b92d64f731144728126bfb5d75c2fc70b34371c6562de2d010709a59c567c4bdc78dc4e5c6a7183c8c4e07b6d3a4bed55738d4"
+   ]
+  },
+  {
+   "id": 28,
+   "secret_hex": "6be21bde0c2123063e421dd2967315db",
+   "n": 3,
+   "t": 3,
+   "shares": [
+    "LV1-3of3-#1-26071470d7ff4c54fe82ad92dbbfdaa0",
+    "LV1-3of3-#2-749f20f372b888efbf2021916050080c",
+    "LV1-3of3-#3-397a2f5da966e7bd7fe091d12d9cc777"
+   ]
+  },
+  {
+   "id": 29,
+   "secret_hex": "74def35cdfd226067ea8e6835590b62e",
+   "n": 2,
+   "t": 2,
+   "shares": [
+    "LV1-2of2-#1-a10217167408741b88dda17903c1e96c",
+    "LV1-2of2-#2-c57d20c8927d823c8942686cf93208aa"
+   ]
+  },
+  {
+   "id": 30,
+   "secret_hex": "4890cbcaa0de25dc",
+   "n": 2,
+   "t": 2,
+   "shares": [
+    "LV1-2of2-#1-4f2ad6fc1ada85b9",
+    "LV1-2of2-#2-46fff1a6cfd67e16"
+   ]
+  },
+  {
+   "id": 31,
+   "secret_hex": "8f4cb54a45104ded1ce16aafba852394e419b4c2203fc01d23fedd5901248b7fb4cd91114877c6aa30aea9c50074a05618608406dfd669b6a6385111c5f4dc20",
+   "n": 5,
+   "t": 4,
+   "shares": [
+    "LV1-4of5-#1-292575ea42d01bed85327faad4f48fb833bbed3cfe755aba700331eaef6de5e972a95b6cb5a721e0ed8ecdc60b0b23b62ccd88780389eb201e3423665c9fff7e",
+    "LV1-4of5-#2-2fa5cb9b636d6631e563f83ce2b18e9ae63a2904d95b1c6f910cecd78470659389784995d9aa03e52b34d70f31bc3411712dc2a105e23ee951858956140c7d22",
+    "LV1-4of5-#3-4534cf70cbb3b7658053e9e76dc8b984944c2da1ae4a5a55ee30c558bfb9f880c3c8a6b72866adc783aa5b9a8f93ffe8b89c072e665e508188e39a990b4f20cf",
+    "LV1-4of5-#4-4cbd39063ddcb36f1c11d3da1738de0e1626e16146aab0344ac087a28557cc574ec18f015afed414061f349ab90b56715e61464440b3231fc0b2dfae27b176d5",
+    "LV1-4of5-#5-74f25707f558da8cbbbede2d0979058e324a6d5e4321d4f0f18dc399a333bef28d6b9ba58f669e35fe9616c0218f7ec75284ca2a3390ffbb25d9f064872a4a0c"
+   ]
+  },
+  {
+   "id": 32,
+   "secret_hex": "1109cbee3e8e9c1c90f62043c4fd4f2729d9d357f438fdc80c8d78d8c9af9aad35083f7d9fecb9ed80f7afb4677a587793ea64fa9016494469303bc5fd2a9147",
+   "n": 5,
+   "t": 3,
+   "shares": [
+    "LV1-3of5-#1-c69cbef3c696bbe3290d8cdfd5797aef7fa0631582300b3f42e4006c2f61ca3f4b8f10a9b717d43a4fbdda54b65cc82a5e7b4cc34b9f56f4eead8dbeea27c4c0",
+    "LV1-3of5-#2-36eadf8bdfc87c3f4904e29044be4966e71e8f14d8a04a867ad260a2ee73d56fdbd1e924d82ee111387bc08c3c42565b4fa8f9c25238a0d251c1153ab53ba93e",
+    "LV1-3of5-#3-e17faa9627d05bc0f0ff4e0c553a7caeb1673f56aea8bc7134bb181608bd85fda556c6f0f0d58cc6f731b56ced64c6068239d1fb89b1bf62d65ca341a236fcb9",
+    "LV1-3of5-#4-21b13643cfc1c96fcf758d136120e8a03d98f7e08105938e6531c5086a7b95ebbabc9e4a4dcf37311f94536574c190415f995cb9a8d6f1eaada41804ee249f1e",
+    "LV1-3of5-#5-f624435e37d9ee90768e218f70a4dd686be147a2f70d65792b58bdbc8cb5c579c43bb19e65345ae6d0de2685a5e7001c92087480735fee5a2a39ae7ff929ca99"
+   ]
+  },
+  {
+   "id": 33,
+   "secret_hex": "9d340dfc70a1d15910b061b575084e1d",
+   "n": 4,
+   "t": 4,
+   "shares": [
+    "LV1-4of4-#1-0bb2f287af1cb666d9c6c3bab0c057a2",
+    "LV1-4of4-#2-82c0e32bd4818e8d0e73fbbb9d00da1d",
+    "LV1-4of4-#3-094ab511310249601d8bcc6f47ade48e",
+    "LV1-4of4-#4-bc960aae42cb459e0ca786b7d6a709d4"
+   ]
+  },
+  {
+   "id": 34,
+   "secret_hex": "4074d33c9f232a0d5ae25d0a46e84a56",
+   "n": 5,
+   "t": 4,
+   "shares": [
+    "LV1-4of5-#1-848c24b9c1baf7d95764020b64ae4dcb",
+    "LV1-4of5-#2-825a11ad755644d18f023d0380713a5c",
+    "LV1-4of5-#3-187c5b8a812408a3aa1c79d1591fe230",
+    "LV1-4of5-#4-740b7743c3114629ecdd0fca0783478e",
+    "LV1-4of5-#5-6f0123274cc4d00411260a170935b403"
+   ]
+  },
+  {
+   "id": 35,
+   "secret_hex": "e6f0288df1",
+   "n": 5,
+   "t": 2,
+   "shares": [
+    "LV1-2of5-#1-c76f406c94",
+    "LV1-2of5-#2-a4d5f8543b",
+    "LV1-2of5-#3-854a90b55e",
+    "LV1-2of5-#4-62ba93247e",
+    "LV1-2of5-#5-4325fbc51b"
+   ]
+  },
+  {
+   "id": 36,
+   "secret_hex": "89306ac941e141ca9f890fb1924a440b",
+   "n": 5,
+   "t": 4,
+   "shares": [
+    "LV1-4of5-#1-2b3129bbd282b16f38897d033cf80388",
+    "LV1-4of5-#2-8bb06ca93b7caecbda21157d75797c5b",
+    "LV1-4of5-#3-c7964c73bfac71b5118e7aad735c5ca8",
+    "LV1-4of5-#4-15cfadd78588aecd64c0512109de771e",
+    "LV1-4of5-#5-e51cbf78646cbc84b00f6dc47a3379a6"
+   ]
+  },
+  {
+   "id": 37,
+   "secret_hex": "4a43749bc6d6afe24a2c9f1adace07af65bb882f85aea645",
+   "n": 4,
+   "t": 4,
+   "shares": [
+    "LV1-4of4-#1-908d2cded4e51c9ca9193342235d4f54e1d352b917508f48",
+    "LV1-4of4-#2-e22e5b67b11894afa99c123d43abf929c8c8fe96b9e937d8",
+    "LV1-4of4-#3-486b66ca6761cec28421da405bfc0a2ccf142b7ee35bc319",
+    "LV1-4of4-#4-876ee534b63841ed2e5c1acc13b6dca338b4e10ac8119827"
+   ]
+  },
+  {
+   "id": 38,
+   "secret_hex": "209b7fb7f4c6c649",
+   "n": 4,
+   "t": 4,
+   "shares": [
+    "LV1-4of4-#1-59989246d6a1a940",
+    "LV1-4of4-#2-365a12b7cb15a0f5",
+    "LV1-4of4-#3-08d2c4bb3a42a58c",
+    "LV1-4of4-#4-aa4152ee83e2953e"
+   ]
+  },
+  {
+   "id": 39,
+   "secret_hex": "5f7262051aa71e7b083007c8c4fb7f5d",
+   "n": 6,
+   "t": 2,
+   "shares": [
+    "LV1-2of6-#1-8dbcaf3bd74395bff60ceb60c49676b3",
+    "LV1-2of6-#2-e0f5e3799b7413e8ef48c483c4216d9a",
+    "LV1-2of6-#3-323b2e475690982c1174282bc44c6474",
+    "LV1-2of6-#4-3a677bfd031a0446ddc09a5ec4545bc8",
+    "LV1-2of6-#5-e8a9b6c3cefe8f8223fc76f6c4395226",
+    "LV1-2of6-#6-85e0fa8182c909d53ab85915c48e490f"
+   ]
+  },
+  {
+   "id": 100,
+   "secret_hex": "cc953aee61c8345d8a6ef32b4d09aa2356a57e19f18f26a7b65df3633322970f5b30c3ebb1f70969841f9642219eeec9f2f27f6b9f1fe7966860e01e0b8c96e62901f916a7759a1ad5da1c722a7816e3e05282ca083790efffa970a3cb05f1d5fccf644b9d73641ecec265a24f3bb9f1ce841a7ede3807334f2da10dc30bbe6ee71e96001e4fe54e59449f37af489b14dca8e41d23fdaa7a3ca8c51cdd1b2b235c8227e49b08f9a67e0a3f77371c20c2707d6d9402580679a3ef9fecd249daab531739d56dd42d11d4c4c3c85aba1ef6adb3699d98fea0485bed0f133f98d674b1981e7c2453cb32aaf882f293aa9260865bd2bb7f138c4a36ec4004fd82ad6b9a4ebead49d486020efbe419cadc8b611b4a3674feea028b193b42fcda98afec16df6aa452d824d06eed1d3a",
+   "n": 3,
+   "t": 2,
+   "shares": [
+    "LV1-2of3-#1-01460d817dc3d41eaef92616564410b843da0a50c86d3a848ae97a816742851843901e40ccb2e556694b4b05abb46e79763209353e80301c92f7098e21aadab4534bf159edcaed181545b9b6b349568b5db04cf3e8c9e9c369bfaac98d1f0d528ea4392e878cfc25b2b745cf9f243378e4d0849786dba2bca2c667fa21ae2668a9823c6826badd885d198f03156e24e3062c02f92389d5a114129691dc8d371222912db2cd1c070b3c0b82fcfe020e81388df9cbd075badd4bd83efb14543e9dba413c67cda5d3cbe464026eec843e14eab41df7b3639be7817f35562272945e2a1ba9c2641babc5f9982881054a62d2e9c9aa97c3fcecffb7edd73f5265b84f962cb2b90700ab53fba3b1042b951a6d10a68164f13d2a49b1bd5a61c0ad439f4043ff12cac209cae25d6779",
+    "LV1-2of3-#2-4d28543059deefdbc25b42517b93c50e7c5b968b83501ee1ce2efabc9be2b3216b6b62a64b7dca1745b737cc2ecaf5b2e16993d7c63a5299875529255fc00e42dd95e9883310741e4eff4de1031a9633818d05b8d3d062b7c885df77473112c01819de81a9964f6836282578f405b6f89a2c3db76ee556368ee036f81c5a95627b3dd9d06ebe95d951febf5fc004fee173bb33ce231554d76cc7631ddf2c1341a0a4334837201ee7fa085e7abe207c44e0865e2abd02652a6881c6c2457309c79abb33aa3636cabeb49f5a9f2dc65e2923bd8149cedfd60df4d27b99055752209c856b1ba4c30bc70c38cd14a471691f586422e31cd64c3b2fee7572b8578723828aa685d567dca0ff4b4e23134eb2790d894354e05f5214522c72ddeef26c0abafc5bd379ec7ee46d96e9bc",
+    "LV1-2of3-#3-80fb635f45d50f98e6cc976c60de7f956924e2c2bab202c2f29a735ecf82a13673cbbf0d36382628a8e3ea8ba4e0750265a9e58967a585137dc2c0b575e64210a7dfe1c779af031c8e60e8259a2bd65b3c6fcb81332e1b9b5e93051d012bee476a7283e4b369d7534a5d0515241a3c71b078a35e3606f3b9630bf00ffeff0d6435a173b8564bad1f55a3af6b7a224116a93fd52a23612b0c447d3090deba0f70deb7391e6134e04ab809e3f1773e5207a876ca756f2fd98e80b667d5836eedf173ed361896473464843f9b399bf87ecb64baf523e542eda22e4041dc18bd100a0706dca5e48b6b305f586767329199ad37f65acfa0392c8eaeefe24917b092078ee8aa919bb3f1f10a131b3ef20723750665f444ef887ad6faaa6a40f4c78079ec60ce65e1f653fee12693ff"
+   ]
+  },
+  {
+   "id": 101,
+   "secret_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+   "n": 5,
+   "t": 3,
+   "shares": [
+    "LV1-3of5-#1-bd06763569af5a8336b7d2b4a1ce0d7ad32b55add04fe1f653a7aadd1d86c2d0",
+    "LV1-3of5-#2-5145a0f7b1e867246f2b4a4c43c6a8f72670a1f560b24681dff992109dcebc20",
+    "LV1-3of5-#3-ec43d6c2d8473da7599c98f8e208a58df55bf458b0fda7778c5e38cd80487ef0",
+    "LV1-3of5-#4-62b570b7ee49afacd2356d64ee88b5f91678751781cfc6da5a6f66d28bceef1a",
+    "LV1-3of5-#5-dfb3068287e6f52fe482bfd04f46b883c55320ba5180272c09c8cc0f96482dca"
+   ]
+  },
+  {
+   "id": 102,
+   "secret_hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+   "n": 5,
+   "t": 5,
+   "shares": [
+    "LV1-5of5-#1-b91e67837789ea2b1e9cefb5287e3a3666d908837ba79383ef99ffde21e19e2a",
+    "LV1-5of5-#2-48bd0a6ccbb8c5df4566e461ef1589fd109e2210ee6a88bd295a4ed3576f7571",
+    "LV1-5of5-#3-9dec19aa322cf6455d69137a4446f0b6e10ca60ade4a54b9864a406bd9fdd276",
+    "LV1-5of5-#4-7b300f3eae0584d3aeaaebdc0262eddd42b23941a8551e058397881b7e9a88e6",
+    "LV1-5of5-#5-7a5c80f31b0945b86fba9f6bc6398d35b001ff72b906ff723cdeac415b814be9"
+   ]
+  },
+  {
+   "id": 103,
+   "secret_hex": "5175616e74757320f09f95af206c656761637920e2809420d0bad0bbd18ed187d0b820d0bdd0b020d0b2d0b5d0bad0b0",
+   "n": 4,
+   "t": 2,
+   "shares": [
+    "LV1-2of4-#1-f5467ce1c8505f52f006800ccb20ac9758a4ce96983ed67d8c5f216a5d66f8c8e3a004076ee64b44204f2cbbe0e7526c",
+    "LV1-2of4-#2-02135b6b173f2bc4f0b6bff2edf4ec9c13f60c5716e7109a686b2902d2458319b688686500bc5de82b5333a9b000cf13",
+    "LV1-2of4-#3-a62046e4ab1a07b6f02faa5106b8256c2a31bbe16c5952c7348ed8d35eadaa5685904cb2d38aa68cdbaecfa7805d4dcf",
+    "LV1-2of4-#4-f7b91564b2e1c3f3f0cdc115a1476c8a855293ce114e874fbb0339d2d70375a01cd8b0a1dc0871ab3d6b0d8d10d5eeed"
+   ]
+  },
+  {
+   "id": 104,
+   "secret_hex": "61",
+   "n": 2,
+   "t": 2,
+   "shares": [
+    "LV1-2of2-#1-cc",
+    "LV1-2of2-#2-20"
+   ]
+  }
+ ]
+}
