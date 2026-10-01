@@ -159,6 +159,7 @@ section{padding:48px 0}
 .app-card.pay{--accent:#e8b04b}.app-card.pay .app-ico{background:rgba(232,176,75,.12);border-color:rgba(232,176,75,.4)}
 .app-card.luck{--accent:#34ff88}.app-card.luck .app-ico{background:rgba(52,255,136,.12);border-color:rgba(52,255,136,.4)}
 .app-card.notary{--accent:#e4572e}.app-card.notary .app-ico{background:rgba(228,87,46,.12);border-color:rgba(228,87,46,.4)}
+.app-card.zktree{--accent:#5eead4}.app-card.zktree .app-ico{background:rgba(94,234,212,.12);border-color:rgba(94,234,212,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -656,6 +657,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Notary Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The on-chain timestamping &amp; proof-of-existence desk: hash any document in your browser, wrap the digest in a versioned envelope, and anchor it with a byte-exact <code>System.remark</code> extrinsic — then verify it, keep it in a local vault, and read the live public remark board. Never signs; every byte cited to upstream source.</p>
         <div class="meta">46/46 logic tests green · full browser QA green · zero console errors</div>
+      </a>
+      <a class="app-card zktree" href="pages/zktree-desk/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🌲</div>
+          <span class="tag">Everyone</span>
+        </div>
+        <h3>QTC ZkTree Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>The ZK Merkle-tree observatory &amp; proof laboratory: watch the chain's 4-ary Poseidon tree live, recompute exact leaf and node hashes in your browser, grow your own tree with batched folding, and verify real Merkle proofs against the live chain root. Never signs; every constant cited to upstream source.</p>
+        <div class="meta">83/83 logic tests green · full browser QA green · zero console errors</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

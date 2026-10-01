@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC ZkTree Desk — the ZK Merkle-tree observatory &amp; proof laboratory for Quantus</title>
+<meta name="description" content="QTC ZkTree Desk: watch Quantus's 4-ary Poseidon Merkle tree live, recompute exact leaf and node hashes in your browser, simulate the tree, and verify real Merkle proofs against the live chain root. 100% client-side.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.48.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.48.0" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">🌲</span>
+    <div><strong>QTC ZkTree Desk</strong><span>The ZK Merkle-tree observatory &amp; proof laboratory</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">Verified 2026-10-01</span>
+    <span class="pill ghost">Never signs</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a href="../pool-desk/"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
+    <a href="../pay-desk/"><span class="ico">🧾</span><span>Pay Desk<span class="meta">Merchant acceptance toolkit</span></span></a>
+    <a href="../cli-forge/"><span class="ico">💻</span><span>CLI Forge<span class="meta">Command builder</span></span></a>
+    <a href="../luck-lab/"><span class="ico">🍀</span><span>Luck Lab<span class="meta">Luck &amp; variance lab</span></span></a>
+    <a href="../notary-desk/"><span class="ico">📜</span><span>Notary Desk<span class="meta">On-chain timestamping</span></span></a>
+<a class="current" href="../zktree-desk/"><span class="ico">🌲</span><span>ZkTree Desk<span class="meta">ZK Merkle-tree lab</span></span></a>
+    <a class="current" href="./"><span class="ico">🌲</span><span>ZkTree Desk<span class="meta">ZK Merkle-tree lab</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main class="zkd">
+  <section class="hero panel">
+    <h1>The tree that remembers every transfer</h1>
+    <p class="lede">Quantus keeps a <strong>4-ary Poseidon Merkle tree</strong> over every transfer on the chain — one leaf per transfer, folded once per block, its root published in the block header. It is the backbone of the wormhole privacy exits: your ZK proof of "I was paid" is a Merkle path in this tree. This desk watches it live, recomputes its hashes exactly, and lets you prove things against it.</p>
+    <div class="hero-facts">
+      <div><span class="k">Arity</span><span class="v">4 children / node</span></div>
+      <div><span class="k">Hash</span><span class="v">Poseidon2 · Goldilocks</span></div>
+      <div><span class="k">Circuit ceiling</span><span class="v">depth 16 · 4.29B leaves</span></div>
+      <div><span class="k">Leaf floor</span><span class="v">≥ 1 leaf / block (mining reward)</span></div>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="ZkTree Desk sections">
+    <button role="tab" aria-selected="true" data-tab="observatory">🔭 Observatory</button>
+    <button role="tab" aria-selected="false" data-tab="leaf">🍃 Leaf Lab</button>
+    <button role="tab" aria-selected="false" data-tab="simulator">🌱 Tree Simulator</button>
+    <button role="tab" aria-selected="false" data-tab="proofs">🧾 Proof Lab</button>
+    <button role="tab" aria-selected="false" data-tab="wormhole">🌀 Wormhole &amp; Circuits</button>
+    <button role="tab" aria-selected="false" data-tab="spec">📖 Spec</button>
+  </nav>
+
+  <!-- ================= OBSERVATORY ================= -->
+  <section class="panel tabpage" id="tab-observatory" role="tabpanel">
+    <h2>🔭 Tree Observatory <span class="live-dot" id="obs-live-dot" title="connection state"></span></h2>
+    <p class="note">Live reads from <code>wss://rpc.quantus.network</code> via the <code>ZkTreeApi</code> runtime API
+    (<code>state_call</code>), with <code>state_getStorage</code> fallback on the <code>ZkTree</code> storage keys.
+    If the node is unreachable the desk says so — it never invents numbers.</p>
+    <div class="conn-row">
+      <label>RPC endpoint <input id="obs-endpoint" class="mono" value="wss://rpc.quantus.network" size="34" spellcheck="false"></label>
+      <button id="obs-connect" class="btn primary">Connect</button>
+      <button id="obs-refresh" class="btn">Refresh</button>
+      <span id="obs-status" class="status">not connected</span>
+    </div>
+    <div class="stat-grid" id="obs-stats">
+      <div class="stat"><span class="k">Leaves</span><span class="v mono" id="obs-leaves">—</span><span class="s" id="obs-leaves-sub">LeafCount</span></div>
+      <div class="stat"><span class="k">Depth</span><span class="v mono" id="obs-depth">—</span><span class="s" id="obs-depth-sub">capacity —</span></div>
+      <div class="stat"><span class="k">Pending this block</span><span class="v mono" id="obs-pending">—</span><span class="s">UnprocessedLeaves</span></div>
+      <div class="stat wide"><span class="k">Root (in block header)</span><span class="v mono small" id="obs-root">—</span><span class="s">Root · set via frame_system::set_zk_tree_root in on_finalize</span></div>
+    </div>
+    <div class="panel sub">
+      <h3>Capacity gauge</h3>
+      <div class="gauge-wrap">
+        <div class="gauge"><div class="gauge-fill" id="obs-gauge-fill"></div>
+          <div class="gauge-mark" id="obs-gauge-mark" title="circuit ceiling: depth 16"></div>
+        </div>
+        <div class="gauge-labels"><span id="obs-gauge-left">depth 0 · capacity 0</span><span class="mark-label">circuit ceiling · depth 16 · 4.29B leaves</span></div>
+      </div>
+      <div id="obs-exhaust" class="exhaust"></div>
+    </div>
+    <div class="panel sub">
+      <h3>How leaves get in</h3>
+      <ul class="facts">
+        <li><strong>Every block</strong> the mining-rewards pallet records the block reward — that is the <strong>≥ 1 leaf/block floor</strong> (<code>pallets/mining-rewards/src/lib.rs</code>).</li>
+        <li><strong>SafeSend reversible transfers</strong> and <strong>vesting payouts</strong> each record a leaf per transfer (<code>pallets/reversible-transfers</code>, <code>pallets/vesting</code>).</li>
+        <li>Leaves are <strong>appended</strong> during the block (<code>UnprocessedLeaves</code> counts them) and folded into the tree <strong>once per block in <code>on_finalize</code></strong> — the root you read mid-block covers the previous block's leaves.</li>
+        <li>Only leaves already folded are provable: <code>get_merkle_proof</code> returns <code>LeafNotYetSettled</code> for this block's fresh leaves.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= LEAF LAB ================= -->
+  <section class="panel tabpage hidden" id="tab-leaf" role="tabpanel">
+    <h2>🍃 Leaf Lab — the exact <code>hash_leaf</code></h2>
+    <p class="note">Recomputes <code>tree::hash_leaf</code> exactly as the runtime does — the same 8-felt layout,
+    the same lossy compact encoding, the same quantization. Pinned against the upstream golden vector
+    (<code>tests.rs::hash_leaf_golden_vector</code>).</p>
+    <div class="grid2">
+      <div>
+        <label>Recipient <span class="hint">qz… SS58 address or 32-byte hex</span>
+          <input id="leaf-to" class="mono wide" spellcheck="false" placeholder="qz… or 0x…"></label>
+        <div class="row">
+          <label>transfer_count <input id="leaf-tc" class="mono" value="7" inputmode="numeric"></label>
+          <label>asset_id <input id="leaf-asset" class="mono" value="0" inputmode="numeric"></label>
+        </div>
+        <label>amount <span class="hint">QTC (decimals ok)</span>
+          <input id="leaf-amount" class="mono" value="0.0001234" inputmode="decimal"></label>
+        <div class="row btns">
+          <button id="leaf-hash" class="btn primary">Hash leaf</button>
+          <button id="leaf-golden" class="btn">Load golden vector</button>
+        </div>
+        <div id="leaf-error" class="error" hidden></div>
+      </div>
+      <div>
+        <h3>Felt preimage <span class="tag-note">8 felts → Poseidon2</span></h3>
+        <table class="felt-table" id="leaf-felts">
+          <thead><tr><th>#</th><th>field</th><th>value (felt)</th></tr></thead>
+          <tbody><tr><td colspan="3" class="dim">Hash a leaf to see its 8-felt preimage.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="result mono" id="leaf-result" hidden></div>
+    <div class="callouts">
+      <div class="callout"><strong>Why is <code>from</code> not in the leaf?</strong>
+        Uniqueness comes from <code>(to, transfer_count)</code> — each recipient's counter only moves forward,
+        so every transfer to them gets a unique index. The sender is irrelevant to proving "I received funds once".</div>
+      <div class="callout"><strong>The lossy-encoding invariant.</strong>
+        Each 8-byte limb is reduced mod the Goldilocks prime, so a recipient and its non-canonical byte-alias
+        hash identically. The wormhole keys transfer counts on the <em>canonical</em> form so two deposits can
+        never commit to the same leaf (and the same nullifier). This desk canonicalizes before hashing and tells
+        you when it had to.</div>
+      <div class="callout"><strong>Two decimals of privacy.</strong>
+        Amounts are quantized to <code>amount / 10<sup>10</sup></code> (2 QTC decimals) and committed as a u32 —
+        oversized values <em>saturate</em> at <code>u32::MAX</code> rather than wrapping, so a huge transfer can
+        never alias a small one in the tree.</div>
+    </div>
+  </section>
+
+  <!-- ================= SIMULATOR ================= -->
+  <section class="panel tabpage hidden" id="tab-simulator" role="tabpanel">
+    <h2>🌱 Tree Simulator — grow your own 4-ary tree</h2>
+    <p class="note">Appends leaves like the runtime does (pending → folded once per "block"), hashes with the
+    exact <code>hash_node</code> (children <strong>sorted</strong> before hashing), and grows depth exactly when
+    capacity is exceeded. Empty subtrees read as the zero hash — same as on-chain.</p>
+    <div class="row btns wrap">
+      <button id="sim-add" class="btn primary">＋ Append leaf</button>
+      <button id="sim-add5" class="btn">＋ Append 5</button>
+      <button id="sim-finalize" class="btn accent">⛏ Finalize block (fold pending)</button>
+      <button id="sim-reset" class="btn danger-ghost">Reset tree</button>
+      <span class="status" id="sim-status">empty tree</span>
+    </div>
+    <div class="grid2">
+      <div class="panel sub">
+        <h3>Tree state</h3>
+        <div class="stat-grid small">
+          <div class="stat"><span class="k">Settled leaves</span><span class="v mono" id="sim-settled">0</span></div>
+          <div class="stat"><span class="k">Pending</span><span class="v mono" id="sim-pending">0</span></div>
+          <div class="stat"><span class="k">Depth</span><span class="v mono" id="sim-depth">0</span></div>
+          <div class="stat"><span class="k">Capacity</span><span class="v mono" id="sim-cap">0</span></div>
+        </div>
+        <div class="result mono small" id="sim-root">root: —</div>
+        <h3>Event log <span class="tag-note">LeafInserted · TreeGrew</span></h3>
+        <div class="eventlog mono" id="sim-events"><span class="dim">No events yet — append a leaf, then finalize.</span></div>
+      </div>
+      <div class="panel sub">
+        <h3>Tree map <span class="tag-note">click a node for its hash</span></h3>
+        <canvas id="sim-canvas" width="640" height="420"></canvas>
+        <div class="mono small" id="sim-nodeinfo">Click any node to inspect its hash.</div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="callout"><strong>Batched folding.</strong> The runtime does <em>not</em> rehash the path on every
+        insert — inserts only append, and <code>on_finalize</code> folds the whole block's range in one bottom-up
+        pass (~<code>n/3</code> node hashes instead of <code>n · depth</code>). Pressing "Finalize block" runs that
+        same fold here.</div>
+      <div class="callout"><strong>Sorted children.</strong> Proofs need no path indices because every node sorts its
+        4 children before hashing — the verifier just sorts and hashes. Try it: the simulator hashes children in
+        shuffled order and still lands on the same node.</div>
+    </div>
+  </section>
+
+  <!-- ================= PROOF LAB ================= -->
+  <section class="panel tabpage hidden" id="tab-proofs" role="tabpanel">
+    <h2>🧾 Proof Lab — generate &amp; verify Merkle proofs</h2>
+    <p class="note">Generate proofs for leaves in your simulated tree, paste proofs to verify by hand, or —
+    the real thing — pull a <strong>live proof from the chain</strong> and verify it against the <strong>live root</strong>,
+    entirely in your browser.</p>
+    <div class="grid2">
+      <div class="panel sub">
+        <h3>From the simulator</h3>
+        <div class="row">
+          <label>leaf index <input id="proof-idx" class="mono" value="0" inputmode="numeric" size="6"></label>
+          <button id="proof-gen" class="btn primary">Generate proof</button>
+        </div>
+        <div id="proof-gen-error" class="error" hidden></div>
+        <pre class="result mono small" id="proof-gen-out" hidden></pre>
+        <h3>Verify pasted proof</h3>
+        <label>proof JSON <span class="hint">{leaf_index, siblings: [[h,h,h], …]}</span>
+          <textarea id="proof-paste" class="mono" rows="4" spellcheck="false" placeholder='{"leaf_index":"0","siblings":[["…","…","…"]]}'></textarea></label>
+        <div class="row">
+          <label>expected root <span class="hint">hex</span><input id="proof-root" class="mono wide" spellcheck="false" placeholder="0x…"></label>
+        </div>
+        <div class="row btns">
+          <button id="proof-verify" class="btn primary">Verify against root</button>
+        </div>
+        <div id="proof-verify-out" class="verdict" hidden></div>
+        <p class="hint">The leaf fields come from the Leaf Lab — hash one there first, or fill them below.</p>
+        <div class="row">
+          <label>to <input id="pv-to" class="mono" spellcheck="false" placeholder="qz… or 0x…"></label>
+        </div>
+        <div class="row">
+          <label>transfer_count <input id="pv-tc" class="mono" value="0" size="8"></label>
+          <label>asset_id <input id="pv-asset" class="mono" value="0" size="8"></label>
+          <label>amount (QTC) <input id="pv-amount" class="mono" value="0" size="12"></label>
+        </div>
+      </div>
+      <div class="panel sub">
+        <h3>⚡ Live chain proof <span class="tag-note">needs Observatory connection</span></h3>
+        <p class="note">Fetches the leaf's SCALE bytes from the <code>ZkTree.Leaves</code> map, decodes them,
+        fetches <code>ZkTreeApi_get_merkle_proof</code>, and runs the exact <code>verify_proof</code> against the
+        live root — a trustless check that this desk's math matches the chain's.</p>
+        <div class="row">
+          <label>leaf index <input id="liveproof-idx" class="mono" value="0" inputmode="numeric" size="10"></label>
+          <button id="liveproof-go" class="btn accent">Fetch &amp; verify live proof</button>
+        </div>
+        <div id="liveproof-out" class="verdict" hidden></div>
+        <div id="liveproof-detail" class="result mono small" hidden></div>
+        <p class="hint">Honest caveat: only leaves already folded into the root are provable — a leaf appended in the
+        current block returns <code>LeafNotYetSettled</code> until the next block finalizes.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= WORMHOLE ================= -->
+  <section class="panel tabpage hidden" id="tab-wormhole" role="tabpanel">
+    <h2>🌀 Wormhole &amp; circuits — what the tree is <em>for</em></h2>
+    <div class="story">
+      <p>The tree is the <strong>commitment layer for private exits</strong>. When a transfer is recorded, its leaf
+      commits to <em>(recipient, per-recipient count, asset, quantized amount)</em> — no sender, no secrets. Later,
+      the recipient proves in zero knowledge: <em>"some leaf in this tree paid me, and I know the secret that lets
+      me spend it"</em>. The wormhole pallet checks that proof with <code>verify_private_batch</code> /
+      <code>verify_public_batch</code> (pallet 20) and enforces one-spend-per-leaf with nullifiers.</p>
+      <div class="flow">
+        <div class="fstep"><span class="fn">1</span><strong>Record</strong><span>transfer → <code>record_transfer</code> → leaf appended</span></div>
+        <div class="fstep"><span class="fn">2</span><strong>Fold</strong><span><code>on_finalize</code> folds the block's leaves; root → block header</span></div>
+        <div class="fstep"><span class="fn">3</span><strong>Prove</strong><span>recipient fetches <code>ZkTreeApi_get_merkle_proof</code>, builds a ZK proof off-chain</span></div>
+        <div class="fstep"><span class="fn">4</span><strong>Exit</strong><span>wormhole verifies the batch proof; nullifier blocks replays</span></div>
+      </div>
+      <h3>The depth-16 circuit ceiling</h3>
+      <p>The chain lets the tree grow to depth <strong>32</strong>, but the deployed ZK circuits only accept proofs up
+      to depth <strong>16</strong> — every leaf proof pays a full 16-level path, so the cap keeps proving fast.
+      4<sup>16</sup> ≈ <strong>4.29 billion</strong> leaves. If the tree ever outgrows it, proof generation halts until
+      a circuit update + runtime upgrade raises the ceiling — a deliberate "fix it when we get close" trade-off,
+      documented in <code>pallets/zk-tree/src/lib.rs</code>. <code>LeafCount</code> is public storage, so exhaustion
+      is visible years in advance.</p>
+      <div class="row">
+        <label>leaves / block <input id="wh-rate" class="mono" value="1" size="8"></label>
+        <button id="wh-calc" class="btn primary">Project exhaustion</button>
+      </div>
+      <div id="wh-out" class="result mono" hidden></div>
+      <div class="scenario-table">
+        <div><span>1 leaf/block (mining-reward floor)</span><strong id="wh-s1">—</strong></div>
+        <div><span>10 transfers/sec chain-wide</span><strong id="wh-s2">—</strong></div>
+        <div><span>Saturated blocks (~50 tps)</span><strong id="wh-s3">—</strong></div>
+      </div>
+      <h3>Chain facts this story stands on <span class="tag-note">Quantus-Network/chain @ 482c5b9</span></h3>
+      <ul class="facts">
+        <li>4-ary tree, Poseidon2-Goldilocks, <code>MAX_TREE_DEPTH = 32</code>, <code>CIRCUIT_MAX_TREE_DEPTH = 16</code> — <code>pallets/zk-tree/src/lib.rs</code></li>
+        <li>Leaf = <code>(to, transfer_count, asset_id, amount)</code>; <code>AMOUNT_SCALE_DOWN_FACTOR = 10<sup>10</sup></code> — <code>pallets/zk-tree/src/tree.rs</code></li>
+        <li>Root published in the block header via <code>frame_system::set_zk_tree_root</code> in <code>on_finalize</code></li>
+        <li>Leaf sources: mining rewards every block (<code>pallets/mining-rewards/src/lib.rs:247</code>), SafeSend (<code>pallets/reversible-transfers/src/lib.rs:833</code>), vesting (<code>pallets/vesting/src/lib.rs:643</code>)</li>
+        <li>Per-recipient <code>transfer_count</code> keyed on the <em>canonical</em> recipient; nullifier binds <code>(secret, transfer_count)</code> — <code>pallets/wormhole/src/lib.rs</code></li>
+        <li>Wormhole dispatchables: <code>verify_private_batch</code>, <code>verify_public_batch</code> (pallet 20)</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= SPEC ================= -->
+  <section class="panel tabpage hidden" id="tab-spec" role="tabpanel">
+    <h2>📖 Spec — constants, storage, events, RPC</h2>
+    <p class="note">Everything below is read from <code>Quantus-Network/chain @ 482c5b9</code> and re-verified for this release.</p>
+    <h3>Constants</h3>
+    <table class="spec-table mono">
+      <thead><tr><th>constant</th><th>value</th><th>where</th></tr></thead>
+      <tbody>
+        <tr><td>ARITY</td><td>4</td><td>tree.rs</td></tr>
+        <tr><td>MAX_TREE_DEPTH</td><td>32 (chain cap)</td><td>lib.rs</td></tr>
+        <tr><td>CIRCUIT_MAX_TREE_DEPTH</td><td>16 (circuit ceiling)</td><td>lib.rs</td></tr>
+        <tr><td>AMOUNT_SCALE_DOWN_FACTOR</td><td>10<sup>10</sup></td><td>tree.rs</td></tr>
+        <tr><td>INSERT_LEAF_DB_OPS</td><td>(3 reads, 4 writes)</td><td>lib.rs</td></tr>
+        <tr><td>INSERT_LEAF_POSEIDON_EVALS</td><td>2</td><td>lib.rs</td></tr>
+        <tr><td>POSEIDON_EVAL_REF_TIME_PS</td><td>10,000,000 (10µs)</td><td>lib.rs</td></tr>
+        <tr><td>TREE_KEY_POV</td><td>2,600 bytes</td><td>lib.rs</td></tr>
+        <tr><td>pallet index</td><td>21</td><td>runtime/src/lib.rs</td></tr>
+        <tr><td>storage prefix</td><td>"ZkTree"</td><td>runtime/src/lib.rs</td></tr>
+      </tbody>
+    </table>
+    <h3>Storage</h3>
+    <table class="spec-table mono">
+      <thead><tr><th>item</th><th>type</th><th>notes</th></tr></thead>
+      <tbody>
+        <tr><td>Leaves</td><td>map u64 → ZkLeaf (Identity)</td><td>60-byte SCALE: to[32] ++ tc u64 LE ++ asset u32 LE ++ amount u128 LE</td></tr>
+        <tr><td>Nodes</td><td>map (u8, u64) → [u8; 32] (Identity)</td><td>level 0 unused; root lives in Root, not Nodes</td></tr>
+        <tr><td>LeafCount</td><td>u64</td><td>public — exhaustion is observable</td></tr>
+        <tr><td>Depth</td><td>u8</td><td>0 = empty</td></tr>
+        <tr><td>Root</td><td>[u8; 32]</td><td>covers leaves up to end of previous block</td></tr>
+        <tr><td>UnprocessedLeaves</td><td>u64</td><td>this block's pending leaves; drained by on_finalize</td></tr>
+      </tbody>
+    </table>
+    <h3>Events</h3>
+    <table class="spec-table mono">
+      <thead><tr><th>event</th><th>payload</th><th>notes</th></tr></thead>
+      <tbody>
+        <tr><td>LeafInserted</td><td>{ index: u64 }</td><td>leaf hash deliberately omitted — derivable from Leaves</td></tr>
+        <tr><td>TreeGrew</td><td>{ new_depth: u8 }</td><td>fired when capacity is exceeded</td></tr>
+      </tbody>
+    </table>
+    <h3>Runtime API (<code>ZkTreeApi</code> via <code>state_call</code>)</h3>
+    <table class="spec-table mono">
+      <thead><tr><th>method</th><th>params (SCALE)</th><th>returns</th></tr></thead>
+      <tbody>
+        <tr><td>ZkTreeApi_get_root</td><td>—</td><td>[u8; 32]</td></tr>
+        <tr><td>ZkTreeApi_get_leaf_count</td><td>—</td><td>u64 LE</td></tr>
+        <tr><td>ZkTreeApi_get_depth</td><td>—</td><td>u8</td></tr>
+        <tr><td>ZkTreeApi_get_merkle_proof</td><td>u64 LE leaf_index</td><td>Option&lt;ZkMerkleProofRpc&gt;</td></tr>
+      </tbody>
+    </table>
+    <h3>Honest limits</h3>
+    <ul class="facts">
+      <li>This desk recomputes hashes and verifies proofs — it does <strong>not</strong> generate ZK proofs or perform wormhole exits; proving needs the off-chain circuit crates.</li>
+      <li>Leaf <em>contents</em> (recipient, amount) are public on-chain data — the tree commits to transfers, it does not hide them. Privacy comes from the ZK proof layer on top.</li>
+      <li>Amounts in leaves have only 2 decimals of precision; dust below 10<sup>10</sup> plancks quantizes to zero in the commitment.</li>
+      <li>The "live" views need a reachable node; this page never fabricates chain state when the node is down.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> ·
+    <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    Donations (QTC): <code class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code>
+  </footer>
+</main>
+
+<script src="js/vendor/twox.js?v=1.48.0"></script>
+<script type="module" src="js/app.js?v=1.48.0"></script>
+</body>
+</html>
