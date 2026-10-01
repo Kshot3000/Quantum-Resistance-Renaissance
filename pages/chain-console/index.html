@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Chain Console — the JSON-RPC developer workbench</title>
+<meta name="description" content="QTC Chain Console: a live JSON-RPC workbench for the Quantus chain. Connect to any node, run one-click recipes, fire custom methods, watch live subscriptions, and read the full method reference — no mocks, everything live.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.39.0">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">&#9000;</span>
+    <div><strong>QTC Chain Console</strong><span>The JSON-RPC developer workbench</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill down" id="conn-pill"><span class="dot"></span>disconnected</span>
+  </div>
+</header>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/" class="current"><span class="ico">&#9000;</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Talk to the chain <span class="accent">directly.</span></h1>
+    <p class="lede">The Chain Console is a live JSON-RPC workbench for Quantus: connect to any node's WebSocket RPC, run one-click recipes against real chain state, fire custom methods, and watch live subscriptions. No mocks, no snapshots — if the endpoint is unreachable, it says so.</p>
+    <div class="hero-badges">
+      <span class="hb">16 one-click recipes</span>
+      <span class="hb">40+ method reference</span>
+      <span class="hb">live subscriptions</span>
+      <span class="hb">read-first, broadcast gated</span>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Console sections">
+    <button class="tab on" data-tab="console" role="tab">Console</button>
+    <button class="tab" data-tab="custom" role="tab">Custom method</button>
+    <button class="tab" data-tab="subs" role="tab">Subscriptions</button>
+    <button class="tab" data-tab="reference" role="tab">Method reference</button>
+    <button class="tab" data-tab="learn" role="tab">Learn</button>
+  </nav>
+
+  <div id="banner"></div>
+
+  <!-- ============ CONSOLE ============ -->
+  <section class="tabpane on" id="pane-console" role="tabpanel">
+    <div class="grid2">
+      <div class="card">
+        <h2>Connection</h2>
+        <label class="field"><span>Endpoint (WebSocket JSON-RPC)</span>
+          <input id="endpoint" class="mono" placeholder="wss://…" spellcheck="false">
+        </label>
+        <div class="presets" id="endpoint-presets"></div>
+        <div class="row">
+          <button class="btn primary" id="btn-connect">connect</button>
+          <button class="btn ghost" id="btn-disconnect">disconnect</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="sv" id="stat-calls">0</span><span class="sl">calls</span></div>
+          <div class="stat"><span class="sv" id="stat-err">0</span><span class="sl">errors</span></div>
+          <div class="stat"><span class="sv" id="stat-avg">—</span><span class="sl">avg time</span></div>
+          <div class="stat"><span class="sv" id="stat-subs">0</span><span class="sl">live subs</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Node identity</h2>
+        <div id="handshake"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recipes</h2>
+      <p class="dim">One click, one method, a human-readable summary plus the raw JSON. Every value comes from the node you connected to.</p>
+      <div class="chips" id="recipe-cats"></div>
+      <div class="recipe-grid" id="recipe-grid"></div>
+      <div id="recipe-form"></div>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <p class="dim">Every call this browser made, newest first. Re-run any of them.</p>
+      <div class="row">
+        <button class="btn small ghost" id="btn-export-hist">export JSON</button>
+        <button class="btn small ghost" id="btn-clear-hist">clear</button>
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ CUSTOM ============ -->
+  <section class="tabpane" id="pane-custom" role="tabpanel">
+    <div class="card">
+      <h2>Custom method</h2>
+      <p class="dim">Any method the node exposes — including ones with no recipe. Params are a JSON array. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> sends.</p>
+      <label class="field"><span>Method</span>
+        <input id="custom-method" class="mono" list="method-list" placeholder="system_chain" spellcheck="false" autocomplete="off">
+        <datalist id="method-list"></datalist>
+      </label>
+      <label class="field"><span>Params (JSON array)</span>
+        <textarea id="custom-params" class="mono" rows="4" placeholder='[]' spellcheck="false"></textarea>
+      </label>
+      <div id="custom-err" class="note warn" hidden></div>
+      <div class="row"><button class="btn primary" id="btn-custom">send</button></div>
+    </div>
+  </section>
+
+  <!-- ============ SUBSCRIPTIONS ============ -->
+  <section class="tabpane" id="pane-subs" role="tabpanel">
+    <div class="card">
+      <h2>Live subscriptions</h2>
+      <p class="dim">Open a subscription and the node pushes updates over the same socket. Start one, watch the feed, stop it when done — subscriptions die with disconnect.</p>
+      <div class="sub-grid" id="subs"></div>
+    </div>
+    <div class="card">
+      <h2>Feed</h2>
+      <div id="feed"><div class="feed-empty">No events yet. Start a subscription above.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCE ============ -->
+  <section class="tabpane" id="pane-reference" role="tabpanel">
+    <div class="card">
+      <h2>Method reference</h2>
+      <p class="dim">The methods a Substrate node exposes, with Quantus notes where this builder has learned something the hard way. Public RPCs commonly disable <span class="mono">author_*</span> and <span class="mono">txWatch_*</span> — a "method not found" there is node policy.</p>
+      <label class="field"><span>Search</span>
+        <input id="ref-search" placeholder="e.g. subscribe, fee, storage…" autocomplete="off">
+      </label>
+      <div id="ref-groups"></div>
+    </div>
+  </section>
+
+  <!-- ============ LEARN ============ -->
+  <section class="tabpane" id="pane-learn" role="tabpanel">
+    <div class="card">
+      <h2>How this console works</h2>
+      <div class="learn">
+        <h3>The wire protocol</h3>
+        <p>Quantus nodes speak <b>JSON-RPC 2.0 over WebSocket</b> — the same protocol every Substrate/Polkadot-SDK chain uses. Each request is <span class="mono">{"jsonrpc":"2.0","id":1,"method":"system_chain","params":[]}</span>; the node answers with <span class="mono">{"jsonrpc":"2.0","id":1,"result":"Quantus"}</span>. The <span class="mono">id</span> lets many calls share one socket — this console fires the node-identity recipe's five calls in parallel.</p>
+        <h3>Subscriptions</h3>
+        <p>A <span class="mono">*_subscribe*</span> call returns a subscription id, then the node <i>pushes</i> notifications on the same socket. That is how the live head feed works — no polling. Unsubscribe (or disconnect) when you are done; a forgotten subscription is a leak on the node.</p>
+        <h3>Read first, write carefully</h3>
+        <p>Everything here is read-only except <span class="mono">author_submitExtrinsic</span>, which is gated behind a review screen and an explicit checkbox. The console never asks for keys — it only moves bytes you already signed elsewhere (the <a href="../airgap-desk/">Airgap Desk</a> produces them).</p>
+        <h3>Etiquette</h3>
+        <p><span class="mono">wss://rpc.quantus.network</span> is a shared public endpoint. Do not poll it in a tight loop from scripts — subscribe instead, cache aggressively, and run your own node for heavy work (the <a href="../node-desk/">Node Operator Desk</a> shows how).</p>
+        <h3>Key facts this console relies on</h3>
+        <ul class="facts">
+          <li>SS58 address prefix <b>189</b>, 12 decimals, 1 QTC = 10<sup>12</sup> planck (<span class="mono">chain/node/src/chain_spec.rs</span>, runtime)</li>
+          <li>Account storage: <span class="mono">System.Account</span> map, Blake2_128Concat over the 32-byte account id — the same key derivation your wallet uses</li>
+          <li>Existential deposit <b>0.001 QTC</b> — accounts below it can be reaped</li>
+          <li><span class="mono">txWatch_*</span> methods are Quantus-specific pool-listener additions — the <a href="../mempool-desk/">Mempool Desk</a> is their full desk</li>
+        </ul>
+        <h3>Further reading</h3>
+        <ul class="links">
+          <li><a href="https://docs.quantus.com" target="_blank" rel="noopener">docs.quantus.com</a> — official docs</li>
+          <li><a href="https://github.com/Quantus-Network/quantus-api-client" target="_blank" rel="noopener">quantus-api-client</a> — the official Substrate WS API client</li>
+          <li><a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network org</a> — chain source this console's crypto was verified against</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- result panel (shared) -->
+  <section class="card result-card">
+    <h2>Result</h2>
+    <div id="busy" style="display:none"><span class="spinner"></span><span id="busy-label">working…</span></div>
+    <div id="result"></div>
+  </section>
+</main>
+
+<div id="toasts" aria-live="polite"></div>
+
+<footer class="site">
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="note">Community-built tooling. Methods verified against Substrate RPC + Quantus-Network source 2026-09-30. Independent builder work — not affiliated with the Quantus team.</span>
+</footer>
+<script src="js/app.js?v=1.39.0" type="module"></script>
+</body>
+</html>

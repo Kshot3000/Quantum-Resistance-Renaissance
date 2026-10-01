@@ -65,6 +65,14 @@ test('xxhash128: 16 bytes, deterministic', () => {
   assert.deepEqual(a, b);
 });
 
+test('xxhash128: canonical Substrate vector (chain-verified 2026-09-30)', () => {
+  // twox_128("System") as the Quantus chain computes it: XxHash64 seeds 0 and 1.
+  // Verified against sp-crypto-hashing 0.1.0 (behind the chain's sp-core 39.0.0),
+  // Quantus-Network/chain frame/support/src/hash.rs, and @polkadot/util-crypto.
+  const got = Buffer.from(xxhash128(new TextEncoder().encode('System'))).toString('hex');
+  assert.equal(got, '26aa394eea5630e07c48ae0c9558cef7');
+});
+
 test('storageKey: layout = xxh128(pallet) ++ xxh128(storage) ++ blake2_128(key) ++ key', () => {
   const key = new Uint8Array(32).fill(9);
   const sk = storageKey('System', 'Account', key);

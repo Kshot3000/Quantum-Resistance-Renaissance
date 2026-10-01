@@ -7,7 +7,7 @@
  */
 import { hexEncode, hexDecode } from './quantus-crypto.js';
 import { ss58Decode } from './quantus-crypto.js';
-import { SYSTEM_ACCOUNT_KEY } from './xxhash.js';
+import { SYSTEM_ACCOUNT_KEY } from './xxhash.js?v=1.39.0';
 import { decodeAccountInfo, eraBirth, encodeMortalEra, buildTransferCall, buildSigningPayload, buildExtrinsic, DILITHIUM65_VARIANT, DILITHIUM87_VARIANT } from './scale.js';
 
 export const DEFAULT_RPC = 'wss://rpc.quantus.network';

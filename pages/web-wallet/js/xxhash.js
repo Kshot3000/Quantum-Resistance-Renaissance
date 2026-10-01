@@ -1,9 +1,14 @@
 /* QTC Web Wallet — xxHash64 (for Substrate storage keys).
  *
  * Substrate storage keys: xxhash128(pallet_name) ++ xxhash128(storage_name) ++
- * Blake2_128Concat(key), where xxhash128 = xxh64(seed=0) ++ xxh64(seed=0x9E3779B97F4A7C15)
- * (low 64 bits first). Implemented from the public xxHash specification; verified
- * against the published test vectors in tests/run-tests.mjs.
+ * Blake2_128Concat(key), where xxhash128 = xxh64(seed=0) ++ xxh64(seed=1)
+ * (low 64 bits first). Verified 2026-09-30 against the chain's actual hasher:
+ * Quantus-Network/chain frame/support/src/hash.rs (`Twox128::hash` calls
+ * `sp_io::hashing::twox_128`), whose implementation is sp-crypto-hashing 0.1.0
+ * (the crate behind the chain's sp-core 39.0.0): XxHash64 seeds 0 and 1.
+ * Cross-checked with @polkadot/util-crypto: xxhash128("System") must equal
+ * 26aa394eea5630e07c48ae0c9558cef7 (asserted in tests/run-tests.mjs).
+ * Implemented from the public xxHash specification.
  */
 import { blake2b } from '../vendor/noble/hashes/blake2.js';
 
@@ -73,7 +78,7 @@ function h64le(h) {
 
 export function xxhash128(data) {
   const lo = h64le(xxh64(data, 0n));
-  const hi = h64le(xxh64(data, 0x9E3779B97F4A7C15n));
+  const hi = h64le(xxh64(data, 1n));
   const out = new Uint8Array(16);
   out.set(lo, 0); out.set(hi, 8);
   return out;

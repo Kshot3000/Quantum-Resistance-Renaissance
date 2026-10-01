@@ -18,6 +18,7 @@ import { encodeMortalEra, qtcToPlancks } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
 import { keypairFromSeed } from '../js/lib/mnemonic.js';
 import { ml_dsa65, ml_dsa87 } from '../js/vendor/noble/post-quantum/ml-dsa.js';
+import { xxhash128, SYSTEM_ACCOUNT_KEY } from '../js/lib/xxhash.js';
 
 const te = new TextEncoder();
 const GENESIS = '0x' + 'ab'.repeat(32);
@@ -229,4 +230,15 @@ test('protocol: sender address in extrinsic matches ticket sender', () => {
 
 test('protocol: ss58 prefix constant is 189', () => {
   assert.equal(QUANTUS_SS58_PREFIX, 189);
+});
+
+test('xxhash128: canonical Substrate vector (chain-verified 2026-09-30)', () => {
+  // twox_128("System") as the Quantus chain computes it: XxHash64 seeds 0 and 1.
+  // Verified against sp-crypto-hashing 0.1.0 (behind the chain's sp-core 39.0.0),
+  // Quantus-Network/chain frame/support/src/hash.rs, and @polkadot/util-crypto.
+  const got = Buffer.from(xxhash128(te.encode('System'))).toString('hex');
+  assert.equal(got, '26aa394eea5630e07c48ae0c9558cef7');
+  const key = SYSTEM_ACCOUNT_KEY(new Uint8Array(32).fill(7));
+  assert.equal(Buffer.from(key.slice(0, 32)).toString('hex'),
+    '26aa394eea5630e07c48ae0c9558cef7' + Buffer.from(xxhash128(te.encode('Account'))).toString('hex'));
 });
