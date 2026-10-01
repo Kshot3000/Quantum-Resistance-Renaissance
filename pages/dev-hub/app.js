@@ -56,7 +56,7 @@ var PALLETS = [
   { i: 17, name: "— vacant —", status: "removed", calls: [], note: "Index 17 was pallet_assets (removed)." },
   { i: 18, name: "— vacant —", status: "removed", calls: [], note: "Index 18 was pallet_assets_holder (removed with assets)." },
   { i: 19, name: "Multisig", status: "active", calls: ["as_multi_threshold_1", "as_multi", "approve_as_multi", "cancel_as_multi"], note: "k-of-n multisig. The address-toolkit + SafeSend labs cover account-side flows." },
-  { i: 20, name: "Wormhole", status: "active", calls: ["from_public_batch", "verify_private_batch", "verify_public_batch", "record_transfer"], note: "Bridge-exit verification path — used by the 4 bps wormhole exit flow in the Fee Lab." },
+  { i: 20, name: "Wormhole", status: "active", calls: ["verify_private_batch", "verify_public_batch"], note: "Bridge-exit verification path — used by the 4 bps wormhole exit flow in the Fee Lab. Only these two are dispatchables (from_public_batch is an ExitBundle constructor, record_transfer an internal helper — verified against pallets/wormhole/src/lib.rs)." },
   { i: 21, name: "ZkTree", status: "active", calls: ["(see pallet_zk_tree)"], note: "ZK-tree pallet (zk-friendly state structures)." },
   { i: 22, name: "Vesting", status: "active", calls: ["vested_transfer", "vest", "vest_other"], note: "Token vesting schedules — backs the genesis vesting tranches in the Tokenomics explorer." },
   { i: 23, name: "Origins", status: "active", calls: ["(custom origins only)"], note: "Custom governance origins (pallet_custom_origins) — e.g. FastUpgrade. No calls, no storage; dispatch origins for the tech-referenda tracks." }

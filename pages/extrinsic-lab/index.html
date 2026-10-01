@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Extrinsic Lab — the transaction autopsy desk</title>
+<meta name="description" content="QTC Extrinsic Lab: paste any Quantus extrinsic hex for a full byte-level autopsy — signer, ML-DSA signature, era, nonce, tip, and every call argument decoded from the verified runtime call table. Re-derive the exact signing payload and verify the signature locally. 100% client-side.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.40.0">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">&#128300;</span>
+    <div><strong>QTC Extrinsic Lab</strong><span>The transaction autopsy desk</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill down" id="conn-pill"><span class="dot"></span>node: disconnected</span>
+  </div>
+</header>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/" class="current"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="decode" role="tab">Decode</button>
+  <button class="tab" data-tab="verify" role="tab">Verify signature</button>
+  <button class="tab" data-tab="live" role="tab">Live blocks</button>
+  <button class="tab" data-tab="ref" role="tab">Call reference</button>
+</nav>
+
+<main>
+  <!-- ============ DECODE ============ -->
+  <section class="panel active" id="tab-decode" role="tabpanel">
+    <div class="card">
+      <h2>Paste an extrinsic</h2>
+      <p class="hint">Hex of a full signed (or unsigned) Quantus extrinsic — grab one from the <b>Live blocks</b> tab, the Chain Console, or a block explorer. Everything is decoded locally; nothing leaves your browser.</p>
+      <textarea id="hex-input" class="hexbox" spellcheck="false" placeholder="0x8400…"></textarea>
+      <div class="row">
+        <button class="btn primary" id="decode-btn">Autopsy</button>
+        <button class="btn" id="clear-btn">Clear</button>
+        <span class="sep"></span>
+        <label class="inline">Lab samples:
+          <select id="sample-sel">
+            <option value="">— pick a sample —</option>
+            <option value="transfer">transfer_keep_alive (ML-DSA-65, signed)</option>
+            <option value="batch">Utility.batch_all ×6 (ML-DSA-65, hashed payload)</option>
+            <option value="inherent">Timestamp.set (unsigned inherent)</option>
+          </select>
+        </button>
+      </div>
+      <p class="fineprint">Samples are generated locally in your browser with fresh ML-DSA keypairs and labeled as lab samples — they are never broadcast.</p>
+      <div class="error" id="decode-error" hidden></div>
+    </div>
+    <div id="decode-result" hidden>
+      <div class="card">
+        <h2>Summary</h2>
+        <div class="stat-grid" id="summary-grid"></div>
+      </div>
+      <div class="card">
+        <h2>Byte map <span class="h-sub" id="bytemap-total"></span></h2>
+        <div class="byte-map" id="byte-map"></div>
+        <div class="legend" id="byte-legend"></div>
+      </div>
+      <div class="card">
+        <h2>Anatomy</h2>
+        <div id="anatomy"></div>
+      </div>
+      <div class="card">
+        <h2>Call arguments</h2>
+        <div id="call-args"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VERIFY ============ -->
+  <section class="panel" id="tab-verify" role="tabpanel">
+    <div class="card">
+      <h2>Signature verification</h2>
+      <p class="hint">Re-derives the exact <span class="mono">SignedPayload</span> the runtime checks — <span class="mono">call ‖ era ‖ nonce ‖ tip ‖ metadataHashMode ‖ specVersion ‖ txVersion ‖ genesisHash ‖ eraBirthHash</span>, blake2-256 hashed when over 256 bytes — and verifies the ML-DSA signature under the chain's <span class="mono">QUANTUS_EXTRINSIC</span> context. Uses the extrinsic currently loaded in the <b>Decode</b> tab.</p>
+      <div class="error" id="verify-error" hidden></div>
+      <div class="form-grid">
+        <label>Spec version <input id="v-spec" class="mono" value="153" inputmode="numeric"></label>
+        <label>Transaction version <input id="v-tx" class="mono" value="6" inputmode="numeric"></label>
+        <label>Genesis hash <input id="v-genesis" class="mono" placeholder="0x… (32 bytes)"></label>
+        <label>Target block number <input id="v-block" class="mono" placeholder="for mortal-era birth (default: latest finalized)"></label>
+        <label>Era-birth block hash <input id="v-birth" class="mono" placeholder="0x… (auto-fetched when block is set)"></label>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="verify-btn">Verify signature</button>
+        <button class="btn" id="ctx-btn">Fetch context from node</button>
+        <span class="crypto-note" id="crypto-note">loading ML-DSA engine…</span>
+      </div>
+      <div id="verify-result" hidden></div>
+    </div>
+    <div class="card">
+      <h2>How verification works</h2>
+      <ol class="how">
+        <li>The decoder re-slices the exact <b>call</b> and <b>era</b> bytes from your pasted hex — no re-encoding, so the payload is byte-identical to what the signer signed.</li>
+        <li>It rebuilds <span class="mono">SignedPayload</span> with the runtime's extension order (verified against <span class="mono">runtime/src/lib.rs</span> and <span class="mono">sp-runtime</span>).</li>
+        <li>The payload is blake2-256 hashed iff it exceeds 256 bytes — the same rule the runtime applies.</li>
+        <li>The ML-DSA signature is checked against the embedded public key with FIPS-204 context <span class="mono">QUANTUS_EXTRINSIC</span>. A forged or tampered extrinsic fails here.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ LIVE ============ -->
+  <section class="panel" id="tab-live" role="tabpanel">
+    <div class="card">
+      <h2>Live block scanner</h2>
+      <p class="hint">Connects to a Quantus node over WebSocket, pulls the latest finalized block, and runs every extrinsic through the local decoder. Default endpoint is the public RPC documented for the Mempool Desk.</p>
+      <div class="row">
+        <input id="rpc-url" class="mono grow" value="wss://rpc.quantus.network" spellcheck="false">
+        <button class="btn primary" id="live-connect">Connect &amp; scan</button>
+        <button class="btn" id="live-refresh" disabled>Refresh head</button>
+      </div>
+      <div class="error" id="live-error" hidden></div>
+      <div id="live-meta" class="fineprint"></div>
+      <div id="live-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCE ============ -->
+  <section class="panel" id="tab-ref" role="tabpanel">
+    <div class="card">
+      <h2>Verified call reference</h2>
+      <p class="hint">Every pallet index, call index, and argument layout the decoder understands — read from <span class="mono">Quantus-Network/chain</span> source (rev <span class="mono">482c5b9</span>, 2026-09-30). Quantus ships custom pallet forks, so upstream Substrate defaults were <b>not</b> assumed.</p>
+      <input id="ref-search" class="grow mono" placeholder="filter: e.g. transfer, multisig, 19…" spellcheck="false">
+      <div id="ref-table"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="note">Community-built tooling. Call table verified against Quantus-Network/chain source 2026-09-30. Independent builder work — not affiliated with the Quantus team.</span>
+</footer>
+
+<script src="js/vendor/wordlist.js?v=1.40.0"></script>
+<script src="js/vendor/checkphrase-core.js?v=1.40.0"></script>
+<script src="js/vendor/ss58.js?v=1.40.0"></script>
+<script src="js/call-table.js?v=1.40.0"></script>
+<script src="js/decode.js?v=1.40.0"></script>
+<script src="js/encode.js?v=1.40.0"></script>
+<script src="js/verify.js?v=1.40.0"></script>
+<script type="module">
+  import { ml_dsa65, ml_dsa87 } from './js/vendor/noble/post-quantum/ml-dsa.js';
+  import { blake2b } from './js/vendor/noble/hashes/blake2.js';
+  window.QEL_NOBLE = { ml_dsa65, ml_dsa87, blake2b };
+  window.dispatchEvent(new Event('qel:crypto-ready'));
+</script>
+<script src="js/app.js?v=1.40.0"></script>
+</body>
+</html>

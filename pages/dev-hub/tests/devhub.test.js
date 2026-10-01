@@ -99,7 +99,9 @@ t("pallet call references include verified extrinsics", function(){
   assert.ok(rt.calls.indexOf("recover_funds") >= 0);
   assert.ok(rt.calls.indexOf("cancel") >= 0);
   var wh = m.lookupPallet(20);
-  assert.ok(wh.calls.indexOf("record_transfer") >= 0);
+  assert.ok(wh.calls.indexOf("verify_private_batch") >= 0);
+  assert.ok(wh.calls.indexOf("verify_public_batch") >= 0);
+  assert.ok(wh.calls.indexOf("record_transfer") < 0, "record_transfer is an internal helper, not a dispatchable");
   var ms = m.lookupPallet(19);
   assert.ok(ms.calls.indexOf("as_multi") >= 0);
 });
