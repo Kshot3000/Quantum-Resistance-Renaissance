@@ -156,6 +156,7 @@ section{padding:48px 0}
 .app-card.ledger{--accent:#4ade80}.app-card.ledger .app-ico{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.4)}
 .app-card.consensus{--accent:#6df2b8}.app-card.consensus .app-ico{background:rgba(109,242,184,.12);border-color:rgba(109,242,184,.4)}
 .app-card.pool{--accent:#38e1ff}.app-card.pool .app-ico{background:rgba(56,225,255,.12);border-color:rgba(56,225,255,.4)}
+.app-card.pay{--accent:#e8b04b}.app-card.pay .app-ico{background:rgba(232,176,75,.12);border-color:rgba(232,176,75,.4)}
 .app-card .tag{
   font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--accent,var(--amber));opacity:.9
@@ -617,6 +618,15 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <h3>QTC Pool Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The mining-pool directory &amp; comparator: every known QTC pool with verified fees, payout terms, and PPLNS windows — an effective-fee comparator that stacks pool + miner dev fees honestly, a connection command builder that never invents endpoints, and the pool-vs-solo-vs-node tradeoff matrix. Every fact stamped with its source.</p>
         <div class="meta">84/84 logic tests green · full browser QA green · zero console errors</div>
+      </a>
+      <a class="app-card pay" href="pages/pay-desk/">
+        <div class="icon-row">
+          <div class="app-ico" aria-hidden="true">🧾</div>
+          <span class="tag">Merchants</span>
+        </div>
+        <h3>QTC Pay Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
+        <p>The merchant acceptance toolkit: invoice builder with exact planck amounts and checksum-verified addresses, QR payment requests, a point-of-sale screen, an invoice register with CSV export, confirmation guidance, and an embeddable tip-button generator. No custody, no price oracle — honest limits throughout.</p>
+        <div class="meta">54/54 logic tests green · full browser QA green · zero console errors</div>
       </a>
     </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>

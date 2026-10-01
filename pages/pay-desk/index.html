@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Pay Desk — the merchant acceptance toolkit</title>
+<meta name="description" content="QTC Pay Desk: accept Quantus (QTC) like a merchant — invoice builder with exact planck amounts, QR payment requests, point-of-sale mode, an invoice register, confirmation guidance, and an embeddable tip-button generator. Honest limits, no custody, no price oracle.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.44.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.44.0" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">🧾</span>
+    <div><strong>QTC Pay Desk</strong><span>The merchant acceptance toolkit</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">Verified 2026-10-01</span>
+    <span class="pill ghost">No custody · no oracle</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a href="../pool-desk/"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
+    <a href="../pay-desk/" class="current"><span class="ico">🧾</span><span>Pay Desk<span class="meta">Merchant acceptance toolkit</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="pill-row"><span class="pill">Merchant tooling</span><span class="pill ghost">Invoices · QR · POS</span></div>
+    <h1>QTC <span class="grad">Pay Desk</span></h1>
+    <p class="sub">Accept Quantus like a merchant: build invoices with exact planck amounts, hand the customer a QR payment request, run a point-of-sale screen, keep a register, and embed a tip button on your site. <strong>This desk never holds keys or funds</strong> — it only prepares and records payment requests. You confirm payment in your own wallet or an explorer, then mark it paid here.</p>
+  </section>
+
+  <section class="trust card">
+    <h2>Read this before you take anyone's QTC</h2>
+    <ul>
+      <li><strong>No custody, no settlement guarantee.</strong> Pay Desk creates payment <em>requests</em> and records what you report. A transaction only exists when you see it in your wallet or the chain explorer.</li>
+      <li><strong>Marking "paid" is your attestation, not chain truth.</strong> Always verify the tx yourself — search the amount and address in the <a href="../block-explorer/">Block Explorer</a> — before you release goods or mark an invoice paid.</li>
+      <li><strong>There is no listed spot price yet.</strong> QTC's first announced venue is NEAR Intents; no listing date was confirmed as of 2026-10-01. The rate card below is a manual entry — set it from whatever price you and the customer agree on, and stamp the timestamp.</li>
+      <li><strong>Amounts are exact to the planck.</strong> QTC has 12 decimals (1 QTC = 10<sup>12</sup> plancks, verified from on-chain block rewards). QR codes encode your address; the amount travels alongside as copyable text — there is no QTC payment-URI standard yet, so the QR never invents one.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="rate-sec">
+    <div class="sec-head"><h2>Rate card</h2><p>Set the QTC/USD rate you are quoting. It applies to every invoice until you change it — each invoice records the rate it was quoted at, so old invoices never silently re-price.</p></div>
+    <div class="rate-grid">
+      <div class="rate-input">
+        <label for="rate-usd">QTC price (USD)</label>
+        <div class="rate-row">
+          <input id="rate-usd" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="e.g. 12.50">
+          <button id="rate-save" class="btn primary">Set rate</button>
+          <button id="rate-clear" class="btn ghost">Clear</button>
+        </div>
+        <p class="hint">Manual entry only — no exchange, no oracle, no API. QTC has no listed spot market yet.</p>
+      </div>
+      <div class="rate-status" id="rate-status" aria-live="polite">
+        <div class="rs-row"><span>Current rate</span><strong id="rs-rate">not set</strong></div>
+        <div class="rs-row"><span>Quoted at</span><strong id="rs-time">—</strong></div>
+        <div class="rs-row"><span>Invoices may price at</span><strong id="rs-qtc1">—</strong></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="builder-sec">
+    <div class="sec-head"><h2>Invoice builder</h2><p>Itemize the sale, pick your receiving address, and generate a payment request. Addresses are checksum-verified (SS58, prefix 189) before an invoice can be created.</p></div>
+    <div class="builder-grid">
+      <div class="b-field">
+        <label for="inv-addr">Receiving QTC address</label>
+        <input id="inv-addr" type="text" spellcheck="false" autocomplete="off" placeholder="qz…">
+        <p class="hint" id="addr-verdict">Enter your wallet address — it is validated locally, never sent anywhere.</p>
+      </div>
+      <div class="b-field">
+        <label for="inv-ref">Customer / order reference</label>
+        <input id="inv-ref" type="text" placeholder="e.g. Order #1042, table 7, @buyer">
+      </div>
+      <div class="b-field">
+        <label for="inv-expiry">Request expires in</label>
+        <select id="inv-expiry">
+          <option value="15">15 minutes</option>
+          <option value="30" selected>30 minutes</option>
+          <option value="60">1 hour</option>
+          <option value="1440">24 hours</option>
+        </select>
+      </div>
+    </div>
+
+    <h3 class="items-title">Line items <span class="muted">(priced in USD)</span></h3>
+    <table class="items" id="items-table">
+      <thead><tr><th>Description</th><th>Qty</th><th>Unit price (USD)</th><th>Line total</th><th></th></tr></thead>
+      <tbody id="items-body"></tbody>
+    </table>
+    <div class="items-actions">
+      <button id="item-add" class="btn ghost">+ Add line</button>
+    </div>
+
+    <div class="totals-grid">
+      <div class="b-field"><label for="inv-discount">Discount (USD)</label><input id="inv-discount" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
+      <div class="b-field"><label for="inv-tax">Tax (%)</label><input id="inv-tax" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
+      <div class="total-out" aria-live="polite">
+        <div><span>Subtotal</span><strong id="t-sub">$0.00</strong></div>
+        <div><span>Tax</span><strong id="t-tax">$0.00</strong></div>
+        <div><span>Discount</span><strong id="t-disc">−$0.00</strong></div>
+        <div class="grand"><span>Total due</span><strong id="t-total">$0.00</strong></div>
+        <div class="qtc"><span>≈ QTC at current rate</span><strong id="t-qtc">—</strong></div>
+        <div class="plancks"><span>Exact plancks</span><strong id="t-plancks">—</strong></div>
+      </div>
+    </div>
+
+    <div class="builder-actions">
+      <button id="inv-create" class="btn primary big">Create payment request</button>
+      <p class="hint" id="inv-error" role="alert"></p>
+    </div>
+  </section>
+
+  <section class="card receipt" id="request-sec" hidden>
+    <div class="sec-head"><h2>Payment request</h2><p id="req-meta">—</p></div>
+    <div class="request-grid">
+      <div class="qr-wrap">
+        <div id="qr-box" aria-label="Payment QR code"></div>
+        <p class="hint center">QR encodes the receiving address only. The amount below is copyable text — verify both with the customer.</p>
+      </div>
+      <div class="req-detail">
+        <div class="req-amount"><span>Amount due</span><strong id="req-qtc">—</strong><span class="fiat" id="req-fiat">—</span></div>
+        <div class="req-field"><span>Plancks (exact)</span><code id="req-plancks">—</code><button class="copybtn" data-copy-target="req-plancks">Copy</button></div>
+        <div class="req-field"><span>Address</span><code id="req-addr" class="addrline">—</code><button class="copybtn" data-copy-target="req-addr">Copy</button></div>
+        <div class="req-field"><span>Invoice ID</span><code id="req-id">—</code></div>
+        <div class="req-field"><span>Expires in</span><strong id="req-countdown" class="countdown">—</strong></div>
+        <div class="req-actions">
+          <button id="req-pos" class="btn primary">Open POS screen</button>
+          <button id="req-new" class="btn ghost">New invoice</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="register-sec">
+    <div class="sec-head"><h2>Invoice register</h2><p>Your local record of every request. Statuses are yours to maintain — Pay Desk cannot see the chain, so <strong>mark paid only after you verify the payment in your wallet or the explorer</strong>.</p></div>
+    <div class="table-wrap">
+      <table class="register" id="register-table">
+        <thead><tr><th>ID</th><th>Reference</th><th>QTC</th><th>USD</th><th>Rate</th><th>Created</th><th>Status</th><th></th></tr></thead>
+        <tbody id="register-body"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="register-empty">No invoices yet — build one above.</p>
+    <div class="register-actions">
+      <button id="reg-export" class="btn ghost">Export CSV</button>
+      <button id="reg-clear" class="btn danger">Clear register</button>
+    </div>
+  </section>
+
+  <section class="card" id="conf-sec">
+    <div class="sec-head"><h2>Confirmation guidance</h2><p>Quantus is proof-of-work: finality is probabilistic, not instant. Blocks land when they land (the Sept 30 chain snapshot averaged ~14 s between blocks; week-one mainnet was faster — times move with difficulty). Suggested confirmation counts by invoice value are <strong>merchant heuristics</strong>, not protocol guarantees.</p></div>
+    <div class="conf-grid">
+      <div class="conf-card"><strong>&lt; 1 QTC</strong><span class="conf-n">2 confirmations</span><p>Coffee-money. Fine for walk-up counter sales.</p></div>
+      <div class="conf-card"><strong>1 – 50 QTC</strong><span class="conf-n">6 confirmations</span><p>Typical retail. ~1–2 minutes at current pace.</p></div>
+      <div class="conf-card"><strong>50 – 500 QTC</strong><span class="conf-n">12 confirmations</span><p>High-ticket. Wait a few minutes before releasing goods.</p></div>
+      <div class="conf-card"><strong>500+ QTC</strong><span class="conf-n">24+ confirmations</span><p>Treasury-scale. Consider escrow or staged delivery.</p></div>
+    </div>
+    <ul class="playbook">
+      <li><strong>Watch the address, not just the amount.</strong> Confirm the receiving address in the explorer/wallet matches your invoice's address exactly — address poisoning is cheap and quiet. The <a href="../contact-vault/">Contact Vault</a> desk explains the attack.</li>
+      <li><strong>Small amounts stay practical.</strong> On-chain fees on Quantus are low by design; still, don't accept dust below the 0.001 QTC existential deposit — an invoice total that can't keep an account alive is an accounting headache.</li>
+      <li><strong>Expiry is yours to enforce.</strong> If the rate moves before payment arrives, the expired request is void — generate a fresh invoice at the fresh rate.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="tipgen-sec">
+    <div class="sec-head"><h2>Tip-button generator</h2><p>An embeddable donate/tip button for your site — the same pattern this builder's own footers use. Fill your address, pick a style, copy the snippet. Everything runs client-side; no tracking, no scripts from us.</p></div>
+    <div class="tip-grid">
+      <div class="b-field">
+        <label for="tip-addr">Receiving QTC address</label>
+        <input id="tip-addr" type="text" spellcheck="false" autocomplete="off" placeholder="qz…">
+        <p class="hint" id="tip-verdict">Validated locally with the same SS58 check as invoices.</p>
+      </div>
+      <div class="b-field">
+        <label for="tip-label">Button label</label>
+        <input id="tip-label" type="text" value="Tip QTC" maxlength="40">
+      </div>
+      <div class="b-field">
+        <label for="tip-style">Style</label>
+        <select id="tip-style">
+          <option value="dark">Dark glow (quantum)</option>
+          <option value="light">Light paper</option>
+          <option value="minimal">Minimal text link</option>
+        </select>
+      </div>
+    </div>
+    <div class="tip-preview-row">
+      <div>
+        <h3>Preview</h3>
+        <div class="tip-preview" id="tip-preview"><span class="muted">Enter an address to preview.</span></div>
+      </div>
+      <div>
+        <h3>Embed snippet</h3>
+        <pre class="snippet" id="tip-snippet"><code>Enter a valid address — the snippet appears here.</code></pre>
+        <button id="tip-copy" class="btn ghost" disabled>Copy snippet</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="playbook-sec">
+    <div class="sec-head"><h2>Merchant playbook</h2><p>The operational habits that separate a smooth QTC checkout from a support ticket.</p></div>
+    <ul class="playbook">
+      <li><strong>One invoice, one receiving address.</strong> Reusing a single address across customers leaks your whole revenue history and invites poisoning. Generate a fresh address per invoice in your wallet (the <a href="../web-wallet/">Web Wallet</a> derives addresses from your seed; <a href="../address-toolkit/">Address Toolkit</a> inspects them).</li>
+      <li><strong>Price in fiat, settle in QTC.</strong> Quote USD, convert at your stamped rate, lock the QTC amount on the invoice. Crypto-denominated pricing transfers volatility to the customer.</li>
+      <li><strong>Decide refunds before you need them.</strong> Publish your policy: refunds in QTC at the <em>original invoice rate</em> (not current) is the standard honest answer. Get a return address up front for large orders.</li>
+      <li><strong>Keep your keys off the counter.</strong> The device that builds invoices should be view-capable only. Signing keys live in the Web Wallet or <a href="../airgap-desk/">Airgap Desk</a> — never in the register, never in the browser tab the customer sees.</li>
+      <li><strong>Taxes are your accountant's job, not this page's.</strong> The <a href="../ledger-desk/">Ledger Desk</a> keeps a miner/holder tax ledger; export this register's CSV into it for your books. Nothing here is tax advice.</li>
+      <li><strong>Have an outage story.</strong> If your wallet or the explorer is unreachable, fall back to: invoice paid → customer shows you the tx in their wallet → you confirm the sending address and amount → goods on trust, settled later. Write it down before Friday night.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="sources-sec">
+    <div class="sec-head"><h2>Sources &amp; honest limits</h2></div>
+    <ul class="sources">
+      <li><a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network</a> <span class="sdate">read 2026-09-29</span><br><span class="snote">Upstream org. Chain is Substrate/Polkadot-SDK-based; SS58 prefix 189 (<code>node/src/chain_spec.rs</code>); account crypto Poseidon2 over Goldilocks, verified byte-for-byte in the Web Wallet.</span></li>
+      <li><span class="snote">Chain snapshot <code>data/live.json</code> (repo, fetched 2026-09-30 from sqm.quantus.com/v1/graphql)</span><br><span class="snote">Block rewards 0.30–0.32 QTC → 12 decimals confirmed (1 QTC = 10<sup>12</sup> plancks); ~14 s average block gap in the snapshot window. Snapshot data decays — re-check the Network Dashboard before quoting block times to customers.</span></li>
+      <li><a href="https://www.quantus.com/blog/weekly-update-09-16-2026/" target="_blank" rel="noopener">Quantus weekly update — mainnet week 1</a> <span class="sdate">2026-09-16</span><br><span class="snote">NEAR Intents named as first announced exchange venue; no listing date confirmed as of 2026-10-01. Hence: no price feed, manual rate card.</span></li>
+    </ul>
+    <p class="limits">Limits: Pay Desk cannot watch the chain, cannot convert to fiat, cannot hold funds, carries no price oracle, and cannot guarantee a payment. QR codes encode addresses only — there is no QTC payment-URI standard yet. Everything persists in your browser's localStorage; clearing site data wipes the register (export CSV first).</p>
+  </section>
+
+  <footer class="site">
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="note">Merchant tooling notes read 2026-10-01 (see Sources). Rates are manual; confirmations are heuristics. Independent builder work — not affiliated with the Quantus team.</span>
+  </footer>
+</main>
+
+<div class="pos-overlay" id="pos-overlay" hidden>
+  <div class="pos-screen">
+    <button class="pos-close" id="pos-close" aria-label="Close POS screen">&times;</button>
+    <div class="pos-id" id="pos-id">—</div>
+    <div class="pos-amount" id="pos-amount">—</div>
+    <div class="pos-fiat" id="pos-fiat">—</div>
+    <div class="pos-qr" id="pos-qr"></div>
+    <div class="pos-addr" id="pos-addr">—</div>
+    <div class="pos-countdown" id="pos-countdown">—</div>
+    <div class="pos-actions">
+      <button class="btn primary big" id="pos-paid">Mark paid</button>
+      <button class="btn ghost" id="pos-expire">Expire</button>
+    </div>
+    <p class="pos-note">Only mark paid after you verify the payment in your wallet or the explorer.</p>
+  </div>
+</div>
+
+<script src="../../assets/app-nav.js?v=1.12.0"></script>
+<script src="js/ss58.js?v=1.44.0"></script>
+<script src="js/qrcode.js?v=1.44.0"></script>
+<script src="js/app.js?v=1.44.0"></script>
+</body>
+</html>
