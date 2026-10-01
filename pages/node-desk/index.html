@@ -135,23 +135,23 @@
     <div class="lab">
       <div>
         <div class="field" id="f-name">
-          <label>Node name <span class="hint">Shown on telemetry. Letters, digits, dots, dashes, underscores; ≤ 40 chars.</span></label>
+          <label for="inName">Node name <span class="hint">Shown on telemetry. Letters, digits, dots, dashes, underscores; ≤ 40 chars.</span></label>
           <input type="text" id="inName" value="my-quantus-node" maxlength="40" spellcheck="false" autocomplete="off">
           <div class="err"></div>
         </div>
         <div class="field" id="f-hash">
-          <label>Rewards inner hash <span class="hint">Your 32-byte wormhole preimage (0x + 64 hex). Generate: <code>quantus-node key quantus --scheme wormhole</code>. Never shared — it stays in this page.</span></label>
+          <label for="inHash">Rewards inner hash <span class="hint">Your 32-byte wormhole preimage (0x + 64 hex). Generate: <code>quantus-node key quantus --scheme wormhole</code>. Never shared — it stays in this page.</span></label>
           <input type="text" id="inHash" placeholder="0x…" spellcheck="false" autocomplete="off" autocapitalize="off">
           <div class="err"></div>
         </div>
         <div class="grid2">
           <div class="field" id="f-mport">
-            <label>Miner listen port <span class="hint">QUIC job server for quantus-miner. Binds 0.0.0.0.</span></label>
+            <label for="inMPort">Miner listen port <span class="hint">QUIC job server for quantus-miner. Binds 0.0.0.0.</span></label>
             <input type="number" id="inMPort" value="9833" min="1024" max="65535">
             <div class="err"></div>
           </div>
           <div class="field">
-            <label>Chain spec</label>
+            <label for="inChain">Chain spec</label>
             <select id="inChain">
               <option value="mainnet" selected>mainnet (QTC, live)</option>
               <option value="planck">planck (retired testnet)</option>
@@ -161,11 +161,11 @@
         </div>
         <div class="grid2">
           <div class="field">
-            <label>Node key file <span class="hint">Stable P2P identity. Generate: <code>quantus-node key generate-node-key --file node_key.p2p</code></span></label>
+            <label for="inKeyFile">Node key file <span class="hint">Stable P2P identity. Generate: <code>quantus-node key generate-node-key --file node_key.p2p</code></span></label>
             <input type="text" id="inKeyFile" value="node_key.p2p" spellcheck="false" autocomplete="off">
           </div>
           <div class="field">
-            <label>Base path <span class="hint">Chain database lives here.</span></label>
+            <label for="inBase">Base path <span class="hint">Chain database lives here.</span></label>
             <input type="text" id="inBase" value="~/.local/share/quantus-node" spellcheck="false" autocomplete="off">
           </div>
         </div>
@@ -173,23 +173,23 @@
         <label class="check"><input type="checkbox" id="inForce"> <span><code>--force-authoring</code> — bypass the 24 h freshness gate. Bootstrap only; remove once synced.</span></label>
         <label class="check"><input type="checkbox" id="inExpRpc"> <span>Experimental RPC endpoint <code>listen-addr=127.0.0.1:9944,methods=unsafe,cors=all</code> (from <code>scripts/run_local_nodes.sh</code>). Localhost only.</span></label>
         <div class="field" style="max-width:220px">
-          <label>Prometheus port <span class="hint">Blank = default. Verify yours with <code>quantus-node --help</code> — upstream docs list 9615 and 9616.</span></label>
+          <label for="inProm">Prometheus port <span class="hint">Blank = default. Verify yours with <code>quantus-node --help</code> — upstream docs list 9615 and 9616.</span></label>
           <input type="number" id="inProm" placeholder="default" min="1024" max="65535">
           <div class="err"></div>
         </div>
       </div>
       <div>
         <div class="field">
-          <label>Miner auth token file <span class="hint">Defaults to <code>&lt;base-path&gt;/chains/&lt;chain&gt;/miner-auth-token</code> (generated 0600 on first run).</span></label>
+          <label for="inAuthFile">Miner auth token file <span class="hint">Defaults to <code>&lt;base-path&gt;/chains/&lt;chain&gt;/miner-auth-token</code> (generated 0600 on first run).</span></label>
           <input type="text" id="inAuthFile" placeholder="default" spellcheck="false" autocomplete="off">
         </div>
         <div class="field">
-          <label>Miner TLS cert SHA-256 file <span class="hint">The node writes this next to the token; the miner pins it (TLS 1.3, ALPN <code>quantus-miner/2</code>).</span></label>
+          <label for="inTlsFile">Miner TLS cert SHA-256 file <span class="hint">The node writes this next to the token; the miner pins it (TLS 1.3, ALPN <code>quantus-miner/2</code>).</span></label>
           <input type="text" id="inTlsFile" placeholder="default" spellcheck="false" autocomplete="off">
         </div>
         <div class="grid2">
-          <div class="field"><label>CPU workers</label><input type="number" id="inCpu" placeholder="auto" min="1" max="256"></div>
-          <div class="field"><label>GPU devices</label><input type="number" id="inGpu" placeholder="auto" min="1" max="16"></div>
+          <div class="field"><label for="inCpu">CPU workers</label><input type="number" id="inCpu" placeholder="auto" min="1" max="256"></div>
+          <div class="field"><label for="inGpu">GPU devices</label><input type="number" id="inGpu" placeholder="auto" min="1" max="16"></div>
         </div>
         <label class="check"><input type="checkbox" id="inCuda"> <span><code>--cuda-gpu</code> — use the CUDA engine (quantus-miner).</span></label>
         <p class="note">Miner flags mirror <code>quantus-miner/README.md</code> (<code>--cpu-workers</code>, <code>--gpu-devices</code>, <code>--cuda-gpu</code>, <code>--metrics-port</code> 9900) and are also settable via <code>MINER_*</code> env vars. Miners must heartbeat every 5–15 s — the node drops idle miner connections after 60 s.</p>
@@ -209,7 +209,7 @@
       <tbody></tbody>
     </table>
     <div class="field" style="max-width:420px">
-      <label>Generate firewall rules <span class="hint">P2P port defaults to 30333 — change it if you run <code>--port</code> elsewhere.</span></label>
+      <label for="fwTool">Generate firewall rules <span class="hint">P2P port defaults to 30333 — change it if you run <code>--port</code> elsewhere.</span></label>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <select id="fwTool" style="flex:1;min-width:140px;background:#04070a;border:1px solid rgba(125,255,168,.22);border-radius:10px;color:var(--nd-text);padding:10px 12px;font-family:var(--font-mono)">
           <option value="ufw">ufw (Ubuntu)</option>
@@ -236,11 +236,11 @@
     <div class="grid2">
       <div>
         <div class="field">
-          <label>Your node's best block <span class="hint">From the log line <code>best: #…</code> or <code>curl</code> below.</span></label>
+          <label for="inLocalH">Your node's best block <span class="hint">From the log line <code>best: #…</code> or <code>curl</code> below.</span></label>
           <input type="number" id="inLocalH" placeholder="e.g. 140000" min="0">
         </div>
         <div class="field">
-          <label>Network head <span class="hint">Auto-probed from the public RPC; override manually if the probe fails.</span></label>
+          <label for="inNetH">Network head <span class="hint">Auto-probed from the public RPC; override manually if the probe fails.</span></label>
           <input type="number" id="inNetH" placeholder="probing…" min="0">
         </div>
         <p class="note" id="netSrc">Probing <code>wss://rpc.quantus.network</code>…</p>
@@ -264,7 +264,7 @@
   <section class="panel" id="sec-logs" aria-labelledby="h-logs">
     <h2><span class="n">06</span> <span id="h-logs">Log forensics</span></h2>
     <p class="sub">Paste node log output — the desk matches it against the known log lines from the upstream docs and mining guide, and tells you what each one means and what to do. Nothing is uploaded; matching runs entirely in your browser.</p>
-    <textarea id="logInput" spellcheck="false" placeholder="Paste quantus-node log lines here…&#10;&#10;e.g.&#10;2026-09-30 12:01:44 💤 Idle (12 peers), best: #142000 (0x25a7…), finalized #141950&#10;2026-09-30 12:02:10 Mining rewards will be sent to wormhole address qz1abc…"></textarea>
+    <textarea id="logInput" aria-label="Paste quantus-node log output for forensics analysis" spellcheck="false" placeholder="Paste quantus-node log lines here…&#10;&#10;e.g.&#10;2026-09-30 12:01:44 💤 Idle (12 peers), best: #142000 (0x25a7…), finalized #141950&#10;2026-09-30 12:02:10 Mining rewards will be sent to wormhole address qz1abc…"></textarea>
     <p class="note" id="logSummary">No input yet.</p>
     <div id="logFindings"></div>
     <h3>Know your healthy lines</h3>

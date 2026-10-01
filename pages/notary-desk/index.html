@@ -108,7 +108,7 @@
             <div class="drop-ico">📥</div>
             <div><strong>Drop a file here</strong> — or <span class="linklike" id="browseLink">browse</span></div>
             <div class="hint">Hashed locally in streaming chunks. Nothing is uploaded — the file never leaves your machine.</div>
-            <input type="file" id="fileInput" hidden>
+            <input type="file" id="fileInput" aria-label="Choose a file to hash and notarize" hidden>
           </div>
           <div class="or">or paste a known digest</div>
           <label class="fld"><span>Digest (64 hex chars)</span>
@@ -185,7 +185,7 @@
           <div class="drop-ico">🔍</div>
           <div><strong>Drop the file to verify</strong></div>
           <div class="hint">Its digests are recomputed locally and compared against your vault.</div>
-          <input type="file" id="vFileInput" hidden>
+          <input type="file" id="vFileInput" aria-label="Choose a file to verify against the vault" hidden>
         </div>
         <div class="or">or paste a digest</div>
         <label class="fld"><span>Digest (64 hex chars)</span>

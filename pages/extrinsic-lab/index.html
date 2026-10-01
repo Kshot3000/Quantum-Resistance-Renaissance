@@ -86,7 +86,7 @@
     <div class="card">
       <h2>Paste an extrinsic</h2>
       <p class="hint">Hex of a full signed (or unsigned) Quantus extrinsic — grab one from the <b>Live blocks</b> tab, the Chain Console, or a block explorer. Everything is decoded locally; nothing leaves your browser.</p>
-      <textarea id="hex-input" class="hexbox" spellcheck="false" placeholder="0x8400…"></textarea>
+      <textarea id="hex-input" aria-label="Quantus extrinsic hex to decode" class="hexbox" spellcheck="false" placeholder="0x8400…"></textarea>
       <div class="row">
         <button class="btn primary" id="decode-btn">Autopsy</button>
         <button class="btn" id="clear-btn">Clear</button>
@@ -161,7 +161,7 @@
       <h2>Live block scanner</h2>
       <p class="hint">Connects to a Quantus node over WebSocket, pulls the latest finalized block, and runs every extrinsic through the local decoder. Default endpoint is the public RPC documented for the Mempool Desk.</p>
       <div class="row">
-        <input id="rpc-url" class="mono grow" value="wss://rpc.quantus.network" spellcheck="false">
+        <input id="rpc-url" aria-label="Quantus node WebSocket RPC URL" class="mono grow" value="wss://rpc.quantus.network" spellcheck="false">
         <button class="btn primary" id="live-connect">Connect &amp; scan</button>
         <button class="btn" id="live-refresh" disabled>Refresh head</button>
       </div>
@@ -176,7 +176,7 @@
     <div class="card">
       <h2>Verified call reference</h2>
       <p class="hint">Every pallet index, call index, and argument layout the decoder understands — read from <span class="mono">Quantus-Network/chain</span> source (rev <span class="mono">482c5b9</span>, 2026-09-30). Quantus ships custom pallet forks, so upstream Substrate defaults were <b>not</b> assumed.</p>
-      <input id="ref-search" class="grow mono" placeholder="filter: e.g. transfer, multisig, 19…" spellcheck="false">
+      <input id="ref-search" aria-label="Filter the verified call reference" class="grow mono" placeholder="filter: e.g. transfer, multisig, 19…" spellcheck="false">
       <div id="ref-table"></div>
     </div>
   </section>
