@@ -65,3 +65,4 @@ The public Quantus indexer (`sqm.quantus.com`) only allowlists official Quantus 
 - GitHub: [@Kshot3000](https://github.com/Kshot3000)
 - X: [@kshot9000](https://x.com/kshot9000)
 - Donations (QTC): `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`
+  - `scale-lab/` — QTC SCALE Lab (the codec workbench: hand-encode and strict-decode the SCALE codec — canonical compact integers in all four modes with a strict/lax decoder that rejects non-canonical encodings, struct type workbench with clickable byte maps, SS58-189 address coder with checksum anatomy, twox_128 storage-key forger with Blake2_128Concat/Twox64Concat/Identity map hashers, and a live vector vault proving the codec against the canonical spec in-page; crypto vendored from the repo's verified cores — 62/62 codec tests, full browser QA, zero console errors — Sept 30, 2026)

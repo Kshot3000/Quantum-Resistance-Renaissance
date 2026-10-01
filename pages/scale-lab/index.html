@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC SCALE Lab — the codec workbench</title>
+<meta name="description" content="QTC SCALE Lab: the interactive Substrate SCALE codec workbench for Quantus — canonical compact-integer lab, type workbench (primitives, options, vecs, structs, enums), SS58-189 address coder, and twox_128 storage-key forger. 100% client-side, test-vector verified.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.41.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.41.0" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">&#x2699;&#xfe0f;</span>
+    <div><strong>QTC SCALE Lab</strong><span>The codec workbench</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">100% client-side</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/" class="current"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+</div>
+    </details>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>The <span class="accent">SCALE</span> codec workbench</h1>
+    <p>Every byte Quantus puts on the wire is SCALE-encoded — extrinsics, storage keys, RPC payloads.
+    This lab lets you <strong>encode and decode</strong> the codec by hand: canonical compact integers in all four
+    modes, every primitive, options / vecs / structs / enums, SS58 addresses on prefix <code>189</code>, and
+    <code>twox_128</code> storage keys. Strict mode rejects non-canonical encodings — the same check that caught a
+    real mode-2 decode bug in this builder's own tooling. Nothing leaves your browser.</p>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="SCALE Lab sections">
+    <button class="tab-btn active" data-tab="compact" role="tab">Compact Lab</button>
+    <button class="tab-btn" data-tab="types" role="tab">Type Workbench</button>
+    <button class="tab-btn" data-tab="address" role="tab">Address Coder</button>
+    <button class="tab-btn" data-tab="storage" role="tab">Storage Keys</button>
+    <button class="tab-btn" data-tab="vectors" role="tab">Vector Vault</button>
+  </nav>
+
+  <!-- ============ COMPACT LAB ============ -->
+  <section class="tabpane active" id="pane-compact" role="tabpanel">
+    <div class="grid2">
+      <div class="card">
+        <h2>Encode <span class="tag">canonical</span></h2>
+        <p class="sub">Enter an integer (decimal or <code>0x</code> hex). The lab always emits the single canonical encoding — smallest mode, minimal bytes.</p>
+        <label class="f" for="ce-in">Integer</label>
+        <input type="text" id="ce-in" value="1073741824" spellcheck="false" autocomplete="off">
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="ce-go">Encode</button>
+          <button class="btn ghost" id="ce-max">u128 max</button>
+        </div>
+        <div class="out" id="ce-out"></div>
+        <div class="bytemap" id="ce-map"></div>
+        <div class="span-legend" id="ce-legend"></div>
+      </div>
+      <div class="card">
+        <h2>Decode <span class="tag">strict</span></h2>
+        <p class="sub">Paste compact bytes. Strict mode rejects non-canonical encodings (bloated modes, padded big-ints) — lax mode still decodes but flags them.</p>
+        <label class="f" for="cd-in">Hex bytes</label>
+        <input type="text" id="cd-in" value="0300000040" spellcheck="false" autocomplete="off">
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="cd-go">Decode</button>
+          <label style="font-family:var(--mono);font-size:13px;color:var(--dim)"><input type="checkbox" id="cd-strict" checked style="width:auto"> strict</label>
+        </div>
+        <div class="out" id="cd-out"></div>
+        <div class="bytemap" id="cd-map"></div>
+        <div class="verdict" id="cd-verdict"><div class="v-title"></div><div class="v-sub"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>The four modes</h2>
+      <p class="sub">The two low bits of the first byte select the mode. Click a notorious value to load it into the decoder.</p>
+      <table class="spec">
+        <tr><th>Mode</th><th>First byte</th><th>Range</th><th>Example</th></tr>
+        <tr><td>single-byte</td><td><code>xxxxxx00</code></td><td>0 – 63</td><td class="hex">42 → a8</td></tr>
+        <tr><td>two-byte</td><td><code>xxxxxx01</code></td><td>64 – 16,383</td><td class="hex">69 → 1501</td></tr>
+        <tr><td>four-byte</td><td><code>xxxxxx10</code></td><td>16,384 – 2³⁰−1</td><td class="hex">16384 → 02000100</td></tr>
+        <tr><td>big-integer</td><td><code>xxxxxx11</code></td><td>2³⁰ – 2⁵³⁶−1</td><td class="hex">2³⁰ → 0300000040</td></tr>
+      </table>
+      <div class="chips" id="notorious">
+        <button class="chip" data-hex="a8">42 · canonical</button>
+        <button class="chip" data-hex="92010000">100 · bloated mode-2 ⚠</button>
+        <button class="chip" data-hex="fdff">16383 · mode-1 edge</button>
+        <button class="chip" data-hex="02000100">16384 · mode-2 edge</button>
+        <button class="chip" data-hex="feffffff">2³⁰−1 · mode-2 edge</button>
+        <button class="chip" data-hex="0300000040">2³⁰ · mode-3 edge</button>
+        <button class="chip" data-hex="130000004000000000">2³⁰ · padded big-int ⚠</button>
+      </div>
+      <div class="note"><strong>Why strict matters.</strong> A decoder that doesn't check canonicality will happily read bloated encodings — and a decoder that mis-handles mode 2 (like this builder's own extrinsic decoder did before 2026-09-30) silently corrupts every amount between 16,384 and 1,073,741,823 plancks. When you verify someone else's bytes, decode strictly.</div>
+    </div>
+  </section>
+
+  <!-- ============ TYPE WORKBENCH ============ -->
+  <section class="tabpane" id="pane-types" role="tabpanel">
+    <div class="card">
+      <h2>Schema <span class="tag">struct builder</span></h2>
+      <p class="sub">Build a struct field-by-field, fill in values, and encode it — or paste hex and decode it back with the same schema. Integers accept decimal or <code>0x</code> hex (BigInt-safe); <code>bytes</code>/<code>accountid</code> accept hex; <code>bool</code> is <code>true</code>/<code>false</code>; <code>str</code> is plain text; <code>balance</code> is plancks (shown in QTC too).</p>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn ghost" id="tb-preset-transfer">Preset: transfer args</button>
+        <button class="btn ghost" id="tb-preset-vec">Preset: Vec&lt;u8&gt;</button>
+        <button class="btn ghost" id="tb-preset-opt">Preset: Option&lt;Balance&gt;</button>
+        <button class="btn ghost" id="tb-clear">Clear</button>
+      </div>
+      <div id="tb-rows"></div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn ghost" id="tb-add">+ Add field</button>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Encode</h2>
+        <div id="tb-values"></div>
+        <div class="row" style="margin-top:10px"><button class="btn" id="tb-encode">Encode struct</button></div>
+        <div class="out" id="tb-enc-out"></div>
+        <div class="bytemap" id="tb-enc-map"></div>
+        <div class="span-legend" id="tb-enc-legend"></div>
+      </div>
+      <div class="card">
+        <h2>Decode</h2>
+        <label class="f" for="tb-dec-in">Hex bytes</label>
+        <input type="text" id="tb-dec-in" spellcheck="false" autocomplete="off" placeholder="0x…">
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="tb-decode">Decode with schema</button>
+          <label style="font-family:var(--mono);font-size:13px;color:var(--dim)"><input type="checkbox" id="tb-strict" checked style="width:auto"> strict</label>
+        </div>
+        <div class="out" id="tb-dec-out"></div>
+        <div class="bytemap" id="tb-dec-map"></div>
+        <div class="span-legend" id="tb-dec-legend"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ADDRESS CODER ============ -->
+  <section class="tabpane" id="pane-address" role="tabpanel">
+    <div class="grid2">
+      <div class="card">
+        <h2>Encode <span class="tag">pubkey → SS58</span></h2>
+        <p class="sub">32-byte public key as hex → Quantus SS58 address (prefix <code>189</code> → prefix bytes <code>6f40</code>, checksum = <code>blake2b-512("SS58PRE" ‖ body)[0..2]</code>).</p>
+        <label class="f" for="ad-pub">Public key (32 bytes hex)</label>
+        <input type="text" id="ad-pub" spellcheck="false" autocomplete="off" value="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f">
+        <div class="row" style="margin-top:10px"><button class="btn" id="ad-enc-go">Encode address</button></div>
+        <div class="out" id="ad-enc-out"></div>
+        <div class="diagram" id="ad-enc-diagram"></div>
+      </div>
+      <div class="card">
+        <h2>Verify <span class="tag">SS58 → anatomy</span></h2>
+        <p class="sub">Paste any SS58 address. The lab checks the base58 alphabet, the prefix (warns if it isn't Quantus <code>189</code>), the key length, and the checksum.</p>
+        <label class="f" for="ad-addr">SS58 address</label>
+        <input type="text" id="ad-addr" spellcheck="false" autocomplete="off" placeholder="e.g. q…">
+        <div class="row" style="margin-top:10px"><button class="btn" id="ad-dec-go">Inspect address</button></div>
+        <div class="out" id="ad-dec-out"></div>
+        <div class="verdict" id="ad-verdict"><div class="v-title"></div><div class="v-sub"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STORAGE KEYS ============ -->
+  <section class="tabpane" id="pane-storage" role="tabpanel">
+    <div class="grid2">
+      <div class="card">
+        <h2>Plain storage key</h2>
+        <p class="sub"><code>twox_128(pallet) ‖ twox_128(item)</code> — the 32-byte key for plain (non-map) storage values. The chain hashes with XxHash64 seeds <code>0</code> and <code>1</code> (verified against the chain's <code>sp-crypto-hashing</code>).</p>
+        <label class="f" for="sk-pallet">Pallet</label>
+        <input type="text" id="sk-pallet" value="System" spellcheck="false" autocomplete="off">
+        <label class="f" for="sk-item">Storage item</label>
+        <input type="text" id="sk-item" value="Account" spellcheck="false" autocomplete="off">
+        <div class="row" style="margin-top:10px"><button class="btn" id="sk-go">Forge key</button></div>
+        <div class="out" id="sk-out"></div>
+        <div class="diagram" id="sk-diagram"></div>
+      </div>
+      <div class="card">
+        <h2>Map storage key</h2>
+        <p class="sub">Plain key + the map hasher applied to your key bytes: <code>Blake2_128Concat</code> (e.g. <code>System.Account</code>), <code>Twox64Concat</code>, or <code>Identity</code>.</p>
+        <label class="f" for="skm-key">Map key bytes (hex)</label>
+        <input type="text" id="skm-key" spellcheck="false" autocomplete="off" placeholder="0x… (e.g. 32-byte AccountId)">
+        <label class="f" for="skm-hasher">Hasher</label>
+        <select id="skm-hasher">
+          <option value="blake2_128concat">Blake2_128Concat — hash(16B) ‖ key</option>
+          <option value="twox64concat">Twox64Concat — hash(8B) ‖ key</option>
+          <option value="identity">Identity — key as-is</option>
+        </select>
+        <div class="row" style="margin-top:10px"><button class="btn" id="skm-go">Forge map key</button></div>
+        <div class="out" id="skm-out"></div>
+        <div class="note"><strong>Tip:</strong> copy a forged key into the Chain Console's storage reader (<span style="font-family:var(--mono)">state_getStorage</span>) to read the value live from a node.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VECTOR VAULT ============ -->
+  <section class="tabpane" id="pane-vectors" role="tabpanel">
+    <div class="card">
+      <h2>Canonical test vectors <span class="tag">run live</span></h2>
+      <p class="sub">The spec table this codec is held to. "Run all" executes every vector in your browser right now — green means this page's codec matches the canonical SCALE spec and the chain-verified hash anchors.</p>
+      <div class="row" style="margin-bottom:6px"><button class="btn" id="vv-run">Run all vectors</button><span id="vv-summary" style="font-family:var(--mono);font-size:13px;color:var(--dim)"></span></div>
+      <div style="overflow-x:auto"><table class="spec" id="vv-table">
+        <tr><th style="width:34px"></th><th>Vector</th><th>Expected hex</th></tr>
+      </table></div>
+      <div class="note"><strong>Anchors.</strong> Compact/primitive vectors are the canonical parity-scale-codec spec table. <code>twox_128("System")</code> is cross-checked against <code>@polkadot/util-crypto</code> (2026-09-30). SS58 vectors round-trip through an independent <code>node:crypto</code> checksum check in the repo's test suite (<code>tests/run-tests.mjs</code> — 62 assertions).</div>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="note">Community-built tooling. SCALE vectors per the canonical parity-scale-codec spec; twox_128 seeds verified against Quantus-Network/chain source 2026-09-30. Independent builder work — not affiliated with the Quantus team.</span>
+</footer>
+
+<script src="js/vendor/scale-crypto.js?v=1.41.0"></script>
+<script src="js/vendor/twox.js?v=1.41.0"></script>
+<script src="js/scale-codec.js?v=1.41.0"></script>
+<script src="js/app.js?v=1.41.0"></script>
+</body>
+</html>
