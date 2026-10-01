@@ -1,0 +1,62 @@
+{
+  "ok": true,
+  "source": "https://sqm.quantus.com/v1/graphql",
+  "fetched_at": "2026-10-01T13:04:02.232Z",
+  "data": {
+    "status": {
+      "block_height": 146270,
+      "total_scheduled_transfers": 3
+    },
+    "scheduled": [
+      {
+        "tx_id": "0xecc13bf48fd3eb10d9bc919d751bc8686e850deb20ebf0eb5933f9871d59742c",
+        "amount": "341500000000",
+        "fee": "764602500",
+        "timestamp": "2026-10-01T00:46:33.146+00:00",
+        "from_id": "qzn8KxCgZMowkRiQ6uRCSKFtQG2KkLcpRpDQ13eLwjmAStCMz",
+        "to_id": "qzjfCb5LXJ8143HiYHSECANywXQCZGssDTm15gmQpQa1Dvuf7"
+      },
+      {
+        "tx_id": "0x911bdb6433a2906c4545187504e6321736a6727b94586f0a2e3b6a805147bb90",
+        "amount": "184000000000",
+        "fee": "764602500",
+        "timestamp": "2026-09-29T18:18:48.314+00:00",
+        "from_id": "qzoysAjkghkKRhbgDXYFrXrZk3L9bs8PBFEkEAvBuedHYsswv",
+        "to_id": "qznCiYp8CoHgWpxeC1Ubkv1H3eMskQWEsAnQtmQ5SSdocTfLs"
+      },
+      {
+        "tx_id": "0x819fbbe22aa93817f6a92e43c0bb3881fd22f67c2bc7f739ce6307e53a0a5b0e",
+        "amount": "100000000000",
+        "fee": "764602500",
+        "timestamp": "2026-09-29T17:16:18.694+00:00",
+        "from_id": "qzoysAjkghkKRhbgDXYFrXrZk3L9bs8PBFEkEAvBuedHYsswv",
+        "to_id": "qznCiYp8CoHgWpxeC1Ubkv1H3eMskQWEsAnQtmQ5SSdocTfLs"
+      }
+    ],
+    "cancelled": [],
+    "executed": [
+      {
+        "tx_id": "0xecc13bf48fd3eb10d9bc919d751bc8686e850deb20ebf0eb5933f9871d59742c",
+        "timestamp": "2026-10-01T00:57:06.109+00:00",
+        "result": "Ok"
+      },
+      {
+        "tx_id": "0x911bdb6433a2906c4545187504e6321736a6727b94586f0a2e3b6a805147bb90",
+        "timestamp": "2026-09-29T18:29:24.545+00:00",
+        "result": "Ok"
+      },
+      {
+        "tx_id": "0x819fbbe22aa93817f6a92e43c0bb3881fd22f67c2bc7f739ce6307e53a0a5b0e",
+        "timestamp": "2026-09-29T17:26:39.999+00:00",
+        "result": "Ok"
+      }
+    ],
+    "high_security": [],
+    "totals": {
+      "scheduled": 3,
+      "cancelled": 0,
+      "executed": 3,
+      "high_security": 0
+    }
+  }
+}

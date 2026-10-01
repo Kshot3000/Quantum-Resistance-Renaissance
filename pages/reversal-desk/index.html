@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Reversal Desk — the reversible-transfers command center</title>
+<meta name="description" content="QTC Reversal Desk: the command center for Quantus's reversible transfers — the signature chain feature. Interactive delay planner with exact unsigned call data, the permanent high-security enrollment desk with quota simulator, the guardian console, and the live pending queue from the indexer. Every constant cited to upstream source.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.50.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.48.0" type="image/svg+xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">🔄</span>
+    <div><strong>QTC Reversal Desk</strong><span>The reversible-transfers command center</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill" id="snapPill" title="Data provenance">loading snapshot&hellip;</span>
+    <span class="pill ghost">Never signs</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a href="../pool-desk/"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
+    <a href="../pay-desk/"><span class="ico">🧾</span><span>Pay Desk<span class="meta">Merchant acceptance toolkit</span></span></a>
+    <a href="../cli-forge/"><span class="ico">💻</span><span>CLI Forge<span class="meta">Command builder</span></span></a>
+    <a href="../luck-lab/"><span class="ico">🍀</span><span>Luck Lab<span class="meta">Luck &amp; variance lab</span></span></a>
+    <a href="../notary-desk/"><span class="ico">📜</span><span>Notary Desk<span class="meta">On-chain timestamping</span></span></a>
+    <a href="../zktree-desk/"><span class="ico">🌲</span><span>ZkTree Desk<span class="meta">ZK Merkle-tree lab</span></span></a>
+    <a href="../energy-observatory/"><span class="ico">⚡</span><span>Energy Observatory<span class="meta">Network-energy & carbon lab</span></span></a>
+    <a class="current" href="./"><span class="ico">🔄</span><span>Reversal Desk<span class="meta">Reversible-transfers lab</span></span></a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main class="rd" id="main">
+  <section class="hero panel">
+    <h1>Send it. Sleep on it. Take it back.</h1>
+    <p class="lede">Reversible transfers are Quantus's signature safety feature: every transfer can be <strong>scheduled with a delay</strong>, held in escrow by the protocol, and <strong>cancelled before it executes</strong> — by you, or by a guardian you appoint. Enroll in <strong>high-security mode</strong> and your account can <em>only</em> make reversible transfers, enforced at the transaction level. This desk plans delays, builds the exact unsigned call data, simulates the quota and the 1% reversal fee, and watches the live queue. It never signs anything.</p>
+    <div class="pulse">
+      <div class="stat hold"><span class="k">Scheduled (all time)</span><span class="v" id="pScheduled">—</span><span class="s">indexer total</span></div>
+      <div class="stat"><span class="k">Executed</span><span class="v" id="pExecuted">—</span><span class="s">delay elapsed, settled</span></div>
+      <div class="stat vio"><span class="k">Cancelled</span><span class="v" id="pCancelled">—</span><span class="s">reversed before execution</span></div>
+      <div class="stat hold"><span class="k">Pending now</span><span class="v" id="pPending">—</span><span class="s">scheduled − cancelled − executed</span></div>
+      <div class="stat vio"><span class="k">High-security accounts</span><span class="v" id="pHS">—</span><span class="s">permanent enrollments</span></div>
+    </div>
+    <div class="hero-note" id="liveNote">Reading the chain snapshot&hellip;</div>
+  </section>
+
+  <section class="panel" id="lifeDesk">
+    <h2>The lifecycle <span class="sub">click each stage for the exact mechanics</span></h2>
+    <p>A reversible transfer is a five-act play. Funds are never "sent and hoped for" — they are <strong>held</strong>, then either released to the destination or returned. Tap a stage.</p>
+    <div class="stages" id="lifeStages"></div>
+    <div class="lifebody" id="lifeBody"></div>
+  </section>
+
+  <section class="panel" id="plannerDesk">
+    <h2>Delay planner <span class="sub">build the exact unsigned call data</span></h2>
+    <p>Compose a reversible transfer. The desk validates the delay against the on-chain minimum (≥ 2 blocks / ≥ 12 000 ms), estimates the execute-at block from the live height, and emits the <strong>exact SCALE call data</strong> — pallet <code>11</code>, the right call index, <code>MultiAddress::Id</code> destination, plain-u128 amount — ready to paste into Chain Console or your signer.</p>
+    <div class="grid2">
+      <div>
+        <div class="field">
+          <label for="plDest">Destination (qz… SS58 address)</label>
+          <input type="text" id="plDest" placeholder="qz…" autocomplete="off" spellcheck="false">
+          <div class="hint">Checksum-verified in your browser (prefix 189). The address is never sent anywhere.</div>
+        </div>
+        <div class="field">
+          <label for="plAmount">Amount (QTC)</label>
+          <input type="number" id="plAmount" value="1" min="0" step="any">
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label>Delay</label>
+          <div class="row3">
+            <input type="number" id="plDelay" value="7200" min="1" step="1" aria-label="Delay value">
+            <select id="plUnit" aria-label="Delay unit">
+              <option value="blocks" selected>blocks</option>
+              <option value="minutes">minutes</option>
+              <option value="hours">hours</option>
+              <option value="days">days</option>
+            </select>
+          </div>
+          <div class="hint">Default 7 200 blocks = 24 h (the on-chain <code>DefaultDelay</code>). High-security accounts ignore this and use their configured delay.</div>
+        </div>
+        <div class="field">
+          <label for="plMode">Account mode</label>
+          <select id="plMode">
+            <option value="onetime" selected>Regular account — one-time schedule (call 4)</option>
+            <option value="hs">High-security account — uses configured delay (call 3)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="plOut"></div>
+    <div class="hexbox" id="plHex" style="display:none">
+      <div id="plBreakdown"></div>
+      <div class="hexout" id="plHexText"></div>
+      <button class="btn" id="plCopy" type="button">Copy call data</button>
+    </div>
+  </section>
+
+  <section class="panel" id="hsDesk">
+    <h2>High-security enrollment <span class="sub">the one-way door</span></h2>
+    <div class="oneway">
+      <h3>⚠ PERMANENT AND IRREVERSIBLE — read this before you build the call below</h3>
+      <p>Calling <code>set_high_security</code> <strong>cannot be undone</strong>. Afterwards your account can <em>only</em> <code>schedule_transfer</code>, <code>cancel</code>, and <code>recover_funds</code> — enforced by the transaction extension, not by convention. An attacker holding your key cannot disable it, which is the point — but neither can you.</p>
+      <ul>
+        <li>Your <strong>guardian</strong> gains instant, total power: cancel any pending transfer (1% burn, remainder to them) and <code>recover_funds</code> to sweep the entire account at any time, repeatedly, with no second approver.</li>
+        <li>Guardian cannot be yourself. Guardian cannot be changed afterwards.</li>
+        <li>Use a <strong>multisig address as guardian</strong> — the pallet docs say so explicitly, and a single-key guardian shares your 16-tx/day quota and can be locked out of rescuing you.</li>
+      </ul>
+    </div>
+    <p>Build the enrollment call. The desk validates the guardian address, the self-guardian rule, and the delay — then emits the exact unsigned <code>set_high_security</code> call data.</p>
+    <div class="grid2">
+      <div>
+        <div class="field">
+          <label for="hsSender">Your account (qz… — optional, used only to check guardian ≠ self)</label>
+          <input type="text" id="hsSender" placeholder="qz… (optional)" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="hsGuardian">Guardian (qz… SS58 address)</label>
+          <input type="text" id="hsGuardian" placeholder="qz… — ideally your multisig address" autocomplete="off" spellcheck="false">
+          <div class="hint">Anyone can be named without their consent — enrollment needs no guardian approval. Choose someone who will actually rescue you.</div>
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label>Reversibility delay (applies to every future transfer)</label>
+          <div class="row3">
+            <input type="number" id="hsDelay" value="7200" min="1" step="1" aria-label="Delay value">
+            <select id="hsUnit" aria-label="Delay unit">
+              <option value="blocks" selected>blocks</option>
+              <option value="minutes">minutes</option>
+              <option value="hours">hours</option>
+              <option value="days">days</option>
+            </select>
+          </div>
+          <div class="hint">Longer delay = longer rescue window, but also longer waits for legitimate payments. 24 h is the on-chain default.</div>
+        </div>
+      </div>
+    </div>
+    <div id="hsOut"></div>
+    <div class="hexbox" id="hsHex" style="display:none">
+      <div id="hsHexNote"></div>
+      <div class="hexout" id="hsHexText"></div>
+      <button class="btn" id="hsCopy" type="button">Copy call data</button>
+    </div>
+  </section>
+
+  <section class="panel" id="quotaDesk">
+    <h2>Quota simulator <span class="sub">16 extrinsics per rolling 24 hours</span></h2>
+    <p>High-security accounts are rate-limited: at most <strong>16 signed extrinsics per rolling 7 200-block window</strong>, tracked in a ring — room opens only when the oldest entry ages out. Non-high-security accounts are unlimited. Add simulated transactions and watch the window fill; the simulator uses the live chain height.</p>
+    <div class="qcontrols">
+      <div class="field">
+        <label for="qBlock">Transaction block</label>
+        <input type="number" id="qBlock" placeholder="defaults to current height" step="1">
+      </div>
+      <button class="btn" id="qAdd" type="button">+ Add transaction</button>
+      <button class="btn ghost" id="qClear" type="button">Clear</button>
+    </div>
+    <div style="font-size:13px;color:var(--faint);margin-top:10px">Remaining quota: <strong id="qRemain" style="color:var(--cyan)">16 / 16</strong></div>
+    <div class="qmeter"><div class="qfill" id="qBar"></div></div>
+    <div id="qNote"></div>
+    <div id="qList" style="margin-top:10px"></div>
+    <p class="dim" style="margin-top:10px">Documented edge case: the quota keys on the outer signer, so a <strong>single-key high-security guardian</strong> shares the quota with its own traffic and can be locked out of <code>cancel</code>/<code>recover_funds</code> for up to a day. A multisig guardian's derived address never signs, so it is immune.</p>
+  </section>
+
+  <section class="panel" id="feeDesk">
+    <h2>Reversal-fee calculator <span class="sub">the 1% that burns</span></h2>
+    <p>Reversing a <strong>high-security</strong> transfer burns <code>HighSecurityVolumeFee = Permill::from_percent(1)</code> of the amount — exactly 1%, integer floor. One-time schedules reverse fee-free. This is the price of the rescue.</p>
+    <div class="field" style="max-width:320px">
+      <label for="feeAmount">Reversed amount (QTC)</label>
+      <input type="number" id="feeAmount" value="100" min="0" step="any">
+    </div>
+    <div id="feeOut"></div>
+  </section>
+
+  <section class="panel" id="guardianDesk">
+    <h2>Guardian console <span class="sub">what the guardian can actually do</span></h2>
+    <p>The guardian is not a co-signer — they are a <strong>unilateral rescue key</strong>. Two powers, no approval needed from the account owner:</p>
+    <table class="matrix">
+      <thead><tr><th>Power</th><th>Who can call it</th><th>What happens, exactly</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>cancel(tx_id)</code><br>pallet 11, call 1</td>
+          <td>Only the guardian recorded at schedule time (frozen — a later <code>set_high_security</code> can't rewrite it)</td>
+          <td>The hold is released: 1% of the amount is <strong>burned</strong>, the remaining 99% is transferred to the <strong>guardian</strong> (not back to the sender). Scheduler task cancelled best-effort. For one-time schedules the sender cancels instead, fee-free, funds return to sender.</td>
+        </tr>
+        <tr>
+          <td><code>recover_funds(account)</code><br>pallet 11, call 7</td>
+          <td>Only the account's <em>live</em> guardian</td>
+          <td><strong>Seize-the-account:</strong> every pending transfer is cancelled (1% burn each), then the entire free balance is swept to the guardian. Best-effort per transfer — failures are skipped with a <code>TransferRecoveryFailed</code> event, never rolled back. Repeatable: the account stays high-security, so future deposits remain recoverable. Guardianship is discoverable off-chain via the <code>HighSecuritySet</code> event.</td>
+        </tr>
+      </tbody>
+    </table>
+    <h3 style="font-size:16px;margin:18px 0 6px">The guardian checklist</h3>
+    <ul class="checklist">
+      <li><strong>Use a multisig as guardian.</strong> The pallet docs recommend it verbatim; a multisig dispatches as its derived address and can cancel/recover exactly like a plain account — with no single point of failure and no quota lockout.</li>
+      <li><strong>Guardian ≠ you, forever.</strong> Self-guardianship is rejected on-chain (<code>GuardianCannotBeSelf</code>), even at genesis — a self-guardian would silently void all protection.</li>
+      <li><strong>Expect the 1%.</strong> Every guardian-initiated reversal burns 1% and pays the other 99% to the guardian, who must forward it to you off-chain. Put that agreement in writing before you enroll.</li>
+      <li><strong>Keep the guardian's key safer than yours.</strong> It can drain the account in one call. A lost guardian key doesn't lock you out (you can still schedule and wait), but a stolen one ends the account.</li>
+      <li><strong>High-security accounts can batch.</strong> A flat, non-nested <code>batch_all</code> of up to 16 whitelisted calls (schedule/cancel/recover) is allowed — handy for scheduling several transfers in one of your 16 daily extrinsics.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="refDesk">
+    <h2>Call reference <span class="sub">exact indices for offline builders</span></h2>
+    <p>Pallet <code>ReversibleTransfers</code> sits at <strong>runtime index 11</strong> (<code>runtime/src/lib.rs</code>). All of the following verified at Quantus-Network/chain rev <code>482c5b9</code>.</p>
+    <table class="matrix">
+      <thead><tr><th>Call</th><th>Index</th><th>Args (SCALE)</th><th>Who</th></tr></thead>
+      <tbody>
+        <tr><td><code>set_high_security</code></td><td>0</td><td><code>delay: BlockNumberOrTimestamp</code> (0x00‖u32 LE blocks | 0x01‖u64 LE ms), <code>guardian: AccountId</code> (32 B)</td><td>any account, once — one-way</td></tr>
+        <tr><td><code>cancel</code></td><td>1</td><td><code>tx_id: H256</code> (32 B)</td><td>sender (one-time) or guardian (HS)</td></tr>
+        <tr><td><code>execute_transfer</code></td><td>2</td><td><code>tx_id: H256</code></td><td>scheduler only (pallet origin <code>rtpallet</code>)</td></tr>
+        <tr><td><code>schedule_transfer</code></td><td>3</td><td><code>dest: MultiAddress</code> (0x00‖32 B), <code>amount: u128</code> <strong>not compact</strong> (16 B LE)</td><td>high-security accounts (uses configured delay)</td></tr>
+        <tr><td><code>schedule_transfer_with_delay</code></td><td>4</td><td>as above + <code>delay: BlockNumberOrTimestamp</code></td><td>regular accounts only</td></tr>
+        <tr><td><em>indices 5–6</em></td><td>—</td><td colspan="2">vacant (asset-transfer calls removed; kept stable so <code>recover_funds</code> stays at 7)</td></tr>
+        <tr><td><code>recover_funds</code></td><td>7</td><td><code>account: AccountId</code> (32 B)</td><td>the account's guardian</td></tr>
+      </tbody>
+    </table>
+    <h3 style="font-size:16px;margin:18px 0 6px">High-security transaction rules</h3>
+    <ul class="checklist">
+      <li><strong>Whitelist:</strong> <code>schedule_transfer</code> (dest must be <code>MultiAddress::Id</code> — a stolen key can't pad <code>Raw</code> to inflate the length fee), <code>cancel</code>, <code>recover_funds</code>, or a flat non-nested <code>batch_all</code> of ≤ 16 of those.</li>
+      <li><strong>Quota:</strong> 16 signed extrinsics per rolling 7 200 blocks (~24 h). <strong>Tip:</strong> forced to zero. <strong>Size:</strong> extrinsics capped at 10 KiB encoded.</li>
+      <li><strong>Delay bounds:</strong> ≥ 2 blocks or ≥ 12 000 ms. Default delay: 7 200 blocks. Max 16 pending transfers per account.</li>
+      <li><strong>Execution:</strong> the scheduler dispatches <code>execute_transfer</code> as the pallet's sovereign account; the inner transfer is <code>transfer_allow_death</code> — a broke sender still completes.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="queueDesk">
+    <h2>Live queue <span class="sub">every reversible transfer the indexer has seen</span></h2>
+    <p>Read from the same-origin snapshot of the public Subsquid indexer. The delay itself lives in the <code>TransactionScheduled</code> event args, which the snapshot doesn't carry — so this is the <em>what</em>, not the <em>when</em>.</p>
+    <h3 style="font-size:15px;color:var(--amber)">Scheduled</h3>
+    <div class="table-wrap"><table class="live" id="qScheduled">
+      <thead><tr><th>tx_id</th><th>Amount</th><th>From</th><th>To</th><th>When</th></tr></thead><tbody></tbody>
+    </table></div>
+    <h3 style="font-size:15px;color:var(--amber)">Cancelled</h3>
+    <div class="table-wrap"><table class="live" id="qCancelled">
+      <thead><tr><th>tx_id</th><th>Cancelled by</th><th>When</th></tr></thead><tbody></tbody>
+    </table></div>
+    <h3 style="font-size:15px;color:var(--amber)">Executed</h3>
+    <div class="table-wrap"><table class="live" id="qExecuted">
+      <thead><tr><th>tx_id</th><th>Result</th><th>When</th></tr></thead><tbody></tbody>
+    </table></div>
+    <h3 style="font-size:15px;color:var(--amber)">High-security enrollments</h3>
+    <div class="table-wrap"><table class="live" id="qHS">
+      <thead><tr><th>Account</th><th>Guardian</th><th>Delay</th><th>When</th></tr></thead><tbody></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel" id="methodDesk">
+    <h2>Methodology &amp; honesty <span class="sub">read this before quoting</span></h2>
+    <div class="method-grid">
+      <div>
+        <h3>What is exact</h3>
+        <ul>
+          <li>Every constant on this page — pallet index 11, call indices 0/1/2/3/4/7, the 2-block / 12 000 ms minimums, the 16-pending cap, the 16-per-7 200-block quota, the 1% burn, the 7 200-block default delay — is read from Quantus-Network/chain rev <code>482c5b9</code> (<code>pallets/reversible-transfers</code>, <code>runtime/src/lib.rs</code>, <code>runtime/src/configs/mod.rs</code>).</li>
+          <li>The call-data encoders reproduce the SCALE layout field-for-field: <code>MultiAddress::Id</code> = <code>0x00</code>‖32 B, <code>amount</code> = plain u128 LE (the field is <em>not</em> <code>#[pallet::compact]</code>), <code>BlockNumberOrTimestamp</code> = <code>0x00</code>‖u32 LE | <code>0x01</code>‖u64 LE. 49/49 node tests green.</li>
+          <li>Live queue: real rows from the public Subsquid indexer via the same-origin snapshot.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What is estimated</h3>
+        <ul>
+          <li>Execute-at blocks and wall-clock ETAs assume the 12 000 ms target block time; real blocks vary.</li>
+          <li>Timestamp-delay scheduling rounds up to bucket boundaries on-chain; the planner shows your raw delay.</li>
+          <li>Pending = scheduled − cancelled − executed is an indexer-derived figure; a transfer cancelled and re-scheduled keeps distinct tx_ids, so counting is by event, not by funds.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What we did not do</h3>
+        <ul>
+          <li>No signing, no key handling, no "connect wallet" — this desk builds <em>unsigned</em> call data only. Verify the hex in Extrinsic Lab before submitting it anywhere.</li>
+          <li>No invented CLI commands — the desk emits call data, not <code>quantus-cli</code> invocations, because the CLI surface wasn't re-verified for these calls.</li>
+          <li>No advice on whether <em>you</em> should enroll in high-security mode — the one-way warning is the advice.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> ·
+    <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    Donations (QTC): <code class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code>
+  </footer>
+</main>
+
+<script src="js/reversal-core.js?v=1.50.0"></script>
+<script src="js/app.js?v=1.50.0"></script>
+</body>
+</html>
