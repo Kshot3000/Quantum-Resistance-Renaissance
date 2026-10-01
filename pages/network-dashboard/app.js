@@ -109,8 +109,9 @@ function gql(query){
     return m.ok ? Promise.resolve(m.data) : Promise.reject(new Error(m.error || "mock indexer failure"));
   }
   /* Browser CORS: sqm.quantus.com only allowlists explorer.quantus.com / quantus.com.
-   * On GitHub Pages we load a same-origin snapshot refreshed by GitHub Actions (~10 min).
-   * Still attempt a direct call first in case CORS opens; fall back to snapshot. */
+   * On GitHub Pages we load a same-origin snapshot refreshed about hourly by the
+   * builder's data pipeline. Still attempt a direct call first in case CORS opens;
+   * fall back to snapshot. */
   return fetchDirect(query).catch(function(){ return fetchSnapshot(); });
 }
 

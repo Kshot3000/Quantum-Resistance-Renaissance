@@ -79,7 +79,7 @@
     <h1>QTC Network Dashboard</h1>
     <p class="sub">Live telemetry from the Quantus mainnet. Numbers come from the public Subsquid indexer
       (<code>sqm.quantus.com</code>). Because that indexer only allowlists official Quantus domains for browser CORS,
-      this Pages build serves a <b>same-origin snapshot</b> refreshed about every 10 minutes by GitHub Actions
+      this Pages build serves a <b>same-origin snapshot</b> refreshed about hourly by the builder's data pipeline
       (and still tries a direct call first). If both fail, the page says so instead of guessing.</p>
   </section>
 
@@ -136,7 +136,7 @@
   <p class="quiet">Not affiliated with Quantus Labs. This is community-built tooling.</p>
 </footer>
 
-<script src="app.js?v=1.8.0"></script>
+<script src="app.js?v=1.8.1"></script>
 <script src="../../assets/app-nav.js?v=1.8.0"></script>
 </body>
 </html>
