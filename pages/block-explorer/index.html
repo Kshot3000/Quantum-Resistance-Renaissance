@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QTC Block Explorer — Quantus Mainnet</title>
 <meta name="description" content="Search blocks, extrinsics, transfers and accounts on the Quantus post-quantum blockchain. Live data from the public Quantus indexer.">
-<link rel="stylesheet" href="styles.css?v=1.0.0">
+<link rel="stylesheet" href="styles.css?v=1.0.1">
 </head>
 <body>
+<a class="skip-link" href="#view">Skip to content</a>
 <div class="bg-grid" aria-hidden="true"></div>
 <div class="bg-glow" aria-hidden="true"></div>
 
@@ -27,7 +28,7 @@
   </div>
 </header>
 
-<main id="view" class="view" aria-live="polite"></main>
+<main tabindex="-1" id="view" class="view" aria-live="polite"></main>
 
 <footer class="foot">
   <div class="foot-src">Data: public Quantus Subsquid indexer (<code>sqm.quantus.com</code>). Indexer state may lag chain head; figures below are observed, not estimated.</div>

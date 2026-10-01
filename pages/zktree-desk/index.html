@@ -10,6 +10,7 @@
 <link rel="icon" href="../../assets/favicon.svg?v=1.16.0" type="image/svg+xml">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="topbar">
   <a class="back" href="../../index.html">&larr; Builder hub</a>
   <div class="brand"><span class="brand-mark" aria-hidden="true">🌲</span>
@@ -74,7 +75,7 @@
   </div>
 </header>
 
-<main class="zkd">
+<main tabindex="-1" id="main" class="zkd">
   <section class="hero panel">
     <h1>The tree that remembers every transfer</h1>
     <p class="lede">Quantus keeps a <strong>4-ary Poseidon Merkle tree</strong> over every transfer on the chain — one leaf per transfer, folded once per block, its root published in the block header. It is the backbone of the wormhole privacy exits: your ZK proof of "I was paid" is a Merkle path in this tree. This desk watches it live, recomputes its hashes exactly, and lets you prove things against it.</p>

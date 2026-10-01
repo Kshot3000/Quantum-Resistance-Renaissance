@@ -78,7 +78,7 @@ main{max-width:1180px;margin:0 auto;padding:6px 22px 20px}
 .inline{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center}
 select,input[type=text],input.grow{font-family:inherit}
 select,.grow,input.mono{background:#030704;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px 13px;font-size:14px;outline:none}
-select:focus,input:focus{border-color:var(--line-hot)}
+select:focus,input:focus{border-color:var(--line-hot);box-shadow:0 0 0 3px rgba(74,255,160,.15)}
 input.grow{flex:1;min-width:220px}
 .btn{border:1px solid var(--line-hot);background:rgba(74,255,160,.08);color:var(--phos);border-radius:10px;padding:11px 20px;font-size:14px;font-weight:700;cursor:pointer;transition:all .18s;font-family:inherit}
 .btn:hover{background:rgba(74,255,160,.16);box-shadow:0 0 16px rgba(74,255,160,.2)}
