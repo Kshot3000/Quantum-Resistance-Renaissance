@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Pool Desk — the mining-pool directory &amp; comparator</title>
+<meta name="description" content="QTC Pool Desk: every known Quantus mining pool compared honestly — real fees, payout terms, PPLNS windows, and copy-paste connection commands verified against the pools' own pages. Effective-fee comparator, command builder, pool-vs-solo-vs-node matrix.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.43.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.43.0" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">🏊</span>
+    <div><strong>QTC Pool Desk</strong><span>The mining-pool directory &amp; comparator</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">Verified 2026-10-01</span>
+    <span class="pill ghost">Independent pools</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a href="../pool-desk/" class="current"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="pill-row"><span class="pill">Mining pools</span><span class="pill ghost">Curated directory</span></div>
+    <h1>QTC <span class="grad">Pool Desk</span></h1>
+    <p class="sub">Every known Quantus mining pool, compared honestly: real fees stacked the way they actually hit you, payout terms, PPLNS windows, and copy-paste connection commands — each fact stamped with the pool page it came from. Pools change their terms; <strong>re-verify on the pool's own site before you connect</strong>.</p>
+  </section>
+
+  <section class="trust card">
+    <h2>Read this before you point a miner anywhere</h2>
+    <ul>
+      <li><strong>Pools are counterparties, not the chain.</strong> Until a payout lands in your wallet, you are trusting the operator's accounting. Both pools below say so themselves in different words.</li>
+      <li><strong>Address only.</strong> A pool needs your <code>qz…</code> payout address — nothing else. Never paste a 24-word phrase into pool software or a pool website.</li>
+      <li><strong>Re-copy endpoints and TLS pins from the pool's own site.</strong> Servers and certificate pins rotate; a stale pin fails permanently. Anything on this page is a snapshot dated 2026-10-01.</li>
+      <li><strong>One GPU, one miner.</strong> Never run a pool miner and your own node (or two pool miners) on the same card — rewards follow hashrate, not worker count.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The directory</h2><p>Two production QTC pools are documented well enough to list with verified terms. This is a curated directory, not an exhaustive one — if you run a QTC pool with public terms, reach <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a>.</p></div>
+    <div id="poolCards" class="pool-grid"></div>
+  </section>
+
+  <section class="card">
+    <div class="sec-head"><h2>Effective-fee comparator</h2><p>The fee that matters is the <strong>stacked</strong> fee: pool fee, then the miner software's dev fee on what's left. Enter your hashrate — the desk does the rest against dated network defaults you can override.</p></div>
+    <div class="cmp-inputs">
+      <label>Your hashrate <input id="c-hash" type="number" min="0" step="any" value="2.5">
+        <select id="c-unit"><option>MH/s</option><option>GH/s</option><option selected>TH/s</option></select></label>
+      <label>Network hashrate (TH/s) <input id="c-net" type="number" min="0" step="any"></label>
+      <label>Block reward (QTC) <input id="c-reward" type="number" min="0" step="any"></label>
+    </div>
+    <div id="c-out"></div>
+  </section>
+
+  <section class="card">
+    <div class="sec-head"><h2>Connection command builder</h2><p>Pick a pool and miner software, paste your payout address — get the exact command. Endpoints and pins are snapshots: the builder warns you where you must re-copy from the pool's live page.</p></div>
+    <div class="cmd-grid">
+      <label>Pool <select id="b-pool"></select></label>
+      <label>Miner software <select id="b-miner"></select></label>
+      <label>Payout address <input id="b-addr" type="text" placeholder="qz…" autocomplete="off" spellcheck="false"></label>
+      <label>Worker (optional) <input id="b-worker" type="text" placeholder="rig1" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <div id="b-warn"></div>
+    <pre id="b-out" class="cmdout">Enter your qz… payout address to generate the command.</pre>
+    <button id="b-go" class="btn">Copy command</button>
+  </section>
+
+  <section class="card">
+    <div class="sec-head"><h2>Pool vs Solo vs your own node</h2><p>The real tradeoff: a pool sells you variance smoothing. Solo keeps the whole block but pays you in lottery tickets.</p></div>
+    <div id="matrix" class="matrix-wrap"></div>
+  </section>
+
+  <section class="card">
+    <div class="sec-head"><h2>How PPLNS actually works</h2><p>Both pools pay PPLNS — Pay Per Last N Shares.</p></div>
+    <div class="pplns">
+      <div class="pplns-step"><strong>1. You submit shares</strong><p>Your miner proves work continuously. Valid shares enter the pool's window; stale or invalid ones don't.</p></div>
+      <div class="pplns-step"><strong>2. The pool finds a block</strong><p>The block reward (minus the pool fee) is split across every share inside the window — weighted by share difficulty.</p></div>
+      <div class="pplns-step"><strong>3. The window slides</strong><p>AriaPool's window is <strong>2 × the block's difficulty</strong> — roughly two blocks' worth of network work. Shares older than that fall out. Stop mining and your weight decays to zero: pool-hopping across a dry spell earns you nothing.</p></div>
+      <div class="pplns-step"><strong>4. Confirmations, then payout</strong><p>Rewards credit once the block is confirmed (Quanpool: 105 blocks). Then the payout schedule runs — twice daily on AriaPool, hourly on Quanpool — and balances below the minimum carry over.</p></div>
+    </div>
+    <p class="fine">Luck cuts both ways: a pool that finds blocks faster than expected pays above the statistical average for a while, and vice versa. The comparator above shows the expectation; the chain decides the reality.</p>
+  </section>
+
+  <section class="card">
+    <div class="sec-head"><h2>Run your own pool</h2><p>For operators: <a href="https://github.com/mining-pool/not-only-mining-pool" target="_blank" rel="noopener">not-only-mining-pool</a> is open-source Go pool software with a <strong>Quantus engine in the default build</strong>.</p></div>
+    <ul class="op-list">
+      <li><strong>Speaks both miner dialects</strong> — native QUIC (<code>quantus-miner/2</code> with token auth + certificate pinning) and LuckyPool Quantus Stratum over TCP/TLS, so the official miner and SRBMiner-Multi work concurrently.</li>
+      <li><strong>Pure-Go Poseidon2 verification</strong> of 512-bit nonces with strict U512 targets; fixed integer share difficulty per port.</li>
+      <li><strong>PROP/SOLO payouts</strong> driven by finalized chain events with an independently funded signing wallet.</li>
+      <li><strong>Validated end-to-end on a real node in CI</strong> — per the repo's engine docs, every engine below the reference Bitcoin path is E2E-tested against a live node.</li>
+    </ul>
+    <p class="fine">Source: github.com/mining-pool/not-only-mining-pool (README + docs/PLUGGABLE_ENGINES.md), verified 2026-10-01. Running a pool makes you a custodian of other people's hashrate — the trust section at the top applies to you doubly.</p>
+  </section>
+
+  <section class="card">
+    <div class="sec-head"><h2>Safety checklist</h2></div>
+    <ul class="check">
+      <li><span class="yn">✓</span> Pool gets your <code>qz…</code> address. Nothing else. Ever.</li>
+      <li><span class="yn">✓</span> Verify miner SHA-256 checksums before running anything you downloaded.</li>
+      <li><span class="yn">✓</span> Re-copy the server address and TLS pin from the pool's live page — never from a screenshot, a chat message, or this desk.</li>
+      <li><span class="yn">✓</span> Watch your address on the pool's own stats page after the first share; if it never appears, your endpoint or pin is wrong.</li>
+      <li><span class="yn">✓</span> Keep miner/RPC/metrics ports off the public internet; only P2P (30333/tcp) should be public on a node.</li>
+      <li><span class="yn">✗</span> Never paste your 24-word phrase into pool software or a website. Address only.</li>
+      <li><span class="yn">✗</span> Don't "verify" a pool by sending it QTC — payouts flow pool → you, never the reverse.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="sec-head"><h2>Sources</h2><p>Every number on this page traces to one of these, with the read date.</p></div>
+    <ul class="sources">
+      <li><a href="https://pool.ariabrain.com/qtc.html" target="_blank" rel="noopener">AriaPool pool page</a> <span class="sdate">read 2026-10-01</span><br><span class="snote">Fee, PPLNS terms, payout schedule, endpoints, miner builds + SHA-256 checksums, TLS pin, QPoW constants.</span></li>
+      <li><a href="https://github.com/0xmoei/quantus" target="_blank" rel="noopener">0xmoei/quantus community mining guide</a> <span class="sdate">read 2026-10-01</span><br><span class="snote">Quanpool terms table and the pool-vs-solo-vs-node matrix; terms as published on quanpool.com at guide-writing time.</span></li>
+      <li><a href="https://quanpool.com/" target="_blank" rel="noopener">quanpool.com</a> <span class="sdate">read 2026-10-01</span><br><span class="snote">Pool stats + per-address lookup (JS-rendered). Re-copy the live Start mining command from the site.</span></li>
+      <li><a href="https://github.com/mining-pool/not-only-mining-pool" target="_blank" rel="noopener">not-only-mining-pool</a> <span class="sdate">read 2026-10-01</span><br><span class="snote">Open-source pool software: Quantus engine (QUIC + LuckyPool Stratum), PROP/SOLO payouts, CI E2E on a real node.</span></li>
+      <li><a href="https://www.quantus.com/blog/weekly-update-09-16-2026/" target="_blank" rel="noopener">Quantus weekly update — mainnet week 1</a> <span class="sdate">2026-09-16</span><br><span class="snote">11.2 TH/s average / 24.4 TH/s peak network hashrate, 7,000+ GPUs, 53,000+ blocks.</span></li>
+    </ul>
+  </section>
+
+  <footer class="site">
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="note">Pool facts read from the pools' own pages on 2026-10-01 (see Sources). Terms, endpoints, and TLS pins change — re-verify on the pool's site before connecting. Independent builder work — not affiliated with the Quantus team or any pool operator.</span>
+  </footer>
+</main>
+<script src="js/app.js?v=1.43.0"></script>
+</body>
+</html>
