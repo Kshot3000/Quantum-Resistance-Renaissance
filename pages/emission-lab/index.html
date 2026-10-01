@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
 <title>QTC Emission Lab — the exponential tail of a 21M supply</title>
 <meta name="description" content="Quantus Emission Lab: the exact on-chain block-reward formula R = (21M − S) / 50,000,000 verified against the runtime source, live reward pulse from the indexer, an interactive decay simulator, milestone timeline, and 80-year supply projections. No halvings — smooth exponential decay.">
-<link rel="stylesheet" href="styles.css?v=1.15.0">
+<link rel="stylesheet" href="styles.css?v=1.15.1">
 <style>:root{--focus:#ffd166;}</style>
 </head>
 <body>
@@ -175,10 +175,10 @@
       <h2>Milestone <span class="gold">timeline</span> <span class="badge b-model">model</span></h2>
       <p class="note">When the decay crosses the markers miners actually care about.</p>
     </div>
-    <table class="miles">
+    <div class="table-wrap"><table class="miles">
       <thead><tr><th>Milestone</th><th>Projected date</th><th>Blocks away</th><th>Reward then</th></tr></thead>
       <tbody id="milestone-rows"></tbody>
-    </table>
+    </table></div>
     <p class="chart-note" id="milestone-note"></p>
   </section>
 

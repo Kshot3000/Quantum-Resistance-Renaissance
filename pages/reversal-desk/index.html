@@ -6,7 +6,7 @@
 <title>QTC Reversal Desk — the reversible-transfers command center</title>
 <meta name="description" content="QTC Reversal Desk: the command center for Quantus's reversible transfers — the signature chain feature. Interactive delay planner with exact unsigned call data, the permanent high-security enrollment desk with quota simulator, the guardian console, and the live pending queue from the indexer. Every constant cited to upstream source.">
 <link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
-<link rel="stylesheet" href="styles.css?v=1.50.0">
+<link rel="stylesheet" href="styles.css?v=1.50.1">
 <link rel="icon" href="../../assets/favicon.svg?v=1.16.0" type="image/svg+xml">
 </head>
 <body>
@@ -221,7 +221,7 @@
   <section class="panel" id="guardianDesk">
     <h2>Guardian console <span class="sub">what the guardian can actually do</span></h2>
     <p>The guardian is not a co-signer — they are a <strong>unilateral rescue key</strong>. Two powers, no approval needed from the account owner:</p>
-    <table class="matrix">
+    <div class="table-wrap"><table class="matrix">
       <thead><tr><th>Power</th><th>Who can call it</th><th>What happens, exactly</th></tr></thead>
       <tbody>
         <tr>
@@ -236,6 +236,7 @@
         </tr>
       </tbody>
     </table>
+    </div>
     <h3 style="font-size:16px;margin:18px 0 6px">The guardian checklist</h3>
     <ul class="checklist">
       <li><strong>Use a multisig as guardian.</strong> The pallet docs recommend it verbatim; a multisig dispatches as its derived address and can cancel/recover exactly like a plain account — with no single point of failure and no quota lockout.</li>
@@ -249,7 +250,7 @@
   <section class="panel" id="refDesk">
     <h2>Call reference <span class="sub">exact indices for offline builders</span></h2>
     <p>Pallet <code>ReversibleTransfers</code> sits at <strong>runtime index 11</strong> (<code>runtime/src/lib.rs</code>). All of the following verified at Quantus-Network/chain rev <code>482c5b9</code>.</p>
-    <table class="matrix">
+    <div class="table-wrap"><table class="matrix">
       <thead><tr><th>Call</th><th>Index</th><th>Args (SCALE)</th><th>Who</th></tr></thead>
       <tbody>
         <tr><td><code>set_high_security</code></td><td>0</td><td><code>delay: BlockNumberOrTimestamp</code> (0x00‖u32 LE blocks | 0x01‖u64 LE ms), <code>guardian: AccountId</code> (32 B)</td><td>any account, once — one-way</td></tr>
@@ -261,6 +262,7 @@
         <tr><td><code>recover_funds</code></td><td>7</td><td><code>account: AccountId</code> (32 B)</td><td>the account's guardian</td></tr>
       </tbody>
     </table>
+    </div>
     <h3 style="font-size:16px;margin:18px 0 6px">High-security transaction rules</h3>
     <ul class="checklist">
       <li><strong>Whitelist:</strong> <code>schedule_transfer</code> (dest must be <code>MultiAddress::Id</code> — a stolen key can't pad <code>Raw</code> to inflate the length fee), <code>cancel</code>, <code>recover_funds</code>, or a flat non-nested <code>batch_all</code> of ≤ 16 of those.</li>

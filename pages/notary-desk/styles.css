@@ -46,6 +46,10 @@ header.topbar .back:hover { color: var(--amber); }
 .brand strong { display: block; font-size: 17px; letter-spacing: 0.3px; font-family: var(--serif); }
 .brand > div span { display: block; font-size: 12px; color: var(--dim); }
 .top-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+@media (max-width: 640px) {
+  header.topbar { flex-wrap: wrap; row-gap: 10px; padding: 12px 14px; }
+  .top-actions { flex-basis: 100%; margin-left: 0; justify-content: flex-start; flex-wrap: wrap; }
+}
 .pill { font-size: 12px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line-hot); color: var(--amber); background: rgba(245,185,66,.08); white-space: nowrap; }
 .pill.ghost { border-color: var(--line); color: var(--dim); background: transparent; }
 .qmb-switch summary { cursor: pointer; list-style: none; font-size: 13px; color: var(--dim); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }
@@ -195,4 +199,4 @@ main.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
 
 footer { text-align: center; padding: 30px 20px; color: var(--faint); font-size: 13px; line-height: 2; border-top: 1px solid var(--line); }
 footer a { color: var(--amber); }
-footer code { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+footer code { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }

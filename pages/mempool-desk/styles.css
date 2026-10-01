@@ -181,4 +181,5 @@ h2 .sub{color:var(--muted);font-size:13.5px;font-weight:500;margin-left:8px}
 @media (max-width:720px){
   .form-grid{grid-template-columns:1fr}
   .s-amount{min-width:0}
+  footer .addr{max-width:100%;overflow-wrap:anywhere;word-break:break-all;white-space:normal}
 }

@@ -72,6 +72,7 @@ input[type=range]{width:100%;accent-color:var(--gold);height:28px;cursor:pointer
   border-radius:0 10px 10px 0}
 
 table.miles{width:100%;border-collapse:collapse;margin-top:18px;font-size:14.5px}
+.table-wrap{overflow-x:auto}
 table.miles th{text-align:left;color:var(--muted);font-size:12px;text-transform:uppercase;
   letter-spacing:.12em;padding:10px 12px;border-bottom:1px solid var(--line)}
 table.miles td{padding:13px 12px;border-bottom:1px solid rgba(255,209,102,.07);
@@ -103,5 +104,5 @@ footer{margin-top:34px;padding:26px 6px 10px;border-top:1px solid var(--line);
 footer a{color:var(--gold)}
 footer .addr{background:rgba(255,209,102,.08);border:1px solid var(--line);color:var(--gold);
   border-radius:8px;padding:3px 10px;font-family:ui-monospace,monospace;font-size:12.5px;
-  cursor:pointer}
+  cursor:pointer;max-width:100%;overflow-wrap:anywhere;word-break:break-all;white-space:normal}
 footer .addr:hover{background:rgba(255,209,102,.16)}

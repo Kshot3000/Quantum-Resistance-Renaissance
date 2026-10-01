@@ -50,6 +50,10 @@ header.topbar .back:hover { color: var(--grn); }
 .brand strong { display: block; font-size: 17px; letter-spacing: 0.3px; }
 .brand span { display: block; font-size: 12px; color: var(--dim); }
 .top-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+@media (max-width: 640px) {
+  header.topbar { flex-wrap: wrap; row-gap: 10px; padding: 12px 14px; }
+  .top-actions { flex-basis: 100%; margin-left: 0; justify-content: flex-start; flex-wrap: wrap; }
+}
 .pill {
   font-size: 12px; padding: 5px 12px; border-radius: 999px;
   border: 1px solid var(--grn-dim); color: var(--grn); background: rgba(74, 222, 128, 0.08);

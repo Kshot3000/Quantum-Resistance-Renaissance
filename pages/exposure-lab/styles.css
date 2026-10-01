@@ -211,7 +211,7 @@ body{
 .sources{ color:var(--dim); font-size:.85rem; margin-top:1rem; max-width:90ch; }
 
 footer{ margin-top:3rem; }
-footer .mono{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.85em; }
+footer .mono{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.85em; overflow-wrap:anywhere; }
 @media (max-width:640px){
   .sum-grid{ flex-direction:column; align-items:flex-start; }
   .hint{ margin-left:0; }

@@ -32,12 +32,12 @@ h2 .mono{font-size:20px}
 .sec-lede{color:var(--cl-dim);margin:0 0 18px;max-width:78ch}
 .sub{font-size:16px;color:var(--cl-mint);margin:22px 0 10px;letter-spacing:.04em}
 .formula-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
-@media(max-width:900px){.formula-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.formula-grid{grid-template-columns:minmax(0,1fr)}}
 .formula-card,.sim-card{border:1px solid var(--cl-line);border-radius:14px;padding:18px;background:rgba(6,10,20,.6)}
 .fc-title{font-weight:800;letter-spacing:.06em;font-size:13px;text-transform:uppercase;color:var(--cl-violet);margin-bottom:10px}
 pre.code{background:#04070f;border:1px solid var(--cl-line);border-radius:10px;padding:14px;overflow-x:auto;
   font-size:12.5px;line-height:1.65;color:#c9f5de}
-.const-table{margin-top:12px}
+.const-table{margin-top:12px;overflow-x:auto}
 .const-table table{width:100%;border-collapse:collapse;font-size:12.5px}
 .const-table td{padding:5px 4px;border-bottom:1px dashed var(--cl-line);color:var(--cl-dim)}
 .const-table td:last-child{text-align:right;color:var(--cl-text)}
