@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Notary Desk — on-chain timestamping &amp; proof-of-existence for Quantus</title>
+<meta name="description" content="QTC Notary Desk: timestamp any document on the Quantus blockchain with byte-exact System.remark extrinsics, verify proof-of-existence, and read the live public remark board. 100% client-side.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.47.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.47.0" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">📜</span>
+    <div><strong>QTC Notary Desk</strong><span>The on-chain timestamping &amp; proof-of-existence desk</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">Verified 2026-10-01</span>
+    <span class="pill ghost">Never signs</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a href="../pool-desk/"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
+    <a href="../pay-desk/"><span class="ico">🧾</span><span>Pay Desk<span class="meta">Merchant acceptance toolkit</span></span></a>
+    <a href="../cli-forge/"><span class="ico">💻</span><span>CLI Forge<span class="meta">Command builder</span></span></a>
+    <a href="../luck-lab/"><span class="ico">🍀</span><span>Luck Lab<span class="meta">Luck & variance lab</span></span></a>
+    <a href="../notary-desk/" class="current"><span class="ico">📜</span><span>Notary Desk<span class="meta">On-chain timestamping</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="seal" aria-hidden="true">◈</div>
+    <h1>Prove it existed. <em>On-chain.</em></h1>
+    <p class="lede">Hash any document in your browser, wrap the digest in a versioned envelope, and anchor it to the Quantus blockchain with a byte-exact <code>System.remark</code> extrinsic — post-quantum sealed from the genesis block. Anyone can verify it later, with or without this desk.</p>
+    <div class="hero-facts">
+      <div><strong>pallet 0 · call 7</strong><span><code>remark_with_event</code> — emits <code>System.Remarked</code></span></div>
+      <div><strong>100k plancks / byte</strong><span>exact length-fee, runtime polynomial</span></div>
+      <div><strong>0 keys leave</strong><span>this desk never signs anything</span></div>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Notary desks">
+    <button class="tab active" data-tab="stamp" role="tab" aria-selected="true">Timestamp Studio</button>
+    <button class="tab" data-tab="verify" role="tab" aria-selected="false">Verify Desk</button>
+    <button class="tab" data-tab="board" role="tab" aria-selected="false">Remark Board</button>
+    <button class="tab" data-tab="spec" role="tab" aria-selected="false">Envelope Spec</button>
+  </nav>
+
+  <!-- ============ TIMESTAMP STUDIO ============ -->
+  <section class="panel active" id="tab-stamp" role="tabpanel">
+    <div class="grid-2">
+      <div class="card">
+        <h2>1 · What are you anchoring?</h2>
+        <div class="seg" id="modeSeg" role="radiogroup" aria-label="Anchor mode">
+          <button class="seg-btn active" data-mode="document" role="radio" aria-checked="true">📄 Document hash</button>
+          <button class="seg-btn" data-mode="message" role="radio" aria-checked="false">💬 Plain message</button>
+        </div>
+        <div id="docInputs">
+          <div class="drop" id="drop" tabindex="0" role="button" aria-label="Drop a file to hash">
+            <div class="drop-ico">📥</div>
+            <div><strong>Drop a file here</strong> — or <span class="linklike" id="browseLink">browse</span></div>
+            <div class="hint">Hashed locally in streaming chunks. Nothing is uploaded — the file never leaves your machine.</div>
+            <input type="file" id="fileInput" hidden>
+          </div>
+          <div class="or">or paste a known digest</div>
+          <label class="fld"><span>Digest (64 hex chars)</span>
+            <input id="digestInput" class="mono" placeholder="e.g. ba7816bf…" spellcheck="false" autocomplete="off">
+          </label>
+          <div class="row-2">
+            <label class="fld"><span>Digest algorithm</span>
+              <select id="algoSel">
+                <option value="1">SHA-256</option>
+                <option value="2">BLAKE2b-256</option>
+              </select>
+            </label>
+            <label class="fld"><span>Label (≤ 64 bytes, optional)</span>
+              <input id="labelInput" placeholder="e.g. Contract v3 — 2026-10-01" maxlength="120">
+            </label>
+          </div>
+        </div>
+        <div id="msgInputs" hidden>
+          <label class="fld"><span>Message (UTF-8, ≤ 4096 bytes — stored raw on-chain)</span>
+            <textarea id="msgInput" rows="4" placeholder="Type the message to anchor verbatim…"></textarea>
+          </label>
+          <div class="hint" id="msgBytes">0 / 4096 bytes</div>
+        </div>
+        <h2>2 · On-chain footprint</h2>
+        <div class="seg" id="eventSeg" role="radiogroup" aria-label="Remark variant">
+          <button class="seg-btn active" data-ev="1" role="radio" aria-checked="true">📯 <code>remark_with_event</code> <em>recommended</em></button>
+          <button class="seg-btn" data-ev="0" role="radio" aria-checked="false">📝 <code>remark</code> <em>cheaper</em></button>
+        </div>
+        <p class="hint"><code>remark_with_event</code> emits a <code>System.Remarked&nbsp;{&nbsp;sender,&nbsp;hash&nbsp;}</code> event (hash&nbsp;=&nbsp;Blake2-256 of your bytes), so anyone — including the Remark Board — can find your anchor later. Plain <code>remark</code> stores the same bytes for ~the same fee but emits no event, so it is only discoverable by scanning extrinsics.</p>
+        <button class="btn primary big" id="buildBtn">⚒ Build unsigned extrinsic</button>
+      </div>
+
+      <div class="card">
+        <h2>3 · The unsigned extrinsic</h2>
+        <div id="stampEmpty" class="empty">Build an anchor on the left — the byte-exact call, its anatomy, and the exact fee math appear here.</div>
+        <div id="stampOut" hidden>
+          <div class="kv"><span>Digest</span><code class="mono wrap" id="oDigest">—</code></div>
+          <div class="kv"><span>Envelope</span><code class="mono wrap" id="oEnvelope">—</code></div>
+          <div class="kv"><span>Call</span><code class="mono wrap strong" id="oCall">—</code>
+            <button class="btn tiny" data-copy="oCall">Copy</button></div>
+          <h3>Byte anatomy</h3>
+          <div class="anatomy" id="oAnatomy"></div>
+          <h3>Fee ledger <span class="tag-note">exact length fee</span></h3>
+          <table class="ledger" id="oFees"></table>
+          <div class="row-2">
+            <label class="fld"><span>Your signature scheme</span>
+              <select id="sigSel">
+                <option value="mldsa65">ML-DSA-65 (3309B sig)</option>
+                <option value="mldsa87">ML-DSA-87 (4627B sig)</option>
+              </select>
+            </label>
+            <label class="fld"><span>Your current nonce</span>
+              <input id="nonceInput" inputmode="numeric" value="0">
+            </label>
+          </div>
+          <div class="warnbox">
+            <strong>🔏 This desk never signs.</strong>
+            Take the call hex to a wallet that holds your key, or paste it into the
+            <a href="../chain-console/">Chain Console</a> broadcast gate (explicit review step) after signing it there.
+            Keep your account above the 0.001&nbsp;QTC existential deposit.
+          </div>
+          <button class="btn" id="saveVaultBtn">💾 Save anchor to my vault</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VERIFY DESK ============ -->
+  <section class="panel" id="tab-verify" role="tabpanel" hidden>
+    <div class="grid-2">
+      <div class="card">
+        <h2>Check a document</h2>
+        <div class="drop" id="vDrop" tabindex="0" role="button" aria-label="Drop a file to verify">
+          <div class="drop-ico">🔍</div>
+          <div><strong>Drop the file to verify</strong></div>
+          <div class="hint">Its digests are recomputed locally and compared against your vault.</div>
+          <input type="file" id="vFileInput" hidden>
+        </div>
+        <div class="or">or paste a digest</div>
+        <label class="fld"><span>Digest (64 hex chars)</span>
+          <input id="vDigestInput" class="mono" placeholder="paste a SHA-256 or BLAKE2b-256 digest" spellcheck="false" autocomplete="off">
+        </label>
+        <button class="btn primary" id="vCheckBtn">Verify against my vault</button>
+        <div id="vResult" class="vresult" hidden></div>
+      </div>
+      <div class="card">
+        <h2>My anchor vault</h2>
+        <p class="hint">Anchors you built in the Timestamp Studio, stored only in this browser (localStorage). Record the block number once your extrinsic lands.</p>
+        <div id="vaultList" class="vault"></div>
+        <div class="row-end"><button class="btn tiny danger" id="vaultClear">Clear vault</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REMARK BOARD ============ -->
+  <section class="panel" id="tab-board" role="tabpanel" hidden>
+    <div class="card">
+      <div class="board-head">
+        <div>
+          <h2>The public remark board</h2>
+          <p class="hint">Every <code>System.Remarked</code> event this desk observes, decoded live. Envelopes built here render as document cards; anything else renders verbatim.</p>
+        </div>
+        <div class="conn">
+          <label class="fld inline"><span>RPC</span><input id="rpcUrl" class="mono" value="wss://rpc.quantus.network" spellcheck="false"></label>
+          <button class="btn primary" id="connBtn">Connect &amp; watch</button>
+          <button class="btn" id="backBtn" disabled>Scan back 720 blocks</button>
+        </div>
+      </div>
+      <div class="statusline"><span class="dot" id="connDot"></span><span id="connStatus">Disconnected — the board shows nothing until you connect. No snapshot exists for remarks; this board is live-only.</span></div>
+      <div class="progress" id="scanProg" hidden><div class="bar"></div><span class="lbl"></span></div>
+      <div id="boardList" class="board"><div class="empty">No remarks observed yet.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ SPEC ============ -->
+  <section class="panel" id="tab-spec" role="tabpanel" hidden>
+    <div class="card">
+      <h2>Notary envelope v1 — the spec</h2>
+      <p>Anyone can verify a QTC Notary anchor without this desk. The remark bytes are:</p>
+      <table class="spec">
+        <tr><th>Field</th><th>Bytes</th><th>Value</th></tr>
+        <tr><td>magic</td><td class="mono">51 4E 4F 54 2F 31</td><td>ASCII <code>"QNOT/1"</code></td></tr>
+        <tr><td>algo</td><td class="mono">01 <em>or</em> 02</td><td><code>0x01</code> = SHA-256, <code>0x02</code> = BLAKE2b-256</td></tr>
+        <tr><td>digest</td><td>32 bytes</td><td>the document digest</td></tr>
+        <tr><td>label</td><td>compact length + UTF-8</td><td>0–64 bytes, human description</td></tr>
+      </table>
+      <h3>Verification recipe (independent)</h3>
+      <ol class="recipe">
+        <li>Hash your document with the stated algorithm → compare with the envelope digest.</li>
+        <li>Rebuild the envelope bytes exactly as above → hash them with <strong>Blake2-256</strong> (the runtime's <code>T::Hashing</code>).</li>
+        <li>Find the <code>System.Remarked&nbsp;{&nbsp;sender,&nbsp;hash&nbsp;}</code> event (pallet&nbsp;0, event&nbsp;variant&nbsp;5) carrying that hash — the block number is your timestamp, the sender is your attestor.</li>
+      </ol>
+      <h3>Chain facts this desk stands on <span class="tag-note">Quantus-Network/chain @ 482c5b9</span></h3>
+      <ul class="facts">
+        <li><code>System.remark</code> = pallet <strong>0</strong>, call <strong>0</strong> (<code>Vec&lt;u8&gt;</code>); <code>remark_with_event</code> = call <strong>7</strong> — <a href="https://github.com/Quantus-Network/chain/blob/main/pallets/frame-system/src/lib.rs" target="_blank" rel="noopener">pallets/frame-system/src/lib.rs</a> @ 482c5b9</li>
+        <li>Length fee <strong>100,000 plancks/byte</strong> — <code>LENGTH_FEE_MULTIPLIER = 1_000_000</code> × <code>FEE_SCALE</code> 1/10, <a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/configs/mod.rs" target="_blank" rel="noopener">runtime/src/configs/mod.rs</a></li>
+        <li><code>UNIT = 10<sup>12</sup></code> plancks; existential deposit 0.001 QTC — <a href="https://github.com/Quantus-Network/chain/blob/main/runtime/src/lib.rs" target="_blank" rel="noopener">runtime/src/lib.rs</a></li>
+        <li>Signed-extrinsic signature section: <code>0x00</code> = ML-DSA-87 [4627B sig ‖ 2592B pub], <code>0x01</code> = ML-DSA-65 [3309B ‖ 1952B] — verified against real on-chain extrinsics (see the Extrinsic Lab)</li>
+      </ul>
+      <h3>Honest limits</h3>
+      <ul class="facts">
+        <li>A timestamp proves a document <strong>existed no later than</strong> its block — it says nothing about authorship beyond the sender key, and nothing about the document's truth.</li>
+        <li>Remarks are <strong>public forever</strong>. Never anchor secrets or plaintext you wouldn't publish.</li>
+        <li>Plain <code>remark</code> (no event) is only discoverable by scanning raw extrinsics — prefer <code>remark_with_event</code> unless you need the cheapest footprint.</li>
+        <li>Fees quoted here are the <strong>exact length fee</strong>; the small weight fee depends on runtime benchmarks and is quoted separately where shown.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> ·
+    <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    Donations (QTC): <code class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code>
+  </footer>
+</main>
+
+<script src="js/vendor/twox.js?v=1.47.0"></script>
+<script src="js/notary-codec.js?v=1.47.0"></script>
+<script type="module" src="js/app.js?v=1.47.0"></script>
+</body>
+</html>
