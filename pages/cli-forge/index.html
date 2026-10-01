@@ -1,32 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC CLI Forge — build correct quantus commands</title>
+<meta name="description" content="QTC CLI Forge: an interactive command builder for the Quantus CLI. 110 commands across wallets, payments, multisig, governance, vesting, chain data, Wormhole privacy, NEAR bridge, airdrops and runtime upgrades — flag map verified field-by-field against the real quantus-cli source. Live validation, POSIX-safe quoting, planck previews, and verified recipe flows.">
 <link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
-<title>QTC Address Toolkit — Quantus Muse Builder</title>
-<meta name="description" content="Inspect any Quantus (QTC) address: decode the SS58 payload, verify the blake2b checksum, and encode 32-byte keys into prefix-189 addresses. All client-side, no network calls.">
-<link rel="stylesheet" href="styles.css?v=1.8.0">
-<style>:root{--focus:#34ff88;}</style>
+<link rel="stylesheet" href="styles.css?v=1.45.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.45.0" type="image/svg+xml">
 </head>
 <body>
-<a class="skip-link" href="#main">Skip to content</a>
-<div class="scan" aria-hidden="true"></div>
-
-<header class="nav chrome">
-  <a class="back" href="../../">&larr; Builder Hub</a>
-  <div class="brand">QTC <span>Address Toolkit</span></div>
-  <div class="nav-end">
-    <nav class="links" aria-label="External links">
-      <a href="https://github.com/Quantus-Network/chain/blob/main/node/src/chain_spec.rs" target="_blank" rel="noopener">chain spec</a>
-      <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream</a>
-    </nav>
-<details class="qmb-switch">
-  <summary>Apps</summary>
-  <div class="qmb-menu" role="menu">
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">💻</span>
+    <div><strong>QTC CLI Forge</strong><span>The <code>quantus</code> command builder</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">Flag map: cli@531a932</span>
+    <span class="pill ghost">110 commands · 7 recipes</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
     <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
-    <a href="../address-toolkit/" class="current"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
     <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
     <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
     <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
@@ -65,89 +61,92 @@
     <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
     <a href="../pool-desk/"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
     <a href="../pay-desk/"><span class="ico">🧾</span><span>Pay Desk<span class="meta">Merchant acceptance toolkit</span></span></a>
-    <a href="../cli-forge/"><span class="ico">💻</span><span>CLI Forge<span class="meta">Command builder</span></span></a>
+    <a href="../cli-forge/" class="current"><span class="ico">💻</span><span>CLI Forge<span class="meta">Command builder</span></span></a>
     <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
-  </div>
-</details>
+      </div>
+    </details>
   </div>
 </header>
 
-<main id="main">
+<main>
   <section class="hero">
-    <p class="eyebrow">SS58 &middot; prefix 189 &middot; 100% client-side</p>
-    <h1>Is this QTC address <span class="grn">real?</span></h1>
-    <p class="lede">Paste any address. The toolkit decodes the SS58 payload, re-computes the <strong>blake2b checksum</strong>, and tells you exactly what it is — prefix, key bytes, and verdict. No network calls, no wallet, nothing leaves your browser.</p>
-  </section>
-
-  <section class="panel">
-    <div class="tabs" role="tablist">
-      <button class="tab active" id="tab-inspect" role="tab" aria-selected="true">Inspect address</button>
-      <button class="tab" id="tab-encode" role="tab" aria-selected="false">Encode key</button>
-    </div>
-
-    <div class="tabpage" id="page-inspect" role="tabpanel">
-      <label class="fld">Address to inspect
-        <input id="in-addr" type="text" spellcheck="false" autocomplete="off"
-               placeholder="qz&hellip;" aria-label="Address to inspect">
-      </label>
-      <div class="samples">
-        <span>Try:</span>
-        <button class="chip" data-sample="qzkmmtHL1XZ94LnDc43hTuUUW6o2jkjQBSgwSYF7Dm2JErapB">upstream genesis address</button>
-        <button class="chip" data-sample="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau">builder donation address</button>
+    <h1>Build the right command,<br>before you touch the terminal.</h1>
+    <p class="lede">The Quantus CLI is a big surface — 30+ command groups, Dilithium key schemes, reversible payments, multisig vaults, Tech Collective governance, Wormhole private transfers, NEAR bridges. Pick a command, fill the fields, and the forge assembles a <strong>copy-paste-ready</strong> invocation with live validation, safe shell quoting, and exact planck amounts.</p>
+    <div class="trust">
+      <div class="trust-card">
+        <strong>🔍 Source-verified</strong>
+        <p>Every flag, alias, default, conflict rule, and required field was read field-by-field from the real CLI source: <code>Quantus-Network/quantus-cli</code> at rev <code>531a932</code> (2026-10-01). Commands that don't exist upstream don't exist here.</p>
       </div>
-      <div id="verdict" class="verdict idle">
-        <div class="v-title">Awaiting input</div>
-        <div class="v-sub">Paste an address above — the verdict lands here.</div>
+      <div class="trust-card">
+        <strong>🔑 No password field, on purpose</strong>
+        <p>The CLI <em>refuses</em> passwords on the command line. Use <code>QUANTUS_WALLET_PASSWORD</code>, <code>QUANTUS_WALLET_PASSWORD_&lt;NAME&gt;</code>, or <code>--password-file</code> — the forge never asks for your secrets.</p>
       </div>
-      <div id="decode-table" class="kv" hidden></div>
-      <p class="fine">Format check only — this validates the address <em>structure</em>, not whether the account exists or holds funds on-chain.</p>
-    </div>
-
-    <div class="tabpage" id="page-encode" role="tabpanel" hidden>
-      <div class="enc-grid">
-        <label class="fld">Public key (hex)
-          <input id="in-hex" type="text" spellcheck="false" autocomplete="off"
-                 placeholder="64 hex characters = 32 bytes" aria-label="Public key in hex">
-        </label>
-        <label class="fld narrow">SS58 prefix
-          <input id="in-prefix" type="number" min="0" max="16383" value="189" aria-label="SS58 prefix">
-        </label>
+      <div class="trust-card">
+        <strong>⚠️ Validation ≠ guarantee</strong>
+        <p>The forge checks formats, ranges, conflicts, and required flags against the flag map. It cannot check chain state — balances, membership, or whether a proposal ID exists. Read the notes under each command.</p>
       </div>
-      <div class="samples">
-        <span>Try:</span>
-        <button class="chip" id="chip-rand">random 32-byte key</button>
-      </div>
-      <div id="enc-out" class="verdict idle">
-        <div class="v-title">Awaiting key</div>
-        <div class="v-sub">Enter 64 hex characters — the SS58 address appears here.</div>
-      </div>
-      <p class="fine">Encoding is pure math: <span class="mono">base58(prefix &Vert; key &Vert; checksum)</span>, checksum = first 2 bytes of <span class="mono">blake2b("SS58PRE" &Vert; prefix &Vert; key)</span>.</p>
     </div>
   </section>
 
-  <section class="panel">
-    <h2>How a QTC address is built</h2>
-    <p class="body">Quantus uses the <strong>SS58</strong> address format (the Substrate standard) with network prefix <strong>189</strong> — set in <a href="https://github.com/Quantus-Network/chain/blob/main/node/src/chain_spec.rs" target="_blank" rel="noopener">chain_spec.rs</a>. That prefix is why every mainnet address starts with <span class="mono">qz</span>.</p>
-    <div class="bytes" aria-label="SS58 address byte layout">
-      <div class="bseg pfx"><span class="bl">prefix bytes</span><span class="bv">111 &middot; 64</span><span class="bn">= 189</span></div>
-      <div class="bseg key"><span class="bl">32-byte account key</span><span class="bv">32 bytes</span></div>
-      <div class="bseg chk"><span class="bl">checksum</span><span class="bv">2 bytes</span></div>
-    </div>
-    <div class="grid3">
-      <div class="fact"><div class="fk">Checksum</div><div class="fv">blake2b-512 of <span class="mono">"SS58PRE" + prefix + key</span>, first 2 bytes. Any typo breaks it.</div></div>
-      <div class="fact"><div class="fk">Base58</div><div class="fv">Bitcoin-style alphabet — no <span class="mono">0</span>, <span class="mono">O</span>, <span class="mono">I</span>, <span class="mono">l</span>. Ambiguous characters are rejected.</div></div>
-      <div class="fact"><div class="fk">Wrong network?</div><div class="fv">A valid SS58 address with a different prefix (e.g. Polkadot's 0) is flagged, not mistaken for QTC.</div></div>
+  <section class="globals-bar" aria-label="Global options">
+    <h2>Global options <span class="muted-sm">apply to every command</span></h2>
+    <div id="global-form" class="gform"></div>
+  </section>
+
+  <section class="forge">
+    <aside class="tree-panel">
+      <input id="cmd-search" type="search" placeholder="Search commands… e.g. multisig, airdrop, wormhole" aria-label="Search commands">
+      <p id="cmd-count" class="muted-sm"></p>
+      <div id="cmd-tree"></div>
+    </aside>
+    <div class="builder-panel" id="builder" aria-live="off"></div>
+  </section>
+
+  <section class="recipes-sec">
+    <h2>Recipes — verified multi-step flows</h2>
+    <p class="muted">Each step is generated from the same catalog as the forge above, so the commands match. Placeholders in <code>&lt;angle brackets&gt;</code> are yours to fill.</p>
+    <div id="recipes"></div>
+  </section>
+
+  <section class="install-sec">
+    <h2>Install &amp; password guide</h2>
+    <div class="two-col">
+      <div class="guide-card">
+        <h3>Install the CLI</h3>
+<pre class="terminal small">cargo install quantus-cli
+# or build from source:
+git clone https://github.com/Quantus-Network/quantus-cli
+cd quantus-cli && cargo build --release</pre>
+        <p class="muted-sm">The binary is named <code>quantus</code>. Requires Rust 1.89+ and a running node (local default <code>ws://127.0.0.1:9944</code>) for chain commands.</p>
+      </div>
+      <div class="guide-card">
+        <h3>Unlocking wallets safely</h3>
+<pre class="terminal small">export QUANTUS_WALLET_PASSWORD='…'
+# per-wallet:
+export QUANTUS_WALLET_PASSWORD_MAIN='…'
+quantus wallet view --name main</pre>
+        <p class="muted-sm">Never pass a password as a flag — the CLI rejects it. Non-interactive scripts use <code>--password-file &lt;path&gt;</code>.</p>
+      </div>
     </div>
   </section>
 
-  <footer>
+  <section class="sources-sec">
+    <h2>Sources &amp; limits</h2>
+    <ul class="slist">
+      <li><a href="https://github.com/Quantus-Network/quantus-cli" target="_blank" rel="noopener">Quantus-Network/quantus-cli</a> <span class="sdate">rev 531a932, read 2026-10-01</span><br><span class="snote">Complete flag map from <code>src/cli/*.rs</code>; password policy from <code>src/wallet/password.rs</code>; upgrade tracks from <code>src/extrinsic/mod.rs</code>.</span></li>
+      <li><a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network org (upstream)</a><br><span class="snote">Substrate/Polkadot-SDK chain, SS58 prefix 189, 12-decimal QTC. Mainnet 2026-09-09.</span></li>
+    </ul>
+    <p class="limits">Limits: the forge builds commands — it does not run them, watch the chain, or hold funds. No price data (no listing date at NEAR Intents as of 2026-10-01). Quantus addresses are checksummed locally with the vendored SS58-189 codec. Independent builder work — not affiliated with the Quantus team.</p>
+  </section>
+
+  <footer class="site">
     Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
     <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
-    Independent builder work — not affiliated with the Quantus team.
+    <span class="note">Flag map read 2026-10-01 from quantus-cli @ 531a932. Independent builder work — not affiliated with the Quantus team.</span>
   </footer>
 </main>
 
-<script src="app.js?v=1.8.0"></script>
-<script src="../../assets/app-nav.js?v=1.8.0"></script>
+<script src="js/ss58.js?v=1.45.0"></script>
+<script src="js/app.js?v=1.45.0"></script>
 </body>
 </html>
