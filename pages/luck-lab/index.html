@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Luck Lab — the mining-luck &amp; variance laboratory</title>
+<meta name="description" content="QTC Luck Lab: the true distribution of mining outcomes on Quantus — solo block-wait luck quantiles, Monte Carlo wait histograms, pool payout variance, and difficulty-shock scenarios, all on live chain data.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.46.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.46.0" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">🍀</span>
+    <div><strong>QTC Luck Lab</strong><span>The mining-luck &amp; variance laboratory</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">Verified 2026-10-01</span>
+    <span class="pill ghost">Real chain data</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a href="../pool-desk/"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
+    <a href="../pay-desk/"><span class="ico">🧾</span><span>Pay Desk<span class="meta">Merchant acceptance toolkit</span></span></a>
+    <a href="../cli-forge/"><span class="ico">💻</span><span>CLI Forge<span class="meta">Command builder</span></span></a>
+    <a href="../luck-lab/" class="current"><span class="ico">🍀</span><span>Luck Lab<span class="meta">Luck & variance lab</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Mining is a lottery with <em>known odds</em>.</h1>
+    <p class="lede">Every mining calculator shows you the <b>average</b>. The Luck Lab shows you the <b>distribution</b> — how long you'll <i>actually</i> wait for a solo block, what your month of pool payouts really looks like, and what happens when the network doubles overnight. All math is the memoryless Poisson model; all chain numbers come from the live Quantus indexer (snapshot fallback when it won't talk to your browser).</p>
+    <p class="hero-note">Nothing here is financial advice. Luck has no memory: a long drought never makes a block "due".</p>
+  </section>
+
+  <section class="panel" id="pulse">
+    <h2>Network pulse</h2>
+    <p class="sub">The numbers every calculation below is anchored to. <span id="pulse-src" class="src-badge">loading…</span></p>
+    <div class="stat-grid">
+      <div class="stat"><span class="k">Mining difficulty</span><span class="v" id="st-diff">—</span><span class="d">expected hashes per block</span></div>
+      <div class="stat"><span class="k">Network hashrate</span><span class="v" id="st-net">—</span><span class="d">difficulty ÷ 12 s</span></div>
+      <div class="stat"><span class="k">Block reward now</span><span class="v" id="st-reward">—</span><span class="d">R = (21M − minted) / 50M</span></div>
+      <div class="stat"><span class="k">Blocks / day</span><span class="v" id="st-bpd">—</span><span class="d">from recent block times</span></div>
+    </div>
+    <p class="fine" id="pulse-fine"></p>
+  </section>
+
+  <section class="panel" id="solo">
+    <h2>Solo luck — how long until <i>your</i> block?</h2>
+    <p class="sub">Your miner finds blocks as a memoryless Poisson process at rate <code>h / D</code> per second. The wait is exponential with mean <code>D / h</code> — the median wait is only 69% of the mean, and 1 in 10 miners wait more than <b>2.3×</b> the average.</p>
+    <div class="controls">
+      <label class="ctl">Your hashrate
+        <span class="row"><input id="solo-h" type="number" min="0" step="any" value="10">
+        <select id="solo-hu">
+          <option value="1">H/s</option><option value="1e3">kH/s</option>
+          <option value="1e6">MH/s</option><option value="1e9" selected>GH/s</option>
+          <option value="1e12">TH/s</option><option value="1e15">PH/s</option>
+        </select></span>
+      </label>
+      <label class="ctl">Quick set
+        <span class="row chips" id="solo-chips">
+          <button data-h="1e9">1 GH/s</button><button data-h="1e10" class="on">10 GH/s</button><button data-h="1e11">100 GH/s</button><button data-h="1e12">1 TH/s</button>
+        </span>
+      </label>
+      <label class="ctl">Simulation trials
+        <select id="solo-trials"><option value="2000">2,000</option><option value="10000" selected>10,000</option><option value="50000">50,000</option></select>
+      </label>
+    </div>
+    <div class="stat-grid six">
+      <div class="stat"><span class="k">Expected wait</span><span class="v gold" id="so-exp">—</span><span class="d">the "average" everyone quotes</span></div>
+      <div class="stat"><span class="k">Median wait</span><span class="v" id="so-med">—</span><span class="d">half of miners beat this</span></div>
+      <div class="stat"><span class="k">Lucky 10% by</span><span class="v green" id="so-p10">—</span><span class="d">1 in 10 finds one this fast</span></div>
+      <div class="stat"><span class="k">Unlucky 10% after</span><span class="v red" id="so-p90">—</span><span class="d">1 in 10 still waiting here</span></div>
+      <div class="stat"><span class="k">1% tail by</span><span class="v" id="so-p99">—</span><span class="d">99 of 100 found one by now</span></div>
+      <div class="stat"><span class="k">Blocks / day (you)</span><span class="v" id="so-rate">—</span><span class="d">your mean block rate</span></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h3>Probability tool</h3>
+        <p class="sub">Chance of finding <b>at least one</b> solo block within…</p>
+        <div class="controls">
+          <label class="ctl">Time window
+            <span class="row"><input id="prob-t" type="number" min="0" step="any" value="24">
+            <select id="prob-tu"><option value="3600" selected>hours</option><option value="86400">days</option><option value="604800">weeks</option></select></span>
+          </label>
+        </div>
+        <div class="big-odds"><span id="prob-out">—</span></div>
+        <p class="fine">P(≥1 block) = 1 − e<sup>−t/E</sup>. At your expected wait E, the chance is 63.2% — not 100%.</p>
+      </div>
+      <div class="card">
+        <h3>Drought odds</h3>
+        <p class="sub">The chance your wait runs <i>longer</i> than a multiple of the average.</p>
+        <table class="tbl" id="drought-tbl">
+          <thead><tr><th>Drought</th><th>Chance it happens</th><th>One in…</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="fine">This is not a malfunction — it is the exponential distribution doing its job.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Wait-time distribution <span class="tag">Monte Carlo</span></h3>
+      <p class="sub">Simulated solo waits (seeded, reproducible). The gold line is the <b>mean</b> everyone quotes; the green line is the <b>median</b> you should plan around.</p>
+      <canvas id="solo-hist" width="960" height="300"></canvas>
+      <p class="fine" id="solo-hist-note"></p>
+    </div>
+    <div class="callout">
+      <b>Memoryless means merciless.</b> After waiting the full expected time with no block, your chance of finding one in the <i>next</i> hour is exactly the same as it was at the start. Past droughts never "use up" bad luck — and past hot streaks never spend good luck either.
+    </div>
+  </section>
+
+  <section class="panel" id="pool">
+    <h2>Pool variance — the smoothing machine</h2>
+    <p class="sub">A fair pool pays you your proportional share of every block it finds, minus fees. The <b>expected</b> income equals solo mining minus the fee — but the <b>variance</b> collapses: instead of rare jackpots you get a steady drip. The simulator below runs real day-by-day draws.</p>
+    <div class="controls">
+      <label class="ctl">Your hashrate
+        <span class="row"><input id="pool-h" type="number" min="0" step="any" value="10">
+        <select id="pool-hu">
+          <option value="1">H/s</option><option value="1e3">kH/s</option>
+          <option value="1e6">MH/s</option><option value="1e9" selected>GH/s</option>
+          <option value="1e12">TH/s</option><option value="1e15">PH/s</option>
+        </select></span>
+      </label>
+      <label class="ctl">Pool fee
+        <span class="row"><input id="pool-fee" type="number" min="0" max="100" step="0.1" value="1"><span class="unit">%</span></span>
+      </label>
+      <label class="ctl">Simulated period
+        <select id="pool-days"><option value="30">30 days</option><option value="90" selected>90 days</option><option value="365">365 days</option></select>
+      </label>
+    </div>
+    <div class="stat-grid four">
+      <div class="stat"><span class="k">Expected / day</span><span class="v gold" id="po-exp">—</span><span class="d">fair-proportional, after fee</span></div>
+      <div class="stat"><span class="k">Expected / period</span><span class="v" id="po-tot">—</span><span class="d">after fee</span></div>
+      <div class="stat"><span class="k">Simulated p10 – p90</span><span class="v" id="po-band">—</span><span class="d">daily earnings, 80% band</span></div>
+      <div class="stat"><span class="k">Your share of network</span><span class="v" id="po-share">—</span><span class="d">h / H<sub>net</sub></span></div>
+    </div>
+    <div class="card">
+      <h3>Daily earnings: solo vs pool <span class="tag">Monte Carlo</span></h3>
+      <p class="sub">Same hashrate, same period — one histogram per strategy. Solo is a spike at zero with rare jackpots; the pool is a bell around the mean.</p>
+      <canvas id="pool-hist" width="960" height="320"></canvas>
+      <div class="legend"><span><i class="sw solo"></i>Solo daily QTC</span><span><i class="sw pool"></i><span id="pool-legend-label">Pool daily QTC (1% fee)</span></span></div>
+      <p class="fine" id="pool-hist-note"></p>
+    </div>
+    <div class="callout warn">
+      <b>Honest model boundaries.</b> This is a <i>fair-proportional</i> pool with zero stale shares and instant payouts — real pools add PPLNS-window noise, payout thresholds, and occasional downtime, all of which widen the band a little. The shape of the answer (pool smooths, fee costs) does not change.
+    </div>
+  </section>
+
+  <section class="panel" id="scenarios">
+    <h2>Difficulty-shock scenarios</h2>
+    <p class="sub">What if the network hashrate jumps <i>today</i>? Difficulty retargets every block (max +1/2048 up, −99/2048 down), so it chases the new reality — fast on the way down, slow on the way up. Your solo expected wait is recomputed at the new steady state.</p>
+    <table class="tbl" id="scen-tbl">
+      <thead><tr><th>Network hashrate</th><th>Your solo expected wait</th><th>Difficulty catch-up</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="fine">Catch-up assumes the full per-block step is used every block (worst case for miners on the way up). Your expected wait depends only on difficulty and your own hashrate — the network's size matters through difficulty, not directly.</p>
+  </section>
+
+  <section class="panel" id="method">
+    <h2>Method, formulas &amp; sources</h2>
+    <div class="two-col">
+      <div class="card">
+        <h3>The math</h3>
+        <ul class="bullets">
+          <li>Solo block finds: Poisson process, rate λ = h/D per second.</li>
+          <li>Expected wait E = D/h; luck quantile t<sub>p</sub> = −E·ln(1−p).</li>
+          <li>P(≥1 block in t) = 1 − e<sup>−t/E</sup>; P(wait &gt; k·E) = e<sup>−k</sup>.</li>
+          <li>Your blocks/day ~ Poisson(h·86400/D); pool blocks/day ~ Poisson(blocks/day).</li>
+          <li>Retarget catch-up: ×r up → ⌈2048·ln r⌉ blocks; ×r down → ⌈ln r / ln(1−99/2048)⌉ blocks.</li>
+          <li>Block reward: exact on-chain R = (21,000,000 − minted) / 50,000,000.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Honest caveats</h3>
+        <ul class="bullets">
+          <li>Difficulty, network hashrate, and reward are snapshots — they move every block.</li>
+          <li>No orphan/stale rate, no pool downtime, no fee tiers beyond the one you set.</li>
+          <li>QTC has no liquid market price used here — figures are in QTC, not dollars.</li>
+          <li>Simulations are seeded and reproducible, not predictions.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="fine">Chain numbers: live-first GraphQL against the public Quantus Subsquid indexer (<code>sqm.quantus.com</code>), falling back to the builder's same-origin snapshots <code>data/consensus.json</code> + <code>data/supply.json</code> (refreshed 2026-10-01). Difficulty semantics verified against <code>pallet_qpow</code> in Quantus-Network/chain — see the Consensus Lab.</p>
+  </section>
+
+  <footer class="site">
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="note">Independent builder work — not affiliated with the Quantus team. Math is the standard memoryless mining model; chain figures are snapshots, not promises.</span>
+  </footer>
+</main>
+
+<script src="js/luck-core.js?v=1.46.0"></script>
+<script src="js/app.js?v=1.46.0"></script>
+</body>
+</html>
