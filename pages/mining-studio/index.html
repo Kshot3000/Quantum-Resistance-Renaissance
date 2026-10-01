@@ -60,6 +60,7 @@
     <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
     <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
     <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
     <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
   </div>
 </details>
@@ -256,7 +257,7 @@
     </div>
     <div class="mon-grid">
       <div class="mon"><h3>Node logs</h3><p>Watch for <code>Imported #…</code> — if block numbers stop climbing, you're stalled.</p><code class="cmd-inline">tail -f ~/.local/share/quantus-node/chains/mainnet/network/quantus-node.log</code></div>
-      <div class="mon"><h3>Prometheus</h3><p>Node metrics at <code>http://localhost:9616/metrics</code> (override with <code>--prometheus-port</code>).</p></div>
+      <div class="mon"><h3>Prometheus</h3><p>Node metrics at <code>http://localhost:9615/metrics</code> (override with <code>--prometheus-port</code>). Upstream docs disagree on the default — 9615 in the current mining guide and <code>sc_cli</code> default, 9616 in the older <code>chain/MINING.md</code> table — confirm with <code>quantus-node --help</code>.</p></div>
       <div class="mon"><h3>Miner metrics</h3><p>The external miner exposes <code>http://localhost:9900/metrics</code> (override with <code>--metrics-port</code>).</p></div>
       <div class="mon"><h3>Telemetry</h3><p><a href="https://telemetry.quantus.cat" target="_blank" rel="noopener">telemetry.quantus.cat</a> — find your <code>--name</code> to confirm the network sees you.</p></div>
       <div class="mon"><h3>Local RPC</h3><p>Latest block, straight from your node:</p><code class="cmd-inline">curl -s -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"chain_getBlock","params":[]}' http://localhost:9944</code></div>
@@ -272,6 +273,6 @@
   </footer>
 </main>
 
-<script src="app.js?v=1.0.0"></script>
+<script src="app.js?v=1.0.1"></script>
 </body>
 </html>

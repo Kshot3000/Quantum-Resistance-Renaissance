@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Node Operator Desk — run your own Quantus node</title>
+<meta name="description" content="QTC Node Operator Desk: install paths, an exact launch-command builder from the real CLI flags, port & firewall map, the 7 verified mainnet bootnodes, sync monitor, log forensics, and the update procedure — every fact read from Quantus-Network source.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.38.0">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">&#128421;</span>
+    <div><strong>QTC Node Operator Desk</strong><span>Run your own Quantus node — the ops console</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill" id="snapPill" title="Data provenance">checking chain head&hellip;</span>
+  </div>
+</header>
+<details class="qmb-switch">
+  <summary>Apps</summary>
+  <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/" class="current"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+  </div>
+</details>
+
+<main>
+  <section class="hero panel">
+    <div class="hero-copy">
+      <p class="kicker">Quantus &middot; QTC &middot; node operations, read from the source</p>
+      <h1>Don't trust the network.<br><em>Be</em> the network.</h1>
+      <p class="lede">Running your own <code>quantus-node</code> is the single highest-leverage thing you
+      can do on a young proof-of-work chain: you verify every block yourself, you serve the
+      network, and you mine without trusting anyone's RPC. This desk is the operations console —
+      exact launch commands built from the real CLI flags, the verified port map, the seven
+      mainnet bootnodes, a sync monitor, a log forensics lab, and the real update procedure.</p>
+      <div class="honesty">
+        <span class="badge warn">&#9888; Every flag, port, and procedure below was read from Quantus-Network source on 2026-09-30 — sources in Method.</span>
+        <span class="badge">No systemd example is published upstream, so this desk ships none — we don't invent ops runbooks.</span>
+        <span class="badge ok">100% client-side &middot; nothing leaves your browser</span>
+      </div>
+    </div>
+    <div class="hero-stats" id="heroStats" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" id="sec-install" aria-labelledby="h-install">
+    <h2><span class="n">01</span> <span id="h-install">Install paths</span></h2>
+    <p class="sub">Three verified ways to get the <code>quantus-node</code> binary. Pick one — they all end at the same Launch Lab below. Hardware minimums from <code>chain/MINING.md</code>: 2+ CPU cores, 4 GB RAM, 100 GB disk, 3+ Mbps stable (below 3 Mbps the node likely can't stay synced). Recommended: 4+ cores, 8 GB+ RAM, 500 GB+ SSD, 10+ Mbps.</p>
+    <div class="grid3">
+      <div class="path-card">
+        <h3>📦 Release tarballs <span class="tag">recommended</span></h3>
+        <p>Prebuilt <code>quantus-node</code> + <code>quantus-miner</code> pairs from the chain repo. Always upgrade the pair together — the QUIC handshake pins ALPN <code>quantus-miner/2</code> and mismatched versions fail.</p>
+        <div class="term"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>releases</span><button class="copybtn" data-copy="https://github.com/Quantus-Network/chain/releases/latest">copy</button></div><pre>https://github.com/Quantus-Network/chain/releases/latest</pre></div>
+        <span class="src">src: chain releases page · node v1.0.1+ required for mainnet</span>
+      </div>
+      <div class="path-card">
+        <h3>🤖 Setup script</h3>
+        <p>The official installer from the docs site. <code>setup</code> fetches binaries and writes <code>mining.conf</code> (keeps your inner hash on re-runs with <code>--force</code>); <code>start</code> launches node + miner.</p>
+        <div class="term"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>setup script</span><button class="copybtn" data-copy="./quantus-mining.sh setup">copy</button></div><pre>./quantus-mining.sh setup
+./quantus-mining.sh start</pre></div>
+        <span class="src">src: docs/static/scripts/quantus-mining.sh · note: "New Docker setup is not supported" by the script</span>
+      </div>
+      <div class="path-card">
+        <h3>🐳 Docker <span class="tag">override CMD</span></h3>
+        <p>Official image <code>ghcr.io/quantus-network/quantus-node:latest</code>. The repo Dockerfile still defaults to the retired <code>planck</code> testnet — always override the chain explicitly.</p>
+        <div class="term"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>docker</span><button class="copybtn" data-copy="docker run -d --name quantus-node -p 30333:30333 -v quantus-data:/var/lib/quantus ghcr.io/quantus-network/quantus-node:latest --validator --base-path /var/lib/quantus --chain mainnet --name my-node">copy</button></div><pre>docker run -d --name quantus-node \
+  -p 30333:30333 \
+  -v quantus-data:/var/lib/quantus \
+  ghcr.io/quantus-network/quantus-node:latest \
+  --validator --base-path /var/lib/quantus \
+  --chain mainnet --name my-node</pre></div>
+        <span class="src">src: chain/MINING.md Docker section + chain/Dockerfile (stale planck CMD — overridden here)</span>
+      </div>
+    </div>
+    <p class="note"><strong>Linux ARM64 caveat:</strong> the docs mining guide notes there is no native <code>quantus-miner</code> release for Linux ARM64 — mine from macOS or Linux x86_64. The node itself runs on Ubuntu 20.04+, macOS 10.15+, or Windows 10/11 (native MSVC or WSL2).</p>
+  </section>
+
+  <section class="panel" id="sec-launch" aria-labelledby="h-launch">
+    <h2><span class="n">02</span> <span id="h-launch">Launch Lab</span></h2>
+    <p class="sub">Build your exact <code>quantus-node</code> startup command from the real flags (<code>chain/node/src/cli.rs</code> + inherited Substrate <code>sc_cli</code> flags). The builder validates as you type — <code>--miner-listen-port</code> requires <code>--validator</code>, mining modes require a valid <code>--rewards-inner-hash</code>, and dangerous choices get flagged, not silently passed.</p>
+    <div class="seg" role="group" aria-label="Node mode" id="modeSeg">
+      <button type="button" data-mode="external" aria-pressed="true">⛏ Mining node + external miner (QUIC)</button>
+      <button type="button" data-mode="local" aria-pressed="false">🖥 Mining node, local CPU mining</button>
+      <button type="button" data-mode="fullnode" aria-pressed="false">📡 Full node, no mining</button>
+    </div>
+    <div class="lab">
+      <div>
+        <div class="field" id="f-name">
+          <label>Node name <span class="hint">Shown on telemetry. Letters, digits, dots, dashes, underscores; ≤ 40 chars.</span></label>
+          <input type="text" id="inName" value="my-quantus-node" maxlength="40" spellcheck="false" autocomplete="off">
+          <div class="err"></div>
+        </div>
+        <div class="field" id="f-hash">
+          <label>Rewards inner hash <span class="hint">Your 32-byte wormhole preimage (0x + 64 hex). Generate: <code>quantus-node key quantus --scheme wormhole</code>. Never shared — it stays in this page.</span></label>
+          <input type="text" id="inHash" placeholder="0x…" spellcheck="false" autocomplete="off" autocapitalize="off">
+          <div class="err"></div>
+        </div>
+        <div class="grid2">
+          <div class="field" id="f-mport">
+            <label>Miner listen port <span class="hint">QUIC job server for quantus-miner. Binds 0.0.0.0.</span></label>
+            <input type="number" id="inMPort" value="9833" min="1024" max="65535">
+            <div class="err"></div>
+          </div>
+          <div class="field">
+            <label>Chain spec</label>
+            <select id="inChain">
+              <option value="mainnet" selected>mainnet (QTC, live)</option>
+              <option value="planck">planck (retired testnet)</option>
+              <option value="heisenberg">heisenberg (reserved)</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label>Node key file <span class="hint">Stable P2P identity. Generate: <code>quantus-node key generate-node-key --file node_key.p2p</code></span></label>
+            <input type="text" id="inKeyFile" value="node_key.p2p" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Base path <span class="hint">Chain database lives here.</span></label>
+            <input type="text" id="inBase" value="~/.local/share/quantus-node" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="inValidator" checked> <span><code>--validator</code> — required for mining; without it <code>--miner-listen-port</code> fails at startup.</span></label>
+        <label class="check"><input type="checkbox" id="inForce"> <span><code>--force-authoring</code> — bypass the 24 h freshness gate. Bootstrap only; remove once synced.</span></label>
+        <label class="check"><input type="checkbox" id="inExpRpc"> <span>Experimental RPC endpoint <code>listen-addr=127.0.0.1:9944,methods=unsafe,cors=all</code> (from <code>scripts/run_local_nodes.sh</code>). Localhost only.</span></label>
+        <div class="field" style="max-width:220px">
+          <label>Prometheus port <span class="hint">Blank = default. Verify yours with <code>quantus-node --help</code> — upstream docs list 9615 and 9616.</span></label>
+          <input type="number" id="inProm" placeholder="default" min="1024" max="65535">
+          <div class="err"></div>
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label>Miner auth token file <span class="hint">Defaults to <code>&lt;base-path&gt;/chains/&lt;chain&gt;/miner-auth-token</code> (generated 0600 on first run).</span></label>
+          <input type="text" id="inAuthFile" placeholder="default" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Miner TLS cert SHA-256 file <span class="hint">The node writes this next to the token; the miner pins it (TLS 1.3, ALPN <code>quantus-miner/2</code>).</span></label>
+          <input type="text" id="inTlsFile" placeholder="default" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="grid2">
+          <div class="field"><label>CPU workers</label><input type="number" id="inCpu" placeholder="auto" min="1" max="256"></div>
+          <div class="field"><label>GPU devices</label><input type="number" id="inGpu" placeholder="auto" min="1" max="16"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="inCuda"> <span><code>--cuda-gpu</code> — use the CUDA engine (quantus-miner).</span></label>
+        <p class="note">Miner flags mirror <code>quantus-miner/README.md</code> (<code>--cpu-workers</code>, <code>--gpu-devices</code>, <code>--cuda-gpu</code>, <code>--metrics-port</code> 9900) and are also settable via <code>MINER_*</code> env vars. Miners must heartbeat every 5–15 s — the node drops idle miner connections after 60 s.</p>
+      </div>
+    </div>
+    <div class="errlist" id="cmdErrors" hidden><strong>Fix these before launching:</strong><ul></ul></div>
+    <div class="term"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>quantus-node launch command</span><button class="copybtn" id="copyNodeCmd">copy</button></div><pre id="nodeCmdOut"><span class="c"># fill in your rewards inner hash above</span></pre></div>
+    <div class="term" id="minerTerm"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>quantus-miner serve command</span><button class="copybtn" id="copyMinerCmd">copy</button></div><pre id="minerCmdOut"></pre></div>
+    <div class="warnlist" id="cmdWarnings" hidden><strong>Heads up:</strong><ul></ul></div>
+  </section>
+
+  <section class="panel" id="sec-ports" aria-labelledby="h-ports">
+    <h2><span class="n">03</span> <span id="h-ports">Port &amp; firewall map</span></h2>
+    <p class="sub">Exactly one port should face the internet. Everything else stays on localhost (or your VPN). The miner QUIC port <strong>binds <code>0.0.0.0</code></strong> — firewall it even though you only intend local miners.</p>
+    <table class="spec" id="portTable">
+      <thead><tr><th>Port</th><th>Proto</th><th>Service</th><th>Exposure</th><th>Source</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="field" style="max-width:420px">
+      <label>Generate firewall rules <span class="hint">P2P port defaults to 30333 — change it if you run <code>--port</code> elsewhere.</span></label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <select id="fwTool" style="flex:1;min-width:140px;background:#04070a;border:1px solid rgba(125,255,168,.22);border-radius:10px;color:var(--nd-text);padding:10px 12px;font-family:var(--font-mono)">
+          <option value="ufw">ufw (Ubuntu)</option>
+          <option value="iptables">iptables</option>
+          <option value="nftables">nftables</option>
+        </select>
+        <input type="number" id="fwP2p" value="30333" min="1024" max="65535" style="width:110px;background:#04070a;border:1px solid rgba(125,255,168,.22);border-radius:10px;color:var(--nd-text);padding:10px 12px;font-family:var(--font-mono)" aria-label="P2P port">
+      </div>
+    </div>
+    <div class="term"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>firewall</span><button class="copybtn" id="copyFw">copy</button></div><pre id="fwOut"></pre></div>
+  </section>
+
+  <section class="panel" id="sec-bootnodes" aria-labelledby="h-bootnodes">
+    <h2><span class="n">04</span> <span id="h-bootnodes">Bootnodes</span></h2>
+    <p class="sub">The seven mainnet bootnodes, copied verbatim from <code>chain/node/src/chain-specs/mainnet.json</code> (the embedded spec — note the <code>chain_spec.rs</code> code path ships <em>zero</em> bootnodes, so the JSON is the authoritative source). You rarely need <code>--bootnodes</code> — the spec already carries them — but they matter for isolated or restricted networks.</p>
+    <div id="bootList"></div>
+    <div class="term"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>--bootnodes flag (all seven)</span><button class="copybtn" id="copyBoot">copy</button></div><pre id="bootOut"></pre></div>
+    <p class="note">Telemetry: <a href="https://telemetry.quantus.cat/" target="_blank" rel="noopener">telemetry.quantus.cat</a> (endpoint <code>/dns/shard-telemetry.quantus.cat/tcp/443/x-parity-wss/%2Fsubmit%2F</code> in every live spec). Explorer: <a href="https://explorer.quantus.com/" target="_blank" rel="noopener">explorer.quantus.com</a>.</p>
+  </section>
+
+  <section class="panel" id="sec-sync" aria-labelledby="h-sync">
+    <h2><span class="n">05</span> <span id="h-sync">Sync monitor</span></h2>
+    <p class="sub">A fresh node syncs <strong>from genesis</strong> — there is no official snapshot or warp sync published anywhere upstream, and <code>--state-pruning</code> / <code>--blocks-pruning</code> flags are <strong>ignored</strong> (pruning is enforced in code: blocks <code>KeepFinalized</code>, state <code>ArchiveCanonical</code>). Expect ~15 minutes to a couple of hours; you're synced when the log switches from <code>Syncing</code> to <code>Idle</code>. Then the 24 h freshness gate (<code>--max-tip-age</code>) must pass before mining starts.</p>
+    <div class="grid2">
+      <div>
+        <div class="field">
+          <label>Your node's best block <span class="hint">From the log line <code>best: #…</code> or <code>curl</code> below.</span></label>
+          <input type="number" id="inLocalH" placeholder="e.g. 140000" min="0">
+        </div>
+        <div class="field">
+          <label>Network head <span class="hint">Auto-probed from the public RPC; override manually if the probe fails.</span></label>
+          <input type="number" id="inNetH" placeholder="probing…" min="0">
+        </div>
+        <p class="note" id="netSrc">Probing <code>wss://rpc.quantus.network</code>…</p>
+        <div class="syncbar" aria-hidden="true"><i id="syncFill" style="width:0%"></i></div>
+        <div class="bigstat" id="syncStat">— <small>blocks behind</small></div>
+        <p class="note" id="syncEta"></p>
+      </div>
+      <div>
+        <h3 style="margin-top:0">Ask your node directly</h3>
+        <div class="term"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>local RPC</span><button class="copybtn" data-copy="curl -s -H &quot;Content-Type: application/json&quot; -d '{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;chain_getHeader&quot;,&quot;params&quot;:[]}' http://localhost:9944 | head -c 400">copy</button></div><pre>curl -s -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"chain_getHeader","params":[]}' \
+  http://localhost:9944 | head -c 400</pre></div>
+        <h3>DB corruption recovery</h3>
+        <div class="term"><div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span>purge &amp; resync</span><button class="copybtn" data-copy="quantus-node purge-chain --chain mainnet">copy</button></div><pre>quantus-node purge-chain --chain mainnet
+<span class="c"># then relaunch from the Launch Lab — full resync from genesis</span></pre></div>
+        <p class="note"><strong>Honest gap:</strong> no official snapshots, no state-size estimates published. The 100 GB / 500 GB figures in <code>MINING.md</code> are <em>hardware requirements</em>, not measured chain sizes — this desk won't present them as chain size.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="sec-logs" aria-labelledby="h-logs">
+    <h2><span class="n">06</span> <span id="h-logs">Log forensics</span></h2>
+    <p class="sub">Paste node log output — the desk matches it against the known log lines from the upstream docs and mining guide, and tells you what each one means and what to do. Nothing is uploaded; matching runs entirely in your browser.</p>
+    <textarea id="logInput" spellcheck="false" placeholder="Paste quantus-node log lines here…&#10;&#10;e.g.&#10;2026-09-30 12:01:44 💤 Idle (12 peers), best: #142000 (0x25a7…), finalized #141950&#10;2026-09-30 12:02:10 Mining rewards will be sent to wormhole address qz1abc…"></textarea>
+    <p class="note" id="logSummary">No input yet.</p>
+    <div id="logFindings"></div>
+    <h3>Know your healthy lines</h3>
+    <table class="spec">
+      <thead><tr><th>Log line</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">"Mining rewards will be sent to wormhole address …"</td><td>Startup self-check: the node derived your reward address from <code>--rewards-inner-hash</code>. Confirm it matches the <code>Address</code> from <code>quantus-node key quantus --scheme wormhole</code>.</td></tr>
+        <tr><td class="mono">Syncing …</td><td>Catching up. Normal for a fresh node.</td></tr>
+        <tr><td class="mono">Idle (N peers), best: #…</td><td>Synced and idling between 12 s blocks. This is the healthy steady state.</td></tr>
+        <tr><td class="mono">Verification failed</td><td class="mono">Version mismatch — the node is out of step with the network (often stalls with 0 peers). Upgrade to the latest node+miner pair.</td></tr>
+        <tr><td class="mono">miner connection idle timeout</td><td>The node drops miner connections after 60 s without a keep-alive; miners must heartbeat every 5–15 s (the bundled miner does every 5 s).</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel" id="sec-update" aria-labelledby="h-update">
+    <h2><span class="n">07</span> <span id="h-update">Update desk</span></h2>
+    <p class="sub">Two different upgrades, two different procedures. Binary upgrades need the matching pair; runtime upgrades need no restart at all.</p>
+    <div class="grid2">
+      <div class="path-card">
+        <h3>🔧 Node binary updates</h3>
+        <p>Watch the releases page. Download the <strong>matching node+miner pair</strong> (independent tags — the QUIC handshake pins ALPN <code>quantus-miner/2</code>). With the setup script, <code>./quantus-mining.sh setup --force</code> refreshes binaries only and keeps your inner hash and wormhole address; pin pairs with <code>NODE_VERSION</code>/<code>MINER_VERSION</code> in <code>mining.conf</code>. Docker: stop, remove, pull <code>:latest</code>, re-run.</p>
+        <p><strong>Symptom of a stale node:</strong> sync stalls mid-chain with <code>Verification failed</code> errors and 0 peers — that's the network leaving your binary behind, not a network outage.</p>
+        <span class="src">src: docs mining guide · chain/MINING.md · research brief §10</span>
+      </div>
+      <div class="path-card">
+        <h3>⚖ Runtime upgrades (no restart)</h3>
+        <p>Governance-only — <code>pallet-sudo</code> is removed. Tech-referenda on the <code>fast_upgrade</code> track (8-of-10 genesis collective votes, ~30 min) execute <code>system.authorize_upgrade(code_hash)</code>; then the <strong>permissionless</strong> <code>quantus runtime apply</code> (<code>system.apply_authorized_upgrade</code>) delivers the WASM. <strong>No node restart required.</strong> Note: Polkadot-JS cannot sign these calls (Dilithium) — use the <code>quantus</code> CLI.</p>
+        <span class="src">src: chain/docs/RUNTIME_UPGRADE_VIA_GOVERNANCE.md + RUNTIME_UPDATE.md</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="sec-specs" aria-labelledby="h-specs">
+    <h2><span class="n">08</span> <span id="h-specs">Chain specs &amp; networks</span></h2>
+    <p class="sub"><code>--chain</code> accepts the embedded specs below, the <code>_live_spec</code> variants built from Rust code, or a path to a JSON spec file (<code>chain/node/src/command.rs</code> <code>load_spec</code>). <code>--dev</code> spins an ephemeral dev chain with Alice/Bob authorities.</p>
+    <table class="spec" id="specTable">
+      <thead><tr><th>Spec</th><th>Token</th><th>Decimals</th><th>SS58</th><th>Notes</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="note"><strong>Planck is retired.</strong> Several upstream examples (Dockerfile CMD, MINING.md docker run) still say <code>planck</code> — they are stale. Mainnet is <code>--chain mainnet</code> and requires node v1.0.1+. Planck's PLK has no carryover to mainnet QTC.</p>
+  </section>
+
+  <section class="panel" id="sec-method" aria-labelledby="h-method">
+    <h2><span class="n">09</span> <span id="h-method">Method &amp; sources</span></h2>
+    <p class="sub">Every operational fact on this page was read from Quantus-Network source on 2026-09-30. What we could <em>not</em> verify is listed as gaps, not published as fact.</p>
+    <ul class="method">
+      <li>Hardware requirements, QUIC miner protocol, auth token + TLS pinning, keep-alive rules: <code>chain/MINING.md</code>, <code>docs/docs/guides/mining.md</code>, <code>docs/static/skills/mining-skill.md</code></li>
+      <li>Custom CLI flags (<code>--rewards-inner-hash</code>, <code>--miner-listen-port</code>, <code>--miner-auth-token-file</code>, <code>--enable-peer-sharing</code>, <code>--max-tip-age</code>, sync tuning): <code>chain/node/src/cli.rs</code></li>
+      <li>Mandatory pruning (<code>KeepFinalized</code> / <code>ArchiveCanonical</code>, CLI flags ignored): <code>chain/README.md</code> "Database Storage Configuration"</li>
+      <li>Canonical startup command: docs mining guide (verified against <code>cli.rs</code> flag requirements)</li>
+      <li>Bootnodes (7): <code>chain/node/src/chain-specs/mainnet.json</code> (authoritative — <code>chain_spec.rs</code> code path ships none)</li>
+      <li>Chain spec loading + <code>--dev</code>: <code>chain/node/src/command.rs</code> <code>load_spec</code>; SS58 189 + QTC/12 decimals: <code>chain/node/src/chain_spec.rs</code>, <code>chain/runtime/src/lib.rs</code></li>
+      <li>Docker image + stale <code>planck</code> CMD: <code>chain/MINING.md</code>, <code>chain/Dockerfile</code>; setup script: <code>docs/static/scripts/quantus-mining.sh</code></li>
+      <li>quantus-miner flags + <code>benchmark</code> subcommand: <code>quantus-miner/README.md</code></li>
+      <li>Runtime upgrade flow: <code>chain/docs/RUNTIME_UPGRADE_VIA_GOVERNANCE.md</code>, <code>chain/docs/RUNTIME_UPDATE.md</code></li>
+      <li><strong>Gaps (deliberately absent):</strong> no systemd unit published upstream · no official snapshots / warp sync / state-size figures · Prometheus default disputed (9615 in current guide + skill + sc-cli default vs 9616 in older MINING.md table — verify with <code>--help</code>)</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="site">
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="note">Community-built tooling. Facts read from Quantus-Network source 2026-09-30; verify flags with <code>quantus-node --help</code> before production use.</span>
+</footer>
+<script src="app.js?v=1.38.0" type="module"></script>
+</body>
+</html>

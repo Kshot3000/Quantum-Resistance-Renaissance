@@ -152,7 +152,7 @@ Studio.buildSteps = function (os, o) {
 Studio.SECURITY = [
   { t: "Only port 30333/TCP is publicly reachable", d: "The P2P port is the only service meant for the open internet." },
   { t: "Miner port (9833) is private", d: "Loopback for local miners, or a VPN / private subnet for remote rigs. Never 0.0.0.0 in a firewall rule." },
-  { t: "RPC (9944) and Prometheus (9616) stay local", d: "Expose only to hosts that genuinely need them." },
+  { t: "RPC (9944) and Prometheus (9615) stay local", d: "Expose only to hosts that genuinely need them. (Prometheus default is disputed upstream — 9615 vs 9616; confirm with quantus-node --help.)" },
   { t: "Auth token + TLS fingerprint files are locked down", d: "miner-auth-token and miner-tls-cert-sha256 under <base-path>/chains/mainnet/ — readable only by you." },
   { t: "Windows: Defender exclusion added (native build)", d: "Add-MpPreference -ExclusionPath on your data dir, or use WSL2." },
   { t: "inner_hash backed up offline, encrypted", d: "Your 32-byte preimage is your mining private key. Paper or encrypted USB, never a screenshot in the cloud." },
