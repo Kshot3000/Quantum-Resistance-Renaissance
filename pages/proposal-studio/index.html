@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Proposal Studio — the governance drafting desk</title>
+<meta name="description" content="QTC Proposal Studio: draft a Quantus tech-collective referendum end-to-end — pick the track, compose the proposal call, get byte-exact unsigned extrinsics (verified against referendum #0's real on-chain bytes), and track your draft. 100% client-side, never signs.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.42.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.42.0" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">&#x1f3db;&#xfe0f;</span>
+    <div><strong>QTC Proposal Studio</strong><span>The governance drafting desk</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">100% client-side</span>
+    <span class="pill ghost">Never signs</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/" class="current"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+</div>
+    </details>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Draft the referendum <em>before</em> it exists.</h1>
+    <p class="lede">Quantus governance is a tech collective of at most 13 members — no token-weighted voting, no community lane. This studio is the actionable companion to the <a href="../governance-tracker/">Governance Tracker</a>: pick your track, compose the proposal call, and walk away with byte-exact unsigned extrinsics. Every constant was read from the chain source; the encoder reproduces referendum #0's real on-chain submit call byte-for-byte.</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-v">2</div><div class="stat-l">governance tracks</div></div>
+      <div class="stat"><div class="stat-v">0.2 QTC</div><div class="stat-l">submission + decision deposits</div></div>
+      <div class="stat"><div class="stat-v">3</div><div class="stat-l">extrinsics to launch</div></div>
+      <div class="stat"><div class="stat-v">53/53</div><div class="stat-l">codec tests green</div></div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Proposal Studio sections">
+      <button role="tab" aria-selected="true" data-tab="tracks">Tracks</button>
+      <button role="tab" aria-selected="false" data-tab="composer">Composer</button>
+      <button role="tab" aria-selected="false" data-tab="pack">Submission Pack</button>
+      <button role="tab" aria-selected="false" data-tab="preimage">Preimage Desk</button>
+      <button role="tab" aria-selected="false" data-tab="vault">Draft Vault</button>
+      <button role="tab" aria-selected="false" data-tab="sources">Sources</button>
+    </nav>
+  </section>
+
+  <!-- TRACKS -->
+  <section id="tab-tracks" class="panel tabpage" role="tabpanel">
+    <h2>The two lanes of Quantus governance</h2>
+    <p class="sec-sub">Read from <code>runtime/src/governance/definitions.rs</code>. Block windows assume the 12&nbsp;s target block time. Both tracks use flat threshold curves — approval and support never decay over the decision period — and both cap deciding referenda at one.</p>
+    <div id="track-cards" class="track-cards"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Who may submit</h3>
+        <p>Only a <strong>signed tech-collective member</strong> can call <code>TechReferenda.submit</code>. The runtime's submit origin accepts a collective member's signature — there is no way to submit as bare Root, and no token-weighted lane exists (the community lane was removed). Membership itself changes only through a passed Root referendum, with a floor of 5 members so the lane can never deadlock.</p>
+      </div>
+      <div class="card">
+        <h3>What each origin can do</h3>
+        <p><strong>Root (track 0)</strong> dispatches any call: runtime upgrades, collective membership, treasury account, remarks. <strong>FastUpgrade (track 1)</strong> is honored <em>only</em> by <code>system.authorize_upgrade</code> — the 10-minute windows cannot be leveraged for anything else. The wasm itself is applied permissionlessly afterwards and version-checked on-chain.</p>
+      </div>
+    </div>
+    <h3>The road from idea to enactment</h3>
+    <div id="lifecycle" class="lifecycle"></div>
+    <p class="fine">Caps: 128 ongoing referenda chain-wide · 8 per account · 100 queued per track · 45-day undeciding timeout (324,000 blocks) for submissions that never get a decision deposit. Cancel/kill is Root-only; slashed deposits are burned, not redirected.</p>
+  </section>
+
+  <!-- COMPOSER -->
+  <section id="tab-composer" class="panel tabpage hidden" role="tabpanel">
+    <h2>Compose the proposal call</h2>
+    <p class="sec-sub">The proposal is the exact call bytes that execute if the referendum passes. Pick a template or paste raw hex (max 4&nbsp;KiB). The studio hashes it, quotes the preimage deposit, and hands the bytes to the Submission Pack.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>1 · Track</h3>
+        <div class="field"><label for="cmp-track">Governance track</label>
+          <select id="cmp-track">
+            <option value="1">Fast Upgrade — track 1 · 10-min confirm/enact</option>
+            <option value="0">Tech Collective — track 0 · 24-h confirm/enact</option>
+          </select>
+        </div>
+        <p class="fine" id="cmp-track-note">FastUpgrade origin is honored only by <code>system.authorize_upgrade</code> — the composer locks the template accordingly.</p>
+        <h3>2 · Template</h3>
+        <div class="field"><label for="cmp-template">Proposal template</label>
+          <select id="cmp-template">
+            <option value="upgrade">Runtime upgrade — System.authorize_upgrade(code_hash)</option>
+            <option value="remark">Remark — System.remark (harmless test proposal)</option>
+            <option value="treasury">Treasury account — TreasuryPallet.set_treasury_account</option>
+            <option value="member">Add collective member — TechCollective.add_member</option>
+            <option value="custom">Custom call hex…</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <h3>3 · Arguments</h3>
+        <div id="cmp-args"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Proposal call preview</h3>
+      <div id="cmp-preview"></div>
+      <div class="btnrow">
+        <button id="cmp-to-pack" class="btn primary">Send to Submission Pack →</button>
+        <button id="cmp-copy" class="btn">Copy call hex</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUBMISSION PACK -->
+  <section id="tab-pack" class="panel tabpage hidden" role="tabpanel">
+    <h2>The submission pack — three extrinsics, in order</h2>
+    <p class="sec-sub">Order matters: the preimage must exist on-chain before <code>submit</code> (the chain rejects a missing preimage), and the decision deposit moves the referendum into the deciding queue. This studio never signs — paste the hex into the <a href="../chain-console/">Chain Console</a> or sign offline with the <a href="../airgap-desk/">Airgap Desk</a>.</p>
+    <div id="pack-empty" class="notice">Nothing composed yet — build your proposal in the <a href="#" data-goto="composer">Composer</a> first, or load the referendum #0 worked example below.</div>
+    <div id="pack-body" class="hidden">
+      <div class="card">
+        <h3>Step 1 · <code>Preimage.note_preimage</code> <span class="dep" id="pack-dep1"></span></h3>
+        <div class="bytewrap"><div id="pack-hex1" class="hexout"></div><button class="btn sm" data-copytarget="pack-hex1">Copy</button></div>
+        <div id="pack-map1" class="bytemap"></div>
+      </div>
+      <div class="card">
+        <h3>Step 2 · <code>TechReferenda.submit</code> <span class="dep" id="pack-dep2"></span></h3>
+        <div class="grid2">
+          <div class="field"><label for="pack-enact-kind">Enactment moment</label>
+            <select id="pack-enact-kind">
+              <option value="after">After N blocks (from approval)</option>
+              <option value="at">At block number</option>
+            </select>
+          </div>
+          <div class="field"><label for="pack-enact-val">Blocks / block number</label>
+            <input id="pack-enact-val" type="number" min="0" value="0">
+          </div>
+        </div>
+        <p class="fine" id="pack-enact-note"></p>
+        <div class="bytewrap"><div id="pack-hex2" class="hexout"></div><button class="btn sm" data-copytarget="pack-hex2">Copy</button></div>
+        <div id="pack-map2" class="bytemap"></div>
+      </div>
+      <div class="card">
+        <h3>Step 3 · <code>TechReferenda.place_decision_deposit</code> <span class="dep" id="pack-dep3"></span></h3>
+        <div class="field inline"><label for="pack-index">Referendum index (known after submit lands)</label>
+          <input id="pack-index" type="number" min="0" value="1" style="max-width:10rem">
+        </div>
+        <div class="bytewrap"><div id="pack-hex3" class="hexout"></div><button class="btn sm" data-copytarget="pack-hex3">Copy</button></div>
+        <div id="pack-map3" class="bytemap"></div>
+      </div>
+      <div class="card">
+        <h3>Cost ledger</h3>
+        <div id="pack-costs"></div>
+        <p class="fine">Deposits are reserved, not spent: the submission and decision deposits are refundable after the referendum concludes (<code>refund_submission_deposit</code> / <code>refund_decision_deposit</code>, callable by any signed account); the preimage deposit is reclaimable with <code>unnote_preimage</code> once the bytes are no longer needed. Length fees are the per-byte component only — weight fees are quoted by the node at submission.</p>
+      </div>
+      <div class="card">
+        <h3>After launch — voting &amp; refunds</h3>
+        <div class="grid2">
+          <div>
+            <p class="fine">Members vote through the collective, not the referenda pallet:</p>
+            <div class="field inline"><label for="vote-poll">Poll (referendum #)</label><input id="vote-poll" type="number" min="0" value="1" style="max-width:8rem"></div>
+            <div class="btnrow">
+              <button id="vote-aye" class="btn sm">Build vote(aye)</button>
+              <button id="vote-nay" class="btn sm">Build vote(nay)</button>
+            </div>
+          </div>
+          <div>
+            <p class="fine">Refund builders (any signed account, after conclusion):</p>
+            <div class="btnrow">
+              <button id="refund-sub" class="btn sm">refund_submission_deposit</button>
+              <button id="refund-dec" class="btn sm">refund_decision_deposit</button>
+              <button id="unnote" class="btn sm">unnote_preimage</button>
+            </div>
+          </div>
+        </div>
+        <div class="bytewrap"><div id="pack-hex4" class="hexout dim">—</div><button class="btn sm" data-copytarget="pack-hex4">Copy</button></div>
+        <div id="pack-map4" class="bytemap"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Worked example — referendum #0, byte-for-byte</h3>
+      <p>The first referendum ever submitted on Quantus (block 95,606, fast_upgrade track): a 34-byte <code>System.authorize_upgrade</code>. Its real <code>note_preimage</code> bytes and preimage hash come from the chain indexer; the studio re-derives the exact <code>submit</code> call below. Compare it against an explorer.</p>
+      <div class="bytewrap"><div class="hexout" id="ref0-submit"></div><button class="btn sm" data-copytarget="ref0-submit">Copy</button></div>
+      <div id="ref0-map" class="bytemap"></div>
+      <p class="fine">Preimage deposit actually locked for those 34 bytes under today's fee model: 0.01 + 35 × 0.00001 = <strong>0.01035 QTC</strong>. Enactment used <code>After(0)</code> — "as soon as the track's minimum enactment period allows" (the scheduler clamps to now + min_enactment_period; it never rejects).</p>
+    </div>
+  </section>
+
+  <!-- PREIMAGE DESK -->
+  <section id="tab-preimage" class="panel tabpage hidden" role="tabpanel">
+    <h2>Preimage desk</h2>
+    <p class="sec-sub">Hash anything into the exact preimage the chain will store: blake2b-256 over the raw bytes, deposit quoted from the runtime's fee model. Drop a runtime <code>.wasm</code> to hash an upgrade candidate.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Input bytes</h3>
+        <div class="field"><label for="pd-hex">Hex bytes <span class="dim">(0x…)</span></label>
+          <textarea id="pd-hex" rows="4" class="mono" placeholder="0x000978389c…"></textarea></div>
+        <div class="field"><label for="pd-text">…or plain text</label>
+          <input id="pd-text" type="text" placeholder="hello quantus"></div>
+        <div class="field"><label for="pd-file">…or a file (wasm, etc.)</label>
+          <input id="pd-file" type="file"></div>
+        <div class="btnrow"><button id="pd-clear" class="btn sm">Clear</button></div>
+      </div>
+      <div class="card">
+        <h3>Preimage</h3>
+        <div id="pd-out"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Requested vs unrequested</h3>
+      <p><code>submit</code> automatically <em>requests</em> the preimage, which pins the bytes even if you reclaim your deposit with <code>unnote_preimage</code> — the bytes stay available through enactment. An unrequested preimage with no depositor can be cleared by anyone. Max proposal size: 4&nbsp;KiB.</p>
+    </div>
+  </section>
+
+  <!-- DRAFT VAULT -->
+  <section id="tab-vault" class="panel tabpage hidden" role="tabpanel">
+    <h2>Draft vault</h2>
+    <p class="sec-sub">Saved in your browser only (localStorage) — the vault never leaves this page. Track each draft through the five lifecycle steps with your own checklist; statuses are self-reported, not chain-read.</p>
+    <div class="card">
+      <h3>Save the current draft</h3>
+      <div class="grid2">
+        <div class="field"><label for="dv-name">Draft name</label><input id="dv-name" type="text" placeholder="e.g. Runtime 154 fast-upgrade"></div>
+        <div class="field"><label for="dv-notes">Notes</label><input id="dv-notes" type="text" placeholder="rationale, links, code hash source…"></div>
+      </div>
+      <div class="btnrow">
+        <button id="dv-save" class="btn primary">Save draft</button>
+        <button id="dv-export" class="btn sm">Export JSON</button>
+        <label class="btn sm filebtn">Import JSON<input id="dv-import" type="file" accept="application/json" hidden></label>
+      </div>
+      <p class="fine" id="dv-save-note"></p>
+    </div>
+    <div id="dv-list"></div>
+  </section>
+
+  <!-- SOURCES -->
+  <section id="tab-sources" class="panel tabpage hidden" role="tabpanel">
+    <h2>Sources — every number, traced</h2>
+    <p class="sec-sub">All paths are in <code>Quantus-Network/chain</code> at rev <code>482c5b9</code> (main, 2026-09-30) unless noted. Byte layouts were additionally verified against the metadata-generated Dart codecs in <code>Quantus-Network/quantus-apps</code> and against referendum #0's real indexer args (block 95,606).</p>
+    <div id="sources-table"></div>
+  </section>
+
+  <footer class="site">
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot; <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> &middot; <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    <span class="donate">Donate QTC <button class="addr" data-copy="qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau" title="Click to copy">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</button></span><br>
+    <span class="note">Community-built tooling. Track constants read from Quantus-Network/chain @ 482c5b9; origin/proposal/enactment byte layouts verified against the metadata-generated quantus_sdk codecs and referendum #0's on-chain args, 2026-09-30. Independent builder work — not affiliated with the Quantus team. This studio never signs: it drafts unsigned calls for your wallet, the Chain Console, or the Airgap Desk.</span>
+  </footer>
+</main>
+
+<script src="js/vendor/scale-crypto.js?v=1.42.0"></script>
+<script src="js/gov-codec.js?v=1.42.0"></script>
+<script src="js/app.js?v=1.42.0"></script>
+</body>
+</html>

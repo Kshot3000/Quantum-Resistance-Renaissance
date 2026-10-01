@@ -62,6 +62,7 @@
     <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
     <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
     <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
     <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
   </div>
 </details>
@@ -165,7 +166,7 @@
   <section id="treasury" class="panel">
     <h2>Treasury</h2>
     <div id="treasury-body">
-      <p class="sec-sub"><code>TreasuryPallet</code> (runtime pallet index 15) is active on chain with <code>propose_spend</code> for outflows. Treasury spends are authorized through the tech-collective governance lane above.</p>
+      <p class="sec-sub"><code>TreasuryPallet</code> (runtime pallet index 15) is a minimal stub: its only dispatchable is <code>set_treasury_account</code> (Root) — there are no on-chain spend proposals. The configured treasury account is expected to be a multisig in real deployments; outflows move as ordinary signed transfers from that account.</p>
       <div class="honest-box" id="treasury-status"><p class="loading">Checking the on-chain record for treasury activity…</p></div>
     </div>
   </section>
@@ -209,7 +210,7 @@
 </footer>
 
 <script src="js/gov-core.js?v=1.23.0"></script>
-<script src="js/app.js?v=1.23.0"></script>
+<script src="js/app.js?v=1.42.0"></script>
 <script src="../../assets/app-nav.js?v=1.12.0"></script>
 </body>
 </html>

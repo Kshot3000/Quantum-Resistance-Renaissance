@@ -51,7 +51,7 @@ var PALLETS = [
   { i: 12, name: "— vacant —", status: "removed", calls: [], note: "Index 12 was ConvictionVoting (removed with the community lane)." },
   { i: 13, name: "TechCollective", status: "active", calls: ["propose", "vote", "execute"], note: "Ranked collective — the technical committee lane." },
   { i: 14, name: "TechReferenda", status: "active", calls: ["submit", "place_decision_deposit", "vote", "cancel"], note: "Governance referenda (Instance1) for the tech tracks — FastUpgrade origin and friends." },
-  { i: 15, name: "TreasuryPallet", status: "active", calls: ["propose_spend", "approve_proposal (origin)", "reject_proposal (origin)"], note: "On-chain treasury spends." },
+  { i: 15, name: "TreasuryPallet", status: "active", calls: ["set_treasury_account (root)"], note: "Single-dispatchable treasury: sets where future treasury credits go (existing balances are NOT migrated). Verified against pallets/treasury/src/lib.rs — no spend/dispatch calls exist." },
   { i: 16, name: "— vacant —", status: "removed", calls: [], note: "Index 16 was pallet_recovery (removed)." },
   { i: 17, name: "— vacant —", status: "removed", calls: [], note: "Index 17 was pallet_assets (removed)." },
   { i: 18, name: "— vacant —", status: "removed", calls: [], note: "Index 18 was pallet_assets_holder (removed with assets)." },

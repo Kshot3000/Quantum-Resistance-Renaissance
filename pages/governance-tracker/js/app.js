@@ -258,7 +258,7 @@ function renderTreasury(data) {
   });
   if (!hits.length) {
     $("treasury-status").innerHTML = "<p><strong>No treasury activity observed on chain yet.</strong> The indexer snapshot contains no TreasuryPallet extrinsics or treasury events. When the collective starts spending, proposals will appear here with the same lifecycle tracking as referenda.</p>" +
-      "<p class='fine'>Spend path: a member submits <code>propose_spend</code> through the tech-collective lane; a confirmed referendum dispatches it.</p>";
+      "<p class='fine'>Treasury model: the pallet only names the treasury account — outflows are ordinary signed transfers from it (typically a multisig), not treasury pallet calls.</p>";
   } else {
     $("treasury-status").innerHTML = "<p><strong>" + hits.length + " treasury-related calls</strong> observed:</p><ul class='bullets'>" +
       hits.map(function (h) { return "<li><span class='mono'>" + esc(fmtDateTime(h.timestamp)) + "</span> " + esc(h.pallet) + "." + esc(h.call) + " by " + esc(shortAddr(h.signer_id)) + "</li>"; }).join("") + "</ul>";
