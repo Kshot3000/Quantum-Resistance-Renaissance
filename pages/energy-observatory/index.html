@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Energy Observatory — the network-energy &amp; carbon observatory</title>
+<meta name="description" content="QTC Energy Observatory: how much power does the Quantus post-quantum PoW network actually burn? Live difficulty-implied hashrate, an honest efficiency band, measured GPU bench data, fleet mixer, rig builder, energy history, per-transfer energy, and a carbon desk — every figure cited.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.49.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.48.0" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">⚡</span>
+    <div><strong>QTC Energy Observatory</strong><span>The network-energy &amp; carbon observatory</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill" id="snapPill" title="Data provenance">loading snapshot&hellip;</span>
+    <span class="pill ghost">Never signs</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a href="../pool-desk/"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
+    <a href="../pay-desk/"><span class="ico">🧾</span><span>Pay Desk<span class="meta">Merchant acceptance toolkit</span></span></a>
+    <a href="../cli-forge/"><span class="ico">💻</span><span>CLI Forge<span class="meta">Command builder</span></span></a>
+    <a href="../luck-lab/"><span class="ico">🍀</span><span>Luck Lab<span class="meta">Luck &amp; variance lab</span></span></a>
+    <a href="../notary-desk/"><span class="ico">📜</span><span>Notary Desk<span class="meta">On-chain timestamping</span></span></a>
+    <a href="../zktree-desk/"><span class="ico">🌲</span><span>ZkTree Desk<span class="meta">ZK Merkle-tree lab</span></span></a>
+    <a class="current" href="./"><span class="ico">⚡</span><span>Energy Observatory<span class="meta">Network-energy & carbon lab</span></span></a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main class="eo">
+  <section class="hero panel">
+    <h1>How much energy does a post-quantum chain burn?</h1>
+    <p class="lede">Quantus secures its blocks with real work — a Poseidon2 proof-of-work running on GPUs, not a validator list. So the chain has a genuine electricity footprint, and this desk measures it honestly: the network hashrate is <strong>implied from live difficulty</strong>, but the watts behind it depend on the fleet's efficiency, which nobody publishes. We refuse to print a fake single number. Everything below is a <strong>band</strong>, bounded by measured hardware on one side and a conservative worst case on the other.</p>
+    <div class="pulse" id="pulseCards">
+      <div class="stat"><span class="k">Network hashrate <span class="why" title="Implied from the latest difficulty snapshot: E[hashes to win a block] = D, network targets one block per 12 s, so H = D / 12.">?</span></span><span class="v" id="pHash">—</span><span class="s" id="pDiff">—</span></div>
+      <div class="stat band"><span class="k">Network power <span class="why" title="From measured fleet bounds: 2.34 MH/J (RTX 4090 at a measured 350 W cap) to 0.34 MH/J (RTX 3060 Ti at board TDP). Everything inside is assumption; the band edges are bench measurements.">?</span></span><span class="v" id="pPower">—</span><span class="s">efficient ⇄ conservative fleet</span></div>
+      <div class="stat band"><span class="k">Annual energy</span><span class="v" id="pAnnual">—</span><span class="s">continuous-power equivalent</span></div>
+      <div class="stat band"><span class="k">Energy per block</span><span class="v" id="pBlock">—</span><span class="s">12 s of network power</span></div>
+    </div>
+    <div class="hero-note" id="provenanceNote">Reading the chain snapshots&hellip;</div>
+  </section>
+
+  <section class="panel" id="bandLab">
+    <h2>The power band <span class="sub">why a band, not a number</span></h2>
+    <p>The chain publishes difficulty, not wattage. One fact — <code>H = D / 12</code> — gives the hashrate exactly. Turning that into watts requires knowing how many joules each hash costs, and that is a <em>fleet assumption</em>. Drag the slider to see how the whole footprint scales with it. The two pins mark the measured fleet bounds.</p>
+    <div class="band-controls">
+      <label for="effSlider">Fleet efficiency <strong id="effVal">—</strong> MH/J</label>
+      <input type="range" id="effSlider" min="0.2" max="3.2" step="0.01" value="1.2" aria-describedby="effVal">
+      <div class="preset-shortcuts" id="effPins"></div>
+    </div>
+    <div class="band-grid" id="bandGrid">
+      <div class="stat"><span class="k">Network power</span><span class="v" id="bPower">—</span></div>
+      <div class="stat"><span class="k">Annual energy</span><span class="v" id="bAnnual">—</span></div>
+      <div class="stat"><span class="k">Annual electricity bill <span class="why" title="At your $/kWh input, for the whole network — a scale check, not a real bill.">?</span></span><span class="v" id="bCost">—</span></div>
+      <div class="stat"><span class="k">Annual CO₂ <span class="why" title="At your grid-intensity input.">?</span></span><span class="v" id="bCo2">—</span></div>
+    </div>
+    <div class="band-inputs">
+      <label>Electricity price <input type="number" id="rateInput" value="0.15" min="0" max="1" step="0.005"> $/kWh</label>
+      <label>Grid carbon intensity <input type="number" id="ciInput" value="0.42" min="0" max="1.2" step="0.01"> kg CO₂/kWh <span class="hint">(US grid average ≈ 0.42)</span></label>
+    </div>
+  </section>
+
+  <section class="panel" id="fleetLab">
+    <h2>Fleet mixer <span class="sub">compose the network you believe in</span></h2>
+    <p>A fleet's efficiency is the <strong>hashrate-weighted harmonic mean</strong> of its parts — slow cards drag the average down harder than they look. Mix measured GPUs and watch the band contract toward the fleet you actually expect to be out there.</p>
+    <div id="fleetRows"></div>
+    <div class="fleet-actions">
+      <button id="fleetAdd" class="btn">+ Add GPU</button>
+      <button id="fleetAll4090" class="btn ghost">All-efficient scenario</button>
+      <button id="fleetAll3060" class="btn ghost">All-conservative scenario</button>
+    </div>
+    <div class="band-grid" id="fleetOut">
+      <div class="stat"><span class="k">Fleet efficiency</span><span class="v" id="fEff">—</span></div>
+      <div class="stat"><span class="k">Fleet size</span><span class="v" id="fSize">—</span></div>
+      <div class="stat"><span class="k">Implied network power</span><span class="v" id="fPower">—</span><span class="s">if the whole network ran this fleet</span></div>
+      <div class="stat"><span class="k">Annual energy</span><span class="v" id="fAnnual">—</span></div>
+    </div>
+    <p class="fine">The network power here rescales the live hashrate through your fleet's efficiency — a thought experiment, not a census.</p>
+  </section>
+
+  <section class="panel" id="benchDesk">
+    <h2>Measured hardware <span class="sub">the benches that bound the band</span></h2>
+    <p>Every row below is a real measurement from the upstream miner team's bench docs — rented Vast.ai / Clore.ai GPUs running <code>quantus-miner benchmark</code>. Green badges are <strong>measured nvidia-smi power caps</strong>; amber badges are <strong>board TDPs</strong>, which overstate wall power and therefore understate efficiency.</p>
+    <div class="table-wrap"><table id="benchTable">
+      <thead><tr><th>GPU</th><th>Engine</th><th>Hashrate</th><th>Power</th><th>Efficiency</th><th>Date</th><th>Source</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel" id="rigDesk">
+    <h2>Rig builder <span class="sub">your card, the live chain, honest math</span></h2>
+    <p>Expected daily QTC from your rig's share of the live network hashrate, at the current emission-model reward. QTC has no market price yet, so instead of fake profits we show the <strong>break-even QTC price</strong>: what a coin would need to be worth for your electricity to pay for itself.</p>
+    <div class="rig-controls">
+      <label>GPU <select id="rigPreset"></select></label>
+      <label>Count <input type="number" id="rigCount" value="1" min="1" max="1000" step="1"></label>
+      <label>Electricity price <input type="number" id="rigRate" value="0.15" min="0" max="1" step="0.005"> $/kWh</label>
+    </div>
+    <div class="band-grid" id="rigOut">
+      <div class="stat"><span class="k">Rig hashrate</span><span class="v" id="rHs">—</span></div>
+      <div class="stat"><span class="k">Expected QTC/day</span><span class="v" id="rQtc">—</span><span class="s" id="rQtcSub">—</span></div>
+      <div class="stat"><span class="k">Daily electricity</span><span class="v" id="rKwh">—</span><span class="s" id="rCost">—</span></div>
+      <div class="stat"><span class="k">Break-even QTC price</span><span class="v" id="rBe">—</span><span class="s">covers electricity only</span></div>
+    </div>
+    <p class="fine">Assumes the reward and difficulty of the latest snapshot, and 24/7 mining at the preset's bench power. Card purchase, rent, downtime, fees, and luck are not in this number.</p>
+  </section>
+
+  <section class="panel" id="historyDesk">
+    <h2>Energy history <span class="sub">the footprint since genesis</span></h2>
+    <p>Daily network energy, recomputed from every ~100th block's difficulty since genesis (1,450 samples), drawn at both efficiency bounds. The rise you see is the hashrate finding its level, not an accounting artifact.</p>
+    <canvas id="histChart" height="240" aria-label="Daily network energy history chart"></canvas>
+    <p class="fine" id="histNote">—</p>
+  </section>
+
+  <section class="panel" id="perTxDesk">
+    <h2>Per-transfer energy <span class="sub">the cost of a young chain</span></h2>
+    <p>The network burns energy to make <em>blocks</em>, not transfers. Divide block energy by actual throughput and each transfer looks wildly expensive — because the chain is young and mostly empty. At its design throughput, the same power spreads over thousands of times more transfers.</p>
+    <div class="band-grid">
+      <div class="stat"><span class="k">Actual transfer rate</span><span class="v" id="tRate">—</span><span class="s" id="tRateSub">—</span></div>
+      <div class="stat band"><span class="k">Energy per transfer, today</span><span class="v" id="tActual">—</span></div>
+      <div class="stat band"><span class="k">Energy per transfer at 430 QTPS</span><span class="v" id="tDesign">—</span><span class="s">design throughput from native aggregation</span></div>
+      <div class="stat"><span class="k">Emptiness factor</span><span class="v" id="tFactor">—</span><span class="s">design rate ÷ actual rate</span></div>
+    </div>
+    <canvas id="txChart" height="180" aria-label="Per-transfer energy comparison chart"></canvas>
+    <p class="fine">Neither bar is a "cost per payment" claim — blocks are secured whether transfers ride along or not. The comparison shows how per-transfer energy collapses as throughput fills the chain.</p>
+  </section>
+
+  <section class="panel" id="compareDesk">
+    <h2>Scale check <span class="sub">one young chain against the industry</span></h2>
+    <p>Annual electricity, log scale. The Quantus band is the whole-network estimate from the band lab above; the Bitcoin figures are the current Cambridge and Digiconomist estimates of the <em>same</em> network — they disagree, honestly, so we show both. Nothing here is adjusted for what the energy does.</p>
+    <canvas id="cmpChart" height="300" aria-label="Energy comparison chart"></canvas>
+    <div class="src-table" id="srcTable"></div>
+  </section>
+
+  <section class="panel" id="carbonDesk">
+    <h2>Carbon desk <span class="sub">intensity is the whole game</span></h2>
+    <p>Energy is joules; emissions are joules × the grid they're drawn from. Set the grid intensity your fleet actually runs on and read the network's annual footprint — and how many U.S. homes it equals.</p>
+    <div class="band-inputs">
+      <label>Grid carbon intensity <input type="number" id="cCiInput" value="0.42" min="0" max="1.2" step="0.01"> kg CO₂/kWh <span class="hint">(US grid ≈ 0.42 · hydro ≈ 0.02–0.05 · coal-heavy ≈ 0.8–1.0)</span></label>
+    </div>
+    <div class="band-grid">
+      <div class="stat band"><span class="k">Annual CO₂</span><span class="v" id="cTonne">—</span></div>
+      <div class="stat"><span class="k">U.S. homes equivalent</span><span class="v" id="cHomes">—</span><span class="s">at 10,791 kWh/yr each (EIA 2022)</span></div>
+      <div class="stat"><span class="k">vs Bitcoin</span><span class="v" id="cVsBtc">—</span><span class="s">annual TWh ratio, Cambridge figure</span></div>
+    </div>
+    <p class="fine">Home equivalence compares electricity only — it says "this much power", not "this much impact". The chain publishes no fuel-mix data; intensity is your assumption to make and to label.</p>
+  </section>
+
+  <section class="panel" id="methodDesk">
+    <h2>Methodology &amp; honesty <span class="sub">read this before quoting</span></h2>
+    <div class="method-grid">
+      <div>
+        <h3>What is exact</h3>
+        <ul>
+          <li><code>H = D / 12</code>: expected hashes to win a block equal difficulty D (verified in the Consensus Lab against <code>pallet_qpow</code>), and the network targets one block per 12 s — so the implied hashrate is exact up to difficulty noise.</li>
+          <li>Efficiency arithmetic: <code>W = (H/s) / (H/J)</code>, annual energy = <code>MW × 8760 h</code>, per-block energy = <code>W × 12 s</code>. All in <code>energy-core.js</code>, 97/97 node tests green.</li>
+          <li>Fleet efficiency is the hashrate-weighted harmonic mean — the only way the joules add up when cards differ.</li>
+          <li>Reward math: <code>R = (21M − S) / 50M</code>, exact to the planck against the emission source (see Emission Lab).</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What is assumed</h3>
+        <ul>
+          <li><strong>Everything about watts.</strong> The fleet mix is unknown; the band edges are an RTX 4090 at a measured 350 W cap and an RTX 3060 Ti at board TDP. If real fleets run cheaper cards or undervolt, the truth sits higher or lower — say so when you cite this page.</li>
+          <li>TDP badges are not measurements: wall power for those cards will differ, usually lower.</li>
+          <li>Snapshots age: consensus and supply snapshots refresh with the loop's data scripts; the pill shows exactly how old they are. When both snapshot and a live read fail, the UI says so instead of inventing numbers.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What we did not do</h3>
+        <ul>
+          <li>No fuel-mix claims for Quantus mining — there is no public survey of where the hashrate sits, and guessing would be fiction.</li>
+          <li>No "greener than Bitcoin" claims — the chains differ by orders of magnitude in hashrate, security assumptions, and signature weight; per-TWh comparisons measure scale, not virtue.</li>
+          <li>No unverified external figures: entries that couldn't be re-verified on Oct 1, 2026 were omitted rather than carried over.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel caveats">
+    <h2>Honest caveats</h2>
+    <ul>
+      <li>Energy is consumed to secure <em>blocks</em>; per-transfer figures are arithmetic, not causation.</li>
+      <li>QTC has no market price yet: revenue, profit, and payback figures cannot exist and are not shown.</li>
+      <li>External figures are cited with source, URL, and date — check them before republishing; they move.</li>
+      <li>This page never fabricates chain state: if the snapshot and the indexer are both unreachable, it says so.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> ·
+    <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    Donations (QTC): <code class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code>
+  </footer>
+</main>
+
+<script src="js/energy-core.js?v=1.49.0"></script>
+<script src="js/app.js?v=1.49.0"></script>
+</body>
+</html>
