@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QTC Exposure Lab — the quantum-exposure auditor</title>
+<meta name="description" content="QTC Exposure Lab: paste Bitcoin/Ethereum addresses and find out whether their public keys are already on-chain — harvestable today, breakable at Q-Day. Local address validation (SS58-189, bech32/bech32m, Base58Check), live chain-history lookup, and a migration playbook to post-quantum Quantus. Read-only; never signs.">
+<link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
+<link rel="stylesheet" href="styles.css?v=1.51.0">
+<link rel="icon" href="../../assets/favicon.svg?v=1.48.0" type="image/svg+xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="back" href="../../index.html">&larr; Builder hub</a>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">🔍</span>
+    <div><strong>QTC Exposure Lab</strong><span>The quantum-exposure auditor</span></div>
+  </div>
+  <div class="top-actions">
+    <span class="pill">Read-only</span>
+    <span class="pill ghost">Never signs</span>
+    <details class="qmb-switch">
+      <summary>Apps</summary>
+      <div class="qmb-menu" role="menu">
+    <a href="../mining-calculator/"><span class="ico">⛏</span><span>Mining Calculator<span class="meta">Reward estimator</span></span></a>
+    <a href="../address-toolkit/"><span class="ico">⌘</span><span>Address Toolkit<span class="meta">SS58 inspector</span></span></a>
+    <a href="../network-dashboard/"><span class="ico">◉</span><span>Network Dashboard<span class="meta">Live telemetry</span></span></a>
+    <a href="../quantum-shield/"><span class="ico">◈</span><span>Quantum Shield<span class="meta">PQ explainer</span></span></a>
+    <a href="../tokenomics/"><span class="ico">◍</span><span>Tokenomics<span class="meta">Genesis deep-dive</span></span></a>
+    <a href="../block-explorer/"><span class="ico">▦</span><span>Block Explorer<span class="meta">Chain search</span></span></a>
+    <a href="../mining-studio/"><span class="ico">🔥</span><span>Mining Studio<span class="meta">Setup command center</span></span></a>
+    <a href="../safesend/"><span class="ico">🛡</span><span>SafeSend Lab<span class="meta">Reversible payments</span></span></a>
+    <a href="../benchmark-lab/"><span class="ico">⚖</span><span>Benchmark Lab<span class="meta">Chain comparator</span></span></a>
+    <a href="../fee-throughput-lab/"><span class="ico">🎛</span><span>Fee &amp; Throughput Lab<span class="meta">Cost estimator</span></span></a>
+    <a href="../threat-lab/"><span class="ico">☢</span><span>Threat Lab<span class="meta">Q-Day countdown</span></span></a>
+    <a href="../emission-lab/"><span class="ico">◐</span><span>Emission Lab<span class="meta">Reward decay</span></span></a>
+    <a href="../mining-observatory/"><span class="ico">📡</span><span>Mining Observatory<span class="meta">Decentralization</span></span></a>
+    <a href="../swap-desk/"><span class="ico">⇄</span><span>Swap Desk<span class="meta">Intents watch</span></span></a>
+    <a href="../dev-hub/"><span class="ico">⌨</span><span>Developer Hub<span class="meta">Build on Quantus</span></span></a>
+    <a href="../whale-watch/"><span class="ico">🐋</span><span>Whale Watch<span class="meta">Supply concentration</span></span></a>
+    <a href="../key-forge/"><span class="ico">⚒</span><span>Key Forge<span class="meta">PQ keypairs</span></span></a>
+    <a href="../distribution-planner/"><span class="ico">📤</span><span>Distribution Planner<span class="meta">Batch payouts</span></span></a>
+    <a href="../multisig-vault/"><span class="ico">🔐</span><span>MultiSig Vault<span class="meta">Shared custody</span></span></a>
+    <a href="../governance-tracker/"><span class="ico">🏛</span><span>Governance Tracker<span class="meta">On-chain parliament</span></span></a>
+    <a href="../vanity-forge/"><span class="ico">✦</span><span>Vanity Forge<span class="meta">Brandable addresses</span></span></a>
+    <a href="../contact-vault/"><span class="ico">🚨</span><span>Contact Vault<span class="meta">Anti-poisoning desk</span></span></a>
+    <a href="../legacy-vault/"><span class="ico">🕯</span><span>Legacy Vault<span class="meta">Inheritance planner</span></span></a>
+    <a href="../supply-audit/"><span class="ico">🧾</span><span>Supply Audit<span class="meta">Monetary audit</span></span></a>
+    <a href="../vesting-desk/"><span class="ico">⏳</span><span>Vesting Desk<span class="meta">Unlock calendar</span></span></a>
+    <a href="../flow-tracer/"><span class="ico">🔎</span><span>Flow Tracer<span class="meta">Money-flow forensics</span></span></a>
+    <a href="../watchtower/"><span class="ico">🛰</span><span>Watchtower<span class="meta">Chain &amp; wallet alerts</span></span></a>
+    <a href="../portfolio-desk/"><span class="ico">💼</span><span>Portfolio Desk<span class="meta">Multi-wallet command</span></span></a>
+    <a href="../mempool-desk/"><span class="ico">🌊</span><span>Mempool Desk<span class="meta">Transaction-pool desk</span></span></a>
+    <a href="../web-wallet/"><span class="ico">🔑</span><span>Web Wallet<span class="meta">Self-custody wallet</span></span></a>
+    <a href="../airgap-desk/"><span class="ico">🧊</span><span>Airgap Desk<span class="meta">Offline signing lab</span></span></a>
+    <a href="../ledger-desk/"><span class="ico">🧾</span><span>Ledger Desk<span class="meta">Tax &amp; accounting ledger</span></span></a>
+    <a href="../consensus-lab/"><span class="ico">⚛</span><span>Consensus Lab<span class="meta">Difficulty laboratory</span></span></a>
+    <a href="../node-desk/"><span class="ico">🖥</span><span>Node Operator Desk<span class="meta">Run your own node</span></span></a>
+    <a href="../chain-console/"><span class="ico">⌨</span><span>Chain Console<span class="meta">RPC workbench</span></span></a>
+    <a href="../extrinsic-lab/"><span class="ico">🧬</span><span>Extrinsic Lab<span class="meta">Transaction autopsy</span></span></a>
+    <a href="../scale-lab/"><span class="ico">⚙️</span><span>SCALE Lab<span class="meta">Codec workbench</span></span></a>
+    <a href="../proposal-studio/"><span class="ico">🏛️</span><span>Proposal Studio<span class="meta">Governance drafting desk</span></span></a>
+    <a href="../pool-desk/"><span class="ico">🏊</span><span>Pool Desk<span class="meta">Mining-pool directory</span></span></a>
+    <a href="../pay-desk/"><span class="ico">🧾</span><span>Pay Desk<span class="meta">Merchant acceptance toolkit</span></span></a>
+    <a href="../cli-forge/"><span class="ico">💻</span><span>CLI Forge<span class="meta">Command builder</span></span></a>
+    <a href="../luck-lab/"><span class="ico">🍀</span><span>Luck Lab<span class="meta">Luck & variance lab</span></span></a>
+    <a href="../notary-desk/"><span class="ico">📜</span><span>Notary Desk<span class="meta">On-chain timestamping</span></span></a>
+    <a href="../zktree-desk/"><span class="ico">🌲</span><span>ZkTree Desk<span class="meta">ZK Merkle-tree lab</span></span></a>
+    <a href="../energy-observatory/"><span class="ico">⚡</span><span>Energy Observatory<span class="meta">Network-energy & carbon lab</span></span></a>
+    <a href="../reversal-desk/"><span class="ico">🔄</span><span>Reversal Desk<span class="meta">Reversible transfers</span></span></a>
+    <a href="../exposure-lab/" class="current"><span class="ico">🔍</span><span>Exposure Lab<span class="meta">Quantum-exposure auditor</span></span></a>
+    <a class="hub-link" href="../../"><span class="ico">⌂</span><span>Builder Hub<span class="meta">All apps</span></span></a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="scan-beam" aria-hidden="true"></div>
+    <h1>Is your crypto <span class="hl">harvestable</span> today?</h1>
+    <p class="lede">A quantum computer running Shor's algorithm breaks ECDSA and secp256k1 — the signatures guarding Bitcoin and Ethereum. Attackers don't need the quantum computer <em>yet</em>: any address whose <strong>public key is already on-chain</strong> can be harvested now and broken later. This lab audits your addresses — Bitcoin, Ethereum, and Quantus — and tells you exactly where you stand before Q-Day.</p>
+    <div class="legend">
+      <span class="lg v-exposed">☢ EXPOSED — key on-chain</span>
+      <span class="lg v-latent">⚠ LATENT — safe until first spend</span>
+      <span class="lg v-clean">○ CLEAN — never used</span>
+      <span class="lg v-safe">⬢ SAFE — post-quantum</span>
+    </div>
+    <p class="hero-note">Q-Day estimates live in the <a href="../threat-lab/">Threat Lab</a>. Post-quantum cryptography, explained, lives in <a href="../quantum-shield/">Quantum Shield</a>.</p>
+  </section>
+
+  <section id="how">
+    <div class="sec-title">Threat model</div>
+    <h2 class="sec-head">How an address becomes harvestable</h2>
+    <div class="how-grid">
+      <div class="how-card exposed">
+        <h3>☢ Exposed</h3>
+        <p>The public key is on-chain <strong>today</strong>. Harvest now, break at Q-Day.</p>
+        <ul>
+          <li><strong>Bitcoin:</strong> any address that has <em>spent</em> — P2PKH/P2WPKH spends publish the key. P2PK and Taproot (P2TR) outputs carry the key from funding — no spend needed.</li>
+          <li><strong>Ethereum:</strong> any address that has <em>sent</em> — the ECDSA signature reveals the key via the recovery id.</li>
+          <li><strong>Other Substrate chains:</strong> the SS58 account id <em>is</em> the raw 32-byte public key. Exposed by design.</li>
+        </ul>
+      </div>
+      <div class="how-card latent">
+        <h3>⚠ Latent</h3>
+        <p>Funded, but the key is still hidden behind a hash. <strong>Safe — until the first spend.</strong></p>
+        <ul>
+          <li>A fresh P2PKH/P2WPKH address that has only ever <em>received</em>.</li>
+          <li>An Ethereum address with inbound transfers but zero outgoing transactions.</li>
+          <li>Fragile by design: one spend/send publishes the key <em>permanently</em>. Terrible for cold storage measured in years.</li>
+        </ul>
+      </div>
+      <div class="how-card clean">
+        <h3>○ Clean</h3>
+        <p>Never touched on-chain. Nothing to harvest — there is no public key anywhere yet.</p>
+        <ul>
+          <li>Freshly generated addresses with zero history.</li>
+          <li>Stays clean only until first use. Generate, fund, and then <em>don't spend</em> — or better, move to the safe column.</li>
+        </ul>
+      </div>
+      <div class="how-card safe">
+        <h3>⬢ Safe</h3>
+        <p>Post-quantum signatures. Shor's algorithm has nothing to chew on.</p>
+        <ul>
+          <li><strong>Quantus (SS58 prefix 189):</strong> ML-DSA-65/87 (NIST FIPS 204) from the genesis block.</li>
+          <li>Checksum-verified locally — no chain lookup needed to prove it.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="auditor">
+    <div class="sec-title">The auditor</div>
+    <h2 class="sec-head">Scan your addresses</h2>
+    <p class="sec-sub">Paste Bitcoin, Ethereum, or Quantus addresses — one per line (up to 25). Validation runs <strong>locally in your browser</strong>; chain history is fetched from public APIs. Nothing is signed, nothing leaves except the lookups you asked for.</p>
+    <div class="audit-box">
+      <label class="visually-hidden" for="addrInput">Addresses to audit, one per line</label>
+      <textarea id="addrInput" rows="6" spellcheck="false" placeholder="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa&#10;0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045&#10;bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"></textarea>
+      <div class="btn-row">
+        <button id="runBtn" class="btn primary"><span class="btn-label">Run audit</span><span class="btn-scan" aria-hidden="true"></span></button>
+        <button id="sampleBtn" class="btn">Try the sample set</button>
+        <button id="clearBtn" class="btn ghost">Clear</button>
+        <span class="hint">Ctrl/⌘ + Enter to run</span>
+      </div>
+      <div id="statusLine" class="status" role="status" aria-live="polite"></div>
+    </div>
+    <div id="summaryPanel" class="summary" style="display:none"></div>
+    <div id="resultsGrid" class="results"></div>
+  </section>
+
+  <section id="playbook">
+    <div class="sec-title">Migration playbook</div>
+    <h2 class="sec-head">From harvestable to quantum-safe</h2>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><div><h3>Audit everything</h3><p>Run every address you control through the auditor above — including old cold-storage addresses you haven't touched in years. Address reuse is the #1 exposure source.</p></div></div>
+      <div class="step"><span class="n">2</span><div><h3>Rank by risk</h3><p>Exposed + funded first, then latent + funded. An exposed address with a balance is harvestable <em>today</em>; a latent one becomes exposed the moment you spend from it.</p></div></div>
+      <div class="step"><span class="n">3</span><div><h3>Generate fresh Quantus keys</h3><p>Use the <a href="../key-forge/">Key Forge</a> to mint ML-DSA keypairs and checksum-verified SS58 (prefix 189) addresses. Post-quantum from the first block — no ECDSA anywhere in the stack.</p></div></div>
+      <div class="step"><span class="n">4</span><div><h3>Move in stages</h3><p>Send a small test amount, verify arrival in the <a href="../block-explorer/">Block Explorer</a>, then move the rest. For large migrations, <a href="../reversal-desk/">Reversal Desk</a> scheduled transfers add a cancellable safety window.</p></div></div>
+      <div class="step"><span class="n">5</span><div><h3>Retire, don't reuse</h3><p>Never spend from the old addresses again — every spend re-publishes the key. Treat retired addresses as radioactive: look, don't touch.</p></div></div>
+    </div>
+  </section>
+
+  <section id="method">
+    <div class="sec-title">Methodology</div>
+    <h2 class="sec-head">What this lab claims — and what it doesn't</h2>
+    <div class="method-grid">
+      <div>
+        <h3>What is exact</h3>
+        <ul>
+          <li>Address validation is computed locally: SS58 checksum = blake2b-512(<code>"SS58PRE"‖body</code>)[0..2] (crypto vendored from the Address Toolkit, verified 2026-09-29 against the Quantus genesis vesting table); bech32 per BIP-173 and bech32m per BIP-350; Base58Check via double-SHA-256. 40/40 node tests green.</li>
+          <li>The exposure rules: spent Bitcoin outputs reveal the key (P2PKH/P2WPKH); P2PK and P2TR outputs carry the key at funding; Ethereum signatures leak the key via the recovery id; non-Quantus SS58 account ids <em>are</em> raw public keys.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What is estimated</h3>
+        <ul>
+          <li>USD "at risk" uses CoinGecko <code>simple/price</code> at audit time; if the feed is offline the estimate is skipped, never guessed.</li>
+          <li>The P2PK/P2TR output scan covers the first page of address history (25 txs) from mempool.space; deeper history relies on the spent-output counts, which are complete.</li>
+          <li>Q-Day itself is unknowable — see the <a href="../threat-lab/">Threat Lab</a> for the estimate range, not a date.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What we did not do</h3>
+        <ul>
+          <li>No signing, no key handling, no wallet connection — this lab is read-only. It cannot move your funds and never asks for secrets.</li>
+          <li>No verdict without chain data: if an API is unreachable the address gets <strong>UNKNOWN</strong>, not a guess. Sample mode is always labeled <strong>SAMPLE DATA</strong> with illustrative figures.</li>
+          <li>Not financial advice. A "safe" verdict means quantum-safe — it says nothing about price, custody, or counterparty risk.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="sources"><strong>Sources:</strong> mempool.space REST API (address + txs), BlockCypher Ethereum API (Blockscout v2 fallback), CoinGecko simple/price, NIST FIPS 204 (ML-DSA), BIP-173 / BIP-350, Quantus-Network/chain (SS58 prefix 189).</p>
+  </section>
+
+  <footer>
+    Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a> ·
+    <a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">upstream org</a><br>
+    Donations (QTC): <code class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code>
+  </footer>
+</main>
+
+<script src="js/exposure-core.js?v=1.51.0"></script>
+<script src="js/app.js?v=1.51.0"></script>
+</body>
+</html>
