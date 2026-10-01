@@ -95,6 +95,7 @@ function init(){
     }
     size(); addEventListener("resize", size);
     x.font = "15px monospace";
+    var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     (function tick(){
       x.fillStyle = "rgba(8,5,3,0.14)"; x.fillRect(0,0,c.width,c.height);
       for (var i=0;i<cols.length;i++){ var col = cols[i];
@@ -104,7 +105,7 @@ function init(){
         col.y += col.v * 15;
         if (col.y > c.height + 20){ col.y = -20; col.v = 1 + Math.random()*2.4; }
       }
-      requestAnimationFrame(tick);
+      if (!REDUCE_MOTION) requestAnimationFrame(tick);
     })();
   })();
 

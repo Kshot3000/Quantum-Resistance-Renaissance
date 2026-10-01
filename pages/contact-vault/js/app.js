@@ -79,8 +79,9 @@ function setVerdict(el, cls, title, sub) {
   resize();
   window.addEventListener("resize", resize);
   var t = 0;
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   (function frame() {
-    requestAnimationFrame(frame);
+    if (!REDUCE_MOTION) requestAnimationFrame(frame);
     if (document.hidden) return;
     t += 0.016;
     ctx.clearRect(0, 0, W, H);

@@ -339,7 +339,7 @@ function renderRequest(inv) {
   $("req-id").textContent = inv.id;
   drawQRInto($("qr-box"), inv.address, 264);
   startCountdown(inv);
-  sec.scrollIntoView({ behavior: "smooth", block: "start" });
+  sec.scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "start" });
 }
 
 function startCountdown(inv) {
@@ -566,7 +566,7 @@ function init() {
     $("request-sec").hidden = true;
     if (state.tick) clearInterval(state.tick);
     state.current = null;
-    $("builder-sec").scrollIntoView({ behavior: "smooth" });
+    $("builder-sec").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
   });
   $("req-pos").addEventListener("click", function () {
     if (state.current) openPos(state.current);

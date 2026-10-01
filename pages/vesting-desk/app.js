@@ -358,7 +358,7 @@
       "Non-final payouts land in 25-QTC chunks; at most one claim per day per schedule. " +
       "Estimates use this page's chain time; the chain decides at the claim block's timestamp.</div>";
     $("detail-close").addEventListener("click", () => { $("sched-detail").hidden = true; });
-    $("sched-detail").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    $("sched-detail").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "nearest" });
   }
   function cell(label, value, cls) {
     return '<div class="detail-cell"><div class="dl">' + label + '</div><div class="dv ' + cls + '">' + value + "</div></div>";
@@ -438,6 +438,7 @@
     }
     size();
     window.addEventListener("resize", size);
+    var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     (function frame() {
       ctx.clearRect(0, 0, w, h);
       ctx.strokeStyle = "rgba(245,196,83,.10)";
@@ -447,7 +448,7 @@
         t.y += t.s;
         if (t.y > h + 20) { t.y = -20; t.x = Math.random() * w; }
       }
-      requestAnimationFrame(frame);
+      if (!REDUCE_MOTION) requestAnimationFrame(frame);
     })();
   }
 

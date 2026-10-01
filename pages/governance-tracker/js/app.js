@@ -292,6 +292,7 @@ function drawSeal() {
   function size() { c.width = innerWidth; c.height = innerHeight; }
   size(); addEventListener("resize", size);
   var t = 0;
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   (function frame() {
     t += 0.0016;
     ctx.clearRect(0, 0, c.width, c.height);
@@ -304,7 +305,7 @@ function drawSeal() {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-    requestAnimationFrame(frame);
+    if (!REDUCE_MOTION) requestAnimationFrame(frame);
   })();
 }
 

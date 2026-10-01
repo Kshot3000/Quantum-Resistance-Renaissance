@@ -42,6 +42,7 @@ const cold = { ticket: null, ticketStr: '', cpWords: null, chunks: [], extrinsic
     r: .7 + Math.random() * 2.1, hue: 190 + Math.random() * 45, tw: Math.random() * 6.28,
   });
   for (let i = 0; i < 70; i++) parts.push(spawn());
+  const REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const tick = () => {
     ctx.clearRect(0, 0, W, H);
     for (const p of parts) {
@@ -53,7 +54,7 @@ const cold = { ticket: null, ticketStr: '', cpWords: null, chunks: [], extrinsic
       ctx.fillStyle = `hsla(${p.hue},90%,75%,${a})`;
       ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
     }
-    requestAnimationFrame(tick);
+    if (!REDUCE_MOTION) requestAnimationFrame(tick);
   };
   tick();
 })();
@@ -148,7 +149,7 @@ $('btn-issue').addEventListener('click', async () => {
     $('ticket-text').value = hot.ticketStr;
     drawQR($('ticket-qr'), hot.ticketStr);
     $('ticket-out').hidden = false;
-    $('ticket-out').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('ticket-out').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) {
     setConn('bad', 'offline');
     err('issue-err', 'Could not issue a ticket: ' + e.message + '. A ticket needs a live node — nothing was fabricated.');
@@ -284,7 +285,7 @@ function verifyPackage() {
   $('btn-broadcast').disabled = !ok;
   $('fee-quote').hidden = true;
   $('verify-out').hidden = false;
-  $('verify-out').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('verify-out').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
 }
 
 $('btn-reverify').addEventListener('click', () => {
@@ -362,7 +363,7 @@ $('btn-broadcast').addEventListener('click', async () => {
     ex.href = EXPLORER;
     ex.textContent = 'Open explorer — paste the hash in “Search the chain”';
     ex.hidden = false;
-    $('broadcast-result').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('broadcast-result').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
     btn.textContent = 'Broadcast ✓';
   } catch (e) {
     err('broadcast-err', 'Broadcast failed: ' + e.message);
@@ -527,7 +528,7 @@ $('btn-cold-review').addEventListener('click', () => {
       ['Checkphrase', '✓ read back correctly'],
     ]);
     $('cold-review').hidden = false;
-    $('cold-review').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('cold-review').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) { err('cold-build-err', e.message); }
 });
 

@@ -237,7 +237,7 @@ function openDossier(addr, graph) {
   $("dossier-trace").onclick = function () {
     $("trace-addr").value = addr;
     doTrace(addr, $("trace-dir").value, parseInt($("trace-hops").value, 10));
-    $("trace-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+    $("trace-panel").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "start" });
   };
   if (graph === snapGraph) { /* keep panel in place */ }
 }
@@ -306,7 +306,7 @@ function renderRadarTab(tab) {
       var a = b.getAttribute("data-trace");
       $("trace-addr").value = a;
       doTrace(a, $("trace-dir").value, parseInt($("trace-hops").value, 10));
-      $("trace-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+      $("trace-panel").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "start" });
     });
   });
 }
@@ -329,7 +329,7 @@ function renderNotable() {
       var a = b.getAttribute("data-trace");
       $("trace-addr").value = a;
       doTrace(a, $("trace-dir").value, parseInt($("trace-hops").value, 10));
-      $("trace-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+      $("trace-panel").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "start" });
     });
   });
 }
@@ -367,6 +367,7 @@ function flowDrift() {
   }
   size();
   window.addEventListener("resize", size);
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   (function frame() {
     ctx.clearRect(0, 0, w, h);
     for (var i = 0; i < ps.length; i++) {
@@ -379,7 +380,7 @@ function flowDrift() {
       p.x += p.s;
       if (p.x - p.l > w) { p.x = -p.l - 10; p.y = Math.random() * h; }
     }
-    requestAnimationFrame(frame);
+    if (!REDUCE_MOTION) requestAnimationFrame(frame);
   })();
 }
 

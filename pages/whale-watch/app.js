@@ -616,6 +616,7 @@ function abyss(){
     s: .0004 + Math.random() * .0012, o: .15 + Math.random() * .5, ph: Math.random() * 6.28
   });
   var whale = { x: 1.2, y: .3, s: .0006 };
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   (function tick(){
     ctx.clearRect(0, 0, W, H);
     var t = Date.now() / 1000, i, p;
@@ -639,7 +640,7 @@ function abyss(){
     ctx.font = Math.round(Math.min(W, H) * 0.09) + "px serif";
     ctx.fillText("🐋", wx, wy);
     ctx.restore();
-    requestAnimationFrame(tick);
+    if (!REDUCE_MOTION) requestAnimationFrame(tick);
   })();
 }
 

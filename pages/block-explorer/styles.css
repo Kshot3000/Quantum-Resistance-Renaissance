@@ -206,3 +206,8 @@ tr.args-row td{background:rgba(3,5,14,.55)}
 .skip-link{position:absolute;left:12px;top:-60px;z-index:10000;background:#40e0ff;color:#03242b;font-weight:700;font-size:14px;padding:10px 16px;border-radius:10px;text-decoration:none}
 .skip-link:focus{top:12px;outline:3px solid #fbbf24;outline-offset:2px}
 :focus-visible{outline:2px solid #40e0ff;outline-offset:3px}
+
+/* ---------- reduced motion (local copy; page does not use shared.css) ---------- */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}

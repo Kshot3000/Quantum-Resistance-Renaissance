@@ -609,6 +609,7 @@ document.querySelectorAll("[data-copy]").forEach(function (btn) {
   }
   size(); window.addEventListener("resize", size);
   var cx = function () { return W2 / 2; }, cy = function () { return 120; };
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   function frame() {
     ctx.clearRect(0, 0, W2, H2);
     ang += 0.006;
@@ -638,7 +639,7 @@ document.querySelectorAll("[data-copy]").forEach(function (btn) {
       ctx.fillStyle = "rgba(143,214,255," + tw.toFixed(3) + ")";
       ctx.fill();
     });
-    requestAnimationFrame(frame);
+    if (!REDUCE_MOTION) requestAnimationFrame(frame);
   }
   frame();
 })();

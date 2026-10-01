@@ -228,6 +228,7 @@ function $(id){ return document.getElementById(id); }
     });
   }
   size(); addEventListener("resize", size);
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   (function tick(){
     x.clearRect(0, 0, c.width, c.height);
     for (var i = 0; i < ps.length; i++){ var p = ps[i];
@@ -235,7 +236,7 @@ function $(id){ return document.getElementById(id); }
       x.fillRect(p.x, p.y, p.s, p.s);
       p.y += p.v; if (p.y > c.height + 6){ p.y = -6; p.x = Math.random() * c.width; }
     }
-    requestAnimationFrame(tick);
+    if (!REDUCE_MOTION) requestAnimationFrame(tick);
   })();
 })();
 

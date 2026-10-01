@@ -121,7 +121,7 @@ $("poisonBtn").addEventListener("click", function () {
   QTC_CHECK.addressToChecksumAsync(tamp, QTC_WORDLIST, null).then(function (tw) {
     renderWords($("tampWords"), tw, true);
     $("poisonBtn").disabled = false; $("poisonBtn").textContent = "Tamper with one character — show the poisoning demo";
-    $("poisonCard").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    $("poisonCard").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "nearest" });
   });
 });
 

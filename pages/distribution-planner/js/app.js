@@ -383,6 +383,7 @@ function init() {
   }
   size();
   addEventListener("resize", size);
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   (function draw() {
     ctx.clearRect(0, 0, cv.width, cv.height);
     for (var i = 0; i < stars.length; i++) {
@@ -395,7 +396,7 @@ function init() {
       ctx.fillStyle = "rgba(167,139,250," + (0.5 * tw).toFixed(3) + ")";
       ctx.fill();
     }
-    requestAnimationFrame(draw);
+    if (!REDUCE_MOTION) requestAnimationFrame(draw);
   })();
   revalidate();
 }

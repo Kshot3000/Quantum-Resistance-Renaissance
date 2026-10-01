@@ -42,6 +42,7 @@ const state = {
     r: .8 + Math.random() * 2.4, hue: 265 + Math.random() * 40, tw: Math.random() * 6.28,
   });
   for (let i = 0; i < 80; i++) parts.push(spawn());
+  const REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const tick = () => {
     ctx.clearRect(0, 0, W, H);
     for (const p of parts) {
@@ -53,7 +54,7 @@ const state = {
       ctx.fillStyle = `hsla(${p.hue},95%,70%,${a})`;
       ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
     }
-    requestAnimationFrame(tick);
+    if (!REDUCE_MOTION) requestAnimationFrame(tick);
   };
   tick();
 })();
@@ -145,7 +146,7 @@ $('btn-create').addEventListener('click', async () => {
     mnemonic.split(' ').forEach((w) => { const li = document.createElement('li'); li.textContent = w; ol.appendChild(li); });
     $('reveal').hidden = false;
     $('reveal-ack').checked = false; $('btn-reveal-done').disabled = true;
-    $('reveal').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('reveal').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) { err('onboard-err', e.message); }
 });
 
@@ -155,7 +156,7 @@ $('btn-reveal-done').addEventListener('click', () => {
   if (!pendingNew) return;
   $('reveal').hidden = true;
   $('pwgate').hidden = false;
-  $('pwgate').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('pwgate').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   $('pw1').focus();
 });
 
@@ -195,7 +196,7 @@ $('btn-import').addEventListener('click', async () => {
     }
     pendingImport = { kp, mnemonic };
     $('pwgate').hidden = false;
-    $('pwgate').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('pwgate').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
     $('pw1').focus();
     err('onboard-err', '✓ Wallet recognized — address ' + shortAddr(kp.address));
     $('onboard-err').style.cssText = 'background:rgba(94,230,168,.08);border-color:rgba(94,230,168,.4);color:#9df0c8';
@@ -413,7 +414,7 @@ $('btn-estimate').addEventListener('click', async () => {
     $('ext-parts').innerHTML = parts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
     $('ext-payload').value = unsigned.payloadHex;
     $('estimate-box').hidden = false;
-    $('estimate-box').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('estimate-box').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) {
     err('send-err', e.message);
   } finally {

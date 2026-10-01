@@ -102,7 +102,7 @@ function deriveVault(){
   $("vault-to-builder").addEventListener("click", function(){
     $("b-vault").value = r.ss58;
     $("b-vault-err").textContent = "";
-    document.getElementById("builder").scrollIntoView({ behavior: "smooth" });
+    document.getElementById("builder").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
     toast("Vault address loaded into the call builder");
   });
 }

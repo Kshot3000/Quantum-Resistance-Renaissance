@@ -267,6 +267,7 @@ function ledgerRain(){
   var glyphs = "0123456789abcdefΣΔλ", cols = [], n = Math.max(20, Math.floor(innerWidth / 26)), i;
   for (i = 0; i < n; i++) cols.push({ x: i * 26, y: Math.random() * innerHeight, v: 12 + Math.random() * 22 });
   ctx.font = "13px ui-monospace, monospace";
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   (function tick(){
     ctx.clearRect(0, 0, c.width, c.height);
     ctx.fillStyle = "rgba(143,227,176,0.10)";
@@ -276,7 +277,7 @@ function ledgerRain(){
       col.y += col.v * 0.16;
       if (col.y > innerHeight + 20){ col.y = -20; col.v = 12 + Math.random() * 22; }
     }
-    requestAnimationFrame(tick);
+    if (!REDUCE_MOTION) requestAnimationFrame(tick);
   })();
 }
 

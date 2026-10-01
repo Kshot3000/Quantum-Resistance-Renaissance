@@ -444,6 +444,7 @@ function init(){
   function size(){ cv.width = innerWidth; cv.height = innerHeight; }
   size(); addEventListener("resize", size);
   for (var i = 0; i < 60; i++) pts.push({ x: Math.random(), y: Math.random(), s: Math.random() * 1.6 + .4, v: Math.random() * .0004 + .0001 });
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   (function tick(){
     ctx.clearRect(0, 0, cv.width, cv.height);
     ctx.fillStyle = "rgba(77,240,164,.5)";
@@ -453,7 +454,7 @@ function init(){
       ctx.fillRect(p.x * cv.width, p.y * cv.height, p.s, p.s);
     }
     ctx.globalAlpha = 1;
-    requestAnimationFrame(tick);
+    if (!REDUCE_MOTION) requestAnimationFrame(tick);
   })();
 }
 

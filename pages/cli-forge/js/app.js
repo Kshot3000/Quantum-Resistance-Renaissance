@@ -1554,7 +1554,7 @@ function selectCommand(id) {
   // keep values for fields the new command also has
   renderTree(document.getElementById("cmd-search").value);
   renderBuilder();
-  document.getElementById("builder").scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById("builder").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "start" });
 }
 
 function currentValues() {

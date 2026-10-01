@@ -189,7 +189,7 @@
     renderAnatomy(d);
     $('call-args').innerHTML = d.call ? renderCall(d.call, 0) : '<div class="fineprint">no call section</div>';
     resBox.hidden = false;
-    resBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    resBox.scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'start' });
   }
 
   function stat(label, value, violet) {
@@ -234,7 +234,7 @@
         seg.classList.add('sel');
         var row = document.querySelector('.arow[data-sec="' + i + '"]');
         if (row) {
-          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
           row.classList.add('flash');
           setTimeout(function () { row.classList.remove('flash'); }, 1200);
         }
@@ -356,7 +356,7 @@
         '<div class="kv"><span class="k">message verified</span><span class="v">' + esc(hexPreview(r.messageHex, 80)) + '</span></div>' +
         (!r.ok ? '<p class="warnline" style="margin-top:8px">The signature does not match this payload under the embedded public key. The extrinsic was tampered with, signed for a different chain/spec version, or the context is wrong.</p>' : '') +
         '</div>';
-      resBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      resBox.scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'nearest' });
     } catch (e) {
       errBox.hidden = false;
       errBox.innerHTML = '<b>Cannot verify.</b> ' + esc(e.message);

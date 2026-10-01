@@ -149,7 +149,7 @@ async function forge() {
 
   $('forgeBusy').hidden = true;
   $('forgeResult').hidden = false;
-  $('forgeResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  $('forgeResult').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'nearest' });
 }
 $('forgeBtn').addEventListener('click', forge);
 $('forgeAgain').addEventListener('click', forge);

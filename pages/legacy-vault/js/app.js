@@ -45,7 +45,7 @@
       document.querySelectorAll(".tabpage").forEach((p) => p.classList.remove("active"));
       b.classList.add("active");
       $("tab-" + b.dataset.tab).classList.add("active");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
     });
   });
 

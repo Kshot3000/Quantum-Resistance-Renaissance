@@ -330,7 +330,7 @@ function onFound({ address, secretKey, attempts, ms, cfg }) {
     else if (act === 'copy-sec') copyText(secs, ev.target);
   });
   $('foundList').prepend(card);
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  card.scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'nearest' });
   $('forgeStatus').textContent = `Found it — ${address.slice(0, 14)}… on attempt ${fmtInt(attempts)}.`;
 }
 

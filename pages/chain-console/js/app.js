@@ -272,7 +272,7 @@ function renderResult({ method, params, result, ms, ok, error, summarizeKey, ctx
   el.querySelectorAll('.fold').forEach((f) => f.addEventListener('click', () => {
     f.outerHTML = `<span class="js">${f.dataset.full}</span>`;
   }));
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  el.scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'nearest' });
 }
 
 function showBanner(title, hint) {
@@ -391,7 +391,7 @@ function selectRecipe(id) {
     $('kb-out').textContent = res.keyHex;
     $('rf-key').value = res.keyHex;
   });
-  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  form.scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'nearest' });
 }
 
 function readForm(r) {
