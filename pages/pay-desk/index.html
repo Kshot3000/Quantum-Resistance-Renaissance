@@ -7,7 +7,7 @@
 <meta name="description" content="QTC Pay Desk: accept Quantus (QTC) like a merchant — invoice builder with exact planck amounts, QR payment requests, point-of-sale mode, an invoice register, confirmation guidance, and an embeddable tip-button generator. Honest limits, no custody, no price oracle.">
 <link rel="stylesheet" href="../../assets/shared.css?v=1.12.0">
 <link rel="stylesheet" href="styles.css?v=1.44.0">
-<link rel="icon" href="../../assets/favicon.svg?v=1.44.0" type="image/svg+xml">
+<link rel="icon" href="../../assets/favicon.svg?v=1.16.0" type="image/svg+xml">
 </head>
 <body>
 <header class="topbar">
@@ -263,7 +263,7 @@
     <div class="sec-head"><h2>Sources &amp; honest limits</h2></div>
     <ul class="sources">
       <li><a href="https://github.com/Quantus-Network" target="_blank" rel="noopener">Quantus-Network</a> <span class="sdate">read 2026-09-29</span><br><span class="snote">Upstream org. Chain is Substrate/Polkadot-SDK-based; SS58 prefix 189 (<code>node/src/chain_spec.rs</code>); account crypto Poseidon2 over Goldilocks, verified byte-for-byte in the Web Wallet.</span></li>
-      <li><span class="snote">Chain snapshot <code>data/live.json</code> (repo, fetched 2026-09-30 from sqm.quantus.com/v1/graphql)</span><br><span class="snote">Block rewards 0.30–0.32 QTC → 12 decimals confirmed (1 QTC = 10<sup>12</sup> plancks); ~14 s average block gap in the snapshot window. Snapshot data decays — re-check the Network Dashboard before quoting block times to customers.</span></li>
+      <li><span class="snote">Chain snapshot <code>data/live.json</code> (repo, fetched 2026-10-01 from sqm.quantus.com/v1/graphql)</span><br><span class="snote">Block rewards 0.30–0.32 QTC → 12 decimals confirmed (1 QTC = 10<sup>12</sup> plancks); ~14 s average block gap in the snapshot window. Snapshot data decays — re-check the Network Dashboard before quoting block times to customers.</span></li>
       <li><a href="https://www.quantus.com/blog/weekly-update-09-16-2026/" target="_blank" rel="noopener">Quantus weekly update — mainnet week 1</a> <span class="sdate">2026-09-16</span><br><span class="snote">NEAR Intents named as first announced exchange venue; no listing date confirmed as of 2026-10-01. Hence: no price feed, manual rate card.</span></li>
     </ul>
     <p class="limits">Limits: Pay Desk cannot watch the chain, cannot convert to fiat, cannot hold funds, carries no price oracle, and cannot guarantee a payment. QR codes encode addresses only — there is no QTC payment-URI standard yet. Everything persists in your browser's localStorage; clearing site data wipes the register (export CSV first).</p>
@@ -293,7 +293,7 @@
   </div>
 </div>
 
-<script src="../../assets/app-nav.js?v=1.12.0"></script>
+<script src="../../assets/app-nav.js?v=1.8.0"></script>
 <script src="js/ss58.js?v=1.44.0"></script>
 <script src="js/qrcode.js?v=1.44.0"></script>
 <script src="js/app.js?v=1.44.0"></script>
