@@ -59,7 +59,7 @@ input[type=range]{accent-color:var(--amber);flex:1;}
 
 /* costs */
 .cost-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;}
-@media(max-width:900px){.cost-grid{grid-template-columns:1fr;}}
+@media(max-width:900px){.cost-grid{grid-template-columns:minmax(0,1fr)}.cost-grid>*{min-width:0}}
 .cost-table{width:100%;border-collapse:collapse;font-size:.88rem;}
 .cost-table th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);padding:.5rem;border-bottom:1px solid var(--vault-line);}
 .cost-table td{padding:.6rem .5rem;border-bottom:1px solid rgba(245,185,66,.07);}
@@ -118,3 +118,13 @@ input[type=range]{accent-color:var(--amber);flex:1;}
 .foot{border-top:1px solid var(--vault-line);}
 .toast{background:#1a1408;border:1px solid var(--amber-dim);color:var(--amber-hot);}
 .qmb-menu a.current{border-left:2px solid var(--amber);}
+
+/* Mobile (2026-10-01): 1fr is minmax(auto,1fr) — the auto minimum lets a number
+   input's intrinsic width (e.g. max="18446744073709551615") force the track
+   wider than the viewport. Clamp tracks and items instead. */
+@media(max-width:640px){
+  .factory-grid{grid-template-columns:minmax(0,1fr)}
+  .factory-grid>*{min-width:0}
+  .threshold-row{grid-template-columns:minmax(0,1fr)}
+  .threshold-row>*{min-width:0}
+}

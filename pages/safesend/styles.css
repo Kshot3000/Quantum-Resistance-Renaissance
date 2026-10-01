@@ -171,3 +171,9 @@ footer .donate{color:var(--muted)}
 footer .addr{cursor:pointer;background:rgba(46,242,184,.07);border:1px solid var(--line);color:var(--mint);border-radius:8px;padding:3px 10px;font-family:"JetBrains Mono",monospace;font-size:11.5px}
 footer .addr:hover{border-color:var(--line-hot)}
 footer .sig{font-size:11px;letter-spacing:.22em;color:var(--dim);margin-top:6px}
+
+/* Mobile: allow code spans to wrap (the global white-space:nowrap would force
+   horizontal scroll on narrow screens). */
+@media (max-width:640px){
+  code{white-space:normal}
+}

@@ -133,3 +133,10 @@ footer a{color:#c084fc;text-decoration:none}
 footer a:hover{text-decoration:underline}
 .donate .addr{cursor:pointer;background:rgba(192,132,252,.08);border:1px solid rgba(192,132,252,.3);color:#e9e2ff;border-radius:8px;padding:4px 10px;font-family:var(--font-mono);font-size:11.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .donate .addr:hover{background:rgba(192,132,252,.16)}
+
+/* Mobile: the desktop external-links row would force horizontal scroll —
+   hide it <=720px (shared.css hides .nav-end .links, but this app's own
+   .nav .links rule wins by source order, so repeat the hide here). */
+@media (max-width:720px){
+  .nav .links{display:none}
+}

@@ -115,3 +115,21 @@ header.chrome, .topbar.chrome, .nav.chrome{
   .nav-end .links{display:none}
   .qmb-menu{right:0;left:auto;min-width:min(280px,92vw)}
 }
+
+/* ---- Fleet mobile hardening (2026-10-01): zero horizontal scroll at <=640px ----
+   One shared rule replaces per-app overflow patches. Long code/address strings
+   wrap anywhere, data tables scroll in place, header action rows drop to their
+   own line, and form controls never exceed the viewport. App stylesheets load
+   after this file, so any app can still override these defaults. */
+code,.mono{overflow-wrap:anywhere}
+footer code,footer .mono,footer .donate,footer .foot-donate,
+footer button.addr,footer .addr,code#donate-addr{overflow-wrap:anywhere}
+footer button.addr{white-space:normal;max-width:100%}
+input,select,textarea{min-width:0;max-width:100%}
+input,select,textarea,button{box-sizing:border-box} /* width:100% + padding must not spill past the container */
+label{min-width:0;max-width:100%}
+@media (max-width:640px){
+  table{display:block;max-width:100%;overflow-x:auto}
+  header.topbar{flex-wrap:wrap;row-gap:10px}
+  .top-actions{flex-basis:100%;margin-left:0;justify-content:flex-start;flex-wrap:wrap}
+}

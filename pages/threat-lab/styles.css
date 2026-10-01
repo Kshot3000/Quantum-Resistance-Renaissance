@@ -31,7 +31,7 @@ main{position:relative;z-index:1}
 .scen-tab.active{border-color:var(--alert);background:rgba(255,84,112,.12);
   box-shadow:0 0 18px rgba(255,84,112,.25)}
 .scen-tab:focus-visible,.chain-btn:focus-visible,.btn:focus-visible{outline:2px solid var(--alert);outline-offset:2px}
-.clock-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:640px}
+.clock-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:640px}
 .clock-cell{background:#120a0d;border:1px solid var(--line);border-radius:14px;padding:16px 8px;
   text-align:center;display:flex;flex-direction:column;gap:4px}
 .cv{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:clamp(1.8rem,4.5vw,2.8rem);

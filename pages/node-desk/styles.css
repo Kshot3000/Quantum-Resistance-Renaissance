@@ -74,7 +74,9 @@ a{color:var(--nd-green)}
 .panel .sub code{color:var(--nd-amber)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:900px){.hero{grid-template-columns:1fr}.grid2,.grid3{grid-template-columns:1fr}}
+@media(max-width:900px){.hero{grid-template-columns:minmax(0,1fr)}.grid2,.grid3{grid-template-columns:minmax(0,1fr)}.grid2>*,.grid3>*{min-width:0}}
+/* (2026-10-01) minmax(0,1fr): 1fr is minmax(auto,1fr) — the auto minimum lets a
+   card's max-content force the track wider than the viewport on mobile. */
 
 /* install path cards */
 .path-card{border:1px solid var(--nd-line);border-radius:var(--radius-md);padding:20px;
@@ -83,7 +85,8 @@ a{color:var(--nd-green)}
 .path-card h3 .tag{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
   color:var(--nd-amber);border:1px solid rgba(255,180,84,.35);padding:2px 8px;border-radius:999px}
 .path-card p{margin:0;font-size:14px;color:#b9c9be;line-height:1.6}
-.path-card .src{font-size:12px;color:var(--nd-dim);font-family:var(--font-mono)}
+.path-card .src{font-size:12px;color:var(--nd-dim);font-family:var(--font-mono);overflow-wrap:anywhere}
+.path-card>*{min-width:0}
 
 /* terminal blocks */
 .term{position:relative;border:1px solid rgba(125,255,168,.22);border-radius:var(--radius-md);
@@ -106,7 +109,7 @@ a{color:var(--nd-green)}
 
 /* forms */
 .lab{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-@media(max-width:900px){.lab{grid-template-columns:1fr}}
+@media(max-width:900px){.lab{grid-template-columns:minmax(0,1fr)}.lab>*{min-width:0}}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#cfe0d4}
 .field label .hint{display:block;font-weight:400;font-size:12px;color:var(--nd-dim);margin-top:2px}

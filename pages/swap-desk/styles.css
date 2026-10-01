@@ -96,7 +96,7 @@ code{background:#0a1220;border:1px solid var(--line);border-radius:6px;padding:1
 
 /* fee lab */
 .lab-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:14px;}
-@media(max-width:860px){.lab-grid{grid-template-columns:1fr;}}
+@media(max-width:860px){.lab-grid{grid-template-columns:minmax(0,1fr)}.lab-grid>*{min-width:0}}
 .lab-inputs{display:flex;flex-direction:column;gap:14px;}
 .lab-inputs label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--dim);font-weight:600;}
 .lab-inputs select,.lab-inputs input{background:#0a1322;border:1px solid var(--line);color:var(--ink);

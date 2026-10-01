@@ -25,14 +25,20 @@ const ROOT = path.resolve(__dirname, "..");
 const PAGES_DIR = path.join(ROOT, "pages");
 
 // asset -> minimum ?v= key allowed (version of last content-changing commit).
-// shared.css: content last changed at v1.16.0 (body color/background fix) but
-// the key assigned at that commit was (mis)labeled v1.12.0; the baseline stays
-// 1.12.0 until the file actually changes again — do not "correct" it to 1.16.0
-// without bumping every referencing page.
+// shared.css: 1.13.0 adds the fleet mobile-hardening rules (2026-10-01:
+// zero-horizontal-scroll at <=640px — code/address wrap, in-place table
+// scroll, header .top-actions own-row wrap, form-control max-widths);
+// 1.13.1 adds label{min-width:0;max-width:100%} so flex/grid label wrappers
+// can't be forced wider than the viewport by a select/input's intrinsic size;
+// 1.13.2 adds box-sizing:border-box on form controls so width:100% + padding
+// can't spill past the container (multisig-vault textarea overflow).
+// (History: content last changed at v1.16.0 (body color/background fix) but the
+// key assigned at that commit was (mis)labeled v1.12.0; the 2026-10-01 fleet
+// mobile-hardening change re-baselined it honestly at 1.13.0.)
 const BASELINES = {
   "assets/app-nav.js": "1.8.0",
   "assets/favicon.svg": "1.16.0",
-  "assets/shared.css": "1.12.0",
+  "assets/shared.css": "1.13.2",
 };
 
 let fails = 0;

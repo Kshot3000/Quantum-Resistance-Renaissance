@@ -134,7 +134,7 @@ tr:hover td{background:rgba(245,158,11,.04)}
 
 /* Wormhole */
 .wh-flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:10px;align-items:stretch;margin:20px 0}
-@media(max-width:760px){.wh-flow{grid-template-columns:1fr}.wh-arrow{transform:rotate(90deg);justify-self:center}}
+@media(max-width:760px){.wh-flow{grid-template-columns:minmax(0,1fr)}.wh-flow>*{min-width:0}.wh-arrow{transform:rotate(90deg);justify-self:center}}
 .wh-step{background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:14px;padding:18px}
 .wh-step h3{font-size:15px;margin:8px 0 6px;color:var(--molten)}
 .wh-step p{font-size:13.5px;color:var(--muted)}
@@ -186,3 +186,9 @@ footer.foot{margin-top:44px;border-top:1px solid var(--line);padding-top:22px;di
 .foot-built a{color:var(--muted)}
 .foot-donate .addr{background:rgba(245,158,11,.08);border:1px dashed var(--line-hot);color:var(--molten);font-family:ui-monospace,monospace;font-size:12px;padding:6px 10px;border-radius:8px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .foot-donate .addr:hover{background:rgba(245,158,11,.18)}
+
+/* Mobile: allow code spans to wrap (the global white-space:nowrap would force
+   horizontal scroll on narrow screens). */
+@media (max-width:640px){
+  code{white-space:normal}
+}

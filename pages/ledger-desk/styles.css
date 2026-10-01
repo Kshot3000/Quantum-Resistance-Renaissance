@@ -202,3 +202,13 @@ label.chk, label.method { flex-direction: row; align-items: center; gap: 0.5rem;
   body { background: #fff; color: #000; }
   .panel { box-shadow: none; border-color: #999; }
 }
+
+/* Mobile hardening (2026-10-01) — ledger-desk does not load shared.css, so it
+   carries the fleet equivalents locally: no horizontal scroll at <=640px. */
+code,.mono{overflow-wrap:anywhere}
+footer code,footer .mono{overflow-wrap:anywhere}
+input,select,textarea{min-width:0;max-width:100%}
+label{min-width:0;max-width:100%}
+@media (max-width:640px){
+  table{display:block;max-width:100%;overflow-x:auto}
+}
