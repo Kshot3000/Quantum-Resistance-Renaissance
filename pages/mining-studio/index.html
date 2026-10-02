@@ -155,16 +155,16 @@
       </div>
       <div class="rig-right">
         <h3>What could it earn?</h3>
-        <label>Network hashrate (GH/s) <input id="netHash" type="number" value="" min="0" placeholder="e.g. 50 — your estimate"></label>
-        <label>Current supply (QTC) <input id="curSupply" type="number" value="5720000" min="5670000" max="21000000"></label>
-        <p class="hint">Supply default is an estimate (~5.72M on 2026-09-29: 5.67M genesis + ~3 weeks of emission). Verify with the <a href="../block-explorer/">Block Explorer</a>.</p>
+        <label>Network hashrate (GH/s) <input id="netHash" type="number" value="" min="0" placeholder="e.g. 45,125 — your estimate"></label>
+        <label>Current supply (QTC) <input id="curSupply" type="number" value="5763610" min="5670000" max="21000000"></label>
+        <p class="hint" id="supplyHint">Supply default is a snapshot estimate (~5.764M total issuance at block 151,373 on 2026-10-02). When the builder's hourly chain snapshot loads, both defaults refresh from it automatically. Verify with the <a href="../block-explorer/">Block Explorer</a>.</p>
         <div class="earn" id="earnBox">
           <div class="earn-row"><span>Your share of network</span><b id="eShare">—</b></div>
           <div class="earn-row"><span>Block reward now</span><b id="eReward">—</b></div>
           <div class="earn-row"><span>Expected QTC / day</span><b id="eDay" class="big">—</b></div>
           <div class="earn-row"><span>Expected blocks / day</span><b id="eBlocks">—</b></div>
         </div>
-        <p class="disclaimer">Estimate only: assumes constant difficulty and 12-second blocks. Real results follow luck and network growth.</p>
+        <p class="disclaimer" id="earnNote">Estimate only: assumes constant difficulty and 12-second blocks. Real results follow luck and network growth.</p>
       </div>
     </div>
     <details class="bench-table">
@@ -286,6 +286,6 @@
   </footer>
 </main>
 
-<script src="app.js?v=1.0.2"></script>
+<script src="app.js?v=1.1.0"></script>
 </body>
 </html>

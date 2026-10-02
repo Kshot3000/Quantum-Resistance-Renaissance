@@ -78,5 +78,32 @@ ok("8 security items", Studio.SECURITY.length === 8);
 ok("7 troubleshooters", Studio.FIXES.length === 7);
 ok("no dev-tax claim in constants", Studio.CHAIN.WORMHOLE_EXIT_FEE_BPS === 4);
 
+/* snapshot-derived network defaults (v1.1.0) — fixtures mirror the real
+ * data/consensus.json + data/supply.json shapes at block ~151,373 */
+var CONS = { fetched_at: "2026-10-02T08:02:18.680Z", head: 151372,
+  current: { height: 151372, difficulty: "541503155817540", est_hashrate_hs: "45125262984795" },
+  block_times_ms: { avg_ms: 12413 } };
+var SUP = { fetched_at: "2026-10-02T08:02:28.460Z", block_height: 151373, total_supply_plancks: "5763610080351232263" };
+var dn = Studio.deriveNetworkDefaults(CONS, SUP);
+ok("derive netGH from est hashrate", Math.abs(dn.netGH - 45125.262984795) < 1e-6, dn.netGH);
+ok("derive supply = total issuance", Math.abs(dn.supplyQtc - 5763610.080351232) < 1e-6, dn.supplyQtc);
+ok("derive pace from observed avg block time", Math.abs(dn.blocksPerDay - 86400000 / 12413) < 1e-9, dn.blocksPerDay);
+ok("derive height + fetchedAt", dn.height === 151372 && dn.fetchedAt === CONS.fetched_at);
+ok("derive reward at snapshot supply = 0.3047278", Math.abs(Studio.blockReward(dn.supplyQtc) - 0.3047278) < 1e-6, Studio.blockReward(dn.supplyQtc));
+var dnull = Studio.deriveNetworkDefaults(null, null);
+ok("derive null-safe", dnull.netGH === null && dnull.supplyQtc === null && dnull.blocksPerDay === null);
+var dbad = Studio.deriveNetworkDefaults({ current: { est_hashrate_hs: "0" }, block_times_ms: { avg_ms: 5 } }, { total_supply_plancks: "100" });
+ok("derive rejects implausible fields", dbad.netGH === null && dbad.blocksPerDay === null && dbad.supplyQtc === null);
+var dpart = Studio.deriveNetworkDefaults(CONS, null);
+ok("derive partial: consensus only", dpart.netGH > 0 && dpart.supplyQtc === null && dpart.blocksPerDay > 0);
+
+/* estimate pace param (backward compatible) */
+var ep = Studio.estimate(1200, 50, 5720000, 6000);
+ok("estimate honors pace param", Math.abs(ep.networkBlocksPerDay - 6000) < 1e-12 && Math.abs(ep.qtcPerDay - ep.share * 6000 * ep.reward) < 1e-12);
+var ed = Studio.estimate(1200, 50, 5720000);
+ok("estimate default pace still 7200", ed.networkBlocksPerDay === 7200);
+ok("estimate bad pace falls back", Studio.estimate(1200, 50, 5720000, -5).networkBlocksPerDay === 7200 && Studio.estimate(1200, 50, 5720000, NaN).networkBlocksPerDay === 7200);
+ok("slower observed pace lowers qtc/day", ep.qtcPerDay < ed.qtcPerDay);
+
 console.log("\n" + (n - fails) + "/" + n + " passed" + (fails ? " — FAILURES" : ""));
 process.exit(fails ? 1 : 0);

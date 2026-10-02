@@ -45,16 +45,51 @@ Studio.blockReward = function (supply) {
   return Math.max(0, (c.MAX_SUPPLY - supply) / c.EMISSION_DIVISOR);
 };
 Studio.blocksPerDay = function () { return 86400 / Studio.CHAIN.BLOCK_TIME_S; };
-Studio.estimate = function (userMH, netGH, supply) {
+/* Derive the earnings estimator's network defaults from the builder's
+ * hourly chain snapshots (data/consensus.json + data/supply.json), so the
+ * pre-filled inputs track the real chain instead of a dated static guess:
+ *  - netGH:         consensus.current.est_hashrate_hs (difficulty / 12 s)
+ *  - supplyQtc:     supply.total_supply_plancks — total issuance incl.
+ *                   genesis, the emission formula's S (NOT mined-only)
+ *  - blocksPerDay:  observed pace from consensus.block_times_ms.avg_ms,
+ *                   not the 12 s target (the chain currently runs slower)
+ * Any field that is missing or implausible comes back null; the caller
+ * keeps its dated static fallback for that field and says so. */
+Studio.deriveNetworkDefaults = function (consensus, supply) {
+  var out = { netGH: null, supplyQtc: null, blocksPerDay: null, avgBlockMs: null, height: null, fetchedAt: null };
+  if (consensus && consensus.current) {
+    var hs = Number(consensus.current.est_hashrate_hs);
+    if (isFinite(hs) && hs > 0) out.netGH = hs / 1e9;
+    var h = Number(consensus.current.height || consensus.head);
+    if (isFinite(h) && h > 0) out.height = h;
+    if (consensus.fetched_at) out.fetchedAt = String(consensus.fetched_at);
+  }
+  if (consensus && consensus.block_times_ms) {
+    var avg = Number(consensus.block_times_ms.avg_ms);
+    if (isFinite(avg) && avg > 1000 && avg < 120000) {
+      out.avgBlockMs = avg;
+      out.blocksPerDay = 86400000 / avg;
+    }
+  }
+  if (supply && supply.total_supply_plancks != null) {
+    var qtc = Number(supply.total_supply_plancks) / 1e12;
+    if (isFinite(qtc) && qtc >= Studio.CHAIN.GENESIS_MINT && qtc <= Studio.CHAIN.MAX_SUPPLY) out.supplyQtc = qtc;
+    if (!out.fetchedAt && supply.fetched_at) out.fetchedAt = String(supply.fetched_at);
+    if (!out.height && supply.block_height) out.height = Number(supply.block_height) || null;
+  }
+  return out;
+};
+Studio.estimate = function (userMH, netGH, supply, blocksPerDay) {
   var reward = Studio.blockReward(supply);
-  var bpd = Studio.blocksPerDay();
+  var bpd = (isFinite(blocksPerDay) && blocksPerDay > 0) ? blocksPerDay : Studio.blocksPerDay();
   if (!(userMH > 0) || !(netGH > 0)) return null;
   var share = userMH / (netGH * 1000);
   return {
     share: share,
     reward: reward,
     qtcPerDay: share * bpd * reward,
-    blocksPerDay: share * bpd
+    blocksPerDay: share * bpd,
+    networkBlocksPerDay: bpd
   };
 };
 Studio.gradeBenchmark = function (rateMH, deviceMid) {
@@ -289,7 +324,7 @@ function renderRig() {
 }
 function renderEarn() {
   var net = parseFloat($("netHash").value), sup = parseFloat($("curSupply").value);
-  var e = Studio.estimate(rigHash(), net, sup);
+  var e = Studio.estimate(rigHash(), net, sup, earnPace);
   if (!e) {
     ["eShare", "eReward", "eDay", "eBlocks"].forEach(function (id) { $(id).textContent = "—"; });
     return;
@@ -323,8 +358,51 @@ $("rigList").addEventListener("click", function (e) {
   var b = e.target.closest(".rm"); if (!b) return;
   rig.splice(parseInt(b.getAttribute("data-i"), 10), 1); renderRig();
 });
-["cpuThreads", "netHash", "curSupply"].forEach(function (id) { $(id).addEventListener("input", function () { $("rigHash").textContent = Studio.formatHash(rigHash()); renderEarn(); }); });
+/* ---- earnings defaults from the hourly chain snapshots ----
+ * Pre-fill netHash / curSupply / block pace from data/consensus.json +
+ * data/supply.json (same derivation as pool-desk v1.44.0). Fields the user
+ * has already edited are never overwritten; when the snapshots can't be
+ * loaded, the dated static defaults in the HTML stand and say so. */
+var earnPace = null; // observed blocks/day once snapshots land
+var netDirty = false, supDirty = false;
+function fmtUtc(iso) {
+  var d = new Date(iso);
+  return isNaN(d) ? String(iso || "") : d.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+}
+function loadNetworkDefaults() {
+  if (typeof fetch !== "function") return;
+  function get(url) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .catch(function () { return null; });
+  }
+  Promise.all([get("../../data/consensus.json"), get("../../data/supply.json")]).then(function (arr) {
+    var d = Studio.deriveNetworkDefaults(arr[0], arr[1]);
+    if (!d || (d.netGH == null && d.supplyQtc == null && d.blocksPerDay == null)) return;
+    if (d.netGH != null && !netDirty) {
+      $("netHash").value = Math.round(d.netGH);
+      $("netHash").placeholder = "snapshot: " + Math.round(d.netGH).toLocaleString("en-US") + " GH/s";
+    }
+    if (d.supplyQtc != null && !supDirty) $("curSupply").value = Math.round(d.supplyQtc);
+    if (d.blocksPerDay != null) earnPace = d.blocksPerDay;
+    var hint = $("supplyHint");
+    if (hint) {
+      hint.innerHTML = "Defaults refreshed from the builder's chain snapshot (fetched " + fmtUtc(d.fetchedAt) +
+        (d.height ? ", block " + Number(d.height).toLocaleString("en-US") : "") +
+        "): network hashrate from live difficulty, supply = total issuance for the emission formula" +
+        (d.avgBlockMs ? ", earnings paced at the observed ~" + (d.avgBlockMs / 1000).toFixed(1) + "s block time — not the 12s target" : "") +
+        ". Edit any field and your numbers win. Verify with the <a href=\"../block-explorer/\">Block Explorer</a>.";
+    }
+    var note = $("earnNote");
+    if (note && d.avgBlockMs) {
+      note.textContent = "Estimate only: assumes constant difficulty and the observed ~" + (d.avgBlockMs / 1000).toFixed(1) +
+        "s block pace from the latest chain snapshot. Real results follow luck and network growth.";
+    }
+    renderEarn();
+  });
+}
+["cpuThreads", "netHash", "curSupply"].forEach(function (id) { $(id).addEventListener("input", function () { if (id === "netHash") netDirty = true; if (id === "curSupply") supDirty = true; $("rigHash").textContent = Studio.formatHash(rigHash()); renderEarn(); }); });
 renderRig();
+loadNetworkDefaults();
 
 /* ---- benchmark grader ---- */
 $("bGo").addEventListener("click", function () {
