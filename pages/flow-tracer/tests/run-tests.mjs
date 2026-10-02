@@ -83,6 +83,43 @@ t("trace of unknown address yields only the seed", () => {
   assert.equal(tr.nodes.size, 1);
   assert.equal(tr.edges.length, 0);
 });
+t("trace caps edges at maxEdges and flags edgeTruncated", () => {
+  const rows = [];
+  for (let i = 0; i < 300; i++) rows.push({ id: "e" + i, amount: 1n * Q, from_id: "HUB", to_id: "LEAF" + (i % 20), block_height: 60 + i, timestamp: null, fee: "0", extrinsic_id: null });
+  const g = F.buildGraph(rows);
+  const tr = F.trace(g, "HUB", { direction: "out", maxHops: 1, maxNodes: 400, maxEdges: 120 });
+  assert.equal(tr.edges.length, 120);
+  assert.equal(tr.edgeTruncated, true);
+  assert.equal(tr.truncated, true);
+});
+t("trace default edge cap is 1200 (hub seed cannot flood the graph)", () => {
+  const rows = [];
+  for (let i = 0; i < 1500; i++) rows.push({ id: "d" + i, amount: 1n * Q, from_id: "HUB", to_id: "L" + (i % 30), block_height: 70 + i, timestamp: null, fee: "0", extrinsic_id: null });
+  const g = F.buildGraph(rows);
+  const tr = F.trace(g, "HUB", { direction: "out", maxHops: 1, maxNodes: 400 });
+  assert.equal(tr.edges.length, 1200);
+  assert.equal(tr.edgeTruncated, true);
+});
+
+/* --- aggregateEdges --- */
+t("aggregateEdges sums parallel transfers per ordered pair", () => {
+  const g = F.buildGraph([
+    { id: "a1", amount: 10n * Q, from_id: "A", to_id: "B", block_height: 5, timestamp: "2026-01-01T00:00:00Z", fee: "0", extrinsic_id: null },
+    { id: "a2", amount: 25n * Q, from_id: "A", to_id: "B", block_height: 9, timestamp: "2026-01-02T00:00:00Z", fee: "0", extrinsic_id: null },
+    { id: "a3", amount: 7n * Q, from_id: "B", to_id: "A", block_height: 1, timestamp: null, fee: "0", extrinsic_id: null },
+  ]);
+  const agg = F.aggregateEdges(g.rows);
+  assert.equal(agg.length, 2); // A->B and B->A are distinct ordered pairs
+  assert.equal(agg[0].from_id, "A"); // first-seen order preserved
+  assert.equal(agg[0].amount, 35n * Q);
+  assert.equal(agg[0].count, 2);
+  assert.equal(agg[0].maxAmount, 25n * Q);
+  assert.equal(agg[0].lastBlock, 9);
+  assert.equal(agg[0].timestamp, "2026-01-02T00:00:00Z");
+  assert.equal(agg[0].genesis, false);
+  assert.equal(agg[1].genesis, true);
+  assert.equal(agg[1].amount, 7n * Q);
+});
 
 /* --- layoutTrace --- */
 t("layoutTrace is deterministic and sizes to layers", () => {

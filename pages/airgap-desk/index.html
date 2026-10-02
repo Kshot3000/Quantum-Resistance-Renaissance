@@ -345,9 +345,10 @@
 </main>
 
 <script src="../../assets/vendor/qrcode.js?v=1.0.0"></script>
-<script src="js/vendor/jsqr.js?v=1.35.0"></script>
+<!-- jsQR (251 KB decoder) is intentionally NOT loaded here: qr.js injects
+     js/vendor/jsqr.js?v=1.35.0 on first scan/upload-decode use. -->
 <script src="js/vendor/checkphrase-core.js?v=1.35.0"></script>
 <script src="js/vendor/checkphrase-wordlist.js?v=1.35.0"></script>
-<script type="module" src="js/app.js?v=1.35.1"></script>
+<script type="module" src="js/app.js?v=1.36.0"></script>
 </body>
 </html>

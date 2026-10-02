@@ -35,22 +35,28 @@ function buildGraph(rows) {
 }
 
 /* BFS trace from a seed address. direction: 'out' | 'in' | 'both'.
- * Returns { nodes: Map(addr -> {depth, via}), edges: [row], truncated }.
- * Depth is signed for 'both' (negative = inbound side). */
+ * Returns { nodes: Map(addr -> {depth, via}), edges: [row], truncated,
+ * edgeTruncated }. Depth is signed for 'both' (negative = inbound side).
+ * Nodes are capped at maxNodes AND edges at maxEdges: a hub seed (the
+ * biggest distributor) can be incident to thousands of transfers in the
+ * snapshot, and an uncapped edge list once produced 6,600+ SVG elements
+ * for a 160-node graph — visual noise and the fleet's heaviest DOM. */
 function trace(graph, seed, opts) {
   opts = opts || {};
   var direction = opts.direction || "both";
   var maxHops = Math.max(1, Math.min(4, opts.maxHops || 2));
   var maxNodes = Math.max(10, Math.min(400, opts.maxNodes || 160));
+  var maxEdges = Math.max(50, Math.min(10000, opts.maxEdges || 1200));
   var nodes = new Map();
   var edges = [];
   var seenEdge = new Set();
   nodes.set(seed, { depth: 0, via: null });
   var frontier = [seed];
   var truncated = false;
-  for (var hop = 1; hop <= maxHops; hop++) {
+  var edgeTruncated = false;
+  for (var hop = 1; hop <= maxHops && !edgeTruncated; hop++) {
     var next = [];
-    for (var f = 0; f < frontier.length; f++) {
+    for (var f = 0; f < frontier.length && !edgeTruncated; f++) {
       var addr = frontier[f];
       var d0 = nodes.get(addr).depth;
       var outs = (direction === "out" || direction === "both") ? (graph.out.get(addr) || []) : [];
@@ -60,6 +66,7 @@ function trace(graph, seed, opts) {
         var row = all[e];
         if (seenEdge.has(row.id)) continue;
         seenEdge.add(row.id);
+        if (edges.length >= maxEdges) { truncated = true; edgeTruncated = true; break; }
         edges.push(row);
         var other = row.from_id === addr ? row.to_id : row.from_id;
         var nd = row.from_id === addr ? Math.abs(d0) + 1 : -(Math.abs(d0) + 1);
@@ -74,7 +81,32 @@ function trace(graph, seed, opts) {
     frontier = next;
     if (!frontier.length) break;
   }
-  return { nodes: nodes, edges: edges, truncated: truncated };
+  return { nodes: nodes, edges: edges, truncated: truncated, edgeTruncated: edgeTruncated };
+}
+
+/* Aggregate parallel transfers between the same ordered pair into ONE
+ * drawable edge: { from_id, to_id, amount (summed BigInt plancks), count,
+ * maxAmount, lastBlock, timestamp (of lastBlock), genesis }.
+ * First-seen pair order is preserved. The renderer draws one path per
+ * pair — 40 transfers A->B are one relationship, not 40 stacked paths. */
+function aggregateEdges(rows) {
+  var byPair = new Map(), out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var key = row.from_id + ">" + row.to_id;
+    var a = byPair.get(key);
+    if (!a) {
+      a = { from_id: row.from_id, to_id: row.to_id, amount: 0n, count: 0,
+            maxAmount: 0n, lastBlock: 0, timestamp: null, genesis: false };
+      byPair.set(key, a); out.push(a);
+    }
+    a.amount += row.amount;
+    a.count++;
+    if (row.amount > a.maxAmount) a.maxAmount = row.amount;
+    if (row.block_height >= a.lastBlock) { a.lastBlock = row.block_height; a.timestamp = row.timestamp; }
+    if (row.block_height === 1) a.genesis = true;
+  }
+  return out;
 }
 
 /* Deterministic layered layout for a trace. Returns
@@ -284,6 +316,7 @@ var api = {
   PLANCKS_PER_QTC: PLANCKS_PER_QTC,
   buildGraph: buildGraph,
   trace: trace,
+  aggregateEdges: aggregateEdges,
   layoutTrace: layoutTrace,
   detectPeelChains: detectPeelChains,
   detectFanOut: detectFanOut,

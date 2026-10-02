@@ -34,8 +34,9 @@ Sign QTC transfers on a machine that never touches the network.
   from the shared vendor tree (`assets/vendor/`), byte-identical to what was verified against
   Quantus-Network/chain + sp-runtime source — one shared copy instead of per-app duplicates
   since the 2026-10-01 vendor consolidation.
-- QR decode via vendored jsQR 1.4.0 (Apache-2.0).
-- `tests/run-tests.mjs`: 21/21 protocol tests (ticket/chunk/era codecs, full cold-sign →
+- QR decode via vendored jsQR 1.4.0 (Apache-2.0), lazy-loaded by `js/qr.js` on first
+  scan/upload-decode use — the 251 KB decoder is not part of the initial page load.
+- `tests/run-tests.mjs`: 22/22 protocol tests (ticket/chunk/era codecs, full cold-sign →
   hot-verify round trip incl. tamper and wrong-ticket failures, ML-DSA-87 path).
 - Browser QA (`hidden_files/qa-airgap-browser.mjs` in the goal workspace): end-to-end
   sign→verify in headless Chromium, QR encode→decode round trip, tamper rejection, and

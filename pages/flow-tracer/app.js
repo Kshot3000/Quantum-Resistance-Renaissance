@@ -103,11 +103,18 @@ async function doTrace(addr, direction, hops) {
   lastTrace = { trace: t, addr: addr, graph: graph, mode: mode };
   renderGraph(t, addr, graph);
   var nAddr = t.nodes.size, nEdge = t.edges.length;
+  var truncNote = "";
+  if (t.truncated) {
+    var caps = [];
+    if (t.edgeTruncated) caps.push(nEdge.toLocaleString() + " transfers");
+    if (nAddr >= 160) caps.push("160 addresses");
+    truncNote = " · <b>truncated at " + (caps.join(" + ") || "trace cap") + "</b> — narrow the hops or direction";
+  }
   status.innerHTML = "Trace of <b>" + esc(F.shortAddr(addr)) + "</b>: <b>" + nAddr + "</b> addresses, <b>" +
     nEdge + "</b> transfers, " + hops + " hop" + (hops > 1 ? "s" : "") + " " + esc(direction) +
     " · <span class=\"" + (mode === "live" ? "mode-live" : "mode-snap") + "\">" +
     (mode === "live" ? "live indexer (" + rows.length + " transfers for this address)" : "snapshot dataset") + "</span>" +
-    (t.truncated ? " · <b>truncated at 160 nodes</b> — narrow the hops or direction" : "") +
+    truncNote +
     (nEdge === 0 ? " · <b>no transfers found</b> for this address in the " + mode + " dataset" : "");
   openDossier(addr, graph);
 }
@@ -143,20 +150,26 @@ function renderGraph(t, seed, graph) {
   role.set(seed, "seed");
 
   var gE = el("g", { class: "edges" }, svg);
-  t.edges.forEach(function (r) {
+  // One path per ordered pair: parallel transfers are aggregated (summed)
+  // so a hub trace stays readable instead of stacking thousands of paths.
+  var aggEdges = F.aggregateEdges(t.edges);
+  aggEdges.forEach(function (r) {
     var p1 = lay.pos.get(r.from_id), p2 = lay.pos.get(r.to_id);
     if (!p1 || !p2) return;
-    var mx = (p1.x + p2.x) / 2;
     var path = el("path", {
       d: "M " + p1.x + " " + p1.y + " C " + (p1.x + 70) + " " + p1.y + ", " + (p2.x - 70) + " " + p2.y + ", " + p2.x + " " + p2.y,
-      class: "edge" + (r.block_height === 1 ? " genesis" : ""),
+      class: "edge" + (r.genesis ? " genesis" : ""),
       "stroke-width": edgeWidth(r.amount).toFixed(1),
     }, gE);
     var tip = el("title", {}, path);
-    tip.textContent = F.fmtQTC(r.amount) + " QTC · block " + r.block_height +
-      (r.timestamp ? " · " + F.fmtTime(r.timestamp) : " · genesis") +
-      "\n" + F.shortAddr(r.from_id) + " → " + F.shortAddr(r.to_id);
-    if (t.edges.length <= 14) {
+    tip.textContent = r.count === 1
+      ? F.fmtQTC(r.amount) + " QTC · block " + r.lastBlock +
+        (r.timestamp ? " · " + F.fmtTime(r.timestamp) : " · genesis") +
+        "\n" + F.shortAddr(r.from_id) + " → " + F.shortAddr(r.to_id)
+      : F.fmtQTC(r.amount) + " QTC total · " + r.count + " transfers · largest " +
+        F.fmtQTC(r.maxAmount) + " QTC · latest block " + r.lastBlock.toLocaleString() +
+        "\n" + F.shortAddr(r.from_id) + " → " + F.shortAddr(r.to_id);
+    if (aggEdges.length <= 14) {
       var lx = (p1.x + p2.x) / 2, ly = (p1.y + p2.y) / 2 - 6;
       var lab = el("text", { x: lx, y: ly, class: "amt-label", "text-anchor": "middle" }, gE);
       lab.textContent = F.fmtQTC(r.amount, 2);

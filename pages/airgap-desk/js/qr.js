@@ -4,7 +4,39 @@
  * Wallet uses). Decoding: vendored jsQR 1.4.0 (Apache-2.0, (c) LazarSoft-style
  * attribution in vendor/jsqr.LICENSE) over uploaded image files or an
  * optional camera stream. Everything stays on-device.
+ *
+ * jsQR is 251 KB — by far the heaviest asset in the fleet — and only the
+ * minority of visitors who scan or upload a QR ever need it, so it is NOT
+ * loaded with the page. ensureJsQR() injects it on first decode/camera use
+ * and caches the in-flight load; every other flow (ticket issue, cold
+ * signing, chunk export, paste/upload-as-text) pays zero decoder bytes.
  */
+
+let jsqrPromise = null;
+
+/* Load the vendored jsQR decoder on demand. Resolves once window.jsQR is
+ * available; rejects with a human message (and clears the cache so a later
+ * attempt can retry) when the script cannot be fetched or is malformed. */
+export function ensureJsQR() {
+  if (typeof window.jsQR === 'function') return Promise.resolve();
+  if (jsqrPromise) return jsqrPromise;
+  jsqrPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    // Resolved against the page URL: the Airgap Desk page is the only
+    // consumer of this module and sits directly above js/vendor/.
+    s.src = 'js/vendor/jsqr.js?v=1.35.0';
+    s.onload = () => {
+      if (typeof window.jsQR === 'function') resolve();
+      else { jsqrPromise = null; reject(new Error('QR decoder loaded but is unavailable — reload the page and try again')); }
+    };
+    s.onerror = () => {
+      jsqrPromise = null;
+      reject(new Error('QR decoder failed to load — check your connection, or use paste / text upload instead'));
+    };
+    document.head.appendChild(s);
+  });
+  return jsqrPromise;
+}
 
 /* Draw `text` into `canvas` (square). Throws if the payload exceeds QR
  * capacity at the chosen error-correction level. */
@@ -26,7 +58,7 @@ export function drawQR(canvas, text, { ecLevel = 'M', dark = '#0a0618', light = 
 
 /* Decode the first QR found in an image File/Blob. Returns the payload text. */
 export async function decodeQRImage(file) {
-  if (typeof window.jsQR !== 'function') throw new Error('QR decoder not loaded');
+  await ensureJsQR();
   const bmp = await createImageBitmap(file);
   const canvas = document.createElement('canvas');
   canvas.width = bmp.width; canvas.height = bmp.height;
@@ -101,6 +133,7 @@ export function mountChunkStepper(el, chunks, { autoMs = 1200 } = {}) {
  * calls onText(text) for each NEW payload seen. Returns { stop() }.
  * Rejects with a human message if the camera is unavailable. */
 export async function startCameraScan(video, onText) {
+  await ensureJsQR();
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
     throw new Error('camera API unavailable in this browser/context');
   let stream;

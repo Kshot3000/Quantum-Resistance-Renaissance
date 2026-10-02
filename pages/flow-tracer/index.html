@@ -9,7 +9,7 @@
 <meta name="description" content="Follow the money on the quantum chain: trace any Quantus address across hops, detect peel chains, distribution fan-outs and consolidation fan-ins, and inspect the largest real transfers — from the live Subsquid indexer or a same-origin snapshot, 100% client-side.">
 <meta name="theme-color" content="#07090f">
 <link rel="stylesheet" href="styles.css?v=1.29.1">
-<script defer src="js/flow-core.js?v=1.29.0"></script>
+<script defer src="js/flow-core.js?v=1.30.0"></script>
 <script defer src="js/ss58.js?v=1.29.0"></script>
 <style>:root{--focus:#7ef0c9;}</style>
 </head>
@@ -120,7 +120,7 @@
       <span><i class="sw receiver"></i>received funds</span>
       <span><i class="sw both"></i>both</span>
       <span><i class="sw sentinel"></i>mint sentinel</span>
-      <span class="edge-note">edge width &prop; log(amount) — hover an edge for details, click a node for its dossier</span>
+      <span class="edge-note">edge width &prop; log(total per pair) — parallel transfers between two addresses are combined into one edge; hover for the count and largest single transfer</span>
     </div>
   </section>
 
@@ -189,6 +189,6 @@
   </div>
 </footer>
 
-<script defer src="app.js?v=1.29.1"></script>
+<script defer src="app.js?v=1.30.0"></script>
 </body>
 </html>
