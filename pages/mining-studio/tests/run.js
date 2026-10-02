@@ -105,5 +105,29 @@ ok("estimate default pace still 7200", ed.networkBlocksPerDay === 7200);
 ok("estimate bad pace falls back", Studio.estimate(1200, 50, 5720000, -5).networkBlocksPerDay === 7200 && Studio.estimate(1200, 50, 5720000, NaN).networkBlocksPerDay === 7200);
 ok("slower observed pace lowers qtc/day", ep.qtcPerDay < ed.qtcPerDay);
 
+/* static HTML fallback integrity — on the no-fetch path (file://, offline,
+ * snapshots unreachable) the painted defaults ARE the estimator's inputs, so
+ * they must be present, plausible, and dated to one capture. Regression
+ * guard for the pre-v1.2.0 state: netHash painted empty (dead estimator)
+ * with a stale "45,125" example ~18% under the real network rate, and a
+ * curSupply paint from an hours-older capture than the hint claimed. */
+var html = require("fs").readFileSync(require("path").join(__dirname, "..", "index.html"), "utf8");
+function inputVal(id) {
+  var m = html.match(new RegExp('id="' + id + '"[^>]*value="([^"]*)"')) ||
+          html.match(new RegExp('value="([^"]*)"[^>]*id="' + id + '"'));
+  return m ? m[1] : null;
+}
+var nhVal = inputVal("netHash"), csVal = inputVal("curSupply");
+ok("fallback netHash paints a value (estimator alive offline)", nhVal !== null && nhVal !== "" && isFinite(Number(nhVal)), nhVal);
+ok("fallback netHash plausible GH/s band", Number(nhVal) >= 1000 && Number(nhVal) <= 500000, nhVal);
+ok("fallback curSupply paints a value", csVal !== null && csVal !== "" && isFinite(Number(csVal)), csVal);
+ok("fallback curSupply within emission bounds", Number(csVal) >= 5670000 && Number(csVal) <= 21000000, csVal);
+var hintM = html.match(/id="supplyHint"[^>]*>([\s\S]*?)<\/p>/);
+ok("fallback hint cites a dated capture height", !!hintM && /block 1[0-9]{2},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
+ok("fallback hint difficulty matches painted netHash (one capture)",
+   !!hintM && /663,822,361,568,328/.test(hintM[1]) && Math.abs(Number(nhVal) - 663822361568328 / 12 / 1e9) < 1,
+   nhVal);
+ok("stale 45,125 example gone", !/45,125/.test(html));
+
 console.log("\n" + (n - fails) + "/" + n + " passed" + (fails ? " — FAILURES" : ""));
 process.exit(fails ? 1 : 0);
