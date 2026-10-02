@@ -2,6 +2,12 @@
  * Run: node tests/run-tests.mjs
  * 1. SHA-256 sanity (FIPS 180-4 test vector).
  * 2. All 1,171 upstream checkphrase test vectors against js/checkphrase-core.js.
+ *    Fixture: tests/fixtures/checksums.json — vendored from
+ *    Quantus-Network/qp-human-checkphrase test-vectors/checksums.json
+ *    (version 1.0, fetched 2026-10-02). Vendored so the suite is hermetic:
+ *    the old /tmp/qcp path died whenever the shared tmpfs was wiped.
+ *    Note: the vector loop takes ~14 min in this container (~0.7s/vector,
+ *    pure-JS SHA-256) — slow, not hung.
  * 3. Reversible-transfer delay math (block <-> wall-clock conversions, min-delay validation).
  */
 import { readFileSync } from "fs";
@@ -27,7 +33,7 @@ ok("sha256('abc')",
   hex(CHECK.sha256Bytes(abc)) === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
 
 /* --- 2. upstream vectors --- */
-const vectors = JSON.parse(readFileSync("/tmp/qcp/test-vectors/checksums.json", "utf8"));
+const vectors = JSON.parse(readFileSync(join(root, "tests", "fixtures", "checksums.json"), "utf8"));
 ok("vector file version", vectors.version === "1.0");
 ok("wordlist length", WORDS.length === 2048);
 const cases = vectors.testCases;

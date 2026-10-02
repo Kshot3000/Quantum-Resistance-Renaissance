@@ -9,8 +9,13 @@ function t(name, fn){ try { fn(); passed++; console.log("ok - " + name); }
 function approx(a, b, eps){ assert.ok(Math.abs(a - b) <= eps, "expected ~" + b + " got " + a); }
 
 // 1. scanTokensForQTC against the REAL captured 1Click token list (202 tokens, no QTC)
+// Fixture: tests/fixtures/tokens.json — vendored capture of
+// https://1click.chaindefuser.com/v0/tokens taken 2026-10-02 (202 tokens, no QTC).
+// Vendored so the suite is hermetic: the old /tmp/tokens.json path died whenever
+// the shared tmpfs was wiped. Re-capture from the live endpoint to refresh; if
+// the live count has drifted, update the pinned counts below with the new capture.
 t("scanTokensForQTC: real fixture has 202 tokens and no QTC", function(){
-  var raw = JSON.parse(fs.readFileSync("/tmp/tokens.json", "utf8"));
+  var raw = JSON.parse(fs.readFileSync(__dirname + "/fixtures/tokens.json", "utf8"));
   var r = m.scanTokensForQTC(raw);
   assert.strictEqual(r.total, 202);
   assert.strictEqual(r.listed, false);
@@ -19,7 +24,7 @@ t("scanTokensForQTC: real fixture has 202 tokens and no QTC", function(){
 
 // 2. scanTokensForQTC detects the placeholder asset id once listed
 t("scanTokensForQTC: detects nep141:qtc.omft.near", function(){
-  var raw = JSON.parse(fs.readFileSync("/tmp/tokens.json", "utf8"));
+  var raw = JSON.parse(fs.readFileSync(__dirname + "/fixtures/tokens.json", "utf8"));
   var list = (Array.isArray(raw) ? raw : raw.tokens).slice();
   list.push({ assetId: m.QTC_ASSET_ID, symbol: "QTC", blockchain: "quantus", decimals: 12, price: "3.5" });
   var r = m.scanTokensForQTC(list);
