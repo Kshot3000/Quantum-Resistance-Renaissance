@@ -54,6 +54,7 @@ The public Quantus indexer (`sqm.quantus.com`) only allowlists official Quantus 
 - Every app is verified in a real browser and on the live Pages URL before it's announced.
 - No demo figures dressed as live data — simulated content is clearly labeled.
 - Releases bump cache keys (`?v=`) for every changed JS/CSS file so fixes actually reach returning visitors.
+- Third-party crypto/vendor code lives once in `assets/vendor/` (noble ML-DSA + hashes, qrcode.js) — shared by every app under one uniformly-keyed URL, so a crypto fix lands fleet-wide and visitors browsing multiple apps get a cache hit. Shared assets keep a single `?v=` key on every page (guarded by `tests/test-cache-keys.js`).
 - Live chain numbers never invent figures: if the snapshot and indexer are both unreachable, the UI says so.
 
 ## Live

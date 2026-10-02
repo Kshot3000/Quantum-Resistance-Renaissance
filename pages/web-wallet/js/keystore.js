@@ -7,7 +7,7 @@
  *
  * Keys are zeroed from memory on lock. Nothing is ever sent anywhere.
  */
-import { sha256 } from '../vendor/noble/hashes/sha2.js';
+import { sha256 } from '../../../assets/vendor/noble/hashes/sha2.js';
 
 const STORE_KEY = 'qtc-web-wallet-vault-v1';
 const ITERATIONS = 250000;

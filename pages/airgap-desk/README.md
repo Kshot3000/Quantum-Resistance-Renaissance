@@ -30,9 +30,10 @@ Sign QTC transfers on a machine that never touches the network.
 
 ## Implementation notes
 
-- Crypto modules (`js/lib/`, `js/vendor/noble`, `js/vendor/qrcode.js`, wordlist) are copied
-  verbatim from the Web Wallet / Contact Vault, whose byte-exactness was verified against
-  Quantus-Network/chain + sp-runtime source.
+- Crypto modules (`js/lib/`, `../../assets/vendor/noble`, `../../assets/vendor/qrcode.js`, wordlist) come
+  from the shared vendor tree (`assets/vendor/`), byte-identical to what was verified against
+  Quantus-Network/chain + sp-runtime source — one shared copy instead of per-app duplicates
+  since the 2026-10-01 vendor consolidation.
 - QR decode via vendored jsQR 1.4.0 (Apache-2.0).
 - `tests/run-tests.mjs`: 21/21 protocol tests (ticket/chunk/era codecs, full cold-sign →
   hot-verify round trip incl. tamper and wrong-ticket failures, ML-DSA-87 path).

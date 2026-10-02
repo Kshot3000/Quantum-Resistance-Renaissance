@@ -14,7 +14,7 @@ import {
   getAccountInfo, getNonce, buildUnsignedTransfer, finalizeTransfer, submitExtrinsic,
   parseRecipient,
 } from './rpc.js';
-import { ml_dsa65, ml_dsa87 } from '../vendor/noble/post-quantum/ml-dsa.js';
+import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { plancksToQtc, qtcToPlancks, EXISTENTIAL_DEPOSIT, SIGNING_CONTEXT, describeExtrinsicParts } from './scale.js';
 
 const $ = (id) => document.getElementById(id);

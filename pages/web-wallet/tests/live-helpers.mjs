@@ -1,6 +1,6 @@
 /* Helpers for the live check: keypair + transfer assembly using the wallet's
  * own modules (so the live probe exercises the real code paths). */
-import { ml_dsa65 } from '../vendor/noble/post-quantum/ml-dsa.js';
+import { ml_dsa65 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { keypairFromSeed } from '../js/mnemonic.js';
 import { hexEncode, hexDecode } from '../js/quantus-crypto.js';
 import {

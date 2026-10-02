@@ -24,7 +24,7 @@
  *
  * The wallet never guesses: every constant above was read from source, not memory.
  */
-import { blake2b } from '../vendor/noble/hashes/blake2.js';
+import { blake2b } from '../../../../assets/vendor/noble/hashes/blake2.js';
 
 /* ------------------------------------------------------------------ */
 /* byte helpers                                                        */

@@ -19,7 +19,7 @@ import {
   INITIAL_EXTERNAL_CONSTANTS,
   TERMINAL_EXTERNAL_CONSTANTS,
 } from './poseidon2-consts.js';
-import { blake2b } from '../vendor/noble/hashes/blake2.js';
+import { blake2b } from '../../../../assets/vendor/noble/hashes/blake2.js';
 
 export const P = 0xFFFFFFFF00000001n; // Goldilocks prime 2^64 - 2^32 + 1
 const WIDTH = 12;

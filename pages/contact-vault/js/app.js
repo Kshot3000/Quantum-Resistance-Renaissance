@@ -2,7 +2,7 @@
  * The address book with a built-in poisoning alarm. 100% client-side:
  * checkphrases via the upstream algorithm (js/checkphrase-core.js),
  * SS58 validation via the shared codec (js/ss58.js), pure logic in
- * js/vault-logic.js, QR cards via js/qrcode.js. No funds move; the vault
+ * js/vault-logic.js, QR cards via ../../assets/vendor/qrcode.js. No funds move; the vault
  * never leaves this browser (localStorage).
  */
 /* global QTC_CHECK, QTC_WORDLIST, QSS58, QTC_VAULT_LOGIC, qrcode */

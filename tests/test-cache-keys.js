@@ -39,6 +39,10 @@ const BASELINES = {
   "assets/app-nav.js": "1.8.0",
   "assets/favicon.svg": "1.16.0",
   "assets/shared.css": "1.13.2",
+  // assets/vendor/qrcode.js: 1.0.0 consolidates the 5 byte-identical per-app
+  // copies (2026-10-01 vendor consolidation) under one shared, uniformly
+  // keyed URL so visitors browsing multiple apps get a cache hit.
+  "assets/vendor/qrcode.js": "1.0.0",
 };
 
 let fails = 0;

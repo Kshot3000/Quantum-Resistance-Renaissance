@@ -33,7 +33,7 @@ test('wordlist: embedded list is the authentic 2048-word BIP-39 English list', (
   return loadWordlist().then((w) => assert.deepEqual(w, emb));
 });
 import { ss58Decode, hexDecode } from '../js/quantus-crypto.js';
-import { ml_dsa65 } from '../vendor/noble/post-quantum/ml-dsa.js';
+import { ml_dsa65 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 
 /* BIP-39 English wordlist stand-in: unique filler words (indexOf must resolve
  * to the right index) plus the real words needed by the fixed vectors. */

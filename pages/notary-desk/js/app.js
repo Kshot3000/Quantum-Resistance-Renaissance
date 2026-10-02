@@ -4,8 +4,8 @@
  * This desk never signs: it builds byte-exact unsigned calls and quotes exact
  * length fees. Signing happens in the user's wallet / Chain Console.
  */
-import { blake2b } from "./vendor/noble/hashes/blake2.js";
-import { sha256 } from "./vendor/noble/hashes/sha2.js";
+import { blake2b } from "../../../assets/vendor/noble/hashes/blake2.js";
+import { sha256 } from "../../../assets/vendor/noble/hashes/sha2.js";
 
 const C = window.QNOT_CODEC;
 const TWOX = window.QSL_TWOX;

@@ -5,8 +5,8 @@
  * Run: node tests/run-tests.mjs  (from pages/extrinsic-lab/)
  */
 import { createRequire } from 'node:module';
-import { ml_dsa65, ml_dsa87 } from '../js/vendor/noble/post-quantum/ml-dsa.js';
-import { blake2b } from '../js/vendor/noble/hashes/blake2.js';
+import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
+import { blake2b } from '../../../assets/vendor/noble/hashes/blake2.js';
 
 const require = createRequire(import.meta.url);
 const CALLS = require('../js/call-table.js');

@@ -3,7 +3,7 @@ import {
   ss58Decode, ss58Encode, accountIdFromPubkey, pubkeyToAddress,
   hexEncode, hexDecode, QUANTUS_SS58_PREFIX,
 } from './quantus-crypto.js';
-import { ml_dsa65, ml_dsa87 } from '../vendor/noble/post-quantum/ml-dsa.js';
+import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 
 const $ = (id) => document.getElementById(id);
 const te = new TextEncoder();

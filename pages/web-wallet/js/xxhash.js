@@ -10,7 +10,7 @@
  * 26aa394eea5630e07c48ae0c9558cef7 (asserted in tests/run-tests.mjs).
  * Implemented from the public xxHash specification.
  */
-import { blake2b } from '../vendor/noble/hashes/blake2.js';
+import { blake2b } from '../../../assets/vendor/noble/hashes/blake2.js';
 
 const P1 = 0x9E3779B185EBCA87n;
 const P2 = 0xC2B2AE3D27D4EB4Fn;

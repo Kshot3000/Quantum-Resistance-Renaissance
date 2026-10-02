@@ -17,7 +17,7 @@ import {
 import { encodeMortalEra, qtcToPlancks } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
 import { keypairFromSeed } from '../js/lib/mnemonic.js';
-import { ml_dsa65, ml_dsa87 } from '../js/vendor/noble/post-quantum/ml-dsa.js';
+import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { xxhash128, SYSTEM_ACCOUNT_KEY } from '../js/lib/xxhash.js';
 
 const te = new TextEncoder();

@@ -27,7 +27,7 @@ import {
   hexDecode,
   QUANTUS_SS58_PREFIX,
 } from '../js/quantus-crypto.js';
-import { ml_dsa65, ml_dsa87 } from '../vendor/noble/post-quantum/ml-dsa.js';
+import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {

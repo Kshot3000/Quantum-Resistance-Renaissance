@@ -1,6 +1,6 @@
 /* QTC Notary Desk — node test suite (run: node tests/notary.test.mjs) */
 import { createHash } from "node:crypto";
-import { blake2b } from "../js/vendor/noble/hashes/blake2.js";
+import { blake2b } from "../../../assets/vendor/noble/hashes/blake2.js";
 import twox from "../js/vendor/twox.js";
 import codec from "../js/notary-codec.js";
 

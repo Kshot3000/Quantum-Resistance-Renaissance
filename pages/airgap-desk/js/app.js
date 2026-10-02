@@ -15,7 +15,7 @@ import {
   RpcClient, getRuntimeVersion, getGenesisHash, getLatestHeader, getEraBirthHash,
   getAccountInfo, getNonce, submitExtrinsic,
 } from './lib/rpc.js';
-import { ml_dsa65, ml_dsa87 } from './vendor/noble/post-quantum/ml-dsa.js';
+import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { keypairFromMnemonic, keypairFromSeed, validateMnemonic, loadWordlist } from './lib/mnemonic.js';
 import { ss58Decode, hexEncode } from './lib/quantus-crypto.js';
 import {

@@ -2,7 +2,7 @@
  *
  * Reuses the verified chain-format stack from Key Forge:
  *   ../../key-forge/js/quantus-crypto.js  (Poseidon2 account-ID + SS58-189)
- *   ../../key-forge/vendor/noble/post-quantum/ml-dsa.js (FIPS-204 keygen)
+ *   ../../../assets/vendor/noble/post-quantum/ml-dsa.js (FIPS-204 keygen)
  * Every keypair is forged locally with the OS CSPRNG; nothing leaves the page.
  */
 import {
@@ -11,7 +11,7 @@ import {
   attemptsForQuantile, medianAttempts, expectedSeconds,
   fmtInt, fmtDuration, difficultyLadder, addressMatches,
 } from './vanity.js';
-import { ml_dsa65, ml_dsa87 } from '../../key-forge/vendor/noble/post-quantum/ml-dsa.js';
+import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { pubkeyToAddress, hexEncode } from '../../key-forge/js/quantus-crypto.js';
 
 const $ = (id) => document.getElementById(id);

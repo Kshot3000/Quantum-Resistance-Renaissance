@@ -8,9 +8,9 @@
  * the same seed path as any other chain's wallet. Re-importing the same 24 words
  * here always reproduces the same address.
  */
-import { sha256, sha512 } from '../vendor/noble/hashes/sha2.js';
-import { hmac } from '../vendor/noble/hashes/hmac.js';
-import { ml_dsa65, ml_dsa87 } from '../vendor/noble/post-quantum/ml-dsa.js';
+import { sha256, sha512 } from '../../../assets/vendor/noble/hashes/sha2.js';
+import { hmac } from '../../../assets/vendor/noble/hashes/hmac.js';
+import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { accountIdFromPubkey, pubkeyToAddress, hexEncode } from './quantus-crypto.js';
 
 /* Authentic BIP-39 English wordlist (bitcoin/bips english.txt), embedded so key generation never depends on the network. */
