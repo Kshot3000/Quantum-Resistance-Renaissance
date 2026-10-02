@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://kshot3000.github.io/Quantus-Muse-Builder/assets/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Quantus Muse Builder — 50+ community-built QTC apps and tools">
+<meta property="og:image:alt" content="Quantus Muse Builder — 47 community-built QTC apps and tools">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://kshot3000.github.io/Quantus-Muse-Builder/assets/og-card.png">
 <link rel="icon" href="assets/favicon.svg?v=1.16.0" type="image/svg+xml">
@@ -186,6 +186,39 @@ section{padding:48px 0}
 }
 .apps-note strong{color:var(--ink)}
 
+/* App directory search */
+#apps .apps-grid{margin-top:18px}
+.dir-tools{display:flex;flex-direction:column;gap:10px;margin-top:26px;max-width:560px}
+.search-label{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--teal);font-weight:700}
+.search-wrap{position:relative}
+.search-wrap input[type=search]{
+  width:100%;padding:14px 52px 14px 18px;border-radius:14px;font-size:15px;
+  background:rgba(10,18,30,.85);border:1px solid var(--line);color:var(--ink);
+  transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;appearance:none
+}
+.search-wrap input[type=search]::placeholder{color:var(--muted);opacity:.75}
+.search-wrap input[type=search]:hover{border-color:var(--line-hot)}
+.search-wrap input[type=search]:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(64,224,255,.16);outline:none}
+.esc-hint{
+  position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  font-size:10.5px;letter-spacing:.08em;color:var(--muted);
+  border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:rgba(4,7,13,.6);
+  pointer-events:none
+}
+.app-count{color:var(--muted);font-size:13.5px;min-height:20px}
+.app-count strong{color:var(--teal);font-weight:700}
+.app-card.is-hidden{display:none}
+.empty-state{
+  margin-top:18px;border:1px dashed var(--line);border-radius:14px;padding:26px 22px;
+  color:var(--muted);font-size:15px;line-height:1.65;text-align:center
+}
+.empty-state strong{color:var(--ink)}
+.link-btn{
+  background:none;border:none;padding:0;color:var(--cyan);font:inherit;cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px
+}
+.link-btn:hover{color:var(--teal)}
+
 /* Timeline */
 .timeline{margin-top:26px;display:flex;flex-direction:column;gap:0}
 .tl-row{display:flex;gap:18px;padding:18px 0;border-bottom:1px solid rgba(64,224,255,.08)}
@@ -277,9 +310,19 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
 
   <section id="apps">
     <div class="sec-title">The Builds</div>
-    <div class="sec-head">Nine tools. Every claim verified.</div>
+    <div class="sec-head" id="appsHead">47 tools. Every claim verified.</div>
     <p class="sec-sub">Each app was tested in a real browser and verified live before it earned a place here. Nothing is demo data wearing a live badge.</p>
-    <div class="apps-grid">
+    <form class="dir-tools" role="search" id="appSearchForm">
+      <label class="search-label" for="appSearch">Search the builds</label>
+      <div class="search-wrap">
+        <input type="search" id="appSearch" name="q" autocomplete="off" spellcheck="false"
+               placeholder="Try &ldquo;mining&rdquo;, &ldquo;multisig&rdquo;, &ldquo;supply&rdquo;&hellip; &mdash; Esc clears"
+               aria-describedby="appCount">
+        <span class="esc-hint" aria-hidden="true">esc</span>
+      </div>
+      <p class="app-count" id="appCount" aria-live="polite"></p>
+    </form>
+    <div class="apps-grid" id="appsGrid">
       <a class="app-card mining" href="pages/mining-calculator/">
         <div class="icon-row">
           <div class="app-ico" aria-hidden="true">⛏</div>
@@ -705,6 +748,9 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
       </a>
 
     </div>
+    <div class="empty-state" id="emptyState" hidden>
+      <p><strong>No builds match that search.</strong> Try a different keyword &mdash; or <button type="button" class="link-btn" id="clearSearch">clear the search</button> to see all <span id="emptyTotal">47</span> builds.</p>
+    </div>
     <div class="apps-note"><strong>More builds on the bench.</strong> Watch the repo for the next shipping loop — wallets and explorer polish are queued.</div>
   </section>
 
@@ -766,6 +812,68 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
     toggle.setAttribute('aria-expanded', open?'true':'false');
   });
   links.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){links.classList.remove('open');toggle.setAttribute('aria-expanded','false');});});
+
+  /* App directory search: filter cards by title/description/tag; ?q= deep-link. */
+  (function(){
+    var grid=document.getElementById('appsGrid');
+    if(!grid) return;
+    var cards=Array.prototype.slice.call(grid.querySelectorAll('.app-card'));
+    var total=cards.length;
+    var head=document.getElementById('appsHead');
+    var form=document.getElementById('appSearchForm');
+    var input=document.getElementById('appSearch');
+    var count=document.getElementById('appCount');
+    var empty=document.getElementById('emptyState');
+    var clearBtn=document.getElementById('clearSearch');
+    var emptyTotal=document.getElementById('emptyTotal');
+    if(!input||!count) return;
+    /* The heading can never go stale again: it is derived from the cards in the DOM. */
+    if(head) head.textContent=total+' tools. Every claim verified.';
+    if(emptyTotal) emptyTotal.textContent=total;
+    var haystacks=cards.map(function(a){
+      var t=a.querySelector('h3'),p=a.querySelector('p'),g=a.querySelector('.tag');
+      return ((t?t.textContent:'')+' '+(p?p.textContent:'')+' '+(g?g.textContent:''))
+        .toLowerCase().replace(/\s+/g,' ').trim();
+    });
+    function norm(s){return s.toLowerCase().replace(/\s+/g,' ').trim();}
+    function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function apply(q,syncUrl){
+      var shown=0,i,hit;
+      for(i=0;i<cards.length;i++){
+        hit=!q||haystacks[i].indexOf(q)>-1;
+        cards[i].classList.toggle('is-hidden',!hit);
+        if(hit) shown++;
+      }
+      if(empty) empty.hidden=shown>0;
+      if(shown===total){
+        count.innerHTML='Showing <strong>'+total+'</strong> builds';
+      }else{
+        count.innerHTML='Showing <strong>'+shown+'</strong> of '+total+' builds'
+          +(q?' for &ldquo;'+esc(q)+'&rdquo;':'');
+      }
+      if(syncUrl!==false){
+        var u=new URL(location.href);
+        if(q) u.searchParams.set('q',q); else u.searchParams.delete('q');
+        history.replaceState(null,'',u.pathname+u.search+u.hash);
+      }
+    }
+    function onEdit(){apply(norm(input.value));}
+    input.addEventListener('input',onEdit);
+    input.addEventListener('search',onEdit); /* native clear button (Esc / ✕) */
+    input.addEventListener('keydown',function(e){
+      if(e.key==='Escape'&&input.value){input.value='';apply('');}
+    });
+    form.addEventListener('submit',function(e){e.preventDefault();});
+    if(clearBtn) clearBtn.addEventListener('click',function(){
+      input.value='';apply('');input.focus();
+    });
+    /* Deep-link: index.html?q=mining starts filtered. */
+    try{
+      var q0=new URL(location.href).searchParams.get('q');
+      if(q0){input.value=q0;apply(norm(q0),false);}
+      else apply('',false);
+    }catch(e){apply('',false);}
+  })();
 
   document.querySelectorAll('.addr').forEach(function(b){
     b.addEventListener('click',function(){
