@@ -9,7 +9,7 @@
  *  - Network defaults: derived live at page load from repo data/*.json
  *    (consensus.json est_hashrate_hs, supply.json total_supply_plancks via the
  *    emission formula, consensus.json block_times_ms observed pace); the
- *    2026-09-30 statics in NETWORK_DEFAULTS are the honest, dated fallback
+ *    2026-10-02 statics in NETWORK_DEFAULTS are the honest, dated fallback
  *    when snapshots can't load.
  */
 const P = require("../js/app.js");
@@ -200,6 +200,47 @@ approx("grossPerDay 4th param pace", P.grossPerDay(1e12, 2e12, 0.3, 6465), 0.5 *
 approx("grossPerDay default 7200", P.grossPerDay(1e12, 2e12, 0.3), 0.5 * 7200 * 0.3, 1e-9);
 const s2 = P.soloStats(1e12, 2e12, 6465);
 approx("soloStats honors pace param", s2.blocksPerDay, 0.5 * 6465, 1e-9);
+
+// --- fallback bundle integrity (regression guard, added 2026-10-02)
+// The Sept-30 fallback bundle survived two days of difficulty growth: at half
+// the real hashrate it overstated every fallback-path earnings figure ~2x.
+// These guards fail if the bundle ever mixes captures or drifts far from the
+// repo snapshots again — refresh NETWORK_DEFAULTS from ONE fresh capture.
+(function () {
+  const nd = P.NETWORK_DEFAULTS;
+  const dNum = /difficulty (\d+)/.exec(nd.netHashLabel);
+  const dHt = /@ height (\d+)/.exec(nd.netHashLabel);
+  const rHt = /@ height (\d+)/.exec(nd.blockRewardLabel);
+  const dateOf = (s) => { const m = /(\d{4}-\d{2}-\d{2})/.exec(s); return m && m[1]; };
+  t("fallback: netHash label names a difficulty", !!dNum);
+  t("fallback: netHashHS = floor(difficulty / 12)", !!dNum && nd.netHashHS === Math.floor(Number(dNum[1]) / 12),
+    "got " + nd.netHashHS);
+  t("fallback: netHash label TH/s matches netHashHS", /≈([\d.]+) TH\/s/.test(nd.netHashLabel) &&
+    Math.abs(parseFloat(/≈([\d.]+) TH\/s/.exec(nd.netHashLabel)[1]) - nd.netHashHS / 1e12) < 0.005);
+  t("fallback: reward label value matches blockRewardQTC (4dp)",
+    nd.blockRewardLabel.startsWith(nd.blockRewardQTC.toFixed(4)));
+  t("fallback: both labels carry the same capture date",
+    !!dateOf(nd.netHashLabel) && dateOf(nd.netHashLabel) === dateOf(nd.blockRewardLabel),
+    nd.netHashLabel + " vs " + nd.blockRewardLabel);
+  t("fallback: both labels cite heights from one capture (<=10 blocks apart)",
+    !!dHt && !!rHt && Math.abs(Number(dHt[1]) - Number(rHt[1])) <= 10,
+    nd.netHashLabel + " vs " + nd.blockRewardLabel);
+  // Freshness tripwire vs the repo snapshots (skipped when data/ is absent,
+  // e.g. a standalone copy of the app).
+  try {
+    const fs = require("fs"), path = require("path");
+    const root = path.join(__dirname, "..", "..", "..");
+    const cons = JSON.parse(fs.readFileSync(path.join(root, "data", "consensus.json"), "utf8"));
+    const sup = JSON.parse(fs.readFileSync(path.join(root, "data", "supply.json"), "utf8"));
+    const ratio = nd.netHashHS / Number(cons.current.est_hashrate_hs);
+    t("fallback: hashrate within 0.6x-1.67x of snapshot (refresh bundle when this fails)",
+      ratio >= 0.6 && ratio <= 1.67, "ratio " + ratio.toFixed(3));
+    const snapReward = P.blockRewardQtc(P.totalSupplyOf(sup));
+    t("fallback: reward within 2% of snapshot emission reward",
+      Math.abs(nd.blockRewardQTC / snapReward - 1) <= 0.02,
+      "fallback " + nd.blockRewardQTC + " vs snapshot " + snapReward);
+  } catch (e) { /* standalone copy: internal-consistency guards above still apply */ }
+})();
 
 console.log(pass + "/" + (pass + fail) + " pool-desk tests green");
 process.exit(fail ? 1 : 0);
