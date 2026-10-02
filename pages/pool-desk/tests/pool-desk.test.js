@@ -6,8 +6,11 @@
  *  - Quanpool terms: 0xmoei/quantus community guide (pool fee 1%,
  *    quanpool-miner dev fee 5% -> 6% total, PPLNS or Solo, min 0.25 QTC,
  *    hourly payouts, 105 confirmations)
- *  - Network defaults: repo data/live.json (avg reward 0.309 QTC, 2026-09-30)
- *    and data/consensus.json (difficulty 306344884677664 @ h142417 -> /12s).
+ *  - Network defaults: derived live at page load from repo data/*.json
+ *    (consensus.json est_hashrate_hs, supply.json total_supply_plancks via the
+ *    emission formula, consensus.json block_times_ms observed pace); the
+ *    2026-09-30 statics in NETWORK_DEFAULTS are the honest, dated fallback
+ *    when snapshots can't load.
  */
 const P = require("../js/app.js");
 
@@ -140,6 +143,63 @@ t("minerOptions helper", P.minerOptions("ariapool").length === 4 && P.minerOptio
 // --- PPLNS window helper
 const w = P.pplnsWindowBlocks(306344884677664);
 eq("PPLNS window multiple is 2x difficulty", w.windowMultiple, 2);
+
+// --- live snapshot derivation (v1.44.0): defaults from hourly data/*.json
+// emission formula: R = (21M - total_issuance) / 50M, total_issuance INCLUDES genesis
+approx("blockRewardQtc formula exact to planck",
+  P.blockRewardQtc("5763112233946770492"),
+  (21000000 - 5763112233946770492 / 1e12) / 50000000, 1e-12);
+approx("blockRewardQtc ~0.3047 at current supply", P.blockRewardQtc("5763112233946770492"), 0.3047, 1e-4);
+
+eq("totalSupplyOf prefers total_supply_plancks",
+  P.totalSupplyOf({ total_supply_plancks: "5763112233946770492" }), "5763112233946770492");
+eq("totalSupplyOf falls back to balances aggregate",
+  P.totalSupplyOf({ balances_plancks: { free: "100", reserved: "5", frozen: "7" } }), "112");
+eq("totalSupplyOf null when unusable", P.totalSupplyOf({}), null);
+
+approx("paceBlocksPerDay from 13365ms avg", P.paceBlocksPerDay(13365), 86400000 / 13365, 1e-6);
+eq("paceBlocksPerDay falls back to 7200 target", P.paceBlocksPerDay(null), 7200);
+
+eq("formatUtc", P.formatUtc("2026-10-02T06:00:21.381Z"), "2026-10-02 06:00 UTC");
+
+// full derivation from realistic snapshot fixtures
+const fixture = {
+  live: {
+    fetched_at: "2026-10-02T06:00:11.401Z",
+    data: { blocks: [{ reward: "310000000000" }, { reward: "300000000000" }] },
+  },
+  consensus: {
+    fetched_at: "2026-10-02T06:00:21.381Z",
+    current: { height: 150644, est_hashrate_hs: "38525603542782" },
+    block_times_ms: { sample: 3000, avg_ms: 13365 },
+  },
+  supply: { fetched_at: "2026-10-02T06:00:30.000Z", total_supply_plancks: "5763112233946770492" },
+};
+const d = P.deriveNetworkDefaults(fixture);
+approx("derive: reward from emission formula", d.rewardQtc, P.blockRewardQtc("5763112233946770492"), 1e-12);
+eq("derive: netHash from est_hashrate_hs", d.netHashHs, 38525603542782);
+approx("derive: pace from block_times_ms", d.blocksPerDay, 86400000 / 13365, 1e-6);
+t("derive: reward label cites emission formula + snapshot", /emission formula/.test(d.rewardLabel) && /2026-10-02 06:00 UTC/.test(d.rewardLabel));
+t("derive: netHash label cites 12s target", /38.53 TH\/s/.test(d.netHashLabel) && /12 s target/.test(d.netHashLabel));
+t("derive: pace label cites observed sample", /6,465 blocks\/day/.test(d.paceLabel) && /last 3000 blocks/.test(d.paceLabel));
+
+// fallback layers: no supply -> avg of recent block rewards
+const d2 = P.deriveNetworkDefaults({ live: fixture.live, consensus: fixture.consensus, supply: {} });
+approx("derive: reward falls back to block avg", d2.rewardQtc, 0.305, 1e-9);
+t("derive: block-avg label says so", /avg of last 2 mainnet blocks/.test(d2.rewardLabel));
+// nothing usable at all
+eq("derive: null for empty snapshots", P.deriveNetworkDefaults({}), null);
+eq("derive: null for non-object", P.deriveNetworkDefaults(null), null);
+// no consensus -> static netHash fallback + 7200 pace
+const d3 = P.deriveNetworkDefaults({ live: fixture.live, consensus: null, supply: fixture.supply });
+eq("derive: netHash static fallback", d3.netHashHs, P.NETWORK_DEFAULTS.netHashHS);
+eq("derive: pace static fallback", d3.blocksPerDay, 7200);
+
+// optional pace param stays backward compatible
+approx("grossPerDay 4th param pace", P.grossPerDay(1e12, 2e12, 0.3, 6465), 0.5 * 6465 * 0.3, 1e-9);
+approx("grossPerDay default 7200", P.grossPerDay(1e12, 2e12, 0.3), 0.5 * 7200 * 0.3, 1e-9);
+const s2 = P.soloStats(1e12, 2e12, 6465);
+approx("soloStats honors pace param", s2.blocksPerDay, 0.5 * 6465, 1e-9);
 
 console.log(pass + "/" + (pass + fail) + " pool-desk tests green");
 process.exit(fail ? 1 : 0);

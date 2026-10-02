@@ -7,7 +7,7 @@ The mining-pool directory & comparator for Quantus: every known QTC pool compare
 ## What it does
 
 - **Pool directory** — AriaPool and Quanpool with verified terms: pool fee, miner-software dev fees, PPLNS scheme details, minimum payouts, payout schedules, signup model, endpoints, and download links with the pools' own SHA-256 checksums. Every fact carries a `verified <date>` stamp and its source.
-- **Effective-fee comparator** — enter your hashrate; the desk computes gross vs net QTC/day per pool × miner-software combination, stacking pool fee + dev fee (1% + 1% = 1.99% effective, not 2%). Network defaults come from the repo's own chain snapshots (block reward 0.309 QTC avg of last 20 blocks; ≈25.53 TH/s from difficulty @ height 142417, both 2026-09-30) and are user-overridable. Includes a solo-lottery line (expected days per block at 0% fee) and a 1×/1.5×/2× network-hashrate sensitivity table.
+- **Effective-fee comparator** — enter your hashrate; the desk computes gross vs net QTC/day per pool × miner-software combination, stacking pool fee + dev fee (1% + 1% = 1.99% effective, not 2%). Network defaults are derived **live at page load from the repo's hourly chain snapshots** — block reward from the emission formula (`(21M − total_issuance) / 50M` on `data/supply.json`, exact to the planck), network hashrate from `data/consensus.json` recomputed difficulty ÷ 12 s target, and daily pace from the snapshot's observed block times (last 3,000 blocks) rather than the 7,200/day protocol target. Every default is labeled with its snapshot time and stays user-overridable; when snapshots can't load, the dated 2026-09-30 static fallbacks stand and say so. Includes a solo-lottery line (expected days per block at 0% fee) and a 1×/1.5×/2× network-hashrate sensitivity table.
 - **Connection command builder** — pick pool + miner software, paste your `qz…` address: generates the exact install/verify/run command (AriaMiner getwork blocks include the pool's published SHA-256 for `sha256sum` verification). Address + worker-name validation. Where the pool's live page must be re-copied (Quanpool server/TLS pin, AriaPool TLS pin), the builder emits placeholders and warns — it never invents endpoints.
 - **Pool vs Solo vs Own node matrix** — the real tradeoff table (who finds the block, fee, payout feel, trust, min payout).
 - **PPLNS explainer** — how the last-N-shares window works, what AriaPool's 2×-difficulty window means in practice, confirmations → payout flow.
@@ -27,7 +27,7 @@ All pool facts read 2026-10-01: `pool.ariabrain.com/qtc.html` (AriaPool: fee, PP
 
 ## Tests
 
-- `node tests/pool-desk.test.js` — 84/84 logic tests (fee stacking, comparator math, solo stats, validators, command builder for all 5 pool×miner combos, data integrity of every published fact).
-- Real-browser QA via `~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-pooldesk-browser.mjs` (headless Chromium, file:// + CDP, zero console errors).
+- `node tests/pool-desk.test.js` — 107/107 logic tests (fee stacking, comparator math, solo stats, validators, command builder for all 5 pool×miner combos, data integrity of every published fact, live-default derivation + fallback layers).
+- Real-browser QA via `~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-pooldesk-livedefaults.mjs` (headless Chromium, file:// + CDP, real snapshot injection + static-fallback path, zero console errors).
 
 100% client-side. Built by [@kshot9000](https://x.com/kshot9000) · QTC donations: `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`

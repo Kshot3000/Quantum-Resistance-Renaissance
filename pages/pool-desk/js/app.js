@@ -8,9 +8,18 @@
  */
 "use strict";
 
-const BLOCK_TIME_S = 12;
-const BLOCKS_PER_DAY = 86400 / BLOCK_TIME_S; // 7200
+const BLOCK_TIME_S = 12; // protocol target, Quantus-Network/chain runtime/src/lib.rs TARGET_BLOCK_TIME_MS
+const BLOCKS_PER_DAY = 86400 / BLOCK_TIME_S; // 7200 — protocol target; comparator uses observed pace when snapshots load
+// Emission model per pallets/mining-rewards on_finalize (verified against
+// Quantus-Network/chain): R = (MaxSupply - total_issuance) / 50_000_000,
+// where total_issuance = Currency::total_issuance() INCLUDES genesis endowments.
+const MAX_SUPPLY_QTC = 21000000;
+const PLANCK = 1e12;
+const EMISSION_DENOM = 50000000;
 const NETWORK_DEFAULTS = {
+  // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
+  // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
+  // and dated for the no-fetch path (file://, offline).
   blockRewardQTC: 0.309, // avg of last 20 mainnet blocks, data/live.json fetched 2026-09-30
   blockRewardLabel: "0.309 QTC · avg of last 20 blocks, 2026-09-30",
   netHashHS: 25528740389805, // difficulty 306344884677664 / 12s, data/consensus.json 2026-09-30
@@ -134,21 +143,25 @@ function effectiveFee(poolFee, devFee) {
   return 1 - (1 - clamp01(poolFee)) * (1 - clamp01(devFee));
 }
 
-/** Expected gross QTC/day before any fee. Hashes in H/s. */
-function grossPerDay(userHashHS, netHashHS, blockRewardQTC) {
+/** Expected gross QTC/day before any fee. Hashes in H/s.
+ * blocksPerDay defaults to the 7200 protocol target; pass the observed network
+ * pace (from snapshot block_times_ms) for honest expectation math. */
+function grossPerDay(userHashHS, netHashHS, blockRewardQTC, blocksPerDay) {
   if (!(userHashHS > 0) || !(netHashHS > 0) || !(blockRewardQTC > 0)) return 0;
-  return (userHashHS / netHashHS) * BLOCKS_PER_DAY * blockRewardQTC;
+  const bpd = blocksPerDay > 0 ? blocksPerDay : BLOCKS_PER_DAY;
+  return (userHashHS / netHashHS) * bpd * blockRewardQTC;
 }
 
-function netPerDay(userHashHS, netHashHS, blockRewardQTC, poolFee, devFee) {
-  return grossPerDay(userHashHS, netHashHS, blockRewardQTC) * (1 - effectiveFee(poolFee, devFee));
+function netPerDay(userHashHS, netHashHS, blockRewardQTC, poolFee, devFee, blocksPerDay) {
+  return grossPerDay(userHashHS, netHashHS, blockRewardQTC, blocksPerDay) * (1 - effectiveFee(poolFee, devFee));
 }
 
 /** Solo-lottery stats: expected days to find a block at current difficulty. */
-function soloStats(userHashHS, netHashHS) {
+function soloStats(userHashHS, netHashHS, blocksPerDay) {
   if (!(userHashHS > 0) || !(netHashHS > 0)) return { daysPerBlock: Infinity, blocksPerDay: 0 };
-  const blocksPerDay = (userHashHS / netHashHS) * BLOCKS_PER_DAY;
-  return { daysPerBlock: blocksPerDay > 0 ? 1 / blocksPerDay : Infinity, blocksPerDay };
+  const bpd = blocksPerDay > 0 ? blocksPerDay : BLOCKS_PER_DAY;
+  const pace = (userHashHS / netHashHS) * bpd;
+  return { daysPerBlock: pace > 0 ? 1 / pace : Infinity, blocksPerDay: pace };
 }
 
 /** PPLNS window explainer: window = 2 × difficulty → approx blocks covered. */
@@ -174,6 +187,108 @@ function fmtDays(d) {
   if (d < 1) return (d * 24).toFixed(1) + " h";
   if (d < 60) return d.toFixed(1) + " days";
   return Math.round(d).toLocaleString("en-US") + " days";
+}
+
+/* ---------------- live snapshot derivation ---------------- */
+
+/** Current block reward from the emission formula. Pass total supply in plancks
+ * (data/supply.json total_supply_plancks), NOT mined rewards alone — mined-only
+ * input overstates the reward by ~37% at current supply. Exact to the planck. */
+function blockRewardQtc(totalSupplyPlancks) {
+  return (MAX_SUPPLY_QTC - Number(totalSupplyPlancks) / PLANCK) / EMISSION_DENOM;
+}
+
+/** Total supply in plancks from a supply snapshot: the first-class
+ * total_supply_plancks field when present, else the balances aggregate
+ * (free + reserved + frozen) = Currency::total_issuance(). Null when neither. */
+function totalSupplyOf(sup) {
+  if (!sup) return null;
+  if (sup.total_supply_plancks) return String(sup.total_supply_plancks);
+  var b = sup.balances_plancks;
+  if (b && b.free != null && b.reserved != null && b.frozen != null) {
+    return (BigInt(b.free) + BigInt(b.reserved) + BigInt(b.frozen)).toString();
+  }
+  return null;
+}
+
+/** Observed blocks/day from a snapshot's average block time in ms.
+ * Falls back to the 7200 protocol target when the snapshot has no sample. */
+function paceBlocksPerDay(avgMs) {
+  if (avgMs > 0 && isFinite(avgMs)) return 86400000 / avgMs;
+  return BLOCKS_PER_DAY;
+}
+
+/** "2026-10-02 06:00 UTC" from an ISO timestamp. */
+function formatUtc(iso) {
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return "unknown time";
+  function p(n) { return String(n).padStart(2, "0"); }
+  return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate()) +
+    " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + " UTC";
+}
+
+/** Derive the comparator's network defaults from hourly chain snapshots.
+ * Layered fallbacks keep the page honest when a snapshot field is missing:
+ * reward falls back to the average of recent mainnet block rewards, then to the
+ * dated static default; hashrate falls back to the dated static default;
+ * pace falls back to the 7200 protocol target. Returns null when no snapshot
+ * object is usable at all (caller keeps the static defaults). */
+function deriveNetworkDefaults(snap) {
+  if (!snap || typeof snap !== "object") return null;
+  var live = snap.live, consensus = snap.consensus, supply = snap.supply;
+  if (!live && !consensus && !supply) return null;
+
+  var out = { snapshotTime: null, rewardLabel: null, netHashLabel: null, paceLabel: null };
+
+  // --- block reward: emission formula first (exact to the planck)
+  var supplyPlancks = totalSupplyOf(supply);
+  if (supplyPlancks) {
+    out.rewardQtc = blockRewardQtc(supplyPlancks);
+    var when = (supply && supply.fetched_at) || (live && live.fetched_at) || null;
+    out.snapshotTime = when;
+    out.rewardLabel = out.rewardQtc.toFixed(4) + " QTC · emission formula, snapshot " + formatUtc(when);
+  } else {
+    // fallback: average of recent mainnet block rewards (planck-exact ints)
+    var rewards = [];
+    try {
+      (live.data.blocks || []).forEach(function (b) {
+        if (b && b.reward != null) rewards.push(Number(b.reward) / PLANCK);
+      });
+    } catch (e) { /* keep empty */ }
+    if (rewards.length) {
+      out.rewardQtc = rewards.reduce(function (a, b) { return a + b; }, 0) / rewards.length;
+      out.snapshotTime = live.fetched_at || null;
+      out.rewardLabel = out.rewardQtc.toFixed(4) + " QTC · avg of last " + rewards.length +
+        " mainnet blocks, snapshot " + formatUtc(out.snapshotTime);
+    } else {
+      out.rewardQtc = NETWORK_DEFAULTS.blockRewardQTC;
+      out.rewardLabel = NETWORK_DEFAULTS.blockRewardLabel;
+    }
+  }
+
+  // --- network hashrate: recomputed difficulty / 12s target
+  var estHs = consensus && consensus.current && consensus.current.est_hashrate_hs;
+  if (estHs != null && Number(estHs) > 0) {
+    out.netHashHs = Number(estHs);
+    var cwhen = consensus.fetched_at || out.snapshotTime;
+    out.netHashLabel = "≈" + (out.netHashHs / 1e12).toFixed(2) +
+      " TH/s · difficulty ÷ 12 s target, snapshot " + formatUtc(cwhen);
+    if (!out.snapshotTime) out.snapshotTime = consensus.fetched_at || null;
+  } else {
+    out.netHashHs = NETWORK_DEFAULTS.netHashHS;
+    out.netHashLabel = NETWORK_DEFAULTS.netHashLabel;
+  }
+
+  // --- daily pace: observed block times beat the 12s target on honesty
+  var avgMs = consensus && consensus.block_times_ms && consensus.block_times_ms.avg_ms;
+  var sample = consensus && consensus.block_times_ms && consensus.block_times_ms.sample;
+  out.blocksPerDay = paceBlocksPerDay(Number(avgMs));
+  out.paceLabel = "≈" + Math.round(out.blocksPerDay).toLocaleString("en-US") +
+    " blocks/day · " + (avgMs > 0
+      ? "observed pace, last " + (sample || "—") + " blocks (target 7,200)"
+      : "protocol target");
+
+  return out;
 }
 
 /* ---------------- validation ---------------- */
@@ -321,13 +436,18 @@ function esc(s) {
 function initComparator() {
   const els = { hash: $("c-hash"), unit: $("c-unit"), net: $("c-net"), reward: $("c-reward"), out: $("c-out") };
   if (!els.hash) return;
+  // Live-derived defaults (updated async below); static fallbacks are honest and dated.
+  const pace = {
+    value: BLOCKS_PER_DAY,
+    label: "≈7,200 blocks/day · protocol target",
+  };
   els.net.value = (NETWORK_DEFAULTS.netHashHS / 1e12).toFixed(2);
   els.reward.value = NETWORK_DEFAULTS.blockRewardQTC;
   const recalc = () => {
     const uh = toHS(parseFloat(els.hash.value) || 0, els.unit.value);
     const nh = toHS(parseFloat(els.net.value) || 0, "TH/s");
     const rw = parseFloat(els.reward.value) || 0;
-    const gross = grossPerDay(uh, nh, rw);
+    const gross = grossPerDay(uh, nh, rw, pace.value);
     let rows = "";
     POOLS.forEach((p) => {
       p.miners.forEach((m) => {
@@ -340,11 +460,11 @@ function initComparator() {
           "<td class='num'>" + fmtQTC(net * 30, 2) + "</td></tr>";
       });
     });
-    const solo = soloStats(uh, nh);
+    const solo = soloStats(uh, nh, pace.value);
     const soloGross = gross;
     let sens = "";
     [1, 1.5, 2].forEach((k) => {
-      const g = grossPerDay(uh, nh * k, rw);
+      const g = grossPerDay(uh, nh * k, rw, pace.value);
       sens += "<tr><td class='num'>" + k + "×</td><td class='num'>" + fmtQTC(g) + "</td><td class='num'>" + fmtQTC(g * 0.99) + "</td></tr>";
     });
     els.out.innerHTML =
@@ -354,10 +474,49 @@ function initComparator() {
       "A pool smooths that variance into daily payouts; the fee is the price of smoothing.</div>" +
       '<h4>Network-hashrate sensitivity (best effective-fee option, 1% pool fee)</h4>' +
       '<table class="cmp small"><thead><tr><th>Network hashrate</th><th>Gross / day</th><th>Net / day</th></tr></thead><tbody>' + sens + "</tbody></table>" +
-      '<p class="fine">Expectation, not a guarantee — pools say the same on their own pages. Defaults: block reward ' + esc(NETWORK_DEFAULTS.blockRewardLabel) + "; network hashrate " + esc(NETWORK_DEFAULTS.netHashLabel) + ". QPoW has no ASICs: your share is hashrate ÷ network hashrate.</p>";
+      '<p class="fine">Expectation, not a guarantee — pools say the same on their own pages. ' + esc(pace.label) + " Defaults: block reward " + esc(NETWORK_DEFAULTS.blockRewardLabel) + "; network hashrate " + esc(NETWORK_DEFAULTS.netHashLabel) + ". QPoW has no ASICs: your share is hashrate ÷ network hashrate.</p>";
   };
   ["hash", "unit", "net", "reward"].forEach((k) => els[k].addEventListener("input", recalc));
   recalc();
+  // Refresh the network defaults from the hourly chain snapshots (<=1h old),
+  // replacing the dated static fallbacks. Inputs stay user-editable.
+  loadLiveDefaults().then((d) => {
+    if (!d) return;
+    NETWORK_DEFAULTS.blockRewardQTC = d.rewardQtc;
+    NETWORK_DEFAULTS.blockRewardLabel = d.rewardLabel;
+    NETWORK_DEFAULTS.netHashHS = d.netHashHs;
+    NETWORK_DEFAULTS.netHashLabel = d.netHashLabel;
+    pace.value = d.blocksPerDay;
+    pace.label = d.paceLabel;
+    els.net.value = (d.netHashHs / 1e12).toFixed(2);
+    els.reward.value = d.rewardQtc.toFixed(4);
+    recalc();
+  }).catch(() => { /* static defaults stand; labels already say so */ });
+}
+
+/* Fetch the hourly chain snapshots and derive live network defaults.
+ * QA hook: qa-pooldesk-livedefaults.mjs injects real snapshot payloads via
+ * window.__qtcpooldesk_mock because file:// fetch is blocked headless. */
+function loadLiveDefaults() {
+  function get(url) {
+    var mock = typeof window !== "undefined" ? window.__qtcpooldesk_mock : null;
+    if (mock) {
+      for (var k in mock) {
+        if (url.indexOf(k) >= 0) return Promise.resolve(mock[k]);
+      }
+    }
+    return fetch(url, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  }
+  return Promise.all([
+    get("../../data/live.json").catch(function () { return null; }),
+    get("../../data/consensus.json").catch(function () { return null; }),
+    get("../../data/supply.json").catch(function () { return null; }),
+  ]).then(function (parts) {
+    return deriveNetworkDefaults({ live: parts[0], consensus: parts[1], supply: parts[2] });
+  });
 }
 
 function initCommandBuilder() {
@@ -429,9 +588,10 @@ function initNav() {
 /* node test hook */
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    BLOCKS_PER_DAY, NETWORK_DEFAULTS, POOLS, SOURCES,
+    BLOCK_TIME_S, BLOCKS_PER_DAY, NETWORK_DEFAULTS, POOLS, SOURCES,
     effectiveFee, grossPerDay, netPerDay, soloStats, pplnsWindowBlocks,
     toHS, fmtQTC, fmtDays, validateAddress, validateWorker, authToken, buildCommand,
     poolById, minerOptions,
+    blockRewardQtc, totalSupplyOf, paceBlocksPerDay, deriveNetworkDefaults, formatUtc,
   };
 }
