@@ -91,7 +91,7 @@ t("vested < claimed never pays (defensive)", () => {
 t("fmtQTC exact decimals", () => {
   assert.equal(VC.fmtQTC(1000000000000n), "1.000");
   assert.equal(VC.fmtQTC(171475000000000000n), "171,475.000");
-  assert.equal(VC.fmtQTC(2441283332572298n, 6), "2441.283332");
+  assert.equal(VC.fmtQTC(2441283332572298n, 6), "2,441.283332");
   assert.equal(VC.fmtQTC(0n), "0.000");
 });
 t("fmtQTC0 thousands separators", () => {
