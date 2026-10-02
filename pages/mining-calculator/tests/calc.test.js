@@ -82,20 +82,20 @@ t("formatters", function(){
   assert.strictEqual(m.fmtDuration(0.5), "12.0 hours");
 });
 
-// 9. Snapshot derivation: realistic 2026-10-02 16:02Z capture shapes
+// 9. Snapshot derivation: realistic 2026-10-02 18:10Z capture shapes
 t("deriveNetworkDefaults reads the hourly snapshots", function(){
-  var cons = { fetched_at: "2026-10-02T16:02:57.561Z", head: 153668,
-    current: { height: 153668, difficulty: "670044142441798", est_hashrate_hs: "55837011870149" },
-    block_times_ms: { avg_ms: 11972, sample: 3000 } };
-  var sup = { fetched_at: "2026-10-02T16:02:24.634Z", block_height: 153667,
-    total_supply_plancks: "5766449413581648445" };
+  var cons = { fetched_at: "2026-10-02T18:10:34.156Z", head: 154192,
+    current: { height: 154192, difficulty: "669643631900391", est_hashrate_hs: "55803635991699" },
+    block_times_ms: { avg_ms: 12669, sample: 3000 } };
+  var sup = { fetched_at: "2026-10-02T18:10:42.628Z", block_height: 154192,
+    total_supply_plancks: "5766760000247799778" };
   var d = m.deriveNetworkDefaults(cons, sup);
-  assert.strictEqual(d.netHs, 55837011870149);
-  approx(d.supplyQtc, 5766449.4136, 0.001);
-  approx(d.blocksPerDay, 86400000 / 11972, 0.01);
-  assert.strictEqual(d.height, 153668);
-  assert.strictEqual(d.fetchedAt, "2026-10-02T16:02:57.561Z");
-  approx(m.blockReward(d.supplyQtc), 0.3046710, 1e-7);
+  assert.strictEqual(d.netHs, 55803635991699);
+  approx(d.supplyQtc, 5766760.0002, 0.001);
+  approx(d.blocksPerDay, 86400000 / 12669, 0.01);
+  assert.strictEqual(d.height, 154192);
+  assert.strictEqual(d.fetchedAt, "2026-10-02T18:10:34.156Z");
+  approx(m.blockReward(d.supplyQtc), 0.3046648, 1e-7);
 });
 
 // 10. Derivation rejects junk field-by-field, never throws
@@ -112,10 +112,10 @@ t("deriveNetworkDefaults is null-safe and plausibility-gated", function(){
 
 // 11. Supply falls back to the balances aggregate (total issuance)
 t("totalSupplyOf aggregates free+reserved+frozen", function(){
-  var sup = { balances_plancks: { free: "5000000000000000000", reserved: "766449413581648445", frozen: "0" } };
-  assert.strictEqual(m.totalSupplyOf(sup), "5766449413581648445");
+  var sup = { balances_plancks: { free: "5000000000000000000", reserved: "766760000247799778", frozen: "0" } };
+  assert.strictEqual(m.totalSupplyOf(sup), "5766760000247799778");
   var d = m.deriveNetworkDefaults(null, sup);
-  approx(d.supplyQtc, 5766449.4136, 0.001);
+  approx(d.supplyQtc, 5766760.0002, 0.001);
   assert.strictEqual(m.totalSupplyOf(null), null);
   assert.strictEqual(m.totalSupplyOf({}), null);
 });
@@ -125,8 +125,8 @@ t("fallback bundle is one consistent capture", function(){
   var F = m.FALLBACK;
   assert.strictEqual(F.netHs, Math.floor(Number(F.difficulty) / 12), "netHs = difficulty / 12s");
   approx(Number(F.totalSupplyPlancks) / 1e12, F.supplyQtc, 0.001); // supplyQtc stored rounded to 4dp
-  approx(m.blockReward(F.supplyQtc), 0.3046710, 1e-7);
-  assert.strictEqual(F.height, 153668);
+  approx(m.blockReward(F.supplyQtc), 0.3046648, 1e-7);
+  assert.strictEqual(F.height, 154192);
   assert.ok(F.fetchedAt.indexOf("2026-10-02") === 0, "fallback is dated 2026-10-02");
   // The old bug, pinned: the pre-v1.9.0 static default was 10 GH/s.
   assert.ok(F.netHs > 1e12, "fallback network rate is TH/s-scale, not the old 10 GH/s example");
@@ -148,17 +148,17 @@ t("default rig estimate is honest at fallback defaults", function(){
   var e = estimate({ userHs: 500e6, netHs: m.FALLBACK.netHs, watts: 450, kwhPrice: 0.12,
                      qtcPrice: 0, reward: m.blockReward(m.FALLBACK.supplyQtc),
                      blocksPerDay: 86400000 / m.FALLBACK.avgBlockMs });
-  assert.ok(e.qtcPerDay > 0.015 && e.qtcPerDay < 0.025, "expected ~0.0197 QTC/day, got " + e.qtcPerDay);
+  assert.ok(e.qtcPerDay > 0.015 && e.qtcPerDay < 0.025, "expected ~0.0186 QTC/day, got " + e.qtcPerDay);
 });
 
 // 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
-t("index.html carries the fallback defaults and v1.9.0 key", function(){
+t("index.html carries the fallback defaults and v1.9.1 key", function(){
   var fs = require("fs"), path = require("path");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="55.837"') >= 0, "in-net defaults to the fallback TH/s figure");
+  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="55.804"') >= 0, "in-net defaults to the fallback TH/s figure");
   assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
   assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
-  assert.ok(html.indexOf("app.js?v=1.9.0") >= 0, "app.js cache key bumped to 1.9.0");
+  assert.ok(html.indexOf("app.js?v=1.9.1") >= 0, "app.js cache key bumped to 1.9.1");
   assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
 });
 
