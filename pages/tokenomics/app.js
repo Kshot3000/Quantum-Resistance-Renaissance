@@ -391,7 +391,7 @@ $("hsInput").addEventListener("input", renderHs); renderHs();
   function local(){ setTiles(0, false); }
   try {
     function fromSnap(){
-      return fetch("../../data/live.json?t=" + Math.floor(Date.now()/60000), { cache: "no-store" })
+      return fetch("../../data/live.json?t=" + Math.floor(Date.now()/60000), { cache: "no-store", signal: (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(9000) : undefined })
         .then(function(r){ return r.json(); })
         .then(function(p){
           var h = p && p.data && p.data.status && p.data.status.block_height;

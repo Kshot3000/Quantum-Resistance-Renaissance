@@ -135,9 +135,18 @@ function fetchDirect(query){
   });
 }
 
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
+
 function fetchSnapshot(){
   var bust = SNAPSHOT + "?t=" + Math.floor(Date.now() / 60000);
-  return fetch(bust, { cache: "no-store" }).then(function(res){
+  return fetch(bust, { cache: "no-store", signal: timeoutSignal(9000) }).then(function(res){
     if (!res.ok) throw new Error("snapshot HTTP " + res.status);
     return res.json();
   }).then(function(payload){

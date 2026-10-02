@@ -11,9 +11,17 @@ let S = null; // snapshot
 let chartRange = "trend", chartScale = "log";
 
 /* ---------- snapshot ---------- */
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
 async function loadSnapshot() {
   try {
-    const r = await fetch(SNAP, { cache: "no-store" });
+    const r = await fetch(SNAP, { cache: "no-store", signal: timeoutSignal(9000) });
     if (!r.ok) throw new Error("HTTP " + r.status);
     S = await r.json();
     const age = Math.max(0, Math.round((Date.now() - Date.parse(S.fetched_at)) / 60000));

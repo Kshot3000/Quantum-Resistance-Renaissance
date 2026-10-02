@@ -10,6 +10,14 @@
   let CHART_MODE = "cumulative";
 
   /* ---------------- data ---------------- */
+  /* Abort a fetch that never settles: a hung request must fall through to
+   * the app's error/fallback path, not strand the page on "Loading…" forever. */
+  function timeoutSignal(ms) {
+    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+    var ctl = new AbortController();
+    setTimeout(function () { ctl.abort(); }, ms);
+    return ctl.signal;
+  }
   async function loadData() {
     // Live attempt first (works from explorer.quantus.com / quantus.com origins;
     // fails on GitHub Pages CORS and in offline sandboxes -> snapshot fallback).
@@ -28,7 +36,7 @@
       DATA = normalizeLive(json.data.schedules, nowMs);
       DATA.live = true;
     } catch (e) {
-      const res = await fetch("../../data/vesting.json");
+      const res = await fetch("../../data/vesting.json", { signal: timeoutSignal(9000) });
       if (!res.ok) throw new Error("snapshot fetch failed: " + res.status);
       DATA = await res.json();
       DATA.live = false;

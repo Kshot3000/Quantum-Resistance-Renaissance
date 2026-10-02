@@ -318,12 +318,21 @@ var EXPLORER = "https://explorer.quantus.com";
 var DATA = null, MODE = "all", PAGE = 0, PER_PAGE = 25, MOVE_TAB = "all";
 var $ = function(id){ return document.getElementById(id); };
 
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
+
 function loadSnapshot(){
   /* Test hook for headless QA: window.__qtcwhales_mock = full snapshot payload */
   if (typeof window !== "undefined" && window.__qtcwhales_mock){
     return Promise.resolve(window.__qtcwhales_mock);
   }
-  return fetch(SNAPSHOT_URL, { cache: "no-store" }).then(function(res){
+  return fetch(SNAPSHOT_URL, { cache: "no-store", signal: timeoutSignal(9000) }).then(function(res){
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
   });

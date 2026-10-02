@@ -115,13 +115,21 @@ if (typeof window !== "undefined"){
              fetchedAt: data.fetched_at || null };
   }
 
+  /* Abort a fetch that never settles: a hung request must fall through to
+   * the app's error/fallback path, not strand the page on "Loading…" forever. */
+  function timeoutSignal(ms) {
+    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+    var ctl = new AbortController();
+    setTimeout(function () { ctl.abort(); }, ms);
+    return ctl.signal;
+  }
   function loadData(){
     /* Test hook for headless QA: window.__qtcemission_mock = {ok, data} */
     if (window.__qtcemission_mock){
       var m = window.__qtcemission_mock;
       return m.ok ? Promise.resolve(m.data) : Promise.reject(new Error(m.error || "mock failure"));
     }
-    return fetch(SNAPSHOT, { cache: "no-store" }).then(function(r){
+    return fetch(SNAPSHOT, { cache: "no-store", signal: timeoutSignal(9000) }).then(function(r){
       if (!r.ok) throw new Error("snapshot HTTP " + r.status);
       return r.json();
     }).then(function(j){ var d = j.data || j; d.fetched_at = d.fetched_at || j.fetched_at; return d; });

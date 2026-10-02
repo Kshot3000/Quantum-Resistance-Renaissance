@@ -57,6 +57,15 @@ function totalSupplyOf(sup) {
   return null;
 }
 
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
+
 function fetchJson(url) {
   // QA hook: qa-energy-browser.mjs injects real snapshot payloads before
   // navigation because file:// fetch is blocked in headless Chromium.
@@ -66,7 +75,7 @@ function fetchJson(url) {
       if (url.indexOf(k) >= 0) return Promise.resolve(mock[k]);
     }
   }
-  return fetch(url, { cache: "no-store" }).then(function (r) {
+  return fetch(url, { cache: "no-store", signal: timeoutSignal(9000) }).then(function (r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.json();
   });

@@ -14,6 +14,15 @@ function esc(s) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
+
 function loadSnapshot() {
   // QA hook: headless file:// cannot fetch() across origins, so the QA harness may
   // inject the snapshot (the real data/governance.json content) before navigation.
@@ -23,7 +32,7 @@ function loadSnapshot() {
     d.fetched_at = d.fetched_at || mk.fetched_at || null;
     return Promise.resolve(d);
   }
-  return fetch(SNAPSHOT, { cache: "no-store" }).then(function (r) {
+  return fetch(SNAPSHOT, { cache: "no-store", signal: timeoutSignal(9000) }).then(function (r) {
     if (!r.ok) throw new Error("snapshot HTTP " + r.status);
     return r.json();
   }).then(function (j) {

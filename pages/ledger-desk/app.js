@@ -122,6 +122,15 @@ var detections = [];
 function tsForHeight(h, anchorH, anchorMs, blockS) {
   return Math.round(anchorMs - (anchorH - h) * blockS * 1000);
 }
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
+
 async function runScan() {
   var status = $("scanStatus"), list = $("detectList");
   detections = [];
@@ -134,9 +143,9 @@ async function runScan() {
   list.innerHTML = "";
   var miners, live, flows;
   try {
-    miners = await (await fetch(DATA + "miners.json")).json();
-    live = await (await fetch(DATA + "live.json")).json();
-    flows = await (await fetch(DATA + "flows.json")).json();
+    miners = await (await fetch(DATA + "miners.json", { signal: timeoutSignal(9000) })).json();
+    live = await (await fetch(DATA + "live.json", { signal: timeoutSignal(9000) })).json();
+    flows = await (await fetch(DATA + "flows.json", { signal: timeoutSignal(20000) })).json();
   } catch (e) {
     status.textContent = "Could not load snapshots: " + e.message;
     return;

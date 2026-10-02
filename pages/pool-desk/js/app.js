@@ -501,6 +501,14 @@ function initComparator() {
 /* Fetch the hourly chain snapshots and derive live network defaults.
  * QA hook: qa-pooldesk-livedefaults.mjs injects real snapshot payloads via
  * window.__qtcpooldesk_mock because file:// fetch is blocked headless. */
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
 function loadLiveDefaults() {
   function get(url) {
     var mock = typeof window !== "undefined" ? window.__qtcpooldesk_mock : null;
@@ -509,7 +517,7 @@ function loadLiveDefaults() {
         if (url.indexOf(k) >= 0) return Promise.resolve(mock[k]);
       }
     }
-    return fetch(url, { cache: "no-store" }).then(function (r) {
+    return fetch(url, { cache: "no-store", signal: timeoutSignal(9000) }).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
     });

@@ -257,8 +257,16 @@
   }
 
   /* ============ live data ============ */
+  /* Abort a fetch that never settles: a hung request must fall through to
+   * the app's error/fallback path, not strand the page on "Loading…" forever. */
+  function timeoutSignal(ms) {
+    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+    var ctl = new AbortController();
+    setTimeout(function () { ctl.abort(); }, ms);
+    return ctl.signal;
+  }
   function loadSnapshot() {
-    fetch("../../data/reversal.json?v=1.50.0", { cache: "no-store" })
+    fetch("../../data/reversal.json?v=1.50.1", { cache: "no-store", signal: timeoutSignal(9000) })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();

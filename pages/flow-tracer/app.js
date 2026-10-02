@@ -44,8 +44,17 @@ async function gql(query, timeoutMs) {
   } finally { clearTimeout(t); }
 }
 
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
+
 async function loadData() {
-  var r = await fetch("../../data/flows.json", { cache: "no-store" });
+  var r = await fetch("../../data/flows.json", { cache: "no-store", signal: timeoutSignal(20000) });
   if (!r.ok) throw new Error("snapshot HTTP " + r.status);
   snap = await r.json();
   snapGraph = F.buildGraph(snap.transfers);

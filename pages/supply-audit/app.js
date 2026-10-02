@@ -77,9 +77,12 @@ async function loadSupply(){
     if (j.errors) throw new Error("GraphQL error");
     var core = j.data, poolFree = null;
     try {
-      var pq = await fetch(A.ENDPOINT, { method: "POST",
+      var pctl = new AbortController();
+      var pt = setTimeout(function(){ pctl.abort(); }, 8000);
+      var pq = await fetch(A.ENDPOINT, { method: "POST", signal: pctl.signal,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ query: `query { account_by_pk(id: "${core.genesis[0].to_id}") { free } }` }) });
+      clearTimeout(pt);
       var pj = await pq.json();
       poolFree = pj.data && pj.data.account_by_pk ? pj.data.account_by_pk.free : null;
     } catch (e) {}

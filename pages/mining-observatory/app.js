@@ -85,12 +85,21 @@ function pct(x, d){ return x.toFixed(d === undefined ? 1 : d) + "%"; }
 
 /* ---------------- data ---------------- */
 
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
+
 function loadData(){
   /* Test hook for headless QA: window.__qtcminers_mock = full snapshot payload */
   if (typeof window !== "undefined" && window.__qtcminers_mock){
     return Promise.resolve(window.__qtcminers_mock);
   }
-  return fetch(SNAPSHOT_URL, { cache: "no-store" }).then(function(res){
+  return fetch(SNAPSHOT_URL, { cache: "no-store", signal: timeoutSignal(9000) }).then(function(res){
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
   });

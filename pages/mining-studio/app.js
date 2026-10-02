@@ -369,10 +369,18 @@ function fmtUtc(iso) {
   var d = new Date(iso);
   return isNaN(d) ? String(iso || "") : d.toISOString().slice(0, 16).replace("T", " ") + " UTC";
 }
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
 function loadNetworkDefaults() {
   if (typeof fetch !== "function") return;
   function get(url) {
-    return fetch(url).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    return fetch(url, { signal: timeoutSignal(9000) }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .catch(function () { return null; });
   }
   Promise.all([get("../../data/consensus.json"), get("../../data/supply.json")]).then(function (arr) {

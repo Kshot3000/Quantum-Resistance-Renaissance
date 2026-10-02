@@ -473,6 +473,15 @@ $('btn-send-again').addEventListener('click', () => {
 const SQUID = 'https://sqm.quantus.com/v1/graphql';
 const EXPLORER = 'https://explorer.quantus.com';
 
+/* Abort a fetch that never settles: a hung request must fall through to
+ * the app's error/fallback path, not strand the page on "Loading…" forever. */
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+  var ctl = new AbortController();
+  setTimeout(function () { ctl.abort(); }, ms);
+  return ctl.signal;
+}
+
 async function loadActivity() {
   const list = $('activity-list');
   err('activity-err');
@@ -487,6 +496,7 @@ async function loadActivity() {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ query, variables: { a: addr } }),
+      signal: timeoutSignal(10000),
     });
     if (!res.ok) throw new Error('indexer HTTP ' + res.status);
     const j = await res.json();

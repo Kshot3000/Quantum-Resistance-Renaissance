@@ -47,6 +47,14 @@
     }, function (e) { clearTimeout(to); throw e; });
   }
 
+  /* Abort a fetch that never settles: a hung request must fall through to
+   * the app's error/fallback path, not strand the page on "Loading…" forever. */
+  function timeoutSignal(ms) {
+    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms);
+    var ctl = new AbortController();
+    setTimeout(function () { ctl.abort(); }, ms);
+    return ctl.signal;
+  }
   function loadData() {
     var liveHead = null;
     return gql("{ s: chain_stats_by_pk(id: \"global\") { block_height } }", 6000)
@@ -54,8 +62,8 @@
       .catch(function () { liveHead = null; })
       .then(function () {
         return Promise.all([
-          fetch("../../data/consensus.json").then(function (r) { return r.json(); }),
-          fetch("../../data/supply.json").then(function (r) { return r.json(); })
+          fetch("../../data/consensus.json", { signal: timeoutSignal(9000) }).then(function (r) { return r.json(); }),
+          fetch("../../data/supply.json", { signal: timeoutSignal(9000) }).then(function (r) { return r.json(); })
         ]);
       })
       .then(function (arr) {
