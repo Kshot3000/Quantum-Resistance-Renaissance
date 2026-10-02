@@ -3,7 +3,7 @@
   --bg:#060d0b; --panel:#0b1512; --panel2:#0e1b16;
   --line:rgba(46,242,184,.16); --line-hot:rgba(46,242,184,.45);
   --mint:#2ef2b8; --mint-deep:#0ea472; --teal:#22d3ee;
-  --ink:#eef7f2; --muted:#9db8ac; --dim:#5f7a6e;
+  --ink:#eef7f2; --muted:#9db8ac; --dim:#6e8d80;
   --ok:#34d399; --warn:#f5b942; --bad:#f87171;
 }
 *{margin:0;padding:0;box-sizing:border-box}

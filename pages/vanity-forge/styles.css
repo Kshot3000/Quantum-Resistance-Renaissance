@@ -1,7 +1,7 @@
 /* QTC Vanity Forge — "the molten forge": charcoal + molten gold. */
 :root{
   --bg:#0b0805; --bg2:#100b06; --panel:#171008; --panel2:#1e150b;
-  --line:#3a2a15; --ink:#f5ead6; --mut:#c4ab84; --fine:#8a7355;
+  --line:#3a2a15; --ink:#f5ead6; --mut:#c4ab84; --fine:#9c8260;
   --gold:#f5a623; --gold-hi:#ffd166; --ember:#ff5e1a; --ember-dim:#8a3a12;
   --green:#4ade80; --red:#f87171;
 }
@@ -123,3 +123,6 @@ footer.chrome{border-top:1px solid var(--line);margin-top:3rem;padding:2rem 1.4r
 .foot-grid a{color:var(--gold)}
 .donate{word-break:break-all;color:var(--mut)}
 @media (max-width:640px){.fc-addr{font-size:.85rem}}
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#f5a623}

@@ -1,7 +1,7 @@
 /* QTC Governance Tracker — "the on-chain parliament": deep ink + bronze seal. */
 :root{
   --bg:#0a0d17; --bg2:#0e1222; --panel:#12172b; --panel2:#161c33;
-  --line:#2a3358; --ink:#ece7d8; --mut:#a9a390; --fine:#7e7a6e;
+  --line:#2a3358; --ink:#ece7d8; --mut:#a9a390; --fine:#8e8a7e;
   --gold:#d4a72c; --gold-dim:#8a6f24; --bronze:#b08d3e;
   --green:#4ade80; --red:#f87171; --blue:#7db4ff;
 }
@@ -145,7 +145,7 @@ table.votes td{color:var(--mut)}
 .life-step{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:1.1rem}
 .life-step.warn{border-color:var(--red)}
 .life-n{width:2rem;height:2rem;border-radius:50%;background:var(--gold);color:#0a0d17;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:.6rem}
-.life-step.warn .life-n{background:var(--red);color:#fff}
+.life-step.warn .life-n{background:var(--red);color:#484848}
 .life-step h3{margin:.2rem 0 .5rem;font-size:1.02rem}
 .life-step p{color:var(--mut);font-size:.9rem;line-height:1.6;margin:0}
 
@@ -165,3 +165,6 @@ footer.chrome{border-top:1px solid var(--line);margin-top:3rem}
 .donate{word-break:break-all;font-size:.8rem}
 .skip-link{position:absolute;left:-9999px}
 .skip-link:focus{left:8px;top:8px;background:var(--gold);color:#000;padding:.5rem 1rem;z-index:99}
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#d4a72c}

@@ -10,7 +10,7 @@
   --line-hot: #a4762a;
   --txt: #f7efdd;
   --dim: #c9b48a;
-  --faint: #8a7554;
+  --faint:#937d5a;
   --amber: #f5b942;
   --amber-deep: #b97c1c;
   --seal: #e4572e;
@@ -121,7 +121,7 @@ main.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
 
 .btn { padding: 10px 18px; border-radius: 10px; border: 1px solid var(--line-hot); background: var(--panel2); color: var(--txt); cursor: pointer; font-size: 14px; }
 .btn:hover { border-color: var(--amber); }
-.btn.primary { background: linear-gradient(135deg, #6b4a12, #a4762a); border-color: var(--amber); color: #fff8e8; font-weight: 600; }
+.btn.primary { background: linear-gradient(135deg, #6b4a12, #8d6624); border-color: var(--amber); color: #fff8e8; font-weight: 600; }
 .btn.big { width: 100%; padding: 14px; font-size: 16px; margin-top: 6px; }
 .btn.tiny { padding: 5px 12px; font-size: 12px; }
 .btn.danger { border-color: #5a2323; color: var(--red); }

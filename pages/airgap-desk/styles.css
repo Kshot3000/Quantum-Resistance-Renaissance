@@ -137,7 +137,7 @@ ul.tight li { margin-bottom: 6px; }
 }
 .btn.ghost { background: transparent; }
 .btn.small { padding: 8px 14px; font-size: 12.5px; }
-.btn.danger { background: linear-gradient(135deg, #a3242f, var(--danger)); color: #fff; border: none; }
+.btn.danger { background: linear-gradient(135deg, #a3242f, #ff4354); color: #fff; border: none; }
 .filebtn { position: relative; overflow: hidden; display: inline-block; }
 
 .err {
@@ -207,7 +207,7 @@ footer .addr {
   font-family: ui-monospace, monospace; font-size: 11.5px; padding: 4px 10px; border-radius: 8px;
   cursor: pointer; word-break: break-all;
 }
-footer .sig { letter-spacing: .3em; font-size: 10.5px; margin-top: 10px; color: #5a6780; }
+footer .sig { letter-spacing: .3em; font-size: 10.5px; margin-top: 10px; color: #6d7c98; }
 
 .skip-link {
   position: absolute; left: -999px; top: 0; background: var(--amber); color: #000;
@@ -228,3 +228,6 @@ footer .sig { letter-spacing: .3em; font-size: 10.5px; margin-top: 10px; color: 
   .kv { grid-template-columns: 1fr; gap: 2px; }
   .kv dt { margin-top: 8px; }
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#ffb02e}

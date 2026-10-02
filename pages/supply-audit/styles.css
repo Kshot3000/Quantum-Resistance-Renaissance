@@ -10,7 +10,7 @@
   --txt:#dcebe0;
   --dim:#93a89a;
   --mint:#8fe3b0;
-  --mint-dim:#4c7a5e;
+  --mint-dim:#548768;
   --gold:#e8c56a;
   --red:#ff7d6b;
   --amber:#f0a95c;
@@ -136,3 +136,6 @@ tr.hl td{background:rgba(143,227,176,.05)}
   .stamp{position:static;display:inline-block;transform:rotate(-4deg);margin-bottom:12px}
   .hero{padding-top:36px}
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#e8c56a}

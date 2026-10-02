@@ -1,7 +1,7 @@
 /* QTC Vesting Desk — chronometer identity: ink-navy dial, amber hands. */
 :root{
   --bg:#0a0c12; --bg2:#0e1119; --panel:#121724; --panel2:#161c2c;
-  --line:#232b42; --ink:#e8ecf5; --dim:#9aa3bd; --faint:#5d6680;
+  --line:#232b42; --ink:#e8ecf5; --dim:#9aa3bd; --faint:#8189a4;
   --amber:#f5c453; --amber-dim:#c99a2e; --green:#7fd6a4; --red:#ef8a8a;
   --blue:#7fb3f5;
 }
@@ -126,3 +126,6 @@ td .claim-hi{color:var(--amber);font-weight:700}
   .chart-wrap{height:260px}
   table{min-width:760px}
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#f5c453}

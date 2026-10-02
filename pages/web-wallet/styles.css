@@ -99,7 +99,7 @@ main{max-width:1080px;margin:0 auto;padding:2rem 1.25rem 4rem}
   transition:transform .12s var(--ease), box-shadow .12s var(--ease);
 }
 .btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(109,61,245,.3)}
-.btn.primary{background:linear-gradient(135deg,var(--violet-deep),#8b5cf6);border-color:transparent;color:#fff}
+.btn.primary{background:linear-gradient(135deg,var(--violet-deep),#804df5);border-color:transparent;color:#fff}
 .btn.danger{background:linear-gradient(135deg,#c22a4a,#8f1d33);border-color:transparent;color:#fff}
 .btn.ghost{background:transparent}
 .btn.small{padding:.35rem .7rem;font-size:.82rem;border-radius:9px}
@@ -178,3 +178,6 @@ footer code{color:var(--gold);font-size:.8rem}
   main{padding:1.25rem .8rem 3rem}
   .bigbal{font-size:2rem}
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#a678ff}

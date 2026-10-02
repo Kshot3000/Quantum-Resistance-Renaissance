@@ -9,7 +9,7 @@
   --pd-line2:#2b4439;
   --pd-text:#e9f4ee;
   --pd-muted:#9db3a9;
-  --pd-dim:#687d74;
+  --pd-dim:#768c82;
   --glow:#6ee7b7;
   --glow-dim:rgba(110,231,183,.12);
   --gold:#f5c76a;
@@ -167,4 +167,4 @@ footer a{color:var(--pd-muted)}
 footer .donate{color:var(--pd-muted)}
 footer .addr{font-family:var(--mono);font-size:12px;background:var(--pd-panel2);border:1px solid var(--pd-line2);color:var(--gold);border-radius:8px;padding:4px 10px;cursor:pointer}
 footer .addr:hover{border-color:var(--gold)}
-footer .sig{margin-top:8px;font-size:11px;letter-spacing:.28em;color:#3d524a}
+footer .sig{margin-top:8px;font-size:11px;letter-spacing:.28em;color:#638578}

@@ -208,3 +208,6 @@ footer.site .addr { background: none; border: none; color: var(--cf-quant); font
   font-size: .78rem; cursor: pointer; padding: 0; }
 footer.site .addr:hover { text-decoration: underline; }
 footer.site .note { font-size: .76rem; }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#4ade80}

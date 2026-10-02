@@ -166,7 +166,7 @@ footer{margin-top:60px;padding-top:26px;border-top:1px solid var(--line);color:v
 footer .addr{background:rgba(192,132,252,.08);border:1px solid var(--line);border-radius:8px;color:var(--violet);
   font-family:var(--font-mono);font-size:12px;padding:4px 10px;cursor:pointer;word-break:break-all}
 footer .addr:hover{border-color:var(--violet)}
-footer .sig{margin-top:8px;font-size:11px;letter-spacing:.22em;color:#6d5b94}
+footer .sig{margin-top:8px;font-size:11px;letter-spacing:.22em;color:#8e7fb0}
 
 /* print: only the paper card */
 @media print{
@@ -185,3 +185,6 @@ footer .sig{margin-top:8px;font-size:11px;letter-spacing:.22em;color:#6d5b94}
 @media (prefers-reduced-motion:reduce){
   #forgefield{display:none}
 }
+
+/* a11y 2026-10-01: contrast fix (scoped override) */
+#pcQr .hint{color:#8065ae}

@@ -155,3 +155,6 @@ a.acct:hover{color:var(--ab-cyan);}
   .rich thead th:nth-child(n+6),.rich tbody td:nth-child(n+6){display:none;}
   .moves thead th:nth-child(6),.moves tbody td:nth-child(6){display:table-cell;}
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#22d3ee}

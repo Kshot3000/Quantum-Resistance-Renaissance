@@ -106,3 +106,6 @@ footer .addr{background:rgba(255,209,102,.08);border:1px solid var(--line);color
   border-radius:8px;padding:3px 10px;font-family:ui-monospace,monospace;font-size:12.5px;
   cursor:pointer;max-width:100%;overflow-wrap:anywhere;word-break:break-all;white-space:normal}
 footer .addr:hover{background:rgba(255,209,102,.16)}
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#ffd166}

@@ -216,3 +216,6 @@ footer .mono{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.85em
   .sum-grid{ flex-direction:column; align-items:flex-start; }
   .hint{ margin-left:0; }
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#22d3ee}

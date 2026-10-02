@@ -121,3 +121,6 @@ footer a{color:var(--cl-mint)}
 .hub-link{border-style:dashed!important}
 .skip-link{position:absolute;left:-999px}
 @media(max-width:640px){.panel{padding:18px;margin:12px}.hero-stats{grid-template-columns:1fr 1fr}}
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#6df2b8}

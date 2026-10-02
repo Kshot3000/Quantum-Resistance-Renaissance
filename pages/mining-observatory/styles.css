@@ -126,3 +126,6 @@ footer .addr:hover{border-color:var(--sig)}
   .sweep{opacity:.28}
   table.miners{font-size:13px}
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#2dd4bf}

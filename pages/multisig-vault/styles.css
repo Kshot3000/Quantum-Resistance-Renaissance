@@ -128,3 +128,6 @@ input[type=range]{accent-color:var(--amber);flex:1;}
   .threshold-row{grid-template-columns:minmax(0,1fr)}
   .threshold-row>*{min-width:0}
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#f5b942}

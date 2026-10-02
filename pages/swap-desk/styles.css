@@ -162,3 +162,6 @@ footer a{color:var(--cyan);}
 .skip-link{position:absolute;left:-9999px;}
 .skip-link:focus{left:12px;top:12px;z-index:99;background:var(--amber);color:#111;padding:8px 14px;border-radius:8px;}
 .qmb-menu a.current{background:rgba(255,195,87,.1);}
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#57e6ff}

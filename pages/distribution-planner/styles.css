@@ -137,3 +137,6 @@ tr.empty td{text-align:center;color:var(--dp-dim);padding:28px;}
   .controls{grid-template-columns:1fr;}
   .cp{white-space:normal;}
 }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#a78bfa}

@@ -9,7 +9,7 @@
   --line: #2b1d4d;
   --txt: #efe7fa;
   --dim: #b3a3d6;
-  --faint: #7a6899;
+  --faint:#8c7da7;
   --gold: #e8b64c;
   --gold-dim: #6b4d17;
   --vio: #a78bfa;
@@ -226,3 +226,6 @@ footer.site a { color: var(--gold); }
 }
 .err { color: var(--red); font-size: 13px; margin-top: 8px; }
 .okline { color: var(--grn); font-size: 13px; margin-top: 8px; font-family: var(--mono); }
+
+/* a11y 2026-10-01: explicit link color (was browser-default #0000ee, fails on dark bg) */
+a,a:visited{color:#e8b64c}
