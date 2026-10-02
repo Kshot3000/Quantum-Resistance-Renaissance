@@ -8,7 +8,7 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
 
 - `index.html` — Builder hub: chain facts, live stats, and the app directory.
 - `pages/` — Each shipped app gets its own folder, verified in a real browser before it goes live:
-  - `mining-calculator/` — QTC reward estimator + emission chart + mining quickstart
+  - `mining-calculator/` — QTC reward estimator + emission chart + mining quickstart (network hashrate / total-issuance / observed-pace defaults derive live from the hourly chain snapshots, with a dated fallback bundle)
   - `address-toolkit/` — SS58 prefix-189 address inspector/encoder
   - `network-dashboard/` — live mainnet telemetry from the public Subsquid indexer
   - `quantum-shield/` — interactive post-quantum explainer (ML-DSA, signature math, exposure demo)

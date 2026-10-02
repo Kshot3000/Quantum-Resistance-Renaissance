@@ -6,7 +6,7 @@
 <link rel="icon" href="../../assets/favicon.svg?v=1.16.0" type="image/svg+xml">
 <link rel="stylesheet" href="../../assets/shared.css?v=1.13.2">
 <title>QTC Mining Calculator — Quantus Muse Builder</title>
-<meta name="description" content="Estimate Quantus (QTC) mining rewards from your hashrate. Uses the real emission formula — (21M − supply) / 50,000,000 — with 12-second blocks and 100% of each block reward to the miner.">
+<meta name="description" content="Estimate Quantus (QTC) mining rewards from your hashrate. Uses the real emission formula — (21M − supply) / 50,000,000 — with network hashrate, total issuance, and block pace defaulting to the builder's hourly chain snapshot.">
 <link rel="stylesheet" href="styles.css?v=1.8.1">
 <style>:root{--focus:#f5b942;}</style>
 </head>
@@ -105,9 +105,9 @@
           <select id="in-user-unit"><option>H/s</option><option>kH/s</option><option selected>MH/s</option><option>GH/s</option><option>TH/s</option></select></div>
         </label>
         <label>Network hashrate
-          <div class="row"><input id="in-net" type="number" min="0" step="any" value="10">
-          <select id="in-net-unit"><option>H/s</option><option>kH/s</option><option>MH/s</option><option selected>GH/s</option><option>TH/s</option></select></div>
-          <span class="hint">Example figure — check <a href="https://telemetry.quantus.cat" target="_blank" rel="noopener">telemetry.quantus.cat</a> for the live network rate and replace it.</span>
+          <div class="row"><input id="in-net" type="number" min="0" step="any" value="55.837">
+          <select id="in-net-unit"><option>H/s</option><option>kH/s</option><option>MH/s</option><option>GH/s</option><option selected>TH/s</option></select></div>
+          <span class="hint" id="net-hint">From the builder's chain snapshot (Oct 2, 2026, block 153,668): difficulty-implied network rate &asymp;55.84 TH/s. It refreshes automatically when the latest snapshot loads — edit it and your number wins.</span>
         </label>
         <label>Rig power draw (watts)
           <input id="in-watts" type="number" min="0" step="any" value="450">
@@ -123,7 +123,7 @@
           <summary>Advanced: override chain state</summary>
           <label>Current supply (QTC)
             <input id="in-supply" type="number" min="0" step="any">
-            <span class="hint">Auto-estimated from mainnet launch (Sept 9, 2026). Override if you know the live supply — the block reward recalculates.</span>
+            <span class="hint" id="supply-hint">Defaults to total issuance from the Oct 2, 2026 chain snapshot (5,766,449 QTC — genesis endowments included, as the emission formula requires) and refreshes with it. Override if you know a fresher figure — the block reward recalculates.</span>
           </label>
         </details>
       </div>
@@ -154,10 +154,11 @@
     <canvas id="chart" width="900" height="360"></canvas>
     <div class="stats">
       <div class="stat"><span class="k">Today's block reward</span><span class="v" id="s-reward">&mdash;</span></div>
-      <div class="stat"><span class="k">Est. supply</span><span class="v" id="s-supply">&mdash;</span></div>
-      <div class="stat"><span class="k">Est. daily emission</span><span class="v" id="s-daily">&mdash;</span></div>
+      <div class="stat"><span class="k">Supply (snapshot)</span><span class="v" id="s-supply">&mdash;</span></div>
+      <div class="stat"><span class="k">Daily emission (observed pace)</span><span class="v" id="s-daily">&mdash;</span></div>
       <div class="stat"><span class="k">Miners' share of cap</span><span class="v">73% &middot; 15.33M QTC</span></div>
     </div>
+    <p class="hint" id="stats-src">Network state from the dated fallback capture (Oct 2, 2026, block 153,668) — refreshes automatically when the latest snapshot loads.</p>
   </section>
 
   <section class="card" id="howto">
@@ -180,7 +181,7 @@
     <ul class="caveats">
       <li><strong>Estimates, not income.</strong> Difficulty retargets, luck variance, stale/orphan blocks, and pool fees all move real results away from the math above.</li>
       <li><strong>No public QTC price exists yet.</strong> NEAR Intents is announced as the first trading venue with no listing date — any revenue figure here uses <i>your</i> assumed price.</li>
-      <li><strong>Supply is estimated</strong> from the Sept 9, 2026 launch at 12-second blocks; the real chain may differ slightly. Override it in Advanced if you know the live figure.</li>
+      <li><strong>Defaults come from the chain, not a calendar.</strong> Network hashrate, supply, and block pace default to the builder's hourly chain snapshot — difficulty-implied hashrate, total issuance, and the observed block pace rather than the 12s target. If the snapshot can't load, the page falls back to the dated Oct 2, 2026 capture and labels it. (Before Oct 2, 2026 this page pre-filled a 10 GH/s example rate that overstated a default rig's estimate roughly 5,500-fold; the snapshot defaults fixed that.)</li>
       <li><strong>Mainnet is real money.</strong> Back up your seed phrase, keep miner auth files private, and never expose the miner port (9833) to the internet.</li>
     </ul>
   </section>
@@ -192,7 +193,7 @@
   </footer>
 </main>
 
-<script src="app.js?v=1.8.1"></script>
+<script src="app.js?v=1.9.0"></script>
 <script src="../../assets/app-nav.js?v=1.8.0"></script>
 </body>
 </html>

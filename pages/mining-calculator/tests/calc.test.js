@@ -82,4 +82,84 @@ t("formatters", function(){
   assert.strictEqual(m.fmtDuration(0.5), "12.0 hours");
 });
 
+// 9. Snapshot derivation: realistic 2026-10-02 16:02Z capture shapes
+t("deriveNetworkDefaults reads the hourly snapshots", function(){
+  var cons = { fetched_at: "2026-10-02T16:02:57.561Z", head: 153668,
+    current: { height: 153668, difficulty: "670044142441798", est_hashrate_hs: "55837011870149" },
+    block_times_ms: { avg_ms: 11972, sample: 3000 } };
+  var sup = { fetched_at: "2026-10-02T16:02:24.634Z", block_height: 153667,
+    total_supply_plancks: "5766449413581648445" };
+  var d = m.deriveNetworkDefaults(cons, sup);
+  assert.strictEqual(d.netHs, 55837011870149);
+  approx(d.supplyQtc, 5766449.4136, 0.001);
+  approx(d.blocksPerDay, 86400000 / 11972, 0.01);
+  assert.strictEqual(d.height, 153668);
+  assert.strictEqual(d.fetchedAt, "2026-10-02T16:02:57.561Z");
+  approx(m.blockReward(d.supplyQtc), 0.3046710, 1e-7);
+});
+
+// 10. Derivation rejects junk field-by-field, never throws
+t("deriveNetworkDefaults is null-safe and plausibility-gated", function(){
+  var d0 = m.deriveNetworkDefaults(null, null);
+  assert.deepStrictEqual(d0, { netHs: null, supplyQtc: null, blocksPerDay: null, avgBlockMs: null, height: null, fetchedAt: null });
+  var d1 = m.deriveNetworkDefaults(
+    { current: { est_hashrate_hs: "0" }, block_times_ms: { avg_ms: 500 } },
+    { total_supply_plancks: "4000000000000000000" }); // 4.0M < genesis mint
+  assert.strictEqual(d1.netHs, null);
+  assert.strictEqual(d1.blocksPerDay, null);
+  assert.strictEqual(d1.supplyQtc, null);
+});
+
+// 11. Supply falls back to the balances aggregate (total issuance)
+t("totalSupplyOf aggregates free+reserved+frozen", function(){
+  var sup = { balances_plancks: { free: "5000000000000000000", reserved: "766449413581648445", frozen: "0" } };
+  assert.strictEqual(m.totalSupplyOf(sup), "5766449413581648445");
+  var d = m.deriveNetworkDefaults(null, sup);
+  approx(d.supplyQtc, 5766449.4136, 0.001);
+  assert.strictEqual(m.totalSupplyOf(null), null);
+  assert.strictEqual(m.totalSupplyOf({}), null);
+});
+
+// 12. FALLBACK bundle integrity — one capture, internally consistent
+t("fallback bundle is one consistent capture", function(){
+  var F = m.FALLBACK;
+  assert.strictEqual(F.netHs, Math.floor(Number(F.difficulty) / 12), "netHs = difficulty / 12s");
+  approx(Number(F.totalSupplyPlancks) / 1e12, F.supplyQtc, 0.001); // supplyQtc stored rounded to 4dp
+  approx(m.blockReward(F.supplyQtc), 0.3046710, 1e-7);
+  assert.strictEqual(F.height, 153668);
+  assert.ok(F.fetchedAt.indexOf("2026-10-02") === 0, "fallback is dated 2026-10-02");
+  // The old bug, pinned: the pre-v1.9.0 static default was 10 GH/s.
+  assert.ok(F.netHs > 1e12, "fallback network rate is TH/s-scale, not the old 10 GH/s example");
+});
+
+// 13. Estimate honors an observed-pace blocksPerDay override
+t("estimate uses observed pace when given", function(){
+  var base = { userHs: 1e9, netHs: 1e11, watts: 0, kwhPrice: 0, qtcPrice: 0, reward: 0.3 };
+  var target = estimate(base);
+  approx(target.blocksPerDay, 72, 1e-9); // 7200/day protocol target
+  var paced = estimate(Object.assign({}, base, { blocksPerDay: 7216.84 }));
+  approx(paced.blocksPerDay, 0.01 * 7216.84, 1e-6);
+  approx(paced.daysPerBlock, 100 / 7216.84, 1e-9);
+  approx(paced.qtcPerDay, paced.blocksPerDay * 0.3, 1e-9);
+});
+
+// 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.02 QTC/day
+t("default rig estimate is honest at fallback defaults", function(){
+  var e = estimate({ userHs: 500e6, netHs: m.FALLBACK.netHs, watts: 450, kwhPrice: 0.12,
+                     qtcPrice: 0, reward: m.blockReward(m.FALLBACK.supplyQtc),
+                     blocksPerDay: 86400000 / m.FALLBACK.avgBlockMs });
+  assert.ok(e.qtcPerDay > 0.015 && e.qtcPerDay < 0.025, "expected ~0.0197 QTC/day, got " + e.qtcPerDay);
+});
+
+// 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
+t("index.html carries the fallback defaults and v1.9.0 key", function(){
+  var fs = require("fs"), path = require("path");
+  var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="55.837"') >= 0, "in-net defaults to the fallback TH/s figure");
+  assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
+  assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
+  assert.ok(html.indexOf("app.js?v=1.9.0") >= 0, "app.js cache key bumped to 1.9.0");
+  assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
+});
+
 console.log(passed + " tests passed");
