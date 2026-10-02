@@ -29,6 +29,16 @@ public Subsquid indexer (`sqm.quantus.com/v1/graphql`, `transfer` entity):
 - the full **22-transfer block-1 genesis allocation** (merged from the
   supply-audit snapshot — the all-time top-600 only caught the largest one).
 
+**Format v2 (2026-10-02):** the file is stored columnar with dictionary-
+encoded addresses/fees (`assets/flows-decode.js`, shared with watchtower,
+portfolio-desk and ledger-desk) plus the fleet-standard `ok: true` envelope.
+Lossless — all 8 fields per row survive decoding exactly — at ~50% of the
+v1 bytes (879 KB vs 1,774 KB at 5,150 rows). The producer round-trip
+self-checks before writing; `tests/test-flows-format.js` guards the
+envelope, the format, the decode and every consumer's wiring. (The missing
+`ok` envelope in v1 had silently disabled portfolio-desk's transfer index:
+its snapshot picker requires `ok`, so activity always showed empty.)
+
 Snapshot at ship time (2026-09-30, block ~140,338): **5,361 transfers** across
 **1,204 addresses**. Radar findings in this window: 6 distributors (≥8
 recipients), 4 consolidators (≥8 senders), 3 peel chains.

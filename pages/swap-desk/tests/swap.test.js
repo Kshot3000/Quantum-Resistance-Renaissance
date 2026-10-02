@@ -123,7 +123,11 @@ t("attribution + endpoint constants", function(){
   assert.ok(html.indexOf("qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau") !== -1, "donation address");
   assert.ok(html.indexOf("https://x.com/kshot9000") !== -1, "x link");
   assert.ok(html.indexOf("app.js?v=1.17.0") !== -1, "js cache key");
-  assert.ok(html.indexOf("styles.css?v=1.17.0") !== -1, "css cache key");
+  // De-pinned (2026-10-02): the a11y contrast pass bumped the css key to
+  // 1.17.2 without updating this pin. Assert a keyed css load at >= the
+  // 1.17.0 floor instead of an exact version that drifts every release.
+  var cssKey = (html.match(/styles\.css\?v=([0-9]+)\.([0-9]+)\.([0-9]+)/) || []).slice(1).map(Number);
+  assert.ok(cssKey.length === 3 && (cssKey[0] > 1 || (cssKey[0] === 1 && (cssKey[1] > 17 || (cssKey[1] === 17 && cssKey[2] >= 0)))), "css cache key >= 1.17.0, got " + cssKey.join("."));
 });
 
 // 12. No mock-data-as-real language on the page

@@ -43,6 +43,10 @@ const BASELINES = {
   // copies (2026-10-01 vendor consolidation) under one shared, uniformly
   // keyed URL so visitors browsing multiple apps get a cache hit.
   "assets/vendor/qrcode.js": "1.0.0",
+  // assets/flows-decode.js: 1.0.0 introduces the flows.json format-v2 codec
+  // (columnar + dictionary-encoded, lossless) shared by the 4 flows
+  // consumers (2026-10-02 flow-tracer heap pass).
+  "assets/flows-decode.js": "1.0.0",
 };
 
 let fails = 0;

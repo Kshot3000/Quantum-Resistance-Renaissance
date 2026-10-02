@@ -133,6 +133,9 @@ function loadChainData() {
 }
 
 function buildScanContext(bundle) {
+  // flows.json is stored columnar (format v2, assets/flows-decode.js);
+  // decode once here — idempotent, v1 object rows pass through untouched.
+  if (bundle.flows && typeof QFlows !== "undefined" && QFlows.decode) bundle.flows = QFlows.decode(bundle.flows);
   var live = bundle.mode === "live" ? bundle.live : bundle.live;
   var src = bundle.mode === "live" ? bundle.live : bundle.live; // bundle.live is snapshot in snapshot mode
   var blocks = (src && src.data && src.data.blocks) || [];

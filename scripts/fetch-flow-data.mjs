@@ -13,10 +13,20 @@
  *    genesis allocation and every historic whale move).
  * Rows carry id, amount, from_id, to_id, block_height, timestamp, fee,
  * extrinsic_id. Deduplicated by id.
+ *
+ * On-disk format is v2 (assets/flows-decode.js): columnar rows with
+ * dictionary-encoded addresses/fees plus the fleet-standard `ok: true`
+ * envelope — lossless, ~half the bytes of the v1 object array. Consumers
+ * call QFlows.decode() right after fetching. The encoder is round-trip
+ * self-checked against the source rows below before anything is written.
  */
 import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const QFlows = require(join(dirname(fileURLToPath(import.meta.url)), "..", "assets", "flows-decode.js"));
 
 const ENDPOINT = "https://sqm.quantus.com/v1/graphql";
 const QTC = 10n ** 12n;
@@ -92,22 +102,37 @@ async function main() {
   rows.sort((a, b) => b.block_height - a.block_height || (BigInt(b.amount) > BigInt(a.amount) ? 1 : -1));
 
   mkdirSync(dirname(OUT), { recursive: true });
-  writeFileSync(OUT, JSON.stringify({
-    meta: {
-      captured_at: new Date().toISOString(),
-      chain_height: height,
-      window_from: from,
-      window_blocks: WINDOW,
-      dust_threshold_planck: DUST.toString(),
-      dust_threshold_qtc: "1",
-      genesis_rows: genesisCount,
-      genesis_source: "data/supply.json (same Subsquid indexer)",
-      transfers: rows.length,
-      source: "sqm.quantus.com/v1/graphql",
-    },
-    transfers: rows,
-  }));
-  console.log(`flows.json: ${rows.length} transfers (recent>=1QTC: ${recent.length}, whales: ${w.transfer.length}), height ${height}`);
+  const meta = {
+    captured_at: new Date().toISOString(),
+    chain_height: height,
+    window_from: from,
+    window_blocks: WINDOW,
+    dust_threshold_planck: DUST.toString(),
+    dust_threshold_qtc: "1",
+    genesis_rows: genesisCount,
+    genesis_source: "data/supply.json (same Subsquid indexer)",
+    transfers: rows.length,
+    source: "sqm.quantus.com/v1/graphql",
+  };
+  const payload = QFlows.encode(rows, meta);
+  // Round-trip self-check: the written file must decode back to the exact
+  // source rows (every field, in order) or nothing is written at all.
+  const back = QFlows.decode(JSON.parse(JSON.stringify(payload)));
+  if (!back.ok || back.transfers.length !== rows.length) throw new Error("codec round-trip: row count mismatch");
+  for (let i = 0; i < rows.length; i++) {
+    const a = rows[i], b = back.transfers[i];
+    if (String(a.id) !== b.id || String(a.amount) !== b.amount ||
+        String(a.from_id) !== b.from_id || String(a.to_id) !== b.to_id ||
+        a.block_height !== b.block_height || (a.timestamp || null) !== b.timestamp ||
+        String(a.fee == null ? "0" : a.fee) !== b.fee ||
+        (a.extrinsic_id || null) !== b.extrinsic_id) {
+      throw new Error("codec round-trip: row " + i + " mismatch");
+    }
+  }
+  const text = JSON.stringify(payload);
+  writeFileSync(OUT, text);
+  const v1Bytes = JSON.stringify({ meta, transfers: rows }).length;
+  console.log(`flows.json: ${rows.length} transfers (recent>=1QTC: ${recent.length}, whales: ${w.transfer.length}), height ${height}, v2 ${text.length} bytes (v1 would be ${v1Bytes}, ${(100 * text.length / v1Bytes).toFixed(1)}%)`);
 }
 
 main().catch((e) => { console.error("FATAL", e.message); process.exit(1); });

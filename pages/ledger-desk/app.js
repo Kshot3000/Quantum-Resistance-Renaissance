@@ -145,7 +145,10 @@ async function runScan() {
   try {
     miners = await (await fetch(DATA + "miners.json", { signal: timeoutSignal(9000) })).json();
     live = await (await fetch(DATA + "live.json", { signal: timeoutSignal(9000) })).json();
-    flows = await (await fetch(DATA + "flows.json", { signal: timeoutSignal(20000) })).json();
+    // flows.json is stored columnar (format v2, assets/flows-decode.js);
+    // decode restores the v1 object rows (id/fee/extrinsic_id included).
+    var flowsRaw = await (await fetch(DATA + "flows.json", { signal: timeoutSignal(20000) })).json();
+    flows = (typeof QFlows !== "undefined" && QFlows.decode) ? QFlows.decode(flowsRaw) : flowsRaw;
   } catch (e) {
     status.textContent = "Could not load snapshots: " + e.message;
     return;

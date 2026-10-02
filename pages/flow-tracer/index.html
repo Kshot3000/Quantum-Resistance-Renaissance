@@ -9,6 +9,7 @@
 <meta name="description" content="Follow the money on the quantum chain: trace any Quantus address across hops, detect peel chains, distribution fan-outs and consolidation fan-ins, and inspect the largest real transfers — from the live Subsquid indexer or a same-origin snapshot, 100% client-side.">
 <meta name="theme-color" content="#07090f">
 <link rel="stylesheet" href="styles.css?v=1.29.1">
+<script defer src="../../assets/flows-decode.js?v=1.0.0"></script>
 <script defer src="js/flow-core.js?v=1.30.0"></script>
 <script defer src="js/ss58.js?v=1.29.0"></script>
 <style>:root{--focus:#7ef0c9;}</style>
@@ -174,6 +175,7 @@
     <ul class="method-list">
       <li><b>Source.</b> The public Subsquid indexer at <code>sqm.quantus.com/v1/graphql</code> (<code>transfer</code> entity: amount, from/to, block height, timestamp, fee, extrinsic). The browser build tries it live first; GitHub Pages is not on the indexer's CORS allowlist, so the app falls back to the same-origin snapshot.</li>
       <li><b>Snapshot contents.</b> <span id="method-window">Every transfer &ge; 1 QTC in the 15,000 blocks before capture, plus the 600 largest transfers of all time, plus the full 22-transfer block-1 genesis allocation</span> (merged from the supply-audit snapshot, same indexer). Miner-reward dust (&lt; 1 QTC) is excluded by design.</li>
+      <li><b>Snapshot format.</b> Stored columnar (format v2): addresses and fees are dictionary-encoded and each transfer is one compact row — lossless (every field, including fee and extrinsic id, survives decoding exactly) at roughly half the download of a plain object list. Decoded in-page by the shared <code>assets/flows-decode.js</code>.</li>
       <li><b>What tracing misses.</b> Transfers below 1 QTC, transfers outside the window, and any move after the snapshot was captured. A trace that ends is a trace that ran out of <em>dataset</em>, not necessarily out of chain.</li>
       <li><b>Patterns are shapes.</b> Peel chains, fan-outs and fan-ins are structural heuristics. They do not identify owners and do not allege anything about intent.</li>
       <li><b>Refresh.</b> <code>node scripts/fetch-flow-data.mjs</code> regenerates <code>data/flows.json</code>; commit it to refresh the snapshot.</li>
@@ -189,6 +191,6 @@
   </div>
 </footer>
 
-<script defer src="app.js?v=1.30.1"></script>
+<script defer src="app.js?v=1.31.0"></script>
 </body>
 </html>

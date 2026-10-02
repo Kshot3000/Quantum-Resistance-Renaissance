@@ -56,7 +56,10 @@ function timeoutSignal(ms) {
 async function loadData() {
   var r = await fetch("../../data/flows.json", { cache: "no-store", signal: timeoutSignal(20000) });
   if (!r.ok) throw new Error("snapshot HTTP " + r.status);
-  snap = await r.json();
+  // flows.json is stored columnar (format v2, assets/flows-decode.js);
+  // decode restores the v1 object rows buildGraph expects. v1 files pass
+  // through untouched.
+  snap = (typeof QFlows !== "undefined" && QFlows.decode) ? QFlows.decode(await r.json()) : await r.json();
   snapGraph = F.buildGraph(snap.transfers);
   var m = snap.meta;
   $("snap-badge").textContent = "snapshot: " + snap.transfers.length.toLocaleString() +

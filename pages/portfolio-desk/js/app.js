@@ -150,6 +150,9 @@ function indexTransfers(transfers) {
 
 function buildChain(bundle, addrs, nowMs) {
   var c = blankChain();
+  // flows.json is stored columnar (format v2, assets/flows-decode.js);
+  // decode once here — idempotent, v1 object rows pass through untouched.
+  if (bundle.flows && typeof QFlows !== "undefined" && QFlows.decode) bundle.flows = QFlows.decode(bundle.flows);
   c.fetchedAt = new Date().toISOString();
   // Live per-address balances
   if (bundle.liveData && bundle.liveData.status) {
@@ -171,7 +174,13 @@ function buildChain(bundle, addrs, nowMs) {
   var live = pickSnap("live", bundle.live);      // data/live.json
   var whales = pickSnap("whales", bundle.whales);
   var vesting = pickSnap("vesting", bundle.vesting);
-  var flows = pickSnap("flows", bundle.flows);
+  // flows.json historically shipped WITHOUT the fleet-standard ok:true
+  // envelope, and pickSnap discarded it — the transfer index silently
+  // stayed empty (0 transfers, empty activity) on every load. The file
+  // now carries ok:true, and this shape check makes the class impossible
+  // to reintroduce from the data side again.
+  var flows = pickSnap("flows", bundle.flows) ||
+    (bundle.flows && Array.isArray(bundle.flows.transfers) && bundle.flows.meta ? bundle.flows : null);
   var miners = pickSnap("miners", bundle.miners);
   if (live && live.data && live.data.status) {
     if (c.height == null) c.height = live.data.status.block_height;
