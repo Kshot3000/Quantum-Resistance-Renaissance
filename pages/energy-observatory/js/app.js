@@ -11,7 +11,10 @@ var E = EnergyCore;
 var FALLBACK = {
   difficulty: "357641624641568",
   height: 144827,
-  minedPlancks: "44658080000000000",
+  // total supply in plancks (free + reserved + frozen), balances aggregate @ block
+  // ~149822, fetched 2026-10-02 — this is total_issuance for the emission formula,
+  // NOT mined rewards alone (genesis endowments count toward issuance).
+  totalSupplyPlancks: "5762370499457120000",
   fetchedAt: null,
   txRate: null,
   txRateSub: null,
@@ -24,7 +27,7 @@ var state = {
   difficulty: FALLBACK.difficulty,
   height: FALLBACK.height,
   netHs: E.hashrateHs(FALLBACK.difficulty),
-  rewardQtc: E.blockRewardQtc(FALLBACK.minedPlancks),
+  rewardQtc: E.blockRewardQtc(FALLBACK.totalSupplyPlancks),
   fetchedAt: null,
   snapshotOk: false,
   txRate: null,
@@ -37,6 +40,21 @@ function $(id) { return document.getElementById(id); }
 function setText(id, s) { var el = $(id); if (el) el.textContent = s; }
 
 /* ---------- data ---------- */
+
+/* Total supply in plancks from a supply snapshot: the first-class
+ * total_supply_plancks field when present (fetch-supply-data.mjs), else the
+ * balances aggregate (free + reserved + frozen) = Currency::total_issuance().
+ * Returns null when neither is available. */
+function totalSupplyOf(sup) {
+  if (!sup) return null;
+  if (sup.total_supply_plancks) return String(sup.total_supply_plancks);
+  var b = sup.balances_plancks;
+  if (b && b.free != null && b.reserved != null && b.frozen != null) {
+    return (BigInt(b.free) + BigInt(b.reserved) + BigInt(b.frozen)).toString();
+  }
+  return null;
+}
+
 function fetchJson(url) {
   // QA hook: qa-energy-browser.mjs injects real snapshot payloads before
   // navigation because file:// fetch is blocked in headless Chromium.
@@ -70,8 +88,8 @@ function loadSnapshots() {
       state.fetchedAt = con.fetched_at || null;
       state.snapshotOk = true;
     }
-    if (sup && sup.mined && sup.mined.total_plancks) {
-      state.rewardQtc = E.blockRewardQtc(String(sup.mined.total_plancks));
+    if (sup && totalSupplyOf(sup)) {
+      state.rewardQtc = E.blockRewardQtc(totalSupplyOf(sup));
       if (!state.fetchedAt) state.fetchedAt = sup.fetched_at;
     }
     if (liv && liv.data && Array.isArray(liv.data.daily) && liv.data.daily.length) {

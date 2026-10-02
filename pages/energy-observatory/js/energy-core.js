@@ -63,9 +63,14 @@ var EnergyCore = (function () {
     return totalTransfers / (blocks * blockTimeS);
   }
 
-  // Current block reward: R = (21M - S) / 50M, S in plancks.
-  function blockRewardQtc(supplyPlancks) {
-    return (MAX_SUPPLY_QTC - Number(supplyPlancks) / PLANCK) / EMISSION_DENOM;
+  // Current block reward per pallets/mining-rewards on_finalize (verified against
+  // Quantus-Network/chain, 2026-10-02):
+  //   R = (MaxSupply − total_issuance) / 50_000_000
+  // where total_issuance = Currency::total_issuance() INCLUDES genesis endowments.
+  // Pass total supply (data/supply.json total_supply_plancks), NOT mined rewards
+  // alone — mined-only input overstates the reward by ~37% at current supply.
+  function blockRewardQtc(totalSupplyPlancks) {
+    return (MAX_SUPPLY_QTC - Number(totalSupplyPlancks) / PLANCK) / EMISSION_DENOM;
   }
 
   // Expected QTC/day for a rig = its share of blocks × reward.

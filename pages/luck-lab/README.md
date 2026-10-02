@@ -6,7 +6,7 @@ The mining-luck & variance laboratory for Quantus: the true *distribution* of mi
 
 ## What it does
 
-- **Network pulse** — difficulty, implied network hashrate (D ÷ 12 s), current block reward from the exact emission formula R = (21M − minted)/50M, and blocks/day from recent block times. Live-first indexer head check; snapshot fallback with honest labeling.
+- **Network pulse** — difficulty, implied network hashrate (D ÷ 12 s), current block reward from the exact emission formula R = (21M − total issuance)/50M, and blocks/day from recent block times. Live-first indexer head check; snapshot fallback with honest labeling.
 - **Solo luck simulator** — enter any hashrate: expected wait, median, p10/p90/p99 luck quantiles, your blocks/day, a "chance of ≥1 block within X" probability tool, and a drought-odds table (P(wait > 2×/3×/5× average) = e^−k). Seeded Monte Carlo histogram with median/mean/p90 markers.
 - **Pool variance lab** — fair-proportional pool model: expected daily QTC after your fee, seeded day-by-day simulation of solo vs pool daily earnings as overlaid histograms, p10–p90 band, your share of network. Honest boundaries box states what the model leaves out (PPLNS-window noise, stales, downtime).
 - **Difficulty-shock scenarios** — network hashrate ×0.25/×0.5/×2/×4: your new steady-state solo wait plus difficulty catch-up time via the runtime's per-block retarget limits (+1/2048 up, −99/2048 down).

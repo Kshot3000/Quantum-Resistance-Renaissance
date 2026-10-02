@@ -10,7 +10,7 @@
   var state = {
     difficulty: 357641624641568,   // fallback: snapshot 2026-10-01
     netHs: 29803468720130,
-    reward: 0.4191068384,
+    reward: 0.3047526,           // fallback: (21M − 5,762,370.5 total supply) / 50M, 2026-10-02
     blocksPerDay: 6382,
     avgBlockMs: 13539,
     head: 144827,
@@ -58,8 +58,11 @@
         state.netHs = Number(c.current.est_hashrate_hs) || state.difficulty / 12;
         state.head = c.current.height;
         state.fetchedAt = c.fetched_at;
-        var minted = Number(s.mined.total_plancks);
-        state.reward = L.currentRewardQtc(minted);
+        // Total issuance for the emission formula (balances aggregate =
+        // Currency::total_issuance(), incl. genesis — NOT mined rewards alone).
+        var totalSupply = s.total_supply_plancks ? Number(s.total_supply_plancks)
+          : (Number(s.balances_plancks.free) + Number(s.balances_plancks.reserved) + Number(s.balances_plancks.frozen));
+        state.reward = L.currentRewardQtc(totalSupply);
         // avg block time from the recent window
         var rec = c.recent;
         if (rec && rec.length > 10) {
@@ -314,7 +317,7 @@
     }
     $("pulse-fine").textContent =
       "Snapshot taken " + when + " from the public Quantus Subsquid indexer. " +
-      "Network hashrate is the difficulty-implied figure (D ÷ 12 s). Reward uses the exact on-chain emission formula against the indexer's minted total. " +
+      "Network hashrate is the difficulty-implied figure (D ÷ 12 s). Reward uses the exact on-chain emission formula against the indexer's total issuance (genesis endowments included). " +
       (state.source === "live" ? "Live head check just succeeded, so the snapshot is current." : "The live indexer did not answer from this browser, so figures are from the snapshot.");
   }
 

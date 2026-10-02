@@ -135,9 +135,11 @@ var LuckCore = (function () {
 
   /* --- Emission ----------------------------------------------------------- */
   // Exact on-chain reward formula R = (21M - S) / 50,000,000 (planck-exact in
-  // the runtime; float here is display-grade only).
-  function currentRewardQtc(mintedPlancks) {
-    return (MAX_SUPPLY_QTC * PLANCK - mintedPlancks) / EMISSION_DENOM / PLANCK;
+  // the runtime; float here is display-grade only). S = total_issuance INCLUDING
+  // genesis endowments (pallets/mining-rewards on_finalize, verified 2026-10-02) —
+  // passing mined rewards alone overstates the reward by ~37% at current supply.
+  function currentRewardQtc(totalSupplyPlancks) {
+    return (MAX_SUPPLY_QTC * PLANCK - totalSupplyPlancks) / EMISSION_DENOM / PLANCK;
   }
 
   /* --- Statistics / formatting ------------------------------------------- */

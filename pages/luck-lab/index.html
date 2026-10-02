@@ -88,7 +88,7 @@
     <div class="stat-grid">
       <div class="stat"><span class="k">Mining difficulty</span><span class="v" id="st-diff">—</span><span class="d">expected hashes per block</span></div>
       <div class="stat"><span class="k">Network hashrate</span><span class="v" id="st-net">—</span><span class="d">difficulty ÷ 12 s</span></div>
-      <div class="stat"><span class="k">Block reward now</span><span class="v" id="st-reward">—</span><span class="d">R = (21M − minted) / 50M</span></div>
+      <div class="stat"><span class="k">Block reward now</span><span class="v" id="st-reward">—</span><span class="d">R = (21M − total issuance) / 50M</span></div>
       <div class="stat"><span class="k">Blocks / day</span><span class="v" id="st-bpd">—</span><span class="d">from recent block times</span></div>
     </div>
     <p class="fine" id="pulse-fine"></p>
@@ -217,7 +217,7 @@
           <li>P(≥1 block in t) = 1 − e<sup>−t/E</sup>; P(wait &gt; k·E) = e<sup>−k</sup>.</li>
           <li>Your blocks/day ~ Poisson(h·86400/D); pool blocks/day ~ Poisson(blocks/day).</li>
           <li>Retarget catch-up: ×r up → ⌈2048·ln r⌉ blocks; ×r down → ⌈ln r / ln(1−99/2048)⌉ blocks.</li>
-          <li>Block reward: exact on-chain R = (21,000,000 − minted) / 50,000,000.</li>
+          <li>Block reward: exact on-chain R = (21,000,000 − total issuance) / 50,000,000.</li>
         </ul>
       </div>
       <div class="card">
@@ -240,7 +240,7 @@
   </footer>
 </main>
 
-<script src="js/luck-core.js?v=1.46.0"></script>
-<script src="js/app.js?v=1.46.0"></script>
+<script src="js/luck-core.js?v=1.46.1"></script>
+<script src="js/app.js?v=1.46.1"></script>
 </body>
 </html>

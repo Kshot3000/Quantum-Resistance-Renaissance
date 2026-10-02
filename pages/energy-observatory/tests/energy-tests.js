@@ -52,18 +52,21 @@ t("per-tx at 430 QTPS ≈ 8.24 Wh", approx(perTxDesign * 1000, 8.24, 1e-2), perT
 t("per-tx guards zero rate", E.perTxEnergyKWh(wBest, 0) === Infinity);
 t("per-tx ratio actual/design ≈ 4496×", approx(perTxActual / perTxDesign, 430 / txRate, 1e-9));
 
-/* --- emission --- */
-t("block reward at 44,658.08 QTC supply ≈ 0.419107",
-  approx(E.blockRewardQtc("44658080000000000"), 0.4191068384, 1e-9));
+/* --- emission ---
+ * S = TOTAL supply (total_issuance incl. genesis), per pallets/mining-rewards
+ * on_finalize — R = (MaxSupply − S) / 50M. Mined-only S overstates R by ~37%. */
+t("block reward at 5,762,370.50 QTC total supply ≈ 0.3047526",
+  approx(E.blockRewardQtc("5762370499457120000"), 0.30475259, 1e-8));
+t("block reward boundary S=0 → 0.42", approx(E.blockRewardQtc(0), 0.42, 1e-12));
 
 /* --- rig builder --- */
 const rigHs = 818e6;
-const qtcDay = E.rigExpectedQtcPerDay(rigHs, net, 0.4191068384);
-t("1×4090 expected QTC/day ≈ 0.0828", approx(qtcDay, 0.08282, 1e-2), qtcDay);
+const qtcDay = E.rigExpectedQtcPerDay(rigHs, net, 0.3047526);
+t("1×4090 expected QTC/day ≈ 0.0602", approx(qtcDay, 0.0602, 1e-2), qtcDay);
 t("expected QTC scales with rig hashrate",
-  approx(E.rigExpectedQtcPerDay(2 * rigHs, net, 0.4191068384), 2 * qtcDay, 1e-12));
-t("zero rig → zero QTC", E.rigExpectedQtcPerDay(0, net, 0.4191) === 0);
-t("zero network → zero QTC", E.rigExpectedQtcPerDay(rigHs, 0, 0.4191) === 0);
+  approx(E.rigExpectedQtcPerDay(2 * rigHs, net, 0.3047526), 2 * qtcDay, 1e-12));
+t("zero rig → zero QTC", E.rigExpectedQtcPerDay(0, net, 0.3047) === 0);
+t("zero network → zero QTC", E.rigExpectedQtcPerDay(rigHs, 0, 0.3047) === 0);
 t("dailyKwh of 350 W rig = 8.4", approx(E.dailyKwh(350), 8.4, 1e-12));
 t("cost at $0.15/kWh = $1.26", approx(E.electricityCostUsd(8.4, 0.15), 1.26, 1e-12));
 

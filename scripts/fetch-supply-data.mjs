@@ -99,6 +99,14 @@ async function main() {
       reserved: core.totals.aggregate.sum.reserved,
       frozen: core.totals.aggregate.sum.frozen,
     },
+    // Total issuance = free + reserved + frozen. This is `Currency::total_issuance()`
+    // for the mining-rewards emission formula R = (MaxSupply − total_issuance) / 50M —
+    // NOT mined rewards alone (genesis endowments count toward issuance).
+    total_supply_plancks: (
+      BigInt(core.totals.aggregate.sum.free) +
+      BigInt(core.totals.aggregate.sum.reserved) +
+      BigInt(core.totals.aggregate.sum.frozen)
+    ).toString(),
     vesting: {
       schedules: core.vestAgg.aggregate.count,
       total_plancks: core.vestAgg.aggregate.sum.total,

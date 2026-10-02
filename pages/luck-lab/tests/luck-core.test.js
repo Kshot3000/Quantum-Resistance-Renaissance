@@ -88,8 +88,8 @@ t("r=0.5 -> 14 blocks", L.retargetCatchupBlocks(0.5) === Math.ceil(Math.log(0.5)
 t("r<=0 -> NaN", Number.isNaN(L.retargetCatchupBlocks(0)));
 t("down move is fast, up move is slow", L.retargetCatchupBlocks(0.5) < L.retargetCatchupBlocks(2));
 
-// --- emission
-approx("R at 44658.08 minted", L.currentRewardQtc(44658080000000000), (21e6 - 44658.0808) / 50e6, 1e-9);
+// --- emission: S = TOTAL supply (total_issuance incl. genesis)
+approx("R at 5,762,370.5 total supply", L.currentRewardQtc(5762370499457120000), (21e6 - 5762370.49945712) / 50e6, 1e-9);
 approx("R at genesis (S=0)", L.currentRewardQtc(0), 0.42, 1e-12);
 
 // --- formatting
