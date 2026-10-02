@@ -169,5 +169,20 @@ t("bitcoin digiconomist 204.44 TWh", E.EXTERNAL.bitcoin_annual_twh_digiconomist.
 t("digiconomist > cambridge", E.EXTERNAL.bitcoin_annual_twh_digiconomist.value > E.EXTERNAL.bitcoin_annual_twh_ccaf.value);
 t("us home 10,791 kWh/yr", E.EXTERNAL.us_home_kwh_2022.value === 10791);
 
+/* --- fallback bundle: one capture, cross-checked with luck-lab ---------- */
+// Regression guard for the 2026-10-02 mixed-date bug (see luck-core.test.js).
+{
+  const fs = require("fs"), path = require("path");
+  const src = fs.readFileSync(path.join(__dirname, "../js/app.js"), "utf8");
+  const luckSrc = fs.readFileSync(path.join(__dirname, "../../luck-lab/js/app.js"), "utf8");
+  const grab = (s, re) => { const m = s.match(re); return m ? m[1] : null; };
+  const diff = grab(src, /difficulty:\s*"(\d+)"/), sup = grab(src, /totalSupplyPlancks:\s*"(\d+)"/);
+  const lDiff = grab(luckSrc, /difficulty:\s*(\d+),/), lRew = Number(grab(luckSrc, /reward:\s*([\d.]+)/));
+  t("fallback: fields parse", !!(diff && sup && lDiff));
+  t("fallback: difficulty matches luck-lab", diff === lDiff, diff + " vs " + lDiff);
+  t("fallback: reward from own supply matches luck-lab reward",
+    Math.abs(E.blockRewardQtc(sup) - lRew) <= 5e-8, E.blockRewardQtc(sup) + " vs " + lRew);
+}
+
 console.log(pass + "/" + (pass + fail) + " tests green");
 process.exit(fail ? 1 : 0);

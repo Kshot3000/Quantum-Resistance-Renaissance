@@ -15,7 +15,7 @@ The mining-luck & variance laboratory for Quantus: the true *distribution* of mi
 ## Honest boundaries
 
 - All figures are in QTC, never dollars — there is no price oracle and none is invented.
-- Chain numbers are snapshots (refreshed 2026-10-01); the page attempts a live head check and says which it is showing.
+- Chain numbers are snapshots (refreshed 2026-10-02); the page attempts a live head check and says which it is showing.
 - The pool model is fair-proportional with zero stales: the *shape* (pool smooths, fee costs) is exact; the *band width* is a lower bound vs real pools.
 - Simulations are seeded and reproducible — they illustrate the distribution, not your future.
 

@@ -103,5 +103,28 @@ t("fmtPct", L.fmtPct(0.6321) === "63.2%", L.fmtPct(0.6321));
 t("percentile empty -> NaN", Number.isNaN(L.percentile([], 0.5)));
 t("percentile p=0 -> min", L.percentile([3, 1, 2].sort((a, b) => a - b), 0) === 1);
 
+// --- fallback bundles: ONE capture across luck-lab + energy-observatory ----
+// Regression guard for the 2026-10-02 mixed-date bug (Oct 1 difficulty paired
+// with an Oct 2 supply-derived reward in both apps' snapshot-failure fallbacks).
+{
+  const fs = require("fs"), path = require("path");
+  const luckSrc = fs.readFileSync(path.join(__dirname, "../js/app.js"), "utf8");
+  const nrgSrc = fs.readFileSync(path.join(__dirname, "../../energy-observatory/js/app.js"), "utf8");
+  const grab = (src, re) => { const m = src.match(re); return m ? m[1] : null; };
+  const lDiff = grab(luckSrc, /difficulty:\s*(\d+),/), eDiff = grab(nrgSrc, /difficulty:\s*"(\d+)"/);
+  const lNet = Number(grab(luckSrc, /netHs:\s*(\d+)/));
+  const lRew = Number(grab(luckSrc, /reward:\s*([\d.]+)/));
+  const lBpd = Number(grab(luckSrc, /blocksPerDay:\s*(\d+)/));
+  const lAvg = Number(grab(luckSrc, /avgBlockMs:\s*(\d+)/));
+  const lHead = grab(luckSrc, /head:\s*(\d+)/), eHead = grab(nrgSrc, /height:\s*(\d+)/);
+  const eSup = grab(nrgSrc, /totalSupplyPlancks:\s*"(\d+)"/);
+  t("fallback: both apps parse", !!(lDiff && eDiff && eSup && lHead && eHead));
+  t("fallback: same difficulty in both apps", lDiff === eDiff, lDiff + " vs " + eDiff);
+  t("fallback: same head/height in both apps", lHead === eHead, lHead + " vs " + eHead);
+  t("fallback: netHs = difficulty / 12", Math.abs(lNet - Number(lDiff) / 12) <= 1, lNet);
+  t("fallback: blocksPerDay = 86400000 / avgBlockMs", Math.abs(lBpd - 86400000 / lAvg) <= 1.5, lBpd + " vs " + (86400000 / lAvg));
+  approx("fallback: luck reward = emission(energy supply)", lRew, L.currentRewardQtc(Number(eSup)), 5e-8);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
