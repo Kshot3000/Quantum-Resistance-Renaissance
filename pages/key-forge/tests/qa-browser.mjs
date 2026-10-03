@@ -3,7 +3,7 @@
 // Exercises: forge ML-DSA-65 + 87, address format, inspector, sign/verify, QR, paper card,
 // scheme picker, attribution, zero console errors.
 import { execFile } from "node:child_process";
-import { cpSync, rmSync, mkdirSync } from "node:fs";
+import { cpSync, rmSync, mkdirSync, readdirSync } from "node:fs";
 
 const SRC = "/home/hatch/workspace/Quantus-Muse-Builder";
 const QA = "/tmp/qaroot-keyforge";
@@ -106,7 +106,10 @@ check("5 panels", await evaluate(() => document.querySelectorAll("section.panel"
 check("45/45 vectors cited", await evaluate(() => document.body.textContent.includes("45/45")));
 check("attribution address", await evaluate((a) => document.body.innerHTML.includes(a), KYLE));
 check("x link", await evaluate(() => !!document.querySelector('a[href="https://x.com/kshot9000"]')));
-check("switcher 17 apps", await evaluate(() => document.querySelectorAll(".qmb-menu a:not(.hub-link)").length === 17));
+// De-pinned (2026-10-03): switcher size derives from the fleet (page dirs);
+// the hard-coded 17 dated from a much smaller fleet and failed every run since.
+const fleetCount = readdirSync(SRC + "/pages", { withFileTypes: true }).filter((d) => d.isDirectory()).length;
+check(`switcher ${fleetCount} apps`, await evaluate((n) => document.querySelectorAll(".qmb-menu a:not(.hub-link)").length === n, fleetCount));
 check("2 scheme cards", await evaluate(() => document.querySelectorAll(".scheme-card").length === 2));
 check("module scripts loaded (no import failure)", await waitFor(() => !!document.querySelector("#forgeBtn") && !document.querySelector("#forgeBusy").hidden === false, 8000));
 

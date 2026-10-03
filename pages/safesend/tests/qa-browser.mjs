@@ -5,7 +5,7 @@
 // Exercises: checkphrase verifier (derive + poisoning demo), transfer simulator
 // (schedule/cancel/execute/validation), call reference, attribution, zero errors.
 import { execFile } from "node:child_process";
-import { cpSync, rmSync, mkdirSync } from "node:fs";
+import { cpSync, rmSync, mkdirSync, readdirSync } from "node:fs";
 
 const SRC = "/home/hatch/workspace/Quantus-Muse-Builder";
 const QA = "/tmp/qaroot-safesend";
@@ -53,7 +53,11 @@ ws.onmessage = (ev) => {
     errors.push("exception: " + (m.params.exceptionDetails.text || JSON.stringify(m.params.exceptionDetails).slice(0, 200)));
   } else if (m.method === "Log.entryAdded") {
     const e = m.params.entry;
-    if (e.level === "error" && !/favicon/i.test(e.url || "")) errors.push("log: " + e.text);
+    // fonts.googleapis.com excluded like every other fleet harness: the
+    // sandbox has no direct egress, so shared.css's @import fails there
+    // (ERR_EMPTY_RESPONSE) while loading fine for real visitors.
+    if (e.level === "error" && !/favicon/i.test(e.url || "") && !/fonts\.googleapis\.com/i.test(e.url || ""))
+      errors.push("log: " + e.text + (e.url ? " [" + e.url + "]" : ""));
   } else if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") {
     errors.push("console.error: " + m.params.args.map((a) => a.value ?? a.description ?? "").join(" "));
   }
@@ -100,7 +104,10 @@ check("verNote mentions 1,171 vectors", await evaluate(() => document.getElement
 check("attribution address", await evaluate((a) => document.body.innerHTML.includes(a), KYLE));
 check("x link", await evaluate(() => !!document.querySelector('a[href="https://x.com/kshot9000"]')));
 check("5 call rows", await evaluate(() => document.querySelectorAll("table.calls tbody tr").length === 5));
-check("switcher has 8 apps", await evaluate(() => document.querySelectorAll(".qmb-menu a:not(.hub-link)").length === 8));
+// De-pinned (2026-10-03): switcher size derives from the fleet (page dirs);
+// the hard-coded 8 dated from a much smaller fleet and failed every run since.
+const fleetCount = readdirSync(SRC + "/pages", { withFileTypes: true }).filter((d) => d.isDirectory()).length;
+check(`switcher has ${fleetCount} apps`, await evaluate((n) => document.querySelectorAll(".qmb-menu a:not(.hub-link)").length === n, fleetCount));
 
 // verifier: derive Kyle's phrase
 await evaluate((a) => { const t = document.getElementById("addrInput"); t.value = a; }, KYLE);
