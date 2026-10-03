@@ -190,7 +190,7 @@ rule("pages/energy-observatory/js/app.js",
 rule("pages/energy-observatory/js/app.js",
   /height: \d+,/, `height: ${V.HEAD_C},`);
 rule("pages/energy-observatory/js/app.js",
-  /\/\/ [\d,]+, fetched \d{4}-\d{2}-\d{2} — the SAME capture as the difficulty above\n  \/\/ \(@ block [\d,]+, \d+ seconds (earlier|apart); never mix snapshot dates in one bundle\)\./,
+  /\/\/ [\d,]+, fetched \d{4}-\d{2}-\d{2} — the SAME capture as the difficulty above\n  \/\/ \(@ block [\d,]+, fetched \d+ seconds (earlier|apart); never mix snapshot dates in one bundle\)\./,
   `// ${V.HEAD_S_FMT}, fetched ${V.DATE_ISO} — the SAME capture as the difficulty above\n  // (@ block ${V.HEAD_C_FMT}, fetched ${V.SECS_APART} seconds apart; never mix snapshot dates in one bundle).`);
 rule("pages/energy-observatory/js/app.js",
   /totalSupplyPlancks: "\d+",/, `totalSupplyPlancks: "${V.PLANCKS}",`);
@@ -249,19 +249,39 @@ rule("index.html",
   /\(\+[\d,]+% and counting\)/,
   `(${V.GROWTH_FMT} and counting)`);
 
-/* ---------- validate all, then write all ---------- */
-const byFile = new Map();
-for (const { file, re, rep } of R) {
-  if (!byFile.has(file)) byFile.set(file, read(file));
-  const src = byFile.get(file);
-  const hits = src.match(new RegExp(re.source, "g"));
-  if (!hits || hits.length !== 1) {
-    console.error(`ABORT: rule matched ${hits ? hits.length : 0}x (want 1) in ${file}: ${re}`);
+/* ---------- validate all, then write all ----------
+ * Pass 1 applies every rule to the on-disk contents. Pass 2 re-applies every
+ * rule to the pass-1 results: each rule must still match exactly once and the
+ * second application must be a byte-for-byte no-op. This idempotency check
+ * exists because the script's first real run (2026-10-03 08:00Z) shipped a
+ * rule whose replacement text its own regex could not match (energy
+ * provenance: regex lacked the word "fetched" that the replacement writes),
+ * so the SECOND run aborted on a file the script itself had written. A rule
+ * that cannot re-match its own output is a latent abort — catch it here. */
+function applyAll(start, phase) {
+  const byFile = new Map(start);
+  for (const { file, re, rep } of R) {
+    if (!byFile.has(file)) byFile.set(file, read(file));
+    const src = byFile.get(file);
+    const hits = src.match(new RegExp(re.source, "g"));
+    if (!hits || hits.length !== 1) {
+      console.error(`ABORT (${phase}): rule matched ${hits ? hits.length : 0}x (want 1) in ${file}: ${re}`);
+      process.exit(1);
+    }
+    byFile.set(file, src.replace(re, rep));
+  }
+  return byFile;
+}
+const pass1 = applyAll(new Map(), "pass 1");
+const pass2 = applyAll(pass1, "pass 2 — idempotency check: a rule no longer matches the replacement text it wrote in pass 1; fix the rule, do not hand-edit the app file");
+for (const [file, content] of pass1) {
+  if (pass2.get(file) !== content) {
+    console.error(`ABORT: sync is not idempotent for ${file} — a rule's replacement does not match its own regex on re-run. Fix the rule in scripts/sync-fallbacks.mjs; nothing was written.`);
     process.exit(1);
   }
-  byFile.set(file, src.replace(re, rep));
 }
-for (const [file, content] of byFile) writeFileSync(join(ROOT, file), content);
+for (const [file, content] of pass1) writeFileSync(join(ROOT, file), content);
+const byFile = pass1;
 
 console.log(`fallback sync @ capture ${V.DATE_ISO} ${V.CAPTURE_HHMM} (consensus ${V.HEAD_C_FMT} / supply ${V.HEAD_S_FMT}, ${V.SECS_APART}s apart)`);
 console.log(`  difficulty ${V.DIFF} · netHs ${V.NETHS} (${V.THS_2DP} TH/s) · supply ${V.SUP_4DP} QTC · reward ${V.REWARD_7DP}`);
