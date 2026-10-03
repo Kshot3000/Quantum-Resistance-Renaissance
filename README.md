@@ -4,9 +4,15 @@ Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000
 
 > Quantus is a proof-of-work Layer 1 blockchain built for the quantum era. Mainnet went live **September 9, 2026** with post-quantum cryptography (ML-DSA-65 / ML-DSA-87) from the genesis block, a **21M $QTC** supply cap, open mining with no built-in advantage for Quantus Labs, and native transaction aggregation. First exchange venue: NEAR Intents.
 
+
+## Briefing room
+
+The homepage recomputes three runtime rules in the browser from `data/supply.json` and `data/miners.json`: integer emission `R = ⌊(21M×10¹² − S) / 50,000,000⌋`, the per-block difficulty step over 2,048, and the ML-DSA signature budget against the 3.75 MB extrinsic limit. The 47 apps in `pages/` are the instruments. They were not replaced.
+
 ## What lives here
 
-- `index.html` — Builder hub: chain facts, live stats, and the app directory.
+- `index.html` — Briefing room on the published homepage (emission walk, difficulty step, signature budget, miner concentration from the hourly snapshots), then chain facts and the 47-app directory.
+- `command-center/` — The same briefing as a local TanStack Start app. GitHub Pages does not serve this folder.
 - `pages/` — Each shipped app gets its own folder, verified in a real browser before it goes live:
   - `mining-calculator/` — QTC reward estimator + emission chart + mining quickstart (network hashrate / total-issuance / observed-pace defaults derive live from the hourly chain snapshots, with a dated fallback bundle)
   - `address-toolkit/` — SS58 prefix-189 address inspector/encoder

@@ -256,6 +256,38 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
   .tl-date{width:96px}
   .live-chip .label{display:none}
 }
+
+.brief{padding-top:8px}
+.brief-grid{display:grid;grid-template-columns:1.35fr .85fr;gap:28px;align-items:start}
+.spec{border-top:1px solid var(--line)}
+.spec div{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.spec span{color:var(--muted)}
+.spec b{font-weight:600;font-family:var(--font-mono,ui-monospace,monospace);font-size:12.5px;text-align:right}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:18px}
+.panel h2{font-size:clamp(22px,3vw,30px);letter-spacing:-.02em;margin:4px 0 8px}
+.kicker{margin-top:18px;color:var(--muted);font-size:13px}
+.reward{font-family:var(--font-mono,ui-monospace,monospace);font-size:clamp(26px,4vw,40px);letter-spacing:-.03em;line-height:1.1}
+.plancks{color:var(--muted);font-family:var(--font-mono,ui-monospace,monospace);font-size:12px;margin-top:6px}
+.rows{margin-top:12px;border-top:1px solid var(--line)}
+.rows div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.rows span{color:var(--muted)}
+.rows b{font-weight:600;font-family:var(--font-mono,ui-monospace,monospace);font-size:13px}
+.steps{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.steps button{background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+.steps button:hover{border-color:var(--cyan)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bar{height:10px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden;margin:6px 0 14px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--teal))}
+.stack{display:flex;height:16px;border-radius:99px;overflow:hidden;margin-top:16px;background:rgba(255,255,255,.04)}
+.stack i{display:block;height:100%}
+.fine{color:var(--muted);font-size:13px;line-height:1.5;margin-top:12px}
+#sigRange{width:100%;margin-top:8px;accent-color:#40e0ff}
+.panel a{color:var(--cyan)}
+@media(max-width:860px){
+  .brief-grid,.pair{grid-template-columns:1fr}
+  .reward{font-size:28px}
+}
+
 </style>
 </head>
 <body>
@@ -270,12 +302,12 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         <ellipse cx="20" cy="20" rx="17" ry="6.5" stroke="#40e0ff" stroke-width="1.6" transform="rotate(60 20 20)"/>
         <ellipse cx="20" cy="20" rx="17" ry="6.5" stroke="#fbbf24" stroke-width="1.6" transform="rotate(120 20 20)"/>
       </svg>
-      <div>QUANTUS MUSE BUILDER<small>post-quantum tooling, built live</small></div>
+      <div>QUANTUS MUSE<small>briefing room for a post-quantum chain</small></div>
     </a>
     <div class="nav-right">
       <div class="live-chip" id="liveChip" title="Live block height from the public Quantus indexer"><span class="dot"></span><span class="label">chain</span> <span id="liveHeight">…</span></div>
       <nav class="nav-links" id="navLinks">
-        <a href="#chain">The Chain</a>
+        <a href="#briefing">Briefing</a>
         <a href="#apps">Apps</a>
         <a href="#story">Story</a>
         <a href="https://github.com/Kshot3000/Quantus-Muse-Builder" target="_blank" rel="noopener">Repo</a>
@@ -285,14 +317,100 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
   </header>
 
   <div class="hero">
-    <span class="pill"><span aria-hidden="true">✦</span> Mainnet live · Sept 9, 2026</span>
-    <h1>Apps for the <span class="q">quantum-era</span> chain</h1>
-    <p class="sub">Quantus is a proof-of-work Layer 1 that put <strong>post-quantum cryptography in the genesis block</strong> — every transaction signed with ML-DSA while the rest of crypto waits for the quantum threat to arrive. This builder ships the tooling the ecosystem needs.</p>
+    <span class="pill">Mainnet · Sept 9, 2026 · ML-DSA from block one</span>
+    <h1>Lattice, <span class="q">before block one.</span></h1>
+    <p class="sub">Three pieces of the runtime, recomputed in this browser from the latest indexer snapshot: the emission recurrence in integer plancks, the per-block difficulty step, and what an ML-DSA signature costs a 3.75&nbsp;MB block. The 47 instruments below are the same apps, still verified. Nothing here signs, and nothing here is a price.</p>
     <div class="cta-row">
-      <a class="btn btn-solid" href="#apps">Browse the builds</a>
-      <a class="btn btn-ghost" href="https://github.com/Kshot3000/Quantus-Muse-Builder" target="_blank" rel="noopener">View the repo</a>
+      <a class="btn btn-solid" href="#briefing">Open the briefing</a>
+      <a class="btn btn-ghost" href="#apps">The 47 instruments</a>
     </div>
   </div>
+
+  <section id="briefing" class="brief">
+    <div class="brief-grid">
+      <div>
+        <div class="sec-title">The briefing</div>
+        <div class="sec-head">The chain, stated as arithmetic</div>
+        <p class="sec-sub">Press a block. The last digits of the reward move. The retarget is an integer step over 2,048, not a smooth curve. Concentration is whoever actually found the last 15,000 blocks.</p>
+      </div>
+      <div class="spec" aria-label="Protocol constants">
+        <div><span>Signature</span><b>ML-DSA-87 · FIPS 204</b></div>
+        <div><span>Proof of work</span><b>Poseidon2 · QPoW</b></div>
+        <div><span>Emission</span><b>(21M − S) / 50,000,000</b></div>
+        <div><span>Target</span><b>12 s · floor 500 ms</b></div>
+        <div><span>Retarget</span><b>integer step / 2048</b></div>
+        <div><span>Account</span><b>SS58 prefix 189</b></div>
+        <div><span>Planck</span><b>10¹² per QTC</b></div>
+        <div><span>Miner tax</span><b>none on the coinbase</b></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="sec-title">Emission</div>
+      <h2>One block at a time</h2>
+      <p class="sec-sub">R = ⌊(21,000,000×10¹² − S) / 50,000,000⌋. There is no halving event. A target-year is 2,628,000 blocks, and only if every block is exactly 12 seconds. <a href="pages/emission-lab/">Open Emission Lab</a></p>
+      <p class="kicker" id="emState">This block</p>
+      <p class="reward" id="emReward">…</p>
+      <p class="plancks" id="emPlanck"></p>
+      <div class="rows">
+        <div><span>Next block</span><b id="emNext">…</b></div>
+        <div><span>Change</span><b id="emDelta">…</b></div>
+        <div><span>Blocks walked</span><b id="emWalk">0</b></div>
+        <div><span>Supply after the walk</span><b id="emSupply">…</b></div>
+      </div>
+      <div class="steps">
+        <button type="button" id="em1">+1 block</button>
+        <button type="button" id="emDay">+1 day</button>
+        <button type="button" id="emYear">+1 target-year</button>
+        <button type="button" id="emReset">Reset</button>
+      </div>
+      <p class="fine" id="emNote">Loading the hourly supply snapshot…</p>
+    </div>
+
+    <div class="pair">
+      <div class="panel">
+        <div class="sec-title">Retarget</div>
+        <h2>A step, not a slope</h2>
+        <p class="sec-sub">Parent 2,048,000 makes the increment exactly 1,000, so a 9-second block lands on 2,049,000. Flat between 10 and 20 seconds. <a href="pages/consensus-lab/">Open Consensus Lab</a></p>
+        <div class="steps">
+          <button type="button" id="rt9">9 s</button>
+          <button type="button" id="rt12">12 s</button>
+          <button type="button" id="rt20">20 s</button>
+          <button type="button" id="rt60">60 s</button>
+        </div>
+        <div class="rows">
+          <div><span>Block time</span><b id="rtMs">12 s</b></div>
+          <div><span>Parent</span><b id="rtParent">2,048,000</b></div>
+          <div><span>adj</span><b id="rtAdj">0</b></div>
+          <div><span>⌊parent / 2048⌋</span><b id="rtInc">1,000</b></div>
+          <div><span>Next difficulty</span><b id="rtNext">2,048,000</b></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="sec-title">Signature budget</div>
+        <h2>What 4,627 bytes buy</h2>
+        <p class="sec-sub">FIPS 204 sizes against the 3.75 MB normal extrinsic limit. A classical 64-byte signature is the hairline. <a href="pages/quantum-shield/">Open Quantum Shield</a></p>
+        <div class="steps scheme">
+          <button type="button" id="sig87">ML-DSA-87</button>
+          <button type="button" id="sig65">ML-DSA-65</button>
+        </div>
+        <p class="fine" id="sigHotLabel"></p>
+        <div class="bar" aria-hidden="true"><i id="sigHot"></i></div>
+        <p class="fine">Classical signature · 64 B</p>
+        <div class="bar" aria-hidden="true"><i id="sigClass"></i></div>
+        <p class="fine">Raw transfers in one block · <b id="sigCount"></b></p>
+        <input id="sigRange" type="range" min="1" max="519" value="1" aria-label="Number of raw transfers">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="sec-title">Concentration</div>
+      <h2>Who found the blocks</h2>
+      <p class="sec-sub">Last window in the miner snapshot. Nakamoto coefficient <b id="conNak">…</b>. <span id="conWin"></span> <a href="pages/mining-observatory/">Open Mining Observatory</a></p>
+      <div class="stack" id="conBar" aria-hidden="true"></div>
+      <div class="rows" id="conList"></div>
+    </div>
+  </section>
 
   <section id="chain">
     <div class="sec-title">The Chain</div>
@@ -908,6 +1026,164 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
       chip.classList.add('err');chip.classList.remove('on');
     });
   }
+
+  (function briefing(){
+    var CAP = 21000000000000000000n;
+    var DIV = 50000000n;
+    var PLANCK = 1000000000000n;
+    function rewardOf(s){ return s >= CAP ? 0n : (CAP - s) / DIV; }
+    function fmt(p, digits){
+      var neg = p < 0n, v = neg ? -p : p;
+      var whole = v / PLANCK;
+      var frac = (v % PLANCK).toString().padStart(12, "0").slice(0, digits).replace(/0+$/, "");
+      var body = whole.toLocaleString("en-US") + (frac ? "." + frac : "");
+      return (neg ? "−" : "") + body;
+    }
+    function walk(start, n){
+      var s = start;
+      for (var i = 0; i < n; i++){
+        var r = rewardOf(s);
+        if (r === 0n) break;
+        s += r;
+      }
+      return s;
+    }
+    var base = null, cur = null, walked = 0, busy = false;
+    function paint(){
+      if (cur == null) return;
+      var r = rewardOf(cur);
+      var nxtSupply = r === 0n ? cur : cur + r;
+      var nxt = rewardOf(nxtSupply);
+      document.getElementById("emReward").textContent = fmt(r, 12);
+      document.getElementById("emPlanck").textContent = r.toLocaleString("en-US") + " plancks";
+      document.getElementById("emNext").textContent = fmt(nxt, 12);
+      document.getElementById("emDelta").textContent = (nxt - r).toLocaleString("en-US") + " plancks";
+      document.getElementById("emWalk").textContent = walked.toLocaleString("en-US");
+      document.getElementById("emSupply").textContent = fmt(cur, 4) + " QTC";
+    }
+    function add(n){
+      if (busy || cur == null) return;
+      busy = true;
+      document.getElementById("emState").textContent = "Walking the recurrence…";
+      setTimeout(function(){
+        cur = walk(cur, n);
+        walked += n;
+        busy = false;
+        document.getElementById("emState").textContent = "This block";
+        paint();
+      }, 20);
+    }
+    fetch("data/supply.json?t=" + Math.floor(Date.now()/60000), {cache:"no-store"})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        base = BigInt(j.total_supply_plancks);
+        cur = base;
+        walked = 0;
+        var note = document.getElementById("emNote");
+        note.textContent = "Indexer supply at block " + Number(j.block_height).toLocaleString("en-US")
+          + " · " + String(j.fetched_at).slice(0, 16).replace("T", " ") + "Z. The walk starts from that figure, not a corrected S.";
+        paint();
+      })
+      .catch(function(){
+        document.getElementById("emReward").textContent = "snapshot offline";
+        document.getElementById("emNote").textContent = "data/supply.json did not load. The recurrence is still the one in Emission Lab.";
+      });
+    document.getElementById("em1").addEventListener("click", function(){ add(1); });
+    document.getElementById("emDay").addEventListener("click", function(){ add(7200); });
+    document.getElementById("emYear").addEventListener("click", function(){ add(2628000); });
+    document.getElementById("emReset").addEventListener("click", function(){
+      if (base == null) return;
+      cur = base; walked = 0; paint();
+    });
+
+    function step(parent, ms){
+      var target = 12000n;
+      var bt = ms > 500n ? ms : 500n;
+      var divisor = (target * 10n) / 12n;
+      var timeFactor = bt / divisor;
+      var adj = 1n - timeFactor;
+      if (adj < -99n) adj = -99n;
+      var inc = parent / 2048n;
+      var next = adj >= 0n ? parent + inc * adj : parent - inc * (-adj);
+      if (next < 131072n) next = 131072n;
+      return {adj: adj, inc: inc, next: next};
+    }
+    var parent = 2048000n, ms = 12000n;
+    function paintD(){
+      var s = step(parent, ms);
+      document.getElementById("rtMs").textContent = (Number(ms) / 1000) + " s";
+      document.getElementById("rtAdj").textContent = (s.adj >= 0n ? "+" : "") + s.adj.toString();
+      document.getElementById("rtInc").textContent = s.inc.toLocaleString("en-US");
+      document.getElementById("rtNext").textContent = s.next.toLocaleString("en-US");
+    }
+    function setMs(v){ ms = BigInt(v); paintD(); }
+    document.getElementById("rt9").addEventListener("click", function(){ setMs(9000); });
+    document.getElementById("rt12").addEventListener("click", function(){ setMs(12000); });
+    document.getElementById("rt20").addEventListener("click", function(){ setMs(20000); });
+    document.getElementById("rt60").addEventListener("click", function(){ setMs(60000); });
+    paintD();
+
+    var schemes = {87:{sig:4627,pk:2592}, 65:{sig:3309,pk:1952}};
+    var scheme = "87", count = 1;
+    function paintSig(){
+      var sc = schemes[scheme];
+      var raw = sc.sig + sc.pk;
+      var fit = Math.floor(3750000 / raw);
+      if (count > fit) count = fit;
+      var scale = schemes[87].sig + schemes[87].pk;
+      document.getElementById("sigCount").textContent = count.toLocaleString("en-US") + " / " + fit.toLocaleString("en-US");
+      var range = document.getElementById("sigRange");
+      range.max = String(fit);
+      range.value = String(count);
+      document.getElementById("sigHot").style.width = (raw / scale * 100) + "%";
+      document.getElementById("sigHotLabel").textContent = "ML-DSA-" + scheme + " signature + key · " + raw.toLocaleString("en-US") + " B";
+      document.getElementById("sigClass").style.width = (64 / scale * 100) + "%";
+    }
+    document.getElementById("sig87").addEventListener("click", function(){ scheme = "87"; count = 1; paintSig(); });
+    document.getElementById("sig65").addEventListener("click", function(){ scheme = "65"; count = 1; paintSig(); });
+    document.getElementById("sigRange").addEventListener("input", function(e){ count = Number(e.target.value); paintSig(); });
+    paintSig();
+
+    fetch("data/miners.json?t=" + Math.floor(Date.now()/60000), {cache:"no-store"})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var entries = Object.keys(j.window_miners).map(function(k){ return [k, j.window_miners[k]]; });
+        entries.sort(function(a,b){ return b[1] - a[1]; });
+        var total = j.window.block_count;
+        var top = entries.slice(0, 4);
+        var topSum = top.reduce(function(s,e){ return s + e[1]; }, 0);
+        var parts = top.concat([["other", Math.max(0, total - topSum)]]);
+        var colors = ["#40e0ff", "#d7e7f5", "#8ba3bd", "#4c6278", "#243246"];
+        var bar = document.getElementById("conBar");
+        var list = document.getElementById("conList");
+        var acc = 0, nak = null;
+        entries.forEach(function(e){
+          acc += e[1];
+          if (nak == null && acc * 2 > total) nak = arguments[1] + 1;
+        });
+        document.getElementById("conNak").textContent = nak == null ? "—" : String(nak);
+        document.getElementById("conWin").textContent = Number(total).toLocaleString("en-US") + " blocks, "
+          + Number(j.window.start_height).toLocaleString("en-US") + "–" + Number(j.window.end_height).toLocaleString("en-US") + ".";
+        parts.forEach(function(e, i){
+          var seg = document.createElement("i");
+          seg.style.width = (e[1] / total * 100) + "%";
+          seg.style.background = colors[i];
+          bar.appendChild(seg);
+          var row = document.createElement("div");
+          var name = e[0] === "other" ? "Everyone else" : (e[0].slice(0, 8) + "…" + e[0].slice(-4));
+          var span = document.createElement("span");
+          span.textContent = name;
+          var b = document.createElement("b");
+          b.textContent = (e[1] / total * 100).toFixed(1) + "%";
+          row.appendChild(span); row.appendChild(b);
+          list.appendChild(row);
+        });
+      })
+      .catch(function(){
+        document.getElementById("conWin").textContent = "Miner snapshot did not load.";
+      });
+  })();
+
   fetchHeight();
   setInterval(fetchHeight,60000);
 })();
