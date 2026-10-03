@@ -1,0 +1,551 @@
+{
+  "fetchedAt": "2026-10-03T12:00:12.666Z",
+  "height": 158855,
+  "accounts": 8705,
+  "transfers": 200604,
+  "scheduledTransfers": 3,
+  "supplyPlancks": "5770260403578220927",
+  "supplyQtc": 5770260.403578221,
+  "minedQtc": 48958.32,
+  "genesisQtc": 5670000.300999999,
+  "vestingSchedules": 48,
+  "vestingTotalQtc": 5669940.0,
+  "vestingClaimedQtc": 171475.0,
+  "freeQtc": 5770258.300078222,
+  "reservedQtc": 2.1035,
+  "blockTimeS": 13.273932462164144,
+  "windowBlocks": 15000,
+  "windowStart": 143857,
+  "windowEnd": 158856,
+  "minerCount": 34,
+  "nakamoto": 1,
+  "hhi": 0.5212,
+  "topShare": 70.09,
+  "top5Share": 98.45,
+  "netHashTH": 68.077,
+  "daily": [
+    {
+      "date": "2026-09-20",
+      "blocks": 5973,
+      "txs": 6692,
+      "accounts": 671
+    },
+    {
+      "date": "2026-09-21",
+      "blocks": 5883,
+      "txs": 6563,
+      "accounts": 738
+    },
+    {
+      "date": "2026-09-22",
+      "blocks": 5807,
+      "txs": 6985,
+      "accounts": 893
+    },
+    {
+      "date": "2026-09-23",
+      "blocks": 5611,
+      "txs": 6653,
+      "accounts": 742
+    },
+    {
+      "date": "2026-09-24",
+      "blocks": 6163,
+      "txs": 7402,
+      "accounts": 750
+    },
+    {
+      "date": "2026-09-25",
+      "blocks": 6153,
+      "txs": 7533,
+      "accounts": 854
+    },
+    {
+      "date": "2026-09-26",
+      "blocks": 5950,
+      "txs": 7245,
+      "accounts": 832
+    },
+    {
+      "date": "2026-09-27",
+      "blocks": 5834,
+      "txs": 7364,
+      "accounts": 849
+    },
+    {
+      "date": "2026-09-28",
+      "blocks": 6701,
+      "txs": 8888,
+      "accounts": 1321
+    },
+    {
+      "date": "2026-09-29",
+      "blocks": 6617,
+      "txs": 11828,
+      "accounts": 2010
+    },
+    {
+      "date": "2026-09-30",
+      "blocks": 5861,
+      "txs": 10397,
+      "accounts": 1635
+    },
+    {
+      "date": "2026-10-01",
+      "blocks": 6384,
+      "txs": 12094,
+      "accounts": 1972
+    },
+    {
+      "date": "2026-10-02",
+      "blocks": 6639,
+      "txs": 14794,
+      "accounts": 2559
+    },
+    {
+      "date": "2026-10-03",
+      "blocks": 3182,
+      "txs": 6988,
+      "accounts": 1563
+    }
+  ],
+  "blocks": [
+    {
+      "height": 158855,
+      "hash": "0xb38a123fc1855863c7d10ce826b2f0d902b471540032c8b012ed027767bd29b3",
+      "time": "2026-10-03T12:00:06.471+00:00",
+      "reward": 0.3
+    },
+    {
+      "height": 158854,
+      "hash": "0x5695c92a76c7cd93bbdc1fb86022fb682d7d09e6e79bba26276fb9af51d10c1d",
+      "time": "2026-10-03T12:00:01.077+00:00",
+      "reward": 0.31
+    },
+    {
+      "height": 158853,
+      "hash": "0x6e4154812b968c64308fb8e8f6c865eb1e8565108328abfec2af5ca4bbc531b8",
+      "time": "2026-10-03T11:59:37.372+00:00",
+      "reward": 0.31
+    },
+    {
+      "height": 158852,
+      "hash": "0x12bb57eea521ad216b84c6034268e7600b61ab517fed696e1238aa889eb895a4",
+      "time": "2026-10-03T11:59:30.303+00:00",
+      "reward": 0.3
+    },
+    {
+      "height": 158851,
+      "hash": "0x43ff85a20b4d2504264a7f25d5b57561cf29c9f4adb2c9604e007f56a4e6e8b5",
+      "time": "2026-10-03T11:59:23.096+00:00",
+      "reward": 0.31
+    },
+    {
+      "height": 158850,
+      "hash": "0x528870037f3e059dda561099206079a7a04b41bbaf013ade28f4e8dc313765e4",
+      "time": "2026-10-03T11:59:06.247+00:00",
+      "reward": 0.31
+    },
+    {
+      "height": 158849,
+      "hash": "0xa3da9a602b86fbd4b873851b11a322064cb3285fe0d294d0d2e63b30afa23d61",
+      "time": "2026-10-03T11:58:47.108+00:00",
+      "reward": 0.3
+    },
+    {
+      "height": 158848,
+      "hash": "0x1fe1609e5728eae7dd9c81d030d488748fbc6d3db67395f6f1b57d60035f1d1a",
+      "time": "2026-10-03T11:58:44.464+00:00",
+      "reward": 0.31
+    },
+    {
+      "height": 158847,
+      "hash": "0xfa369fb857a7765c0ed6114043ba73b4def389fea9b2f5ac109956dbb6e04d0c",
+      "time": "2026-10-03T11:58:21.297+00:00",
+      "reward": 0.3
+    },
+    {
+      "height": 158846,
+      "hash": "0x42f7f452c8f7ac545711fb9f1d332466933fea1814606653f9f2e3893254eb11",
+      "time": "2026-10-03T11:58:18.959+00:00",
+      "reward": 0.31
+    },
+    {
+      "height": 158845,
+      "hash": "0x479d481f2b2413a908e6398f3c5f5b3d975adb6d8dcf3d1c7a1e0cd933ff7c40",
+      "time": "2026-10-03T11:58:03.129+00:00",
+      "reward": 0.31
+    },
+    {
+      "height": 158844,
+      "hash": "0xe0aaba6caa67c8c983fa6af06cd6b258bfb513556f08a714484b2188ea22d0fd",
+      "time": "2026-10-03T11:57:59.376+00:00",
+      "reward": 0.3
+    },
+    {
+      "height": 158843,
+      "hash": "0x872b51cf307ad51b575acc6fe227d100d18f26130c8b4453a72eb933d9006490",
+      "time": "2026-10-03T11:57:27.324+00:00",
+      "reward": 0.31
+    },
+    {
+      "height": 158842,
+      "hash": "0xdc011c64560378ec18015ea390afe0100d871930aee275e51435485d8774ad8b",
+      "time": "2026-10-03T11:57:04.991+00:00",
+      "reward": 0.32
+    },
+    {
+      "height": 158841,
+      "hash": "0xde54daff52293203d62c55a37a4515c3a1630ca9409060ebfd510e5cf5d3db48",
+      "time": "2026-10-03T11:56:46.043+00:00",
+      "reward": 0.3
+    }
+  ],
+  "miners": [
+    {
+      "address": "qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv",
+      "blocks": 10513,
+      "share": 70.09
+    },
+    {
+      "address": "qzowWAgbzjc2XfHY4vyEo2eVLKbknTESUFoXnisQuUh1x1koo",
+      "blocks": 1814,
+      "share": 12.09
+    },
+    {
+      "address": "qzmb4MVgBfg1fhcH6uf4uyqgrsLeCaDfUucrVPpnfGubJHTSR",
+      "blocks": 1740,
+      "share": 11.6
+    },
+    {
+      "address": "qzpueEjdvcRyjgo5NVqURZv9keqjC2PL9FRctc4wJoRcmyP91",
+      "blocks": 639,
+      "share": 4.26
+    },
+    {
+      "address": "qzomKPLex4yGadrC5QWN5tE8g6pmz2yhC6xtK8mgnaGAbFKRv",
+      "blocks": 61,
+      "share": 0.41
+    },
+    {
+      "address": "qzo2jJJC1xxhHXDPqSWr651Ejib7SyGv9GfjqCP23eZDwdCZi",
+      "blocks": 53,
+      "share": 0.35
+    },
+    {
+      "address": "qznMvNmJLggQChWjMcyCXGvtQocAa7xU1dEb46PEL3vm5J1YE",
+      "blocks": 31,
+      "share": 0.21
+    },
+    {
+      "address": "qznmXxVAZWrFVgzgW5ovSjLt181co22PM6RsEgugnpWu3Jdu2",
+      "blocks": 23,
+      "share": 0.15
+    }
+  ],
+  "allTimeMiners": [
+    {
+      "address": "qzowWAgbzjc2XfHY4vyEo2eVLKbknTESUFoXnisQuUh1x1koo",
+      "blocks": 71366
+    },
+    {
+      "address": "qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv",
+      "blocks": 50285
+    },
+    {
+      "address": "qzmb4MVgBfg1fhcH6uf4uyqgrsLeCaDfUucrVPpnfGubJHTSR",
+      "blocks": 23673
+    },
+    {
+      "address": "qzjrhfWYbbQCo2HZymSKDvbudEQPL3GXiYaudEtMGA3sfZPZt",
+      "blocks": 5259
+    },
+    {
+      "address": "qzknqXTjvVP3czeqG4Xdu1zREGNAm6saMDQE3oA8k1AbPYAGB",
+      "blocks": 1639
+    },
+    {
+      "address": "qzo2jJJC1xxhHXDPqSWr651Ejib7SyGv9GfjqCP23eZDwdCZi",
+      "blocks": 1307
+    },
+    {
+      "address": "qzpueEjdvcRyjgo5NVqURZv9keqjC2PL9FRctc4wJoRcmyP91",
+      "blocks": 1282
+    },
+    {
+      "address": "qzomKPLex4yGadrC5QWN5tE8g6pmz2yhC6xtK8mgnaGAbFKRv",
+      "blocks": 511
+    }
+  ],
+  "whales": [
+    {
+      "rank": 1,
+      "address": "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7",
+      "liquid": 0.001,
+      "locked": 5498465.0,
+      "pool": true
+    },
+    {
+      "rank": 2,
+      "address": "qzjsuLN7Nhu4bjvmUbjSTr2ZTeZ7oRxXpQP9fdv6PcHUCRrVR",
+      "liquid": 161425.0,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 3,
+      "address": "qzowWAgbzjc2XfHY4vyEo2eVLKbknTESUFoXnisQuUh1x1koo",
+      "liquid": 22382.51,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 4,
+      "address": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "liquid": 20472.487748359134,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 5,
+      "address": "qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv",
+      "liquid": 15515.57,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 6,
+      "address": "qzmb4MVgBfg1fhcH6uf4uyqgrsLeCaDfUucrVPpnfGubJHTSR",
+      "liquid": 7321.45,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 7,
+      "address": "qzksfFVdMDEoP9dD5A3RVW4jhqj46ymxcPw2E5CKiPUM6UpMS",
+      "liquid": 4207.836471,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 8,
+      "address": "qzjUx5w2bBuDPkjKSckJZwWLJxHov6SpdpJtoK7kFHETpmisV",
+      "liquid": 2633.018994048374,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 9,
+      "address": "qzk7eG5eghLyWKaewWhL5dGkQskg5TwJYm2ZG33x2oijmvKJE",
+      "liquid": 2169.268771195,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 10,
+      "address": "qzneAy2MUbyrDarDMEMC3KKUobuGXsGaaDAyiNXvAzRus9JV1",
+      "liquid": 2048.8838143,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 11,
+      "address": "qzjrhfWYbbQCo2HZymSKDvbudEQPL3GXiYaudEtMGA3sfZPZt",
+      "liquid": 1623.96,
+      "locked": 0.0,
+      "pool": false
+    },
+    {
+      "rank": 12,
+      "address": "qzohr35QeQTvMzY2SERx1iTeUX3dz3YfP7P8se8pHjS5onHX1",
+      "liquid": 978.475527,
+      "locked": 0.0,
+      "pool": false
+    }
+  ],
+  "brackets": [
+    {
+      "label": "Whales \u2265 1,000 QTC",
+      "count": 11,
+      "qtc": 5738264.986798902
+    },
+    {
+      "label": "Sharks 100 \u2013 1,000",
+      "count": 78,
+      "qtc": 18201.264396485727
+    },
+    {
+      "label": "Dolphins 10 \u2013 100",
+      "count": 341,
+      "qtc": 10792.16642114373
+    },
+    {
+      "label": "Fish 1 \u2013 10",
+      "count": 793,
+      "qtc": 2437.511862958633
+    },
+    {
+      "label": "Shrimp 0.1 \u2013 1",
+      "count": 1607,
+      "qtc": 542.710510075719
+    },
+    {
+      "label": "Dust < 0.1",
+      "count": 5876,
+      "qtc": 20.269267852111
+    }
+  ],
+  "moves": [
+    {
+      "amount": 92.9191790975,
+      "from": "qzoUrdE5hqVBpcUTbTTpPrDA1uvCXmHk8d7tBnhaECzfzQeCA",
+      "to": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "height": 158702,
+      "time": "2026-10-03T11:26:37.491+00:00"
+    },
+    {
+      "amount": 92.92,
+      "from": "qznBxYN6mNEpPS3ujchG2DGDqEPzXen4sCDxKURrKBqBcWrCV",
+      "to": "qzoUrdE5hqVBpcUTbTTpPrDA1uvCXmHk8d7tBnhaECzfzQeCA",
+      "height": 158656,
+      "time": "2026-10-03T11:15:16.327+00:00"
+    },
+    {
+      "amount": 16.89,
+      "from": "qzoHJ7QbaTRBP6KeHnXKArgTxC16ByrBAd5ShAPgs7h9oUjHd",
+      "to": "qznBxYN6mNEpPS3ujchG2DGDqEPzXen4sCDxKURrKBqBcWrCV",
+      "height": 158653,
+      "time": "2026-10-03T11:13:32.282+00:00"
+    },
+    {
+      "amount": 15.51,
+      "from": "qzjhhuzS95SYMKwygx6GWuzaMahTABAnq8GmNNDNDJfUuxgbw",
+      "to": "qznBxYN6mNEpPS3ujchG2DGDqEPzXen4sCDxKURrKBqBcWrCV",
+      "height": 158653,
+      "time": "2026-10-03T11:13:32.282+00:00"
+    },
+    {
+      "amount": 13.557426,
+      "from": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "to": "qzpk5Gju9smuruAP3E52g74qgnFbZfEGdUiAvkC4GLD6Do7iW",
+      "height": 158554,
+      "time": "2026-10-03T10:49:04.593+00:00"
+    },
+    {
+      "amount": 56.3675723925,
+      "from": "qzkAGgwjhhP5WDgpoJe8cF94HmCwdUrgBoDcxg9EB3sog6dBa",
+      "to": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "height": 158379,
+      "time": "2026-10-03T10:06:59.576+00:00"
+    },
+    {
+      "amount": 56.401539,
+      "from": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "to": "qzjWMuBFKw1cKeJgxLgpsaaeZA6sg6wCsaTcwWsjj9njDszSh",
+      "height": 158379,
+      "time": "2026-10-03T10:06:59.576+00:00"
+    },
+    {
+      "amount": 56.368393295,
+      "from": "qzmjPTQnrwaRRiEP7be3MoHxjSeNNQkvuT9ckfA6A8CdV4rmS",
+      "to": "qzkAGgwjhhP5WDgpoJe8cF94HmCwdUrgBoDcxg9EB3sog6dBa",
+      "height": 158334,
+      "time": "2026-10-03T09:56:23.471+00:00"
+    }
+  ],
+  "cohorts": [
+    {
+      "key": "grant",
+      "label": "Genesis grants (team / partners / treasury)",
+      "note": "1-year lockup from TGE (2026-09-09), then linear vesting over 3 years to 2030-09-08. cliff == start: nothing unlocks as a lump.",
+      "schedules": 46,
+      "total": 5417940.0,
+      "claimed": 0.0,
+      "vested": 0.0,
+      "start": 1820479917807,
+      "end": 1915087917807
+    },
+    {
+      "key": "intents",
+      "label": "Intents grant (id 45)",
+      "note": "Vests from TGE over 365 days to 2027-09-09.",
+      "schedules": 1,
+      "total": 42000.0,
+      "claimed": 0.0,
+      "vested": 2776.710664383561,
+      "start": 1788943917807,
+      "end": 1820479917807
+    },
+    {
+      "key": "liquidity",
+      "label": "Treasury initial liquidity (id 46)",
+      "note": "Vested over 16 days from TGE; fully vested since 2026-09-25.",
+      "schedules": 1,
+      "total": 210000.0,
+      "claimed": 171475.0,
+      "vested": 210000.0,
+      "start": 1788943917807,
+      "end": 1790326317807
+    }
+  ],
+  "referenda": [
+    {
+      "index": 0,
+      "type": "SUBMITTED",
+      "track": "fast_upgrade",
+      "summary": "Authorize runtime upgrade",
+      "time": "2026-09-23T08:14:24.319+00:00",
+      "ayes": null,
+      "nays": null
+    },
+    {
+      "index": 0,
+      "type": "DECISION_STARTED",
+      "track": "fast_upgrade",
+      "summary": "Authorize runtime upgrade",
+      "time": "2026-09-23T08:25:54.209+00:00",
+      "ayes": "1",
+      "nays": "0"
+    },
+    {
+      "index": 0,
+      "type": "CONFIRM_STARTED",
+      "track": "fast_upgrade",
+      "summary": "Authorize runtime upgrade",
+      "time": "2026-09-23T12:32:32.285+00:00",
+      "ayes": null,
+      "nays": null
+    },
+    {
+      "index": 0,
+      "type": "CONFIRMED",
+      "track": "fast_upgrade",
+      "summary": "Authorize runtime upgrade",
+      "time": "2026-09-23T12:45:35.531+00:00",
+      "ayes": "8",
+      "nays": "0"
+    }
+  ],
+  "upgradeAt": "2026-09-23T14:49:17.407+00:00",
+  "scheduled": [
+    {
+      "amount": 0.3415,
+      "from": "qzn8KxCgZMowkRiQ6uRCSKFtQG2KkLcpRpDQ13eLwjmAStCMz",
+      "to": "qzjfCb5LXJ8143HiYHSECANywXQCZGssDTm15gmQpQa1Dvuf7",
+      "time": "2026-10-01T00:46:33.146+00:00"
+    },
+    {
+      "amount": 0.184,
+      "from": "qzoysAjkghkKRhbgDXYFrXrZk3L9bs8PBFEkEAvBuedHYsswv",
+      "to": "qznCiYp8CoHgWpxeC1Ubkv1H3eMskQWEsAnQtmQ5SSdocTfLs",
+      "time": "2026-09-29T18:18:48.314+00:00"
+    },
+    {
+      "amount": 0.1,
+      "from": "qzoysAjkghkKRhbgDXYFrXrZk3L9bs8PBFEkEAvBuedHYsswv",
+      "to": "qznCiYp8CoHgWpxeC1Ubkv1H3eMskQWEsAnQtmQ5SSdocTfLs",
+      "time": "2026-09-29T17:16:18.694+00:00"
+    }
+  ],
+  "donate": "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau"
+}
