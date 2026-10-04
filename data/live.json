@@ -1,112 +1,112 @@
 {
   "ok": true,
   "source": "https://sqm.quantus.com/v1/graphql",
-  "fetched_at": "2026-10-04T17:00:15.684Z",
+  "fetched_at": "2026-10-04T18:00:13.760Z",
   "data": {
     "status": {
-      "block_height": 165475,
-      "total_accounts": 9297,
-      "total_immediate_transfers": 214969,
+      "block_height": 165643,
+      "total_accounts": 9313,
+      "total_immediate_transfers": 215394,
       "total_scheduled_transfers": 5
     },
     "blocks": [
       {
-        "height": 165475,
-        "hash": "0x4224fe87294d78c3f66e27ea5cf5e0d0ea6b85ae0a3cc4ace1e3ce591f185771",
-        "timestamp": "2026-10-04T16:59:55.497+00:00",
+        "height": 165643,
+        "hash": "0x24fdaae6238d4cb67997bd40a88853b602b3349818cca0d6c50b8e6b75366e89",
+        "timestamp": "2026-10-04T17:59:36.802+00:00",
+        "reward": "310000000000"
+      },
+      {
+        "height": 165642,
+        "hash": "0x280fb0ce1802c837cc82733ba813d28fae40366fea4256185e73f122f151a928",
+        "timestamp": "2026-10-04T17:58:36.713+00:00",
         "reward": "300000000000"
       },
       {
-        "height": 165474,
-        "hash": "0xa213a3e4b6294cbf19a0fe2f0128d8a65f1833cbca022d834252a1a223281084",
-        "timestamp": "2026-10-04T16:59:54.613+00:00",
+        "height": 165641,
+        "hash": "0x07fc54c7e379feab228acad5be2ed68d773553ba38c579b987fcd7f733aca526",
+        "timestamp": "2026-10-04T17:57:51.265+00:00",
         "reward": "310000000000"
       },
       {
-        "height": 165473,
-        "hash": "0x465ebdd3a1af1c60568385593e61334bd1385cff300262a0346e754aa11311a3",
-        "timestamp": "2026-10-04T16:59:52.043+00:00",
+        "height": 165640,
+        "hash": "0x1fa6c1320517e83ec79e0ae3bdc09e0dc9b07bf2ea1e6e0783cc3162956d1a0c",
+        "timestamp": "2026-10-04T17:57:45.9+00:00",
+        "reward": "310000000000"
+      },
+      {
+        "height": 165639,
+        "hash": "0x10d488e0971b42ea85ecb2f719e6c4a9629064a66a016e27a510bf0b858c8dc0",
+        "timestamp": "2026-10-04T17:57:29.544+00:00",
         "reward": "300000000000"
       },
       {
-        "height": 165472,
-        "hash": "0xb2e01db9996d052ae0cab33b5491879ca37dc710568405ee39c2a54554bcb0bf",
-        "timestamp": "2026-10-04T16:59:49.342+00:00",
+        "height": 165638,
+        "hash": "0xb31b989f2f0e52577ecb0a1862617243bc18d2b4fcad0f9f6b4650e2bdd66d1b",
+        "timestamp": "2026-10-04T17:57:19.924+00:00",
         "reward": "310000000000"
       },
       {
-        "height": 165471,
-        "hash": "0xf0c9d7ee92fff8ba835d1e47cbe3a9c2bb89a6b942350e96b5bcd2f976367643",
-        "timestamp": "2026-10-04T16:59:41.209+00:00",
-        "reward": "310000000000"
-      },
-      {
-        "height": 165470,
-        "hash": "0x3989202a6eee188f3d78640bdc7002ecfa17edecd839679e6905fbdad95debda",
-        "timestamp": "2026-10-04T16:59:36.169+00:00",
+        "height": 165637,
+        "hash": "0x6b18709365ed2bf71a3d94af297fec52e3b49fcedba1892ba2488e456b860e3b",
+        "timestamp": "2026-10-04T17:57:15.87+00:00",
         "reward": "300000000000"
       },
       {
-        "height": 165469,
-        "hash": "0xcb56716c548b323da00314782d148403402d88921f02d24fe41c5b5606f96b7c",
-        "timestamp": "2026-10-04T16:59:30.29+00:00",
+        "height": 165636,
+        "hash": "0x558064c04c9f14b53280dfc7c60adbb1e63ab18b6a06890df8d2551ae8379379",
+        "timestamp": "2026-10-04T17:56:50.283+00:00",
         "reward": "310000000000"
       },
       {
-        "height": 165468,
-        "hash": "0xdd85c454e60f0c50033709bf2f4ccea9c82e9effb8b31874b0c5c1092310d862",
-        "timestamp": "2026-10-04T16:59:17.614+00:00",
+        "height": 165635,
+        "hash": "0xa04938ba5962e9ccf0c692bc29f91d79b3d30dce03f55965c4204fbc452abb2d",
+        "timestamp": "2026-10-04T17:56:37.914+00:00",
+        "reward": "310000000000"
+      },
+      {
+        "height": 165634,
+        "hash": "0x8742b561bc4def0593b5778b6a478aaafb549bc34eb4295e294a657f6269a72c",
+        "timestamp": "2026-10-04T17:56:26.062+00:00",
         "reward": "300000000000"
       },
       {
-        "height": 165467,
-        "hash": "0xde0070d23555ed3a37e471c6a64d5187a2852a195d3d67f7b42a63e3021d0905",
-        "timestamp": "2026-10-04T16:59:11.173+00:00",
+        "height": 165633,
+        "hash": "0x6f81b2c36fa58211745f2bd51f689c2609f002a90cbd0eb3ef6b679530e49a23",
+        "timestamp": "2026-10-04T17:55:30.333+00:00",
         "reward": "310000000000"
       },
       {
-        "height": 165466,
-        "hash": "0x11efc7d5cdbeaeb582db333c725315fdda6d5931a373c49a2bbe9d8905a61701",
-        "timestamp": "2026-10-04T16:59:01.698+00:00",
+        "height": 165632,
+        "hash": "0x6b379791efaca76caae1c079021e66c7ece9f557e630ecf0d69019a037ea42ae",
+        "timestamp": "2026-10-04T17:55:16.292+00:00",
         "reward": "300000000000"
       },
       {
-        "height": 165465,
-        "hash": "0xa62727f1ff3ab6314c3e76aeb13ae33a27ff45bcf0749ee19b8552e0be6e8c99",
-        "timestamp": "2026-10-04T16:58:17.527+00:00",
+        "height": 165631,
+        "hash": "0xe4be671f970e6dc6f88187ce81a1a55206694b81f1ca4b490f948acc0feb5012",
+        "timestamp": "2026-10-04T17:55:14.652+00:00",
         "reward": "310000000000"
       },
       {
-        "height": 165464,
-        "hash": "0x85f5bf35b1b0be8d90b4af8e9477bd1a4205c0a20d4fc2836d00796b22b835d5",
-        "timestamp": "2026-10-04T16:58:12.39+00:00",
+        "height": 165630,
+        "hash": "0x20b1c75d8eb0424538cbce155ab7778bcbaa7f9988c78663c46252d9d08e88bd",
+        "timestamp": "2026-10-04T17:55:00.917+00:00",
         "reward": "300000000000"
       },
       {
-        "height": 165463,
-        "hash": "0x753499f452b0b5a00d91352210c19d6a6a913241ac69132873474c1f2e2cd9aa",
-        "timestamp": "2026-10-04T16:58:00.832+00:00",
+        "height": 165629,
+        "hash": "0x109c9b069832edef1702b93f5925d4eada18ca5290fbaa370e5a2ded1eb53e87",
+        "timestamp": "2026-10-04T17:54:47.809+00:00",
         "reward": "310000000000"
-      },
-      {
-        "height": 165462,
-        "hash": "0x2fdc6f2da2ec3c80417af157cad6d6c452bfcca2d0e630635591fce70f3fe9e4",
-        "timestamp": "2026-10-04T16:57:29.045+00:00",
-        "reward": "310000000000"
-      },
-      {
-        "height": 165461,
-        "hash": "0x72a38c1ed77dd8727aa1377de043c17e1d749daee6e9a486d20f536d3e14de19",
-        "timestamp": "2026-10-04T16:57:07.417+00:00",
-        "reward": "300000000000"
       }
     ],
     "daily": [
       {
         "date": "2026-10-04T00:00:00+00:00",
-        "blocks_count": 3729,
-        "tx_count": 7973,
-        "active_accounts": 1652
+        "blocks_count": 3897,
+        "tx_count": 8398,
+        "active_accounts": 1715
       },
       {
         "date": "2026-10-03T00:00:00+00:00",
