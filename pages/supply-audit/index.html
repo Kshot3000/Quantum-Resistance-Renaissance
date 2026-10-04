@@ -127,7 +127,7 @@
           <li>Spot check 2026-09-30: the top miner's balance (11,520.95&nbsp;QTC) ≈ its transfer-ins (11,507.28&nbsp;QTC), <em>not</em> 2× its rewards — the excess is concentrated in the indexer's global/pool accounting, not spread across miners.</li>
           <li>The wormhole pallet source contains no <code>mint_into</code> path, so exits cannot be chain-side inflation.</li>
         </ul>
-        <p class="caveat">Open item: ≈258&nbsp;QTC of the gap is unattributed (possible burns, e.g. the 0.03&nbsp;QTC multisig creation burn, fee dust, or indexer noise). The desk flags it rather than inventing a source.</p>
+        <p class="caveat">Open item: ≈<span id="v-unattributed">…</span> of the gap is unattributed (possible burns, e.g. the 0.03&nbsp;QTC multisig creation burn, fee dust, or indexer noise) — computed live as (sentinel outflows − recorded rewards) − gap. The desk flags it rather than inventing a source.</p>
       </div>
     </div>
     <div class="callout">
@@ -231,7 +231,7 @@
         <h3>Honest limits</h3>
         <ul>
           <li>The protocol baseline assumes zero fees per block; the real chain recycles fees into rewards, so the baseline is a lower bound and the fee wedge is the difference — not a per-block fee measurement.</li>
-          <li>The 42.9k&nbsp;QTC gap is measured against the <em>indexer's</em> tables. The chain's true <code>total_issuance</code> is not directly queryable from a browser; the desk treats recorded mints as the provable money stock.</li>
+          <li>The <span id="m-gap">…</span> gap is measured against the <em>indexer's</em> tables. The chain's true <code>total_issuance</code> is not directly queryable from a browser; the desk treats recorded mints as the provable money stock.</li>
           <li>Multisig creation burns (0.03&nbsp;QTC each, per the runtime constants used by the MultiSig Vault) and any other burns are not subtracted from recorded mints — bounded small, disclosed, not hidden.</li>
           <li>Two candidate explanations for the gap are on the table: (A) indexer wormhole-exit accounting artifact (favored — no mint path exists in the wormhole pallet); (B) a chain-side exit-mint bug (would be real inflation — <em>not asserted</em>; requires chain-state access to rule out). The desk reports the evidence, not a verdict beyond what the evidence supports.</li>
           <li>Snapshot staleness: figures are pinned to the snapshot's <code>fetched_at</code>; the app retries a live indexer query first and labels which source it used.</li>
@@ -256,7 +256,7 @@
   </section>
 </main>
 
-<script src="js/audit-core.js?v=1.27.0"></script>
-<script src="app.js?v=1.27.2"></script>
+<script src="js/audit-core.js?v=1.28.0"></script>
+<script src="app.js?v=1.28.0"></script>
 </body>
 </html>

@@ -114,6 +114,8 @@ function renderVerdict(a, d){
   $("v-sentinel").textContent = d.mint_sentinel_id;
   $("v-sentinel-out").textContent = A.fmtQtc(a.sentinelOut) + " QTC";
   $("v-sentinel-x").textContent = (Number(a.sentinelOut * 1000n / a.mined) / 1000).toFixed(3) + "×";
+  $("v-unattributed").textContent = A.fmtInt(Math.round(Number(a.unattributed) / 1e12)) + " QTC";
+  $("m-gap").textContent = A.fmtQtc(a.gap) + " QTC";
   $("v-true-supply").textContent = A.fmtQtc(a.recorded) + " QTC";
 }
 function renderLedgers(a, d){

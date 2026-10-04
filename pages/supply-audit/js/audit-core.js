@@ -74,6 +74,12 @@ function computeAudit(d){
   var baselineMined = base.supply - s0;
   var feeWedge = mined - baselineMined;
   var sentinelOut = BigInt(d.mint_sentinel.out_nongenesis_plancks);
+  // Reconciliation remainder: sentinel outflows beyond the recorded rewards
+  // (reward proofs double-booked + wormhole exit proofs) should explain the
+  // balance gap; what is left over is honestly unattributed (burns, fee dust,
+  // indexer noise). 258.32 QTC at height 139,888 (2026-09-30); 268.81 QTC at
+  // 166,338 (2026-10-04) — computed live, never hard-coded in the UI again.
+  var unattributed = (sentinelOut - mined) - gap;
   var vestTotal = BigInt(d.vesting.total_plancks);
   var vestClaimed = BigInt(d.vesting.claimed_plancks);
   var unclaimed = vestTotal - vestClaimed;
@@ -81,6 +87,7 @@ function computeAudit(d){
   return {
     s0: s0, h: h, base: base, mined: mined, recorded: recorded, bal: bal, gap: gap,
     baselineMined: baselineMined, feeWedge: feeWedge, sentinelOut: sentinelOut,
+    unattributed: unattributed,
     vestTotal: vestTotal, vestClaimed: vestClaimed, unclaimed: unclaimed, poolFree: poolFree,
     subsidy: subsidyAt(base.supply)
   };
