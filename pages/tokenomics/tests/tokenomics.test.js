@@ -101,36 +101,77 @@ t("milestoneDay: ordered, sane, terminal cases", () => {
 });
 
 t("wormhole fee: 1000 QTC exit splits 40q fee → burn 10 / miner 20 / agg 10", () => {
-  const f = A.wormholeFee(1000);
-  assert.equal(f.exitQ, 100000);
-  assert.equal(f.feeQ, 40);       // 100000 * 4 / 10000 = 40 quanta = 0.40 QTC
-  assert.equal(f.burnQ, 10);
-  assert.equal(f.minerQ, 20);
-  assert.equal(f.aggQ, 10);
-  assert.equal(f.feeQ, f.burnQ + f.minerQ + f.aggQ);
+  const f = A.wormholeFee("1000");
+  assert.equal(f.amountPlancks, 1000000000000000n);
+  assert.equal(f.feeQuanta, 40n);       // 100000 quanta * 4 / 10000 = 40 quanta = 0.40 QTC
+  assert.equal(f.burnQuanta, 10n);
+  assert.equal(f.minerQuanta, 20n);
+  assert.equal(f.aggQuanta, 10n);
+  assert.equal(f.feeQuanta, f.burnQuanta + f.minerQuanta + f.aggQuanta);
 });
 
 t("wormhole fee: dust exits pay the 1-quantum minimum", () => {
-  const f = A.wormholeFee(1);
-  assert.equal(f.feeQ, 1);
-  assert.equal(f.burnQ, 1);
-  assert.equal(f.minerQ, 0);
-  assert.equal(f.aggQ, 0);
-  const tiny = A.wormholeFee(0.01);
-  assert.equal(tiny.feeQ, 1);
+  const f = A.wormholeFee("1");
+  assert.equal(f.feeQuanta, 1n);
+  assert.equal(f.burnQuanta, 1n);
+  assert.equal(f.minerQuanta, 0n);
+  assert.equal(f.aggQuanta, 0n);
+  const tiny = A.wormholeFee("0.01");
+  assert.equal(tiny.feeQuanta, 1n);
 });
 
 t("wormhole fee conserves quanta across sizes", () => {
-  [0.5, 25, 137.42, 1e6].forEach(v => {
+  ["0.5", "25", "137.42", "1000000"].forEach(v => {
     const f = A.wormholeFee(v);
-    assert.equal(f.feeQ, f.burnQ + f.minerQ + f.aggQ, "v=" + v);
-    assert.ok(f.feeQ >= 1);
+    assert.equal(f.feeQuanta, f.burnQuanta + f.minerQuanta + f.aggQuanta, "v=" + v);
+    assert.ok(f.feeQuanta >= 1n);
   });
 });
 
-t("high-security fee is 1%, fully burned", () => {
-  assert.equal(A.hsFee(1000), 10);
-  assert.equal(A.hsFee(0.5), 0.005);
+t("wormhole fee: sub-quantum amounts are NOT silently rounded up", () => {
+  // Regression: the old float version ceiled the amount to whole quanta
+  // before computing/displaying, so 25.004 QTC was shown as a 25.01 exit.
+  const f = A.wormholeFee("25.004");
+  assert.equal(f.amountPlancks, 25004000000000n);
+  assert.equal(f.feeQuanta, 2n); // ceil(2500.4 quanta * 4 / 10000)
+  assert.equal(A.fmtPlancksExact(f.amountPlancks), "25.004");
+  const g = A.wormholeFee("2073.273");
+  assert.equal(A.fmtPlancksExact(g.amountPlancks), "2,073.273");
+});
+
+t("wormhole fee matches the pallet fixed point on a 20k-quanta sweep", () => {
+  // Pallet (net basis): fee = ceil(net * 4 / 9996) quanta for a gross exit
+  // whose net = gross - fee decomposes exactly. Gross-basis formula used
+  // here must agree wherever the gross amount is a whole number of quanta.
+  for (let q = 1; q <= 20000; q++) {
+    const f = A.wormholeFee((q / 100).toFixed(2));
+    assert.equal(f.feeQuanta, BigInt(Math.ceil(q * 4 / 10000)), "q=" + q);
+    assert.equal(f.feeQuanta, f.burnQuanta + f.minerQuanta + f.aggQuanta, "q=" + q);
+  }
+});
+
+t("high-security fee is an exact Permill floor to the planck", () => {
+  const a = A.hsFee("1000");
+  assert.equal(a.feePlancks, 10000000000000n); // exactly 10 QTC
+  assert.equal(a.netPlancks, a.amountPlancks - a.feePlancks);
+  // 123.456 QTC: the float version rendered fee 1.23 / recipient 122.22 at
+  // 2 dp and the row stopped adding up; exact fee is 1.23456 QTC.
+  const b = A.hsFee("123.456");
+  assert.equal(b.feePlancks, 1234560000000n);
+  assert.equal(A.fmtPlancksExact(b.feePlancks), "1.23456");
+  assert.equal(A.fmtPlancksExact(b.netPlancks), "122.22144");
+  // Permill floors: 0.000000000001 QTC (1 planck) pays no fee; 199 plancks pay 1.
+  assert.equal(A.hsFee("0.000000000001").feePlancks, 0n);
+  assert.equal(A.hsFee("0.000000000199").feePlancks, 1n);
+});
+
+t("high-security rows always add up exactly", () => {
+  for (let i = 1; i <= 5000; i++) {
+    const s = (i * 1.6180339887 % 10000).toFixed(3);
+    const f = A.hsFee(s);
+    assert.equal(f.feePlancks + f.netPlancks, f.amountPlancks, "v=" + s);
+    assert.equal(f.feePlancks, f.amountPlancks / 100n, "v=" + s);
+  }
 });
 
 t("funding: $2.42M total; implied FDV per QTC", () => {

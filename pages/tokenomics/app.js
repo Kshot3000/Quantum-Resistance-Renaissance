@@ -102,19 +102,81 @@ function milestoneDay(targetQTC){
   return hi;
 }
 
-/* Wormhole exit fee in quanta (1 quantum = 0.01 QTC), integer math.
- * fee = ceil(q * 4bps); burn bucket = ceil(fee/2); miner keeps rest;
- * public batches redirect floor(burn/2) to the aggregator. */
-function wormholeFee(qtc){
-  var q = Math.max(1, Math.ceil(qtc * 100));
-  var fee = Math.floor((q * 4 + 9999) / 10000);
-  var burnBucket = Math.ceil(fee / 2);
-  var miner = fee - burnBucket;
-  var agg = Math.floor(burnBucket / 2);
-  return { exitQ: q, feeQ: fee, burnQ: burnBucket - agg, minerQ: miner, aggQ: agg };
+/* Exact decimal -> plancks (BigInt, half-up past 12 dp, exponent forms OK).
+ * Same parser the Fee & Throughput Lab standardized on — no float ever
+ * touches a fee figure on this page. */
+function qtcToPlancksExact(value){
+  if (typeof value === "bigint") return value > 0n ? value * 1000000000000n : 0n;
+  var s = String(value == null ? "" : value).trim();
+  var m = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m || (m[2] === "" && !m[3])) return 0n;
+  var raw = (m[2] || "") + (m[3] || "");
+  var lead = raw.length - raw.replace(/^0+/, "").length;
+  var digits = raw.replace(/^0+/, "") || "0";
+  var point = (m[2] || "").length - lead + (m[4] ? parseInt(m[4], 10) : 0);
+  if (m[1] === "-") return 0n;
+  var scale = point + 12;
+  var kept, roundUp = false;
+  if (scale <= 0){
+    kept = "0";
+    roundUp = scale === 0 && digits[0] >= "5";
+    if (scale < 0) roundUp = false;
+  } else if (digits.length > scale){
+    kept = digits.slice(0, scale);
+    roundUp = digits[scale] >= "5";
+  } else {
+    kept = digits + "0".repeat(scale - digits.length);
+  }
+  var out = BigInt(kept);
+  if (roundUp) out += 1n;
+  return out;
 }
-function hsFee(qtc){ return qtc * 0.01; } // 1% high-security fee, fully burned
-function q2qtc(q){ return q / 100; }
+
+var QUANTUM_PLANCKS = 10000000000n; // wormhole SCALE_DOWN_FACTOR: 1 quantum = 0.01 QTC
+
+/* Wormhole exit fee, exact BigInt — mirrors pallets/wormhole
+ * volume_fee_for_exit as proven in the Fee & Throughput Lab:
+ * fee_quanta = ceil(amount_plancks * 4 / (10000 * quantum)), minimum
+ * 1 quantum for any positive amount; split in whole quanta —
+ * burn bucket = ceil(fee/2) (Permill mul_ceil), miner keeps the rest;
+ * public batches redirect floor(burn bucket/2) to the aggregator.
+ * The amount itself is NEVER rounded: sub-quantum inputs keep their
+ * exact plancks (the old float version silently ceiled the displayed
+ * exit volume up to whole quanta). */
+function wormholeFee(qtc){
+  var amountP = qtcToPlancksExact(qtc);
+  if (amountP <= 0n)
+    return { amountPlancks: 0n, feeQuanta: 0n, burnQuanta: 0n, minerQuanta: 0n, aggQuanta: 0n };
+  var feeQuanta = (amountP * 4n + (10000n * QUANTUM_PLANCKS - 1n)) / (10000n * QUANTUM_PLANCKS);
+  var burnBucket = (feeQuanta + 1n) / 2n;
+  var minerQuanta = feeQuanta - burnBucket;
+  var aggQuanta = burnBucket / 2n;
+  return { amountPlancks: amountP, feeQuanta: feeQuanta,
+           burnQuanta: burnBucket - aggQuanta, minerQuanta: minerQuanta, aggQuanta: aggQuanta };
+}
+/* High-security fee: the reversible-transfers pallet charges
+ * Permill(1%) * amount, floored to the planck, fully burned. */
+function hsFee(qtc){
+  var amountP = qtcToPlancksExact(qtc);
+  if (amountP <= 0n) return { amountPlancks: 0n, feePlancks: 0n, netPlancks: 0n };
+  var feeP = amountP / 100n;
+  return { amountPlancks: amountP, feePlancks: feeP, netPlancks: amountP - feeP };
+}
+/* Exact plancks -> grouped QTC string, fraction trimmed (max 12 dp). */
+function fmtPlancksExact(plancks){
+  var p = BigInt(plancks);
+  var neg = p < 0n; if (neg) p = -p;
+  var whole = (p / 1000000000000n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  var frac = (p % 1000000000000n).toString().padStart(12, "0").replace(/0+$/, "");
+  return (neg ? "-" : "") + whole + (frac ? "." + frac : "");
+}
+/* Whole quanta -> exact QTC string (quanta are hundredths, always 2 dp). */
+function fmtQuanta(quanta){
+  var q = BigInt(quanta);
+  var whole = (q / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return whole + "." + (q % 100n).toString().padStart(2, "0");
+}
+function q2qtc(q){ return Number(q) / 100; } // legacy helper, display-only
 
 /* SVG builders (pure, testable). */
 function vestChartSVG(daysMax, step){
@@ -205,6 +267,7 @@ var API = { CHAIN: CHAIN, GENESIS_BUCKETS: GENESIS_BUCKETS, MINER_BUCKET: MINER_
   supplyAtBlocks: supplyAtBlocks, blockRewardAtBlocks: blockRewardAtBlocks,
   rewardAtDays: rewardAtDays, milestoneDay: milestoneDay,
   wormholeFee: wormholeFee, hsFee: hsFee, q2qtc: q2qtc,
+  qtcToPlancksExact: qtcToPlancksExact, fmtPlancksExact: fmtPlancksExact, fmtQuanta: fmtQuanta,
   vestChartSVG: vestChartSVG, emitChartSVG: emitChartSVG };
 if (typeof module !== "undefined" && module.exports) module.exports = API;
 
@@ -327,33 +390,32 @@ $("dateSlider").addEventListener("input", function(e){ renderClock(parseFloat(e.
 
 /* Fee calculators. */
 function renderFee(){
-  var v = parseFloat($("exitInput").value);
-  if (!isFinite(v) || v <= 0){ $("feeOut").innerHTML = "Enter an exit volume."; $("feeBar").innerHTML = ""; return; }
-  var f = wormholeFee(v);
+  var f = wormholeFee($("exitInput").value);
+  if (f.amountPlancks <= 0n){ $("feeOut").innerHTML = "Enter an exit volume."; $("feeBar").innerHTML = ""; return; }
   var rows = [
-    ["Exit volume", q2qtc(f.exitQ).toFixed(2) + " QTC", ""],
-    ["Fee (4 bps, ceil to quanta)", q2qtc(f.feeQ).toFixed(2) + " QTC", "hl"],
-    ["Burned", q2qtc(f.burnQ).toFixed(2) + " QTC", ""],
-    ["To miner", q2qtc(f.minerQ).toFixed(2) + " QTC", ""],
-    ["To aggregator (public batch)", q2qtc(f.aggQ).toFixed(2) + " QTC", ""]
+    ["Exit volume", fmtPlancksExact(f.amountPlancks) + " QTC", ""],
+    ["Fee (4 bps, ceil to quanta)", fmtQuanta(f.feeQuanta) + " QTC", "hl"],
+    ["Burned", fmtQuanta(f.burnQuanta) + " QTC", ""],
+    ["To miner", fmtQuanta(f.minerQuanta) + " QTC", ""],
+    ["To aggregator (public batch)", fmtQuanta(f.aggQuanta) + " QTC", ""]
   ];
   $("feeOut").innerHTML = rows.map(function(r){
     return '<div class="frow' + (r[2] ? " " + r[2] : "") + '"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>';
   }).join("");
-  var tot = f.feeQ || 1;
+  var tot = f.feeQuanta > 0n ? f.feeQuanta : 1n;
+  var pct = function(q){ return (Number(q * 10000n / tot) / 100).toString(); };
   $("feeBar").innerHTML =
-    '<span style="width:' + (f.burnQ / tot * 100) + '%;background:#e8a94a" title="burned"></span>' +
-    '<span style="width:' + (f.minerQ / tot * 100) + '%;background:#5eead4" title="miner"></span>' +
-    '<span style="width:' + (f.aggQ / tot * 100) + '%;background:#7fd6c0" title="aggregator"></span>';
+    '<span style="width:' + pct(f.burnQuanta) + '%;background:#e8a94a" title="burned"></span>' +
+    '<span style="width:' + pct(f.minerQuanta) + '%;background:#5eead4" title="miner"></span>' +
+    '<span style="width:' + pct(f.aggQuanta) + '%;background:#7fd6c0" title="aggregator"></span>';
 }
 function renderHs(){
-  var v = parseFloat($("hsInput").value);
-  if (!isFinite(v) || v <= 0){ $("hsOut").innerHTML = "Enter a transfer volume."; return; }
-  var fee = hsFee(v);
+  var f = hsFee($("hsInput").value);
+  if (f.amountPlancks <= 0n){ $("hsOut").innerHTML = "Enter a transfer volume."; return; }
   $("hsOut").innerHTML =
-    '<div class="frow"><span>Volume</span><b>' + v.toFixed(2) + ' QTC</b></div>' +
-    '<div class="frow hl"><span>Burned (1%)</span><b>' + fee.toFixed(2) + ' QTC</b></div>' +
-    '<div class="frow"><span>Recipient receives</span><b>' + (v - fee).toFixed(2) + ' QTC</b></div>';
+    '<div class="frow"><span>Volume</span><b>' + fmtPlancksExact(f.amountPlancks) + ' QTC</b></div>' +
+    '<div class="frow hl"><span>Burned (1%)</span><b>' + fmtPlancksExact(f.feePlancks) + ' QTC</b></div>' +
+    '<div class="frow"><span>Recipient receives</span><b>' + fmtPlancksExact(f.netPlancks) + ' QTC</b></div>';
 }
 $("exitInput").addEventListener("input", renderFee); renderFee();
 $("hsInput").addEventListener("input", renderHs); renderHs();
