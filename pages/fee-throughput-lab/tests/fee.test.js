@@ -61,40 +61,105 @@ t("standard fee aggregation", function(){
   var r = m.standardFee(7500, 0.0002, 1e9);
   assert.strictEqual(r.lengthPlancks, 750000000);
   assert.strictEqual(r.weightPlancks, 100000000);
-  assert.strictEqual(r.tipPlancks, 0.0002 * 1e12);
+  assert.strictEqual(r.tipPlancks, 200000000, "tip parsed exactly, not 0.0002*1e12 float");
   assert.strictEqual(r.totalPlancks, r.lengthPlancks + r.weightPlancks + r.tipPlancks);
   assert.strictEqual(r.toMinerPlancks, r.totalPlancks, "100% of fees to miner, no dev tax");
   var r2 = m.standardFee(7500, 0, 0);
   assert.strictEqual(r2.totalPlancks, 750000000);
 });
 
-// 7. Wormhole exit: 0.04% fee, burn = ceil(50%), remainder to miner
+// 7. Wormhole exit at a whole-quanta boundary: 100 QTC -> exactly 4 quanta
 t("wormhole fee split", function(){
   var r = m.wormholeFee(100);
-  assert.strictEqual(r.amountPlancks, 100 * 1e12);
-  assert.strictEqual(r.feePlancks, 0.04 * 1e12, "0.04% of 100 QTC");
-  assert.strictEqual(r.burnPlancks, 0.02 * 1e12, "ceil(50%)");
-  assert.strictEqual(r.minerPlancks, 0.02 * 1e12);
+  assert.strictEqual(r.amountPlancks, 100n * 1000000000000n);
+  assert.strictEqual(r.feeQuanta, 4n);
+  assert.strictEqual(r.feePlancks, 4n * m.QUANTUM_PLANCKS, "0.04% of 100 QTC = 0.04 QTC");
+  assert.strictEqual(r.burnPlancks, 2n * m.QUANTUM_PLANCKS, "ceil(50%) in whole quanta");
+  assert.strictEqual(r.minerPlancks, 2n * m.QUANTUM_PLANCKS);
   assert.strictEqual(r.burnPlancks + r.minerPlancks, r.feePlancks);
 });
 
-// 8. Wormhole burn ceil on odd planck fees
-t("wormhole burn ceil rounding", function(){
-  // fee of 3 plancks -> burn = ceil(1.5) = 2, miner = 1
-  var r = m.wormholeFee(0.00000000075); // 750 plancks * 0.0004 = 0.3 -> rounds to 0? use bigger
-  var fee3 = 3;
-  assert.strictEqual(Math.ceil(fee3 / 2), 2);
-  var r2 = m.wormholeFee(0.00075); // 7.5e8 plancks * 0.0004 = 300000
-  assert.strictEqual(r2.burnPlancks + r2.minerPlancks, r2.feePlancks);
-  assert.strictEqual(r2.burnPlancks, Math.ceil(r2.feePlancks / 2));
+// 8. Wormhole settlement ceil-rounds to whole quanta (pallet semantics).
+// The pre-fix float code returned the raw 0.04% with no quantum rounding —
+// wrong in 199,920 of the first 200,000 whole-quanta amounts.
+t("wormhole quantum ceil rounding", function(){
+  var r = m.wormholeFee("101"); // raw 0.0404 QTC -> 5 quanta
+  assert.strictEqual(r.feeQuanta, 5n);
+  assert.strictEqual(r.feePlancks, 5n * m.QUANTUM_PLANCKS);
+  assert.strictEqual(r.burnPlancks, 3n * m.QUANTUM_PLANCKS, "ceil(5/2) quanta — rounds against the miner");
+  assert.strictEqual(r.minerPlancks, 2n * m.QUANTUM_PLANCKS);
+  var small = m.wormholeFee("10"); // raw 0.004 QTC -> minimum 1 quantum
+  assert.strictEqual(small.feeQuanta, 1n);
+  assert.strictEqual(small.burnPlancks, 1n * m.QUANTUM_PLANCKS);
+  assert.strictEqual(small.minerPlancks, 0n);
+  var tiny = m.wormholeFee("0.00075"); // sub-quantum exit still pays 1 quantum
+  assert.strictEqual(tiny.feeQuanta, 1n);
+  assert.strictEqual(m.wormholeFee(0).feePlancks, 0n, "zero amount -> zero fee");
+  assert.strictEqual(m.wormholeFee("").feePlancks, 0n);
 });
 
-// 9. High-security: 1% volume fee, burned in full
+// 9. High-security: 1% volume fee, burned in full, Permill floor to the planck
 t("high-security 1% burned", function(){
   var r = m.highSecFee(50);
-  assert.strictEqual(r.feePlancks, 0.5 * 1e12);
+  assert.strictEqual(r.feePlancks, 500000000000n);
   assert.strictEqual(r.burnPlancks, r.feePlancks);
-  assert.strictEqual(r.minerPlancks, 0);
+  assert.strictEqual(r.minerPlancks, 0n);
+  var odd = m.highSecFee("1.234567890123"); // 1,234,567,890,123 plancks
+  assert.strictEqual(odd.amountPlancks, 1234567890123n);
+  assert.strictEqual(odd.feePlancks, 12345678901n, "floor(amount/100), not float Math.round");
+});
+
+// 17. Exact decimal -> planck parser (the Pay Desk float lesson, applied here)
+t("qtcToPlancksExact", function(){
+  var p = m.qtcToPlancksExact;
+  assert.strictEqual(p("1.005"), 1005000000000n);
+  assert.strictEqual(p("0.0002"), 200000000n);
+  assert.strictEqual(p("100"), 100000000000000n);
+  assert.strictEqual(p("0.0000000000005"), 1n, "half a planck rounds half-up");
+  assert.strictEqual(p("0.0000000000004"), 0n);
+  assert.strictEqual(p("1e-13"), 0n);
+  assert.strictEqual(p("2.5e-12"), 3n, "exponent form, 2.5 plancks -> 3");
+  assert.strictEqual(p("9007199.254740993"), 9007199254740993000n, "exact above 2^53 plancks");
+  assert.strictEqual(p("-5"), 0n);
+  assert.strictEqual(p(""), 0n);
+  assert.strictEqual(p(0.0002), 200000000n, "number input via shortest round-trip string");
+});
+
+// 18. Sweep: wormhole fee vs the pallet's own fixed point. The pallet charges
+// ceil(net_quanta*4/9996) on the minted amount; for every gross (in whole
+// quanta) that decomposes exactly, the app fee must equal the pallet fee.
+t("wormhole sweep vs pallet fixed point", function(){
+  for (var g = 1; g <= 20000; g++){
+    var grossFee = m.wormholeFee(String(g / 100)).feeQuanta; // g quanta = g/100 QTC
+    var found = -1;
+    for (var o = Math.max(0, g - Math.ceil(g * 4 / 9996) - 2); o <= g; o++){
+      if (o + Math.ceil(o * 4 / 9996) === g){ found = o; break; }
+    }
+    if (found < 0) continue; // gross totals the pallet map skips
+    var palletFee = BigInt(Math.ceil(found * 4 / 9996));
+    assert.strictEqual(grossFee, palletFee, "gross " + g + " quanta");
+  }
+});
+
+// 19. Sweep: high-sec fee is exactly floor(amount/100) on random decimal inputs
+t("high-sec floor sweep", function(){
+  var seed = 123456789;
+  function rnd(){ seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+  for (var i = 0; i < 5000; i++){
+    var int = Math.floor(rnd() * 1e6), frac = String(Math.floor(rnd() * 1e12)).padStart(12, "0");
+    var s = int + "." + frac;
+    var r = m.highSecFee(s);
+    assert.strictEqual(r.feePlancks, r.amountPlancks / 100n, s);
+    assert.strictEqual(r.amountPlancks, BigInt(int) * 1000000000000n + BigInt(frac), s);
+  }
+});
+
+// 20. fmtQTC is exact for BigInt plancks (all 12 decimals, trimmed)
+t("fmtQTC exact BigInt rendering", function(){
+  assert.strictEqual(m.fmtQTC(1n), "0.000000000001");
+  assert.strictEqual(m.fmtQTC(5n * m.QUANTUM_PLANCKS), "0.05");
+  assert.strictEqual(m.fmtQTC(1234567890123n), "1.234567890123");
+  assert.strictEqual(m.fmtPlancks(1234567890123n), "1,234,567,890,123 plancks");
 });
 
 // 10. QTPS = transfers/block ÷ 12 s

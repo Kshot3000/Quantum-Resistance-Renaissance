@@ -9,6 +9,18 @@
  *       (UNIT=10^12 plancks, FEE_SCALE=1/10, LengthToFee=100,000 plancks/byte,
  *        WeightToFee=ScaledIdentityFee ~0.1 planck/ps of ref_time [benchmark-dependent])
  *
+ * Fee rounding re-verified 2026-10-07 against the pallets themselves:
+ *   pallets/wormhole/src/lib.rs volume_fee_for_exit + SCALE_DOWN_FACTOR=10^10
+ *       (1 quantum = 0.01 QTC): the exit fee is ceil-rounded to whole quanta
+ *       once per segment (min 1 quantum), then split in whole quanta —
+ *       burn = ceil(50% of fee quanta), miner = remainder. The pallet computes
+ *       on the minted (net) amount as ceil(net·4/9996); on the gross amount
+ *       entered here that is exactly ceil(gross·4/10000) quanta (cross-checked
+ *       against the pallet fixed point for every gross up to 500,000 quanta).
+ *   pallets/reversible-transfers: high-security volume fee is a Permill of
+ *       the amount — sp_arithmetic Permill multiplication floors to the planck.
+ * All volume-fee math below is exact BigInt; floats never touch a planck.
+ *
  * Pure helpers are exported for node tests; the DOM renderer only runs in a
  * browser. Fully offline — no network calls anywhere in this app.
  */
@@ -93,22 +105,68 @@ var SOURCES = [
 
 /* ================= Pure helpers (node-testable) ================= */
 
+var QUANTUM_PLANCKS = 10000000000n; // SCALE_DOWN_FACTOR: 1 quantum = 0.01 QTC
+
+/* Parse a QTC amount (decimal string, or a JS number via its shortest
+ * round-trip string) into exact BigInt plancks. Extra precision beyond
+ * 12 decimals rounds half-up; negatives clamp to 0. No float ever touches
+ * the value, so amounts above ~9,007 QTC stay exact to the planck. */
+function qtcToPlancksExact(value){
+  if (typeof value === "bigint") return value > 0n ? value * 1000000000000n : 0n;
+  var s = String(value == null ? "" : value).trim();
+  var m = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m || (m[2] === "" && !m[3])) return 0n;
+  var raw = (m[2] || "") + (m[3] || "");
+  var lead = raw.length - raw.replace(/^0+/, "").length; // leading zeros stripped
+  var digits = raw.replace(/^0+/, "") || "0";
+  var point = (m[2] || "").length - lead + (m[4] ? parseInt(m[4], 10) : 0); // digits left of the decimal point
+  if (m[1] === "-") return 0n;
+  var scale = point + 12; // digits to keep so the last kept digit is 1 planck
+  var kept, roundUp = false;
+  if (scale <= 0){
+    kept = "0";
+    roundUp = scale === 0 && digits[0] >= "5";
+    if (scale < 0) roundUp = false;
+  } else if (digits.length > scale){
+    kept = digits.slice(0, scale);
+    roundUp = digits[scale] >= "5";
+  } else {
+    kept = digits + "0".repeat(scale - digits.length);
+  }
+  var out = BigInt(kept);
+  if (roundUp) out += 1n;
+  return out;
+}
+
 /* Exact length fee: bytes × 100,000 plancks */
 function lengthFeePlancks(bytes){
   if (!(bytes > 0)) return 0;
-  return Math.round(bytes) * LENGTH_FEE_PER_BYTE;
+  return Number(BigInt(Math.round(bytes)) * 100000n);
 }
 
-function plancksToQTC(plancks){ return plancks / UNIT; }
+function plancksToQTC(plancks){
+  if (typeof plancks === "bigint") return Number(plancks) / UNIT;
+  return plancks / UNIT;
+}
 
-/* Human QTC string: up to 8 decimals, trimmed */
+/* Human QTC string: exact for BigInt / integer plancks (all 12 decimals,
+ * trimmed). A fractional Number (only the weight-fee estimate can be one)
+ * falls back to the legacy 8-decimal float rendering and is labeled an
+ * estimate wherever it appears. */
 function fmtQTC(plancks){
-  var q = plancksToQTC(plancks);
-  var s = q.toFixed(8).replace(/\.?0+$/, "");
+  if (typeof plancks === "bigint" || (typeof plancks === "number" && Number.isInteger(plancks))){
+    var p = BigInt(plancks);
+    var neg = p < 0n; if (neg) p = -p;
+    var whole = p / 1000000000000n, frac = (p % 1000000000000n).toString().padStart(12, "0").replace(/0+$/, "");
+    return (neg ? "-" : "") + whole.toString() + (frac ? "." + frac : "");
+  }
+  var s = (plancks / UNIT).toFixed(8).replace(/\.?0+$/, "");
   return s === "" ? "0" : s;
 }
 
 function fmtPlancks(plancks){
+  if (typeof plancks === "bigint")
+    return plancks.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " plancks";
   return Math.round(plancks).toLocaleString("en-US") + " plancks";
 }
 
@@ -118,29 +176,44 @@ function weightFeeEstimatePlancks(refTimePs){
   return refTimePs * WEIGHT_FEE_PER_PS;
 }
 
-/* Standard transfer: length fee + weight estimate + optional tip → all to miner */
+/* Standard transfer: length fee + weight estimate + optional tip → all to miner.
+ * Length and tip are exact (tip parsed as a decimal, never floated); the
+ * weight fee is a benchmark-dependent estimate and stays a Number. */
 function standardFee(bytes, tipQTC, refTimePs){
   var len = lengthFeePlancks(bytes);
   var w = weightFeeEstimatePlancks(refTimePs);
-  var tip = (tipQTC > 0 ? tipQTC : 0) * UNIT;
+  var tip = Number(qtcToPlancksExact(tipQTC));
   return { lengthPlancks: len, weightPlancks: w, tipPlancks: tip,
            totalPlancks: len + w + tip, toMinerPlancks: len + w + tip };
 }
 
-/* Wormhole exit: 0.04% fee; burn = ceil(50% of fee); remainder → miner */
+/* Wormhole exit: 0.04% (4 bps) volume fee, settled in whole quanta —
+ * fee_quanta = ceil(amount_quanta × 4 / 10000), minimum 1 quantum for any
+ * positive amount; split in whole quanta: burn = ceil(50%), miner = rest.
+ * (Public batches also redirect floor(50% of the burn) to the aggregator;
+ * this lab models a single private segment, where no aggregator share
+ * applies.) Exact BigInt throughout; planck fields are BigInt. */
 function wormholeFee(amountQTC){
-  var amountP = Math.round(Math.max(0, amountQTC) * UNIT);
-  var fee = Math.round(amountP * WORMHOLE_FEE_RATE);
-  var burn = Math.ceil(fee / 2);
-  return { amountPlancks: amountP, feePlancks: fee,
-           burnPlancks: burn, minerPlancks: fee - burn };
+  var amountP = qtcToPlancksExact(amountQTC);
+  if (amountP <= 0n)
+    return { amountPlancks: 0n, feePlancks: 0n, feeQuanta: 0n,
+             burnPlancks: 0n, minerPlancks: 0n };
+  var feeQuanta = (amountP * 4n + (10000n * QUANTUM_PLANCKS - 1n)) / (10000n * QUANTUM_PLANCKS); // ceil
+  var burnQuanta = (feeQuanta + 1n) / 2n; // Permill 50% mul_ceil, in whole quanta
+  var minerQuanta = feeQuanta - burnQuanta;
+  return { amountPlancks: amountP, feeQuanta: feeQuanta,
+           feePlancks: feeQuanta * QUANTUM_PLANCKS,
+           burnPlancks: burnQuanta * QUANTUM_PLANCKS,
+           minerPlancks: minerQuanta * QUANTUM_PLANCKS };
 }
 
-/* High-security / reversible transfer: 1% volume fee, burned */
+/* High-security / reversible transfer: 1% volume fee, burned in full.
+ * Runtime type is Permill — multiplication floors to the planck.
+ * Exact BigInt throughout; planck fields are BigInt. */
 function highSecFee(amountQTC){
-  var amountP = Math.round(Math.max(0, amountQTC) * UNIT);
-  var fee = Math.round(amountP * HIGHSEC_FEE_RATE);
-  return { amountPlancks: amountP, feePlancks: fee, burnPlancks: fee, minerPlancks: 0 };
+  var amountP = qtcToPlancksExact(amountQTC);
+  var fee = amountP / 100n;
+  return { amountPlancks: amountP, feePlancks: fee, burnPlancks: fee, minerPlancks: 0n };
 }
 
 /* QTPS arithmetic: transfers per block ÷ 12 s block time */
@@ -241,7 +314,7 @@ function renderEstimator(){
   var refIn = document.getElementById("std-ref");
   var calcStd = function(){
     estState.bytes = Math.max(0, Math.round(parseFloat(bytesIn.value) || 0));
-    estState.tip = Math.max(0, parseFloat(tipIn.value) || 0);
+    estState.tip = tipIn.value;
     estState.refTime = Math.max(0, parseFloat(refIn.value) || 0);
     bytesOut.textContent = estState.bytes.toLocaleString("en-US") + " B";
     tipOut.textContent = estState.tip + " QTC";
@@ -266,12 +339,13 @@ function renderEstimator(){
   /* wormhole pane */
   var whIn = document.getElementById("wh-amount");
   var calcWh = function(){
-    estState.wh = Math.max(0, parseFloat(whIn.value) || 0);
+    estState.wh = whIn.value;
     var r = wormholeFee(estState.wh);
     document.getElementById("wh-fee").textContent =
       fmtQTC(r.feePlancks) + " QTC  (" + fmtPlancks(r.feePlancks) + ")";
     document.getElementById("wh-fee-math").textContent =
-      estState.wh + " QTC × 0.04% = " + estState.wh + " × 0.0004";
+      "raw 0.04% of " + fmtQTC(r.amountPlancks) + " QTC, ceil-rounded at settlement to " +
+      r.feeQuanta.toString() + (r.feeQuanta === 1n ? " quantum" : " quanta") + " (1 quantum = 0.01 QTC)";
     document.getElementById("wh-burn").textContent =
       fmtQTC(r.burnPlancks) + " QTC  (" + fmtPlancks(r.burnPlancks) + ")";
     document.getElementById("wh-miner").textContent =
@@ -283,12 +357,12 @@ function renderEstimator(){
   /* high-security pane */
   var hsIn = document.getElementById("hs-amount");
   var calcHs = function(){
-    estState.hs = Math.max(0, parseFloat(hsIn.value) || 0);
+    estState.hs = hsIn.value;
     var r = highSecFee(estState.hs);
     document.getElementById("hs-fee").textContent =
       fmtQTC(r.feePlancks) + " QTC  (" + fmtPlancks(r.feePlancks) + ")";
     document.getElementById("hs-fee-math").textContent =
-      estState.hs + " QTC × 1% — burned in full, no miner share";
+      fmtQTC(r.amountPlancks) + " QTC × 1% (Permill, floored to the planck) — burned in full, no miner share";
   };
   hsIn.addEventListener("input", calcHs);
   calcHs();
@@ -492,6 +566,7 @@ if (typeof module !== "undefined" && module.exports){
     WORMHOLE_FEE_RATE: WORMHOLE_FEE_RATE, HIGHSEC_FEE_RATE: HIGHSEC_FEE_RATE,
     MODES: MODES, CMP: CMP, WORMHOLE_STEPS: WORMHOLE_STEPS, SOURCES: SOURCES,
     AMORT_BYTES_PER_TX: AMORT_BYTES_PER_TX, BADGE_LABEL: BADGE_LABEL,
+    QUANTUM_PLANCKS: QUANTUM_PLANCKS, qtcToPlancksExact: qtcToPlancksExact,
     lengthFeePlancks: lengthFeePlancks, plancksToQTC: plancksToQTC,
     fmtQTC: fmtQTC, fmtPlancks: fmtPlancks, fmtBytes: fmtBytes,
     weightFeeEstimatePlancks: weightFeeEstimatePlancks, standardFee: standardFee,

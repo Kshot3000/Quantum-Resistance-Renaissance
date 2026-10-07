@@ -149,8 +149,10 @@
           <div class="ctl">
             <label for="wh-amount">Exit amount (QTC)</label>
             <input type="number" id="wh-amount" min="0" step="any" value="100">
-            <p class="fine">Wormhole exit: 0.04% volume fee (4 bps). Settlement ceil-rounds per segment and small
-            segments pay ≥ 1 quantum (0.01 QTC) — tiny exits pay proportionally more.</p>
+            <p class="fine">Wormhole exit: 0.04% volume fee (4 bps). Settlement ceil-rounds per segment to whole
+            quanta and small segments pay ≥ 1 quantum (0.01 QTC) — tiny exits pay proportionally more. The split
+            below is per private segment; in public batches, floor(50% of the burn) is redirected to the
+            aggregator instead of being burned.</p>
           </div>
         </div>
         <div class="readout" aria-live="polite">
@@ -258,7 +260,7 @@
   </footer>
 </main>
 
-<script src="app.js?v=1.13.0"></script>
+<script src="app.js?v=1.14.0"></script>
 <script src="../../assets/app-nav.js?v=1.8.0"></script>
 </body>
 </html>
