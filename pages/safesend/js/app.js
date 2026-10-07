@@ -79,8 +79,35 @@ function renderWords(el, words, animate) {
   });
 }
 
-$("exKyle").addEventListener("click", function () { $("addrInput").value = KYLE; });
-$("exGenesis").addEventListener("click", function () { $("addrInput").value = GENESIS; });
+/* The displayed checkphrase is a pin bound to lastAddr. Any edit that makes
+ * the field diverge from lastAddr must void it: leaving the old words on
+ * screen would present them as the checkphrase of the address now in the
+ * box — exactly the mismatch this verifier exists to catch. */
+function renderPlaceholderWords() {
+  var row = $("wordRow"); row.innerHTML = "";
+  for (var i = 0; i < 5; i++) {
+    var s = document.createElement("span");
+    s.className = "word empty"; s.textContent = "—";
+    row.appendChild(s);
+  }
+}
+function voidDerived(msg) {
+  if (!lastAddr && !lastWords) return;
+  lastAddr = ""; lastWords = null;
+  $("poisonBtn").disabled = true;
+  $("poisonCard").hidden = true;
+  renderPlaceholderWords();
+  $("resNote").textContent = msg;
+}
+var CHANGED_MSG = "Address changed — the checkphrase shown was for the previous address and has been cleared. Derive again for the address now in the box.";
+
+$("addrInput").addEventListener("input", function () {
+  if ($("addrInput").value.trim() !== lastAddr) voidDerived(CHANGED_MSG);
+});
+/* Example buttons set the field programmatically (no input event fires),
+ * so they must void the pin explicitly. */
+$("exKyle").addEventListener("click", function () { $("addrInput").value = KYLE; voidDerived(CHANGED_MSG); });
+$("exGenesis").addEventListener("click", function () { $("addrInput").value = GENESIS; voidDerived(CHANGED_MSG); });
 
 $("deriveBtn").addEventListener("click", function () {
   var addr = $("addrInput").value.trim();
@@ -92,6 +119,13 @@ $("deriveBtn").addEventListener("click", function () {
     bar.style.width = (100 * done / total).toFixed(1) + "%";
   }).then(function (words) {
     wrap.hidden = true; $("deriveBtn").disabled = false;
+    if ($("addrInput").value.trim() !== addr) {
+      /* The field moved while the KDF ran (e.g. an example button — no
+       * input event): this result belongs to the previous address. */
+      lastAddr = addr; lastWords = words; // make voidDerived act, then clear
+      voidDerived("The address changed while deriving — that result was for the previous address and was discarded. Derive again for the address now in the box.");
+      return;
+    }
     lastAddr = addr; lastWords = words;
     renderWords($("wordRow"), words, true);
     $("resNote").textContent = "Derived locally from " + addr.length + "-character address · 5 words · 2,048-word list. Read them back to the recipient.";
@@ -189,6 +223,12 @@ function clearSim() {
   simState = null;
   $("simActive").hidden = true; $("simEmpty").hidden = false;
   $("liveDot").hidden = true;
+  /* A finished/cancelled run disables Cancel and renames the final step
+   * ("Executed"/"Cancelled"). Reset both, or the NEXT scheduled transfer
+   * can never be cancelled — the lab's core action. */
+  $("cancelBtn").disabled = false;
+  var doneLbl = document.querySelector('.tl-step[data-s="done"] .lbl');
+  if (doneLbl) doneLbl.textContent = "Final";
 }
 
 $("resetBtn").addEventListener("click", clearSim);

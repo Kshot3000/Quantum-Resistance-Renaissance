@@ -17,6 +17,7 @@ rmSync(PROFILE, { recursive: true, force: true });
 mkdirSync(QA, { recursive: true });
 cpSync(SRC + "/pages/safesend", QA + "/pages/safesend", { recursive: true });
 cpSync(SRC + "/assets", QA + "/assets", { recursive: true });
+cpSync(SRC + "/visual-upgrade", QA + "/visual-upgrade", { recursive: true });
 
 const chrome = execFile("/opt/meta-chromium/chrome", [
   "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
@@ -138,9 +139,19 @@ const phraseP = pois ? await evaluate(() => [...document.querySelectorAll("#tamp
 check("tampered phrase differs", phraseP !== phrase1, phraseP);
 check("tampered char highlighted", await evaluate(() => !!document.querySelector("#tampAddr .mut")));
 
-// genesis example button fills input
+// stale-pin regression: editing the address must void the derived phrase
+// (the words were bound to the previous address; leaving them on screen
+// would present them as the new address's checkphrase)
+await evaluate((a) => { const t = document.getElementById("addrInput"); t.value = a; t.dispatchEvent(new Event("input", { bubbles: true })); }, "qzka7DZXAT7GnzgXQfxiSwrPKRWgW6m6G89QRsQiLThThZ6Cw");
+check("address edit voids phrase", await evaluate(() =>
+  document.getElementById("poisonBtn").disabled &&
+  [...document.querySelectorAll("#wordRow .word")].every((w) => w.textContent === "—") &&
+  /changed/.test(document.getElementById("resNote").textContent)));
+
+// genesis example button fills input (programmatic set must also void)
 await evaluate(() => document.getElementById("exGenesis").click());
 check("genesis example fills", await evaluate(() => document.getElementById("addrInput").value.startsWith("qzka7DZXAT")));
+check("example fill keeps phrase voided", await evaluate(() => document.getElementById("poisonBtn").disabled));
 
 // simulator: validation
 await evaluate(() => { document.getElementById("simAddr").value = "qzkTestRecipient123"; document.getElementById("simAmt").value = "100"; document.getElementById("customBlocks").value = "1"; document.getElementById("customBlocks").dispatchEvent(new Event("input", { bubbles: true })); document.getElementById("scheduleBtn").click(); });
@@ -165,6 +176,18 @@ await evaluate(() => { document.getElementById("customBlocks").value = "4"; docu
 const execd = await waitFor(() => document.querySelector('.tl-step[data-s="done"] .lbl').textContent === "Executed", 20000);
 check("4-block window executes", execd);
 check("execution logged", await evaluate(() => document.getElementById("simLog").textContent.includes("Scheduler pallet executed")));
+
+// second-run regression: after a run ends (executed/cancelled), a NEW
+// scheduled transfer must start with Cancel enabled and the final step
+// labelled "Final" again — and must actually be cancellable.
+await evaluate(() => { document.querySelector('.preset[data-blocks="50"]').click(); document.getElementById("scheduleBtn").click(); });
+await new Promise((r) => setTimeout(r, 400));
+check("second run: final label reset", await evaluate(() => document.querySelector('.tl-step[data-s="done"] .lbl').textContent === "Final"));
+check("second run: cancel enabled", await evaluate(() => !document.getElementById("cancelBtn").disabled));
+await new Promise((r) => setTimeout(r, 2200));
+await evaluate(() => document.getElementById("cancelBtn").click());
+await new Promise((r) => setTimeout(r, 400));
+check("second run: cancels", await evaluate(() => document.querySelector('.tl-step[data-s="done"] .lbl').textContent === "Cancelled"));
 
 // footer copy button
 await evaluate(() => document.querySelector("footer .addr").click());
