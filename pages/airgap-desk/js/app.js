@@ -28,7 +28,7 @@ const EXPLORER = 'https://explorer.quantus.com';
 const DONATE = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
 
 const hot = { rpc: null, rpcUrl: '', ticket: null, ticketStr: '', verified: null, extrinsicHex: '' };
-const cold = { ticket: null, ticketStr: '', cpWords: null, chunks: [], extrinsicHex: '' };
+const cold = { ticket: null, ticketStr: '', cpWords: null, chunks: [], extrinsicHex: '', reviewed: null };
 
 /* ---------------- background ---------------- */
 (() => {
@@ -459,7 +459,7 @@ document.querySelectorAll('[data-ck]').forEach((t) => t.addEventListener('click'
 let cpTimer = null;
 $('cold-dest').addEventListener('input', () => {
   err('cold-dest-err');
-  $('cp-box').hidden = true; cold.cpWords = null;
+  $('cp-box').hidden = true; cold.cpWords = null; cold.reviewed = null;
   clearTimeout(cpTimer);
   const v = $('cold-dest').value.trim();
   if (!v) return;
@@ -527,6 +527,8 @@ $('btn-cold-review').addEventListener('click', () => {
       ['Signature wire', `${wireLen.toLocaleString()} bytes (fixed for the scheme)`],
       ['Checkphrase', '✓ read back correctly'],
     ]);
+    // pin exactly what was reviewed — signing re-validates against this
+    cold.reviewed = { dest, amount: $('cold-amount').value.trim(), nonce: nonceRaw };
     $('cold-review').hidden = false;
     $('cold-review').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) { err('cold-build-err', e.message); }
@@ -544,7 +546,14 @@ $('btn-cold-sign').addEventListener('click', async () => {
       throw new Error('this key derives to ' + shortAddr(kp.address) + ' — but the ticket is for ' + shortAddr(cold.ticket.addr) + '. Wrong key, refusing to sign.');
     }
     const dest = $('cold-dest').value.trim();
-    const { accountId: destAccountId } = ss58Decode(dest);
+    // sign EXACTLY what was reviewed: re-validate the live fields against the
+    // reviewed snapshot — a dest/amount/nonce edited (or pasted over) after
+    // review must never be signed on the strength of the old checkphrase.
+    if (!cold.reviewed) throw new Error('review the transfer first — signing is pinned to the reviewed destination, amount and nonce');
+    if (dest !== cold.reviewed.dest || $('cold-amount').value.trim() !== cold.reviewed.amount || $('cold-nonce').value.trim() !== cold.reviewed.nonce)
+      throw new Error('destination, amount or nonce changed since review — review again before signing');
+    const { prefix: destPrefix, accountId: destAccountId } = ss58Decode(dest);
+    if (destPrefix !== 189) throw new Error('destination has wrong network prefix');
     const amount = qtcToPlancks($('cold-amount').value);
     const nonce = Number($('cold-nonce').value.trim());
     const era = encodeMortalEra(cold.ticket.era.period, cold.ticket.era.phase);
@@ -564,6 +573,7 @@ $('btn-cold-sign').addEventListener('click', async () => {
     if (!mod.verify(sig, payload, kp.publicKey, { context: te.encode('QUANTUS_EXTRINSIC') }))
       throw new Error('local signature self-check failed — nothing was exported');
     cold.extrinsicHex = built.extrinsicHex;
+    cold.reviewed = null; // a review authorizes exactly one signature
     const session = Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0');
     cold.chunks = encodeChunks(session, built.extrinsicHex, 800);
     $('stepper-mount').innerHTML = '';
