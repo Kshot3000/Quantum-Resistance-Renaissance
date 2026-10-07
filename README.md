@@ -1,6 +1,6 @@
-# Quantus Muse Builder
+# Quantum Resistance Renaissance
 
-Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000](https://x.com/kshot9000).
+Apps and tools for the **Quantus Blockchain** ecosystem — built by [@kshot9000](https://x.com/kshot9000) for the [@Quantus-Network](https://github.com/Quantus-Network) ecosystem.
 
 > Quantus is a proof-of-work Layer 1 blockchain built for the quantum era. Mainnet went live **September 9, 2026** with post-quantum cryptography (ML-DSA-65 / ML-DSA-87) from the genesis block, a **21M $QTC** supply cap, open mining with no built-in advantage for Quantus Labs, and native transaction aggregation. First exchange venue: NEAR Intents.
 

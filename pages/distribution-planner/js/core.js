@@ -220,7 +220,7 @@ function buildRunScript(batches, fromWallet, tipQTC) {
   var tipFlag = tip ? " --tip " + shellQuote(tip) : "";
   var L = [];
   L.push("#!/usr/bin/env bash");
-  L.push("# QTC Distribution Planner — generated run script (Quantus Muse Builder).");
+  L.push("# QTC Distribution Planner — generated run script (Quantum Resistance Renaissance).");
   L.push("# Executes " + batches.length + " batch_all extrinsic(s) via `quantus batch send`.");
   L.push("# Atomic per batch: every transfer in a batch succeeds, or the whole batch fails.");
   L.push("# Review every file below before running. Never paste a wallet password on the");
