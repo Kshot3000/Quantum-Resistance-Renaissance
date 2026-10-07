@@ -15,6 +15,7 @@ rmSync(PROFILE, { recursive: true, force: true });
 mkdirSync(QA, { recursive: true });
 cpSync(SRC + "/pages/key-forge", QA + "/pages/key-forge", { recursive: true });
 cpSync(SRC + "/assets", QA + "/assets", { recursive: true });
+cpSync(SRC + "/visual-upgrade", QA + "/visual-upgrade", { recursive: true });
 
 const chrome = execFile("/opt/meta-chromium/chrome", [
   "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
@@ -167,6 +168,17 @@ const sigHex = await evaluate(() => {
 await evaluate(() => { document.getElementById("verSig").value = "00".repeat(3309); });
 await evaluate(() => document.getElementById("verifyBtn").click());
 check("verify rejects wrong sig", await waitFor(() => document.getElementById("verifyResult").textContent.includes("INVALID"), 15000));
+
+// scheme-switch desync regression: forge was ML-DSA-65; switching the picker to
+// 87 WITHOUT re-forging must not break signing — sign + backup must keep using
+// the forged key's own scheme (pinned at forge time), never the picker's.
+await evaluate(() => document.querySelector('.scheme-card[data-scheme="87"]').click());
+await evaluate(() => { document.getElementById("signMsg").value = "desync regression message"; });
+await evaluate(() => document.getElementById("signBtn").click());
+const signedAfterSwitch = await waitFor(() => document.getElementById("signResult").textContent.includes("Signed & verified"), 20000);
+check("sign works after scheme switch without re-forge", signedAfterSwitch);
+check("sig size still ML-DSA-65 (3,309) after switch", await evaluate(() => document.getElementById("signResult").textContent.includes("3,309")));
+await evaluate(() => document.querySelector('.scheme-card[data-scheme="65"]').click());
 
 // forge ML-DSA-87 (slower keygen)
 await evaluate(() => document.querySelector('.scheme-card[data-scheme="87"]').click());

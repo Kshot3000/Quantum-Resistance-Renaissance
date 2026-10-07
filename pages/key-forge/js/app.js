@@ -13,7 +13,9 @@ const SCHEMES = {
   87: { mod: ml_dsa87, label: 'ML-DSA-87', pkLen: 2592, skLen: 4896, sigLen: 4627 },
 };
 let scheme = '65';
-let currentKey = null; // { publicKey, secretKey, address, accountId }
+let currentKey = null; // { publicKey, secretKey, address, accountId, scheme } — scheme is
+// pinned at forge time: sign/download MUST use the forged key's own scheme, never the
+// picker's current selection (switching cards after forging must not desync them).
 let secretRevealed = false;
 
 /* ---------- background forge-field canvas ---------- */
@@ -120,7 +122,7 @@ async function forge() {
   setStep(4, 'done');
   await sleep(260);
 
-  currentKey = { publicKey, secretKey, address, accountId };
+  currentKey = { publicKey, secretKey, address, accountId, scheme };
   secretRevealed = false;
 
   $('resAddress').textContent = address;
@@ -156,8 +158,10 @@ $('forgeAgain').addEventListener('click', forge);
 $('copyAddr').addEventListener('click', (e) => copyText($('resAddress').textContent, e.target));
 $('copyPubkey').addEventListener('click', (e) => copyText($('resPubkey').dataset.full, e.target));
 $('dlPubkey').addEventListener('click', () => {
-  download(`quantus-${SCHEMES[scheme].label.toLowerCase()}-pubkey.txt`,
-    `Quantus ${SCHEMES[scheme].label} public key\naddress: ${currentKey.address}\naccount id: ${hexEncode(currentKey.accountId)}\n\n${$('resPubkey').dataset.full}\n`);
+  if (!currentKey) return;
+  const S = SCHEMES[currentKey.scheme];
+  download(`quantus-${S.label.toLowerCase()}-pubkey.txt`,
+    `Quantus ${S.label} public key\naddress: ${currentKey.address}\naccount id: ${hexEncode(currentKey.accountId)}\n\n${$('resPubkey').dataset.full}\n`);
 });
 $('revealSecret').addEventListener('click', (e) => {
   secretRevealed = !secretRevealed;
@@ -171,7 +175,7 @@ $('copySecret').addEventListener('click', (e) => {
 });
 $('dlSecret').addEventListener('click', () => {
   if (!currentKey) return;
-  const S = SCHEMES[scheme];
+  const S = SCHEMES[currentKey.scheme];
   download(`quantus-${S.label.toLowerCase()}-secret-backup.json`, JSON.stringify({
     warning: 'RAW SECRET KEY MATERIAL. Anyone with this file controls the address. Store encrypted, offline, in two places.',
     scheme: S.label,
@@ -226,12 +230,18 @@ $('hexBtn').addEventListener('click', () => {
 $('signBtn').addEventListener('click', async () => {
   const box = $('signResult');
   if (!currentKey) return;
-  const S = SCHEMES[scheme];
+  const S = SCHEMES[currentKey.scheme];
   const msg = te.encode($('signMsg').value);
   if (!msg.length) { box.innerHTML = '<p class="hint">Type a message first.</p>'; return; }
   box.innerHTML = '<p class="hint">Signing…</p>';
   await sleep(30);
-  const sig = S.mod.sign(msg, currentKey.secretKey);
+  let sig;
+  try {
+    sig = S.mod.sign(msg, currentKey.secretKey);
+  } catch (err) {
+    box.innerHTML = inspHtml([['Error', err.message]], false, 'Cannot sign');
+    return;
+  }
   const sigHex = hexEncode(sig);
   const okNow = S.mod.verify(sig, msg, currentKey.publicKey);
   box.innerHTML = inspHtml([
