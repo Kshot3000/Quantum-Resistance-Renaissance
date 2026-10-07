@@ -290,6 +290,7 @@ $('btn-copy-tip').addEventListener('click', (e) => copyText('qznY8nwuvWcCCVys4da
 $('rpc-url').value = DEFAULT_RPC;
 
 async function connectRpc() {
+  invalidateUnsigned(); // a pinned estimate was quoted by the previous node/era
   const url = $('rpc-url').value.trim() || DEFAULT_RPC;
   state.rpcUrl = url;
   if (state.rpc) state.rpc.close();
@@ -353,7 +354,20 @@ function validateRecipient() {
     return null;
   }
 }
-$('send-to').addEventListener('input', () => { if ($('send-to').value.trim()) validateRecipient(); });
+/* An estimate pins exactly one transfer (state.unsigned). Editing the
+ * recipient or amount afterwards must void it — otherwise Sign & broadcast
+ * would send the OLD transfer while the form shows the new values (the
+ * review→sign desync fixed in Airgap Desk / Key Forge). Same for Max (which
+ * sets the amount programmatically, firing no input event) and for an RPC
+ * reconnect (the pinned era/nonce/fee were quoted by the previous node). */
+function invalidateUnsigned() {
+  if (!state.unsigned) return;
+  state.unsigned = null;
+  $('estimate-box').hidden = true;
+  err('send-err', 'Recipient or amount changed — the estimate was discarded. Build & estimate again to review the new transfer before signing.');
+}
+$('send-to').addEventListener('input', () => { invalidateUnsigned(); if ($('send-to').value.trim()) validateRecipient(); });
+$('send-amount').addEventListener('input', invalidateUnsigned);
 
 $('btn-max').addEventListener('click', async () => {
   // Fill amount = free balance minus a conservative fee guess (refined at estimate).
@@ -363,6 +377,7 @@ $('btn-max').addEventListener('click', async () => {
     const guessFee = 5000000000n; // 0.005 QTC headroom; exact fee shown at estimate
     const max = info.free > guessFee + EXISTENTIAL_DEPOSIT ? info.free - guessFee : 0n;
     $('send-amount').value = plancksToQtc(max);
+    invalidateUnsigned(); // programmatic set fires no input event
     err('send-amount-err');
   } catch (e) { err('send-amount-err', e.message); }
 });
@@ -378,6 +393,7 @@ $('btn-estimate').addEventListener('click', async () => {
   catch (e) { err('send-amount-err', e.message); return; }
   if (amount <= 0n) { err('send-amount-err', 'Amount must be greater than zero.'); return; }
   const btn = $('btn-estimate'); btn.disabled = true; btn.textContent = 'Building…';
+  const toRaw = $('send-to').value, amountRaw = $('send-amount').value;
   try {
     const unsigned = await buildUnsignedTransfer(state.rpc, {
       fromAddress: state.kp.address,
@@ -385,6 +401,12 @@ $('btn-estimate').addEventListener('click', async () => {
       destAddress: rcpt.address,
       amountPlancks: amount,
     });
+    // Fields edited while the node was building: the result no longer
+    // matches the form — discard it instead of pinning a stale transfer.
+    if ($('send-to').value !== toRaw || $('send-amount').value !== amountRaw) {
+      state.unsigned = null;
+      throw new Error('Recipient or amount changed while building — estimate discarded. Build & estimate again.');
+    }
     state.unsigned = unsigned;
     const info = await getAccountInfo(state.rpc, state.kp.accountId);
     const free = info ? info.free : 0n;
