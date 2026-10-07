@@ -82,10 +82,29 @@ function renderVault() {
   renderEventForm();
 }
 
+/* The checkphrase confirm is a pin bound to the address it was derived
+ * from. Editing the address field after derivation must void it: leaving
+ * the confirm live would let a click silently vault the PREVIOUS address
+ * (and its submit-time label) while the box shows a different address —
+ * in the one flow whose whole job is binding words to an address before
+ * it is trusted for tax records. The label is NOT part of the pin: it is
+ * read live at confirm time, so fixing a typo in it never forces a
+ * re-derivation, and a label edited after derivation is never dropped. */
+var addrPin = null;    // { address, words } while a confirm is on screen
+var addrDeriveSeq = 0; // token: only the latest derivation may render
+var ADDR_CHANGED_MSG = "Address changed \u2014 the checkphrase shown was for the previous address, so its confirmation has been cleared. Verify again for the address now in the box.";
+var ADDR_DISCARD_MSG = "The address changed while deriving \u2014 that checkphrase was for the previous address and was discarded. Verify again for the address now in the box.";
+function voidAddrPin(msg) {
+  if (!addrPin) return;
+  addrPin = null;
+  $("addrCheck").innerHTML = '<span class="bad">' + esc(msg) + "</span>";
+}
+
 function handleAddrSubmit(ev) {
   ev.preventDefault();
   var input = $("addrInput").value.trim();
-  var label = $("addrLabel").value.trim();
+  var seq = ++addrDeriveSeq;
+  addrPin = null;
   var line = $("addrCheck");
   line.innerHTML = '<span class="muted">validating\u2026</span>';
   var dec;
@@ -102,17 +121,33 @@ function handleAddrSubmit(ev) {
   }
   line.innerHTML = '<span class="muted">deriving checkphrase (40k PBKDF2 rounds)\u2026</span>';
   window.QTC_CHECK.addressToChecksumAsync(input, window.QTC_WORDLIST).then(function (words) {
+    if (seq !== addrDeriveSeq) return; // a newer derivation superseded this one
+    if ($("addrInput").value.trim() !== input) {
+      /* The field moved while the 40k-round KDF ran: this result belongs
+       * to the previous address and must not land under the new one. */
+      line.innerHTML = '<span class="bad">' + esc(ADDR_DISCARD_MSG) + "</span>";
+      return;
+    }
+    addrPin = { address: input, words: words };
     line.innerHTML = '<span class="ok">\u2713 checksum valid &middot; SS58 prefix 189.</span><br>' +
       '<span class="words">checkphrase: ' + esc(words.join(" ")) + "</span><br>" +
       '<span class="muted">Read the five words back. If they match what you expect for this address, confirm:</span> ' +
       '<button class="btn" id="addrConfirm" type="button">Words match &mdash; add address</button>';
     $("addrConfirm").addEventListener("click", function () {
-      state.addresses.push({ address: input, label: label, words: words, addedAt: Date.now() });
+      if (!addrPin || addrPin.address !== input) return;
+      if ($("addrInput").value.trim() !== input) { voidAddrPin(ADDR_CHANGED_MSG); return; }
+      state.addresses.push({ address: input, label: $("addrLabel").value.trim(), words: words, addedAt: Date.now() });
+      addrPin = null;
       $("addrInput").value = ""; $("addrLabel").value = "";
       line.innerHTML = '<span class="ok">\u2713 added to vault.</span>';
       save(); renderVault(); renderHero();
     });
   }).catch(function (e) {
+    if (seq !== addrDeriveSeq) return;
+    if ($("addrInput").value.trim() !== input) {
+      line.innerHTML = '<span class="bad">' + esc(ADDR_DISCARD_MSG) + "</span>";
+      return;
+    }
     line.innerHTML = '<span class="bad">checkphrase failed: ' + esc(e.message) + "</span>";
   });
 }
@@ -523,6 +558,9 @@ function renderAll() {
 function init() {
   load();
   $("addrForm").addEventListener("submit", handleAddrSubmit);
+  $("addrInput").addEventListener("input", function () {
+    if (addrPin && $("addrInput").value.trim() !== addrPin.address) voidAddrPin(ADDR_CHANGED_MSG);
+  });
   $("btnScan").addEventListener("click", runScan);
   $("btnAddSelected").addEventListener("click", addSelectedDetections);
   $("btnDetectNone").addEventListener("click", function () {
