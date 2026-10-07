@@ -2,7 +2,7 @@
 
 Interactive Substrate SCALE codec workbench for the Quantus chain. Every byte Quantus puts on the wire is SCALE-encoded — extrinsics, storage keys, RPC payloads. This lab lets you encode and decode the codec by hand. 100% client-side, zero network calls.
 
-**Live:** https://kshot3000.github.io/Quantus-Muse-Builder/pages/scale-lab/
+**Live:** https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/scale-lab/
 
 ## Tabs
 

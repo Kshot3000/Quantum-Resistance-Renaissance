@@ -5,7 +5,7 @@ post-quantum ML-DSA signatures, addresses derive from the chain's own Poseidon2 
 vault is encrypted before it ever touches disk. No accounts, no servers — the 24-word phrase
 never leaves the page.
 
-Live: https://kshot3000.github.io/Quantus-Muse-Builder/pages/web-wallet/
+Live: https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/web-wallet/
 
 ## What it does
 

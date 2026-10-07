@@ -180,7 +180,7 @@ $('dlSecret').addEventListener('click', () => {
     public_key_hex: hexEncode(currentKey.publicKey),
     secret_key_hex: hexEncode(currentKey.secretKey),
     forged_at: new Date().toISOString(),
-    forged_by: 'QTC Quantum Key Forge (kshot9000 Quantus-Muse-Builder)',
+    forged_by: 'QTC Quantum Key Forge (kshot9000 Quantum Resistance Renaissance)',
   }, null, 2), 'application/json');
 });
 

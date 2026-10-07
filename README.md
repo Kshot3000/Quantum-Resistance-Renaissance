@@ -65,7 +65,7 @@ The public Quantus indexer (`sqm.quantus.com`) only allowlists official Quantus 
 
 ## Live
 
-- Hub: https://kshot3000.github.io/Quantus-Muse-Builder/
+- Hub: https://kshot3000.github.io/Quantum-Resistance-Renaissance/
 
 ## Builder
 

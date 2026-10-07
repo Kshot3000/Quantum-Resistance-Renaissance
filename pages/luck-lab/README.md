@@ -2,7 +2,7 @@
 
 The mining-luck & variance laboratory for Quantus: the true *distribution* of mining outcomes, not just the average. Solo block-wait luck quantiles, a seeded Monte Carlo wait histogram, a probability tool, drought odds, a pool-vs-solo daily-earnings simulator, and difficulty-shock scenarios — all on live chain numbers.
 
-**Live:** https://kshot3000.github.io/Quantus-Muse-Builder/pages/luck-lab/
+**Live:** https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/luck-lab/
 
 ## What it does
 

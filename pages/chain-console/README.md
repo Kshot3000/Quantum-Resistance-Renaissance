@@ -2,7 +2,7 @@
 
 Talk to the Quantus chain directly: connect to any Substrate WebSocket RPC (default: the upstream-documented mainnet endpoint `wss://rpc.quantus.network`), run one-click recipes against real chain state, fire custom methods, watch live subscriptions, and read the full method reference. No mocks, no snapshots — if the endpoint is unreachable, the console says so.
 
-**Live:** https://kshot3000.github.io/Quantus-Muse-Builder/pages/chain-console/
+**Live:** https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/chain-console/
 
 ## What it does
 

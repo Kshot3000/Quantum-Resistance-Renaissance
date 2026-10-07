@@ -2,7 +2,7 @@
 
 Sign QTC transfers on a machine that never touches the network.
 
-**Live:** https://kshot3000.github.io/Quantus-Muse-Builder/pages/airgap-desk/
+**Live:** https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/airgap-desk/
 
 ## The protocol
 

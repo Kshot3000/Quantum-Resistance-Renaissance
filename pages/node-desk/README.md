@@ -2,7 +2,7 @@
 
 The node-operations console for Quantus: install paths, an exact launch-command builder, the verified port & firewall map, the seven mainnet bootnodes, a sync monitor, a log forensics lab, and the real update procedure.
 
-**Live:** https://kshot3000.github.io/Quantus-Muse-Builder/pages/node-desk/
+**Live:** https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/node-desk/
 
 ## What it does
 

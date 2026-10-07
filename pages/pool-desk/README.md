@@ -2,7 +2,7 @@
 
 The mining-pool directory & comparator for Quantus: every known QTC pool compared honestly — real fees stacked the way they actually hit you, payout terms, PPLNS windows, and copy-paste connection commands, each fact stamped with the pool page it came from.
 
-**Live:** https://kshot3000.github.io/Quantus-Muse-Builder/pages/pool-desk/
+**Live:** https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/pool-desk/
 
 ## What it does
 
