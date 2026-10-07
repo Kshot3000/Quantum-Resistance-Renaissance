@@ -1,7 +1,7 @@
 {
   "ok": true,
   "source": "https://sqm.quantus.com/v1/graphql",
-  "fetched_at": "2026-10-05T01:00:19.167Z",
+  "fetched_at": "2026-10-07T03:24:01.034Z",
   "data": {
     "referenda": [
       {
@@ -202,6 +202,26 @@
         "block_id": "0000096616-e075f",
         "success": true,
         "args": "{\"poll\":0,\"aye\":true}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechReferenda",
+        "call": "refund_decision_deposit",
+        "timestamp": "2026-10-05T04:31:37.079+00:00",
+        "signer_id": "qzpfF7tvw4nhTzhhAjifFGPRKqKTBfCk68dgvM5DwnDCSyXYJ",
+        "block_id": "0000168043-53dce",
+        "success": true,
+        "args": "{\"index\":0}",
+        "index_in_block": 1
+      },
+      {
+        "pallet": "TechReferenda",
+        "call": "refund_submission_deposit",
+        "timestamp": "2026-10-05T04:32:15.413+00:00",
+        "signer_id": "qzpfF7tvw4nhTzhhAjifFGPRKqKTBfCk68dgvM5DwnDCSyXYJ",
+        "block_id": "0000168046-c29c6",
+        "success": true,
+        "args": "{\"index\":0}",
         "index_in_block": 1
       }
     ],
