@@ -243,11 +243,35 @@ export const RECIPE_BUILDERS = {
   },
 };
 
+/* ---------- fee formatting ---------- */
+
+/* Exact QTC string for a payment_queryInfo partialFee (planck, string or
+ * number from the node). Delegates to the shared scale helper — the app.js
+ * summarizer previously hand-rolled this and printed "1." / "0." for
+ * whole-QTC and zero fees (its `|| '0'` guard never fired on the truthy
+ * "1." string). Missing/garbage input renders as a dash, never a guess. */
+export function formatPartialFeeQtc(partialFee) {
+  if (partialFee === null || partialFee === undefined || partialFee === '') return '—';
+  try { return plancksToQtc(BigInt(partialFee)); } catch { return '—'; }
+}
+
 /* ---------- history ---------- */
 
 export function historyEntry(method, params, ms, ok, errorTitle) {
+  // Store the full params so the history re-run button can restore the
+  // EXACT call — before this, only the method was restored and re-run
+  // silently executed with whatever stale params sat in the Custom tab.
+  // Cap: multi-KB params (extrinsic/metadata blobs) x 200 entries would
+  // blow the localStorage quota; those entries store params === null
+  // (marked non-rerunnable) rather than truncated, unparseable JSON.
+  let storedParams = null;
+  try {
+    const arr = Array.isArray(params) ? params : [];
+    if (JSON.stringify(arr).length <= 8192) storedParams = arr;
+  } catch { storedParams = null; }
   return {
     t: Date.now(), method,
+    params: storedParams,
     paramsPreview: shortHex(JSON.stringify(params), 40),
     ms: Math.round(ms), ok: !!ok,
     error: ok ? null : (errorTitle || 'failed'),

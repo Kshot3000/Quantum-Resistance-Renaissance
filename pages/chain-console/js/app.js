@@ -8,7 +8,7 @@ import {
   validateEndpoint, parseParamsJson, explainError, shortHex, formatMs, formatNumber,
   parseAddressInput, decodeBalanceStorage, buildMapKeyHex,
   summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion,
-  historyEntry, loadHistory, saveHistory, normalizeHex, isHex,
+  historyEntry, loadHistory, saveHistory, normalizeHex, isHex, formatPartialFeeQtc,
 } from './core.js';
 import { ConsoleRpc } from './rpc-client.js';
 import { RECIPES, RECIPE_CATEGORIES, getRecipe } from './recipes.js';
@@ -110,8 +110,7 @@ const SUMMARIZERS = {
   fee(r) {
     if (!r || typeof r !== 'object') return null;
     const pf = r.partialFee;
-    let qtc = '—';
-    try { qtc = (BigInt(pf) / 10n ** 12n).toString() + '.' + (BigInt(pf) % 10n ** 12n).toString().padStart(12, '0').replace(/0+$/, '') || '0'; } catch {}
+    const qtc = formatPartialFeeQtc(pf);
     return kvRow('Partial fee', `<b>${esc(qtc)} QTC</b>`) + kvRow('Raw (planck)', esc(String(pf)), true)
       + kvRow('Weight', esc(JSON.stringify(r.weight))) + kvRow('Class', esc(String(r.class)));
   },
@@ -312,7 +311,29 @@ function renderHistory() {
     </div>`).join('');
   el.querySelectorAll('[data-rerun]').forEach((b) => b.addEventListener('click', () => {
     const h = history[Number(b.dataset.rerun)];
-    if (h) { switchTab('custom'); $('custom-method').value = h.method; runCustom(true); }
+    if (!h) return;
+    // Restore the entry's EXACT params, not just its method — restoring
+    // only the method silently re-ran the call with whatever stale params
+    // were sitting in the Custom tab's textarea.
+    if (!h.params) {
+      // Legacy entries (pre-fix, no stored params) and oversized entries
+      // (params deliberately not stored) must not be re-run blind.
+      switchTab('custom');
+      $('custom-method').value = h.method;
+      const errEl = $('custom-err');
+      errEl.hidden = false;
+      errEl.textContent = 'This history entry has no stored params (recorded before params were kept, or too large to store) — re-enter its params here before running, so the re-run cannot silently use stale params.';
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(h.method)) {
+      toast('That entry is a composite (multi-call) recipe result — re-run it from its recipe card, not the Custom tab.', 'err');
+      return;
+    }
+    switchTab('custom');
+    $('custom-method').value = h.method;
+    $('custom-params').value = JSON.stringify(h.params);
+    $('custom-err').hidden = true;
+    runCustom(true);
   }));
 }
 

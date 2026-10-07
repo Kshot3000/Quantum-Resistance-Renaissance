@@ -4,7 +4,7 @@ import {
   isHex, normalizeHex, shortHex, formatMs,
   parseAddressInput, accountStorageKeyHex, buildMapKeyHex, decodeBalanceStorage,
   summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion,
-  RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory,
+  RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory, formatPartialFeeQtc,
 } from '../js/core.js';
 import { ConsoleRpc } from '../js/rpc-client.js';
 import { ss58Encode, hexEncode } from '../js/lib/quantus-crypto.js';
@@ -172,6 +172,35 @@ t('recipes: gated broadcast', RECIPES.find((r) => r.id === 'submit').gated === t
   const back = loadHistory(store);
   t('history round-trip', back.length === 1 && back[0].method === 'system_chain');
 }
+{
+  // Re-run must be able to restore the EXACT params, not just the method:
+  // before this fix historyEntry dropped params entirely, so the history
+  // re-run button silently executed the method with whatever stale params
+  // were sitting in the Custom tab's textarea.
+  const store = { d: {}, getItem(k) { return this.d[k] || null; }, setItem(k, v) { this.d[k] = v; } };
+  const params = ['0x26aa394eea5630e07c48ae0c9558cef7', 42];
+  const e = historyEntry('state_getStorage', params, 9, true);
+  t('history: params preserved', Array.isArray(e.params) && e.params.length === 2 && e.params[0] === params[0] && e.params[1] === 42);
+  saveHistory(store, [e]);
+  const back = loadHistory(store);
+  t('history: params round-trip', back.length === 1 && JSON.stringify(back[0].params) === JSON.stringify(params));
+  // Oversized params (multi-KB extrinsic blobs) must be marked non-rerunnable
+  // (params === null), never stored truncated — truncated JSON would re-run wrong.
+  const big = historyEntry('payment_queryInfo', ['0x' + 'ab'.repeat(6000)], 9, true);
+  t('history: oversized params -> null', big.params === null);
+  const exact = historyEntry('system_chain', [], 1, true);
+  t('history: empty params rerunnable', Array.isArray(exact.params) && exact.params.length === 0);
+}
+
+/* ---- fee formatting (payment_queryInfo summarizer) ---- */
+t('fee: zero is "0" not "0."', formatPartialFeeQtc('0') === '0');
+t('fee: whole QTC is "1" not "1."', formatPartialFeeQtc('1000000000000') === '1');
+t('fee: 2.5 QTC', formatPartialFeeQtc('2500000000000') === '2.5');
+t('fee: sub-millli exact', formatPartialFeeQtc('1000000000') === '0.001');
+t('fee: 1 planck exact', formatPartialFeeQtc('1') === '0.000000000001');
+t('fee: numeric input', formatPartialFeeQtc(1500000000000) === '1.5');
+t('fee: missing -> dash', formatPartialFeeQtc(null) === '—' && formatPartialFeeQtc(undefined) === '—' && formatPartialFeeQtc('') === '—');
+t('fee: garbage -> dash', formatPartialFeeQtc('not-a-number') === '—');
 
 /* ---- rpc-client with mock WebSocket ---- */
 class MockWS {
