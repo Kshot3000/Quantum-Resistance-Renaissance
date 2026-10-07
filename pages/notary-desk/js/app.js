@@ -117,6 +117,29 @@ wireDrop("drop", "fileInput", async (file) => {
   drop.querySelector(".drop-ico").textContent = "📥";
 });
 
+/* The dropped file's two digests must stay bound to the algorithm selector:
+ * switching algorithms swaps in the digest that was actually computed with
+ * that algorithm (hashFile always computes both). Building an envelope whose
+ * algo byte names BLAKE2b-256 while the bytes are the file's SHA-256 digest
+ * would anchor a permanently unverifiable proof. A manual digest edit that
+ * matches neither of the file's digests voids the file attribution, so the
+ * build output never credits a pasted digest to the dropped file. */
+$("algoSel").addEventListener("change", () => {
+  if (!studio.fileHash) return;
+  const cur = $("digestInput").value.trim().toLowerCase();
+  if (cur === studio.fileHash.sha256 || cur === studio.fileHash.blake2) {
+    $("digestInput").value = parseInt($("algoSel").value, 10) === 2
+      ? studio.fileHash.blake2 : studio.fileHash.sha256;
+  }
+});
+$("digestInput").addEventListener("input", () => {
+  if (!studio.fileHash) return;
+  const cur = $("digestInput").value.trim().toLowerCase();
+  if (cur === studio.fileHash.sha256) $("algoSel").value = "1";
+  else if (cur === studio.fileHash.blake2) $("algoSel").value = "2";
+  else studio.fileHash = null;
+});
+
 $("msgInput").addEventListener("input", () => {
   const n = new TextEncoder().encode($("msgInput").value).length;
   $("msgBytes").textContent = n.toLocaleString("en-US") + " / 4096 bytes";
@@ -253,15 +276,26 @@ function renderVault() {
 function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 /* ---------------- Verify Desk ---------------- */
+/* Verify-by-file must try BOTH of the file's digests: a vault anchor built
+ * as BLAKE2b-256 stores that digest, so filling only the SHA-256 into the
+ * box (the old behaviour) reported a matching file as "not in your vault".
+ * A manual edit that matches neither digest voids the file pairing. */
+let verifyFileHash = null;
 wireDrop("vDrop", "vFileInput", async (file) => {
   const drop = $("vDrop");
   drop.querySelector(".drop-ico").textContent = "⏳";
   try {
     const h = await hashFile(file, null);
+    verifyFileHash = h;
     $("vDigestInput").value = h.sha256;
     drop.querySelector("strong").textContent = "✓ " + file.name + " — digest filled below";
   } catch { drop.querySelector("strong").textContent = "Hashing failed — try again"; }
   drop.querySelector(".drop-ico").textContent = "🔍";
+});
+$("vDigestInput").addEventListener("input", () => {
+  if (!verifyFileHash) return;
+  const cur = $("vDigestInput").value.trim().toLowerCase();
+  if (cur !== verifyFileHash.sha256 && cur !== verifyFileHash.blake2) verifyFileHash = null;
 });
 
 $("vCheckBtn").addEventListener("click", () => {
@@ -272,7 +306,8 @@ $("vCheckBtn").addEventListener("click", () => {
     box.innerHTML = "<strong>⚠ Not a digest</strong>Paste a 64-character hex digest, or drop the file above to hash it.";
     return;
   }
-  const hit = loadVault().find((a) => a.digestHex === d);
+  const candidates = verifyFileHash ? [d, verifyFileHash.sha256, verifyFileHash.blake2] : [d];
+  const hit = loadVault().find((a) => candidates.includes(a.digestHex));
   if (hit) {
     const fp = hit.envelopeHex ? C.bytesToHex(b2b256(C.hexToBytes(hit.envelopeHex))) : null;
     box.className = "vresult hit";
