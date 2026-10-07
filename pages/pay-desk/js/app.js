@@ -16,15 +16,35 @@ var QT_PER_PAGE = 20;
 
 function parseUsdToCents(s) {
   // Accepts "1,234.56", "12", ".5". Returns BigInt cents or null.
+  // Extra decimals round half-up at the 3rd digit — the same rule
+  // parseQtcToPlancks applies at the 13th digit. (Previously the fraction
+  // was silently truncated: "1.005" parsed to 100 cents, not 101.)
   var t = String(s == null ? "" : s).trim().replace(/[$,\s]/g, "");
   if (t === "") return null;
   var m = /^(\d*)(?:\.(\d*))?$/.exec(t);
   if (!m) return null;
   var whole = m[1] === "" ? "0" : m[1];
-  var frac = (m[2] || "").slice(0, 2);
+  var fracFull = m[2] || "";
+  var frac = fracFull.slice(0, 2);
   while (frac.length < 2) frac += "0";
   var v = BigInt(whole) * CENT + BigInt(frac);
+  if (fracFull.length > 2 && fracFull[2] >= "5") v += 1n;
   return v >= 0n ? v : null;
+}
+
+/* Exact decimal -> rational {num, den} (BigInts), or null.
+ * Accepts "12.50", ".5", "0.008912", and exponent forms ("1e-3") so a rate
+ * passed as a JS number stringifies safely. No float ever touches money. */
+function parseDecimalRational(s) {
+  var t = String(s == null ? "" : s).trim();
+  var m = /^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(t);
+  if (!m) return null;
+  var digits = (m[1] || "") + (m[2] || "");
+  if (digits === "") return null;
+  var num = BigInt(digits);
+  var scale = BigInt((m[2] || "").length) - (m[3] ? BigInt(m[3].replace(/^\+/, "")) : 0n);
+  if (scale >= 0n) return { num: num, den: 10n ** scale };
+  return { num: num * (10n ** (-scale)), den: 1n };
 }
 
 function parseQtcToPlancks(s) {
@@ -60,11 +80,21 @@ function fmtUsd(cents) {
 }
 
 function centsToQtcString(cents, usdPerQtc) {
-  // cents * 1e12 / (usdPerQtc * 100) -> plancks, rounded half-up, as decimal string
-  var rateNum = Number(usdPerQtc);
-  if (!isFinite(rateNum) || rateNum <= 0) return null;
-  var pl = (Number(cents) * 1e12) / (rateNum * 100);
-  return plancksToQtcString(BigInt(Math.round(pl)));
+  // plancks = cents * 10^12 / (usdPerQtc * 100), rounded half-up, computed
+  // in exact BigInt rational arithmetic. The previous float path
+  // (Number(cents) * 1e12 / Number(rate)) disagreed with the exact result
+  // in 8,965 of 16,048 swept cases (worst error 2,228 plancks on an
+  // $183,503.21 invoice @ $0.008912) — float64 runs out of integer
+  // precision for any invoice over ~$90.
+  var r = parseDecimalRational(usdPerQtc);
+  if (!r || r.num <= 0n) return null;
+  var c = BigInt(cents);
+  var neg = c < 0n;
+  var num = (neg ? -c : c) * PLANCKS_PER_QTC * r.den;
+  var den = 100n * r.num;
+  var pl = num / den;
+  if ((num % den) * 2n >= den) pl += 1n;
+  return plancksToQtcString(neg ? -pl : pl);
 }
 
 function makeInvoiceId(now) {
@@ -82,7 +112,12 @@ function invoiceTotals(items, discountCents, taxPct) {
   }, 0n);
   var disc = discountCents > sub ? sub : discountCents;
   var taxable = sub - disc;
-  var tax = (taxable * BigInt(Math.round(Number(taxPct) * 100))) / 10000n;
+  // Tax percent parsed as an exact decimal rational: the old
+  // Math.round(Number(taxPct) * 100) snapped 8.875% to 8.88% and 2.675%
+  // to 2.67% before the tax was computed. Truncation of the final tax
+  // amount (never round a tax up) is unchanged.
+  var pct = parseDecimalRational(taxPct == null ? "0" : String(taxPct));
+  var tax = pct && pct.num > 0n ? (taxable * pct.num) / (100n * pct.den) : 0n;
   var total = taxable + tax;
   return { sub: sub, disc: disc, tax: tax, total: total };
 }
@@ -184,7 +219,7 @@ function renderRate() {
   } else {
     $("rs-rate").textContent = "$" + r.usdPerQtc + " / QTC";
     $("rs-time").textContent = new Date(r.ts).toLocaleString();
-    $("rs-qtc1").textContent = plancksToQtcString(parseQtcToPlancks((1 / Number(r.usdPerQtc)).toFixed(12)) || 0n) + " QTC per $1";
+    $("rs-qtc1").textContent = (centsToQtcString(100n, r.usdPerQtc) || "0") + " QTC per $1";
   }
   renderTotals();
 }
@@ -615,6 +650,7 @@ if (typeof module !== "undefined" && module.exports) {
     plancksToQtcString: plancksToQtcString,
     fmtUsd: fmtUsd,
     centsToQtcString: centsToQtcString,
+    parseDecimalRational: parseDecimalRational,
     makeInvoiceId: makeInvoiceId,
     invoiceTotals: invoiceTotals,
     fmtCountdown: fmtCountdown,

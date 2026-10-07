@@ -26,6 +26,9 @@ eq("cents empty -> null", P.parseUsdToCents(""), null);
 eq("cents garbage -> null", P.parseUsdToCents("abc"), null);
 eq("cents negative sign -> null", P.parseUsdToCents("-5"), null);
 eq("cents $ sign stripped", P.parseUsdToCents("$7.25"), 725n);
+eq("cents 1.005 rounds half-up (was truncated to 100)", P.parseUsdToCents("1.005"), 101n);
+eq("cents 1.999 rounds to 200", P.parseUsdToCents("1.999"), 200n);
+eq("cents 1.994 stays 199", P.parseUsdToCents("1.994"), 199n);
 
 /* ---- QTC -> plancks ---- */
 eq("plancks 1 QTC", P.parseQtcToPlancks("1"), 1000000000000n);
@@ -54,6 +57,27 @@ eq("$1 @ $2.50/QTC = 0.4 QTC", P.centsToQtcString(100n, "2.50"), "0.4");
 eq("zero rate -> null", P.centsToQtcString(100n, "0"), null);
 eq("bad rate -> null", P.centsToQtcString(100n, "xyz"), null);
 t("no float dust on 0.1-ish amounts", P.parseQtcToPlancks(P.centsToQtcString(33n, "1.00")) === 330000000000n);
+/* Exactness regression (2026-10-07): the float path disagreed with exact
+ * rational arithmetic in 8,965/16,048 swept cases, worst 2,228 plancks. */
+eq("exact: $1,234,567.89 @ $0.37", P.centsToQtcString(123456789n, "0.37"), "3336669.972972972973");
+eq("exact: worst swept case @ $0.008912", P.centsToQtcString(18350321n, "0.008912"), "20590575.628366247756");
+eq("rate as JS number", P.centsToQtcString(100n, 2.5), "0.4");
+eq("rate in exponent form", P.centsToQtcString(100n, "1e-3"), "1000");
+(function () {
+  // Sweep against an independent in-test BigInt rational reference.
+  function ref(cents, rate) {
+    const m = /^(\d*)(?:\.(\d*))?$/.exec(rate);
+    const frac = m[2] || "";
+    const R = BigInt((m[1] || "0") + frac);
+    const num = cents * 10n ** 12n * 10n ** BigInt(frac.length), den = 100n * R;
+    let q = num / den; if ((num % den) * 2n >= den) q += 1n;
+    return P.plancksToQtcString(q);
+  }
+  const rates = ["0.37", "2.50", "0.0314", "1.00", "12.50", "0.008912", "3.14159", "0.99"];
+  let bad = 0, n = 0;
+  for (const r of rates) for (let c = 1n; c < 20000000n; c += 9973n) { n++; if (P.centsToQtcString(c, r) !== ref(c, r)) bad++; }
+  t("exact sweep " + n + " cases, 0 mismatches", bad === 0, bad + " mismatches");
+})();
 
 /* ---- invoice IDs ---- */
 t("invoice id format", /^INV-\d{8}-\d{6}-[0-9A-Z]{3}$/.test(P.makeInvoiceId(Date.UTC(2026, 9, 1, 4, 5, 6))));
@@ -81,6 +105,11 @@ t("invoice id carries timestamp", P.makeInvoiceId(Date.UTC(2026, 9, 1, 4, 5, 6))
   eq("discount applied", r2.disc, 500n);
   eq("tax on taxable", r2.tax, (2999n * 800n) / 10000n);
   eq("total with tax+discount", r2.total, 2999n + (2999n * 800n) / 10000n);
+
+  const big = [{ qty: 1, unitCents: 100000n }];
+  eq("tax 8.875% exact (was snapped to 8.88%)", P.invoiceTotals(big, 0n, "8.875").tax, 8875n);
+  eq("tax 2.675% exact (was snapped to 2.67%)", P.invoiceTotals(big, 0n, "2.675").tax, 2675n);
+  eq("tax as JS number still works", P.invoiceTotals(big, 0n, 8.875).tax, 8875n);
 
   const r3 = P.invoiceTotals(items, 99999n, 0);
   t("discount capped at subtotal", r3.total === 0n && r3.disc === 3499n);
