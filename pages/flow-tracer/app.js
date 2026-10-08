@@ -16,6 +16,7 @@ var SVGNS = "http://www.w3.org/2000/svg";
 var snap = null, snapGraph = null, liveOk = false;
 var radar = null; // {peel, fanout, fanin, round, miner}
 var lastTrace = null;
+var traceSeq = 0; // generation token: only the latest doTrace may render
 
 function $(id) { return document.getElementById(id); }
 function esc(s) {
@@ -102,6 +103,7 @@ async function liveTraceRows(addr) {
 }
 
 async function doTrace(addr, direction, hops) {
+  var my = ++traceSeq;
   var status = $("trace-status");
   status.innerHTML = "Tracing <b>" + esc(F.shortAddr(addr)) + "</b>…";
   var graph = snapGraph, mode = "snapshot", rows = null;
@@ -111,6 +113,12 @@ async function doTrace(addr, direction, hops) {
       if (rows.length) { graph = F.buildGraph(rows); mode = "live"; }
     } catch (e) { /* fall through to snapshot */ }
   }
+  // Superseded while the live query was in flight: a newer trace owns
+  // the status line, the graph, the dossier and lastTrace now. Discard
+  // silently — rendering here would pronounce THIS address's trace over
+  // the newer one the form shows (and a stale FAILURE would fall through
+  // to a snapshot render of the wrong address over a live one).
+  if (my !== traceSeq) return;
   var t = F.trace(graph, addr, { direction: direction, maxHops: hops, maxNodes: 160 });
   lastTrace = { trace: t, addr: addr, graph: graph, mode: mode };
   renderGraph(t, addr, graph);
