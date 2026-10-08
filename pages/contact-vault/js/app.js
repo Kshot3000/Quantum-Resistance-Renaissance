@@ -243,7 +243,8 @@ function startEdit(card, c) {
 }
 $("addForm").addEventListener("submit", function (ev) {
   ev.preventDefault();
-  var label = $("nc-label").value.trim(), addr = $("nc-addr").value.trim(), note = $("nc-note").value.trim();
+  var labelRaw = $("nc-label").value, addrRawIn = $("nc-addr").value, noteRaw = $("nc-note").value;
+  var label = labelRaw.trim(), addr = addrRawIn.trim(), note = noteRaw.trim();
   var msg = $("addMsg"), btn = $("addBtn");
   function fail(t) { msg.className = "msg err"; msg.textContent = t; }
   if (!label) return fail("Give the contact a label.");
@@ -256,7 +257,12 @@ $("addForm").addEventListener("submit", function (ev) {
     vault.push({ id: uid(), label: label, address: v.address, note: note,
                  trusted: false, addedAt: new Date().toISOString(), checkphrase: words });
     saveVault(); renderVaultList();
-    $("nc-label").value = ""; $("nc-addr").value = ""; $("nc-note").value = "";
+    // Clear only fields the user has not touched since submitting — the
+    // derivation is async, and wiping the form unconditionally would
+    // destroy a next entry typed while it ran.
+    if ($("nc-label").value === labelRaw) $("nc-label").value = "";
+    if ($("nc-addr").value === addrRawIn) $("nc-addr").value = "";
+    if ($("nc-note").value === noteRaw) $("nc-note").value = "";
     msg.className = "msg ok"; msg.textContent = "✓ Saved — checkphrase: " + words.join(" · ");
     btn.disabled = false;
     toast("Contact added to the vault.", "ok");
@@ -360,29 +366,59 @@ function renderSimilarity(el, addr, best) {
 }
 
 /* ---------- spoken checkphrase ---------- */
+/* The verdict is a safety call ("this is / is not the address they meant"),
+ * so it must stay bound to the exact inputs it was computed for: a
+ * sequence token lets only the latest check render (a slow uncached
+ * derivation must never overwrite a newer cached one's verdict), a
+ * result whose fields moved mid-KDF is discarded with an explanation,
+ * and editing either input voids a shown verdict with an explanation. */
+var sToken = 0, sShown = null; // sShown: the raw inputs the shown verdict describes
+["sAddr", "sWords"].forEach(function (id) {
+  $(id).addEventListener("input", function () {
+    if (!sShown) return;
+    sShown = null;
+    setVerdict($("sResult"), "idle", "Inputs changed",
+      "That verdict was computed for the previous address / words — run the check again for what is in the boxes now.");
+  });
+});
 $("sCheckBtn").addEventListener("click", function () {
   var out = $("sResult");
-  var v = LOGIC.validateQuantusAddress($("sAddr").value);
+  var my = ++sToken;
+  var addrRaw = $("sAddr").value, wordsRaw = $("sWords").value;
+  sShown = { addr: addrRaw, words: wordsRaw };
+  var v = LOGIC.validateQuantusAddress(addrRaw);
   if (!v.ok) { out.innerHTML = ""; setVerdict(out, "err", "✗ Invalid address", esc(v.message)); return; }
-  var typed = $("sWords").value.toLowerCase().split(/[\s\-_.,;\/]+/).filter(Boolean);
+  var typed = wordsRaw.toLowerCase().split(/[\s\-_.,;\/]+/).filter(Boolean);
   if (typed.length !== 5) {
     out.innerHTML = "";
     setVerdict(out, "err", "✗ Need exactly five words", "You entered " + typed.length + ". Ask them to read the checkphrase again, slowly.");
     return;
   }
+  sShown = null; // derivation in flight — nothing shown yet to void
   out.innerHTML = '<div class="msg"><span class="spinner"></span>Deriving the true checkphrase…</div>';
   derivePhrase(v.address).then(function (words) {
+    if (my !== sToken) return; // a newer check owns the panel now
+    if ($("sAddr").value !== addrRaw || $("sWords").value !== wordsRaw) {
+      setVerdict(out, "idle", "Inputs changed while deriving",
+        "The address or the words changed while the checkphrase was being derived, so that result was discarded. Run the check again for what is in the boxes now.");
+      return;
+    }
+    sShown = { addr: addrRaw, words: wordsRaw };
     var diff = wordsDiff(words.map(function (w) { return w.toLowerCase(); }), typed);
     var bad = diff.filter(Boolean).length;
     out.innerHTML = '<div class="chips">' + words.map(function (w, i) {
       return '<span class="chip ' + (diff[i] ? "diff" : "same") + '"><span class="wn">' + (i + 1) +
         "</span>" + esc(w) + (diff[i] ? ' <span class="wn">you heard: ' + esc(typed[i]) + "</span>" : "") + "</span>";
     }).join("") + "</div>";
+    // Append the verdict BELOW the chips — setVerdict replaces innerHTML,
+    // so calling it on `out` here would erase the per-word diff it just drew.
+    var vWrap = document.createElement("div");
     if (bad === 0)
-      setVerdict(out, "ok", "✓ Words match", "All five words match the address. This is the address they meant.");
+      setVerdict(vWrap, "ok", "✓ Words match", "All five words match the address. This is the address they meant.");
     else
-      setVerdict(out, "err", '<span class="pulse-dot"></span>✗ ' + bad + " of 5 words differ",
+      setVerdict(vWrap, "err", '<span class="pulse-dot"></span>✗ ' + bad + " of 5 words differ",
         "Stop. The address in front of you is <strong>not</strong> the one those words describe — it was swapped or mistyped.");
+    out.appendChild(vWrap.firstChild);
   });
 });
 
