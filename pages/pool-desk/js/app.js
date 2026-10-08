@@ -20,8 +20,8 @@ const NETWORK_DEFAULTS = {
   // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
   // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
   // and dated for the no-fetch path (file://, offline). All four figures come from
-  // ONE capture (2026-10-08 19:20Z): consensus difficulty @189,029 and total
-  // issuance @189,029, 1 seconds apart — never mix snapshot dates in one bundle
+  // ONE capture (2026-10-08 20:19Z): consensus difficulty @189,029 and total
+  // issuance @189,029, 11 seconds apart — never mix snapshot dates in one bundle
   // (the Sept-30 bundle survived to Oct 2 at half the real hashrate and skewed
   // every fallback-path earnings figure ~2x; guarded in tests).
   blockRewardQTC: 0.3041789, // emission formula: (21M − 5,791,052.5063 total issuance) / 50M, data/supply.json @189029, 2026-10-08
@@ -447,6 +447,14 @@ function initComparator() {
   };
   els.net.value = (NETWORK_DEFAULTS.netHashHS / 1e12).toFixed(2);
   els.reward.value = NETWORK_DEFAULTS.blockRewardQTC;
+  // A late live-defaults load must never overwrite a field the user has
+  // already typed in (same clobber class as Node Desk's netHeadEdited fix):
+  // the snapshots can take seconds to arrive, and the fields invite editing
+  // the whole time. The landed values still update NETWORK_DEFAULTS/pace
+  // and the provenance fine print — only the input writes are gated.
+  const userEdited = { net: false, reward: false };
+  els.net.addEventListener("input", () => { userEdited.net = true; });
+  els.reward.addEventListener("input", () => { userEdited.reward = true; });
   const recalc = () => {
     const uh = toHS(parseFloat(els.hash.value) || 0, els.unit.value);
     const nh = toHS(parseFloat(els.net.value) || 0, "TH/s");
@@ -492,8 +500,8 @@ function initComparator() {
     NETWORK_DEFAULTS.netHashLabel = d.netHashLabel;
     pace.value = d.blocksPerDay;
     pace.label = d.paceLabel;
-    els.net.value = (d.netHashHs / 1e12).toFixed(2);
-    els.reward.value = d.rewardQtc.toFixed(4);
+    if (!(userEdited.net && els.net.value.trim() !== "")) els.net.value = (d.netHashHs / 1e12).toFixed(2);
+    if (!(userEdited.reward && els.reward.value.trim() !== "")) els.reward.value = d.rewardQtc.toFixed(4);
     recalc();
   }).catch(() => { /* static defaults stand; labels already say so */ });
 }
