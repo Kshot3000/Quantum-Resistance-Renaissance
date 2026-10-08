@@ -261,6 +261,7 @@ function openSocket() {
   setConnBadge();
 
   state.connectTimer = setTimeout(function () {
+    if (state.ws !== ws) return; // superseded socket's timer must not kill the current connection
     if (!state.connected) {
       logConn("connection timed out after " + (CONNECT_TIMEOUT_MS / 1000) + "s", true);
       try { ws.close(); } catch (e) {}
@@ -269,8 +270,10 @@ function openSocket() {
   }, CONNECT_TIMEOUT_MS);
 
   ws.onopen = function () {
+    if (state.ws !== ws) return; // a superseded socket never starts a handshake
     logConn("socket open — running handshake");
     handshake().then(function () {
+      if (state.ws !== ws) return; // superseded mid-handshake — the current socket owns the desk
       state.connected = true;
       state.reconnectAttempt = 0;
       if (state.connectTimer) { clearTimeout(state.connectTimer); state.connectTimer = null; }
@@ -283,6 +286,12 @@ function openSocket() {
       startPoolPolling();
       subscribeAllWatchers();
     }).catch(function (e) {
+      // A superseded socket's handshake is rejected by closeSocketQuiet()
+      // when its replacement opens. That rejection must discard itself:
+      // scheduleReconnect() here would clearTimers() the NEW socket's
+      // timers and schedule a competing socket that tears the healthy
+      // connection down seconds later.
+      if (state.ws !== ws) return;
       logConn("handshake failed: " + e.message, true);
       try { ws.close(); } catch (err) {}
       scheduleReconnect();
@@ -292,10 +301,12 @@ function openSocket() {
   ws.onmessage = function (ev) { routeMessage(ev.data); };
 
   ws.onerror = function () {
+    if (state.ws !== ws) return;
     logConn("socket error", true);
   };
 
   ws.onclose = function () {
+    if (state.ws !== ws) return; // a superseded socket's close changes nothing
     var was = state.connected;
     state.connected = false;
     state.head = null;
