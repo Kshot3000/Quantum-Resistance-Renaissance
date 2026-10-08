@@ -681,20 +681,42 @@ function addWatcher() {
 }
 
 function subscribeWatcher(w) {
+  if (w.status === "live" || w.status === "subscribing") return;
+  var ws = state.ws;
   var p = C.buildTxWatchSubscribe(w.address);
   state.reqToWatcher.set(p.id, w.address);
   w.status = "subscribing";
   w.note = "";
   renderWatchers();
+  // The subscribe resolves seconds later, by which time the watcher may
+  // have been removed or the socket replaced (disconnect / reconnect
+  // rejects the pending RPC via closeSocketQuiet). A continuation that
+  // ignores that would register a live node subscription for a removed
+  // address — never unsubscribed, still feeding signals — or stamp
+  // ERROR over the "waiting" state a clean disconnect just set.
+  function stillCurrent() {
+    return state.ws === ws && state.watchers.indexOf(w) !== -1;
+  }
   rpcCall(p).then(function (subId) {
-    state.reqToWatcher.delete(p.id);
+    if (state.reqToWatcher.get(p.id) === w.address) state.reqToWatcher.delete(p.id);
+    if (!stillCurrent()) {
+      // Superseded. If the socket that granted the subscription is
+      // still the current one, the subscription is live on the node
+      // for an address nobody watches — release it instead of leaking
+      // it into subToWatcher. (On a dead socket it died with it.)
+      if (state.ws === ws && ws) {
+        try { rpcCall(C.buildTxWatchUnsubscribe(String(subId))).catch(function () {}); } catch (e) {}
+      }
+      return;
+    }
     w.subId = String(subId);
     w.status = "live";
     state.subToWatcher.set(w.subId, w.address);
     logConn("txWatch live for " + C.shorten(w.address, 12, 8));
     renderWatchers();
   }).catch(function (e) {
-    state.reqToWatcher.delete(p.id);
+    if (state.reqToWatcher.get(p.id) === w.address) state.reqToWatcher.delete(p.id);
+    if (!stillCurrent()) return; // a superseded attempt's failure changes nothing
     w.status = "error";
     w.note = e.code === 5011 ? "node rejected the address (invalid SS58)" : e.message;
     logConn("txWatch subscribe failed for " + C.shorten(w.address, 12, 8) + ": " + e.message, true);
@@ -725,6 +747,15 @@ function removeWatcher(addr) {
     if (x.address === addr) { w = x; return false; }
     return true;
   });
+  if (w) {
+    // A subscribe may still be in flight for this address; drop its
+    // pending-request entries now — subscribeWatcher's continuations
+    // identity-check the watch list and release a late-granted
+    // subscription instead of registering it.
+    state.reqToWatcher.forEach(function (addr, id) {
+      if (addr === w.address) state.reqToWatcher.delete(id);
+    });
+  }
   if (w && w.subId && state.connected) {
     rpcCall(C.buildTxWatchUnsubscribe(w.subId)).catch(function () {});
     state.subToWatcher.delete(w.subId);
