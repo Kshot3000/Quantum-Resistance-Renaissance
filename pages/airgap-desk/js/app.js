@@ -298,6 +298,18 @@ $('btn-quote-fee').addEventListener('click', async () => {
   err('broadcast-err');
   const v = hot.verified;
   if (!v || !v.ok) { err('broadcast-err', 'Verify a valid package first.'); return; }
+  // Pin the exact extrinsic that was verified. This handler awaits the node
+  // several times, and assembling a new package mid-quote replaces
+  // hot.verified/hot.extrinsicHex: reading the hex live would quote the NEW
+  // extrinsic's fee beside THIS package's amount/era/nonce, and this quote's
+  // stale era/nonce verdicts could disable the NEW package's Broadcast.
+  const hex = hot.extrinsicHex;
+  const stale = () => hot.verified !== v || hot.extrinsicHex !== hex;
+  const discard = () => {
+    const e = new Error('the verified package changed while its fee was being quoted — quote discarded. Quote the package now on screen instead.');
+    e.discard = true;
+    throw e;
+  };
   const btn = $('btn-quote-fee'); btn.disabled = true; btn.textContent = 'Quoting…';
   try {
     const url = $('rpc-url').value.trim() || 'wss://rpc.quantus.network';
@@ -307,11 +319,14 @@ $('btn-quote-fee').addEventListener('click', async () => {
     }
     setConn('', 'connecting…');
     const latest = await getLatestHeader(hot.rpc);
+    if (stale()) discard();
     setConn('on', 'connected');
-    const details = await hot.rpc.call('payment_queryFeeDetails', [hot.extrinsicHex, latest.hash]);
+    const details = await hot.rpc.call('payment_queryFeeDetails', [hex, latest.hash]);
+    if (stale()) discard();
     const f = details.inclusionFee;
     const fee = BigInt(f.baseFee) + BigInt(f.lenFee) + BigInt(f.adjustedWeightFee);
     const info = await getAccountInfo(hot.rpc, v.decoded.accountId);
+    if (stale()) discard();
     const free = info ? info.free : 0n;
     const total = v.decoded.call.amountPlancks + fee;
     let warn = '';
@@ -319,30 +334,38 @@ $('btn-quote-fee').addEventListener('click', async () => {
       warn = ` ⚠️ Sender holds ${plancksToQtc(free)} QTC — not enough for amount + fee (${plancksToQtc(total)} QTC). Broadcast would fail.`;
     else if (info && free - total < EXISTENTIAL_DEPOSIT && free !== total)
       warn = ` ⚠️ After this transfer the sender would hold ${plancksToQtc(free - total)} QTC — below the 0.001 QTC existential deposit; transfer_keep_alive will refuse.`;
-    // era freshness
+    // era freshness — verdicts are computed into locals and only APPLIED
+    // (broadcast disable + panel render) in the final synchronous section
+    // below, after the last stale check, so a discarded quote can never
+    // touch the package now on screen.
     const era = v.decoded.era;
     let eraNote = '';
+    let eraExpired = false;
     if (!era.immortal) {
       const birthBlock = v.ticket.era.birth;
       const remaining = birthBlock + era.period - latest.number;
       eraNote = remaining > 0
         ? ` Era valid for ~${remaining} more blocks.`
         : ` ⛔ Era EXPIRED at head #${latest.number.toLocaleString()} — re-issue the ticket and re-sign.`;
-      if (remaining <= 0) $('btn-broadcast').disabled = true;
+      eraExpired = remaining <= 0;
     }
     // nonce freshness
     let nonceNote = '';
+    let nonceStale = false;
     try {
       const live = await getNonce(hot.rpc, v.decoded.address);
       if (BigInt(live) !== v.decoded.nonce) {
         nonceNote = ` ⛔ Nonce STALE — chain says ${live}, package says ${v.decoded.nonce}. Re-issue the ticket and re-sign.`;
-        $('btn-broadcast').disabled = true;
+        nonceStale = true;
       } else nonceNote = ' Nonce fresh.';
     } catch { nonceNote = ' (nonce freshness check failed — node unreachable for accountNextIndex)'; }
+    if (stale()) discard();
+    if (eraExpired || nonceStale) $('btn-broadcast').disabled = true;
     const fq = $('fee-quote');
     fq.hidden = false;
     fq.innerHTML = `⛽ Node-quoted fee: <strong>${plancksToQtc(fee)} QTC</strong> (exact, quoted just now at head #${latest.number.toLocaleString()}).${warn}${eraNote}${nonceNote}`;
   } catch (e) {
+    if (e.discard) { err('broadcast-err', e.message); return; }
     setConn('bad', 'offline');
     err('broadcast-err', 'Fee quote failed: ' + e.message);
   } finally {
@@ -354,9 +377,10 @@ $('btn-broadcast').addEventListener('click', async () => {
   err('broadcast-err');
   const v = hot.verified;
   if (!v || !v.ok) return;
+  const hex = hot.extrinsicHex; // the exact bytes this verification pronounced valid
   const btn = $('btn-broadcast'); btn.disabled = true; btn.textContent = 'Broadcasting…';
   try {
-    const hash = await submitExtrinsic(hot.rpc, hot.extrinsicHex);
+    const hash = await submitExtrinsic(hot.rpc, hex);
     $('broadcast-result').hidden = false;
     $('res-hash').textContent = hash;
     const ex = $('res-explorer');
