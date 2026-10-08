@@ -6,7 +6,7 @@
 import {
   QUANTUS_SS58_PREFIX, MAINNET_RPC, LOCAL_RPC, ENDPOINT_PRESETS,
   validateEndpoint, parseParamsJson, explainError, shortHex, formatMs, formatNumber,
-  parseAddressInput, decodeBalanceStorage, buildMapKeyHex,
+  parseAddressInput, decodeBalanceStorage, buildMapKeyHex, accountStorageKeyHex,
   summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion,
   historyEntry, loadHistory, saveHistory, normalizeHex, isHex, formatPartialFeeQtc,
 } from './core.js';
@@ -132,6 +132,8 @@ let connectedUrl = null;
 let history = loadHistory(localStorage);
 let stats = { calls: 0, errors: 0, totalMs: 0 };
 let activeSubs = new Map(); // key -> {subId, method, unsub, stop}
+let startingSubs = new Set(); // keys whose subscribe RPC is still in flight
+let subStartSeq = new Map(); // key -> latest start token; only that token may register/report
 let currentTab = 'console';
 let selectedRecipe = null;
 let pendingBroadcast = null;
@@ -175,6 +177,10 @@ async function connect(url) {
 }
 
 function disconnect(silent = true) {
+  // Invalidate any subscribe still in flight: its continuation must not
+  // register a subscription (or report an error) for a dead connection.
+  for (const k of startingSubs) subStartSeq.set(k, (subStartSeq.get(k) || 0) + 1);
+  startingSubs.clear();
   for (const [, s] of activeSubs) { try { s.stop(); } catch {} }
   activeSubs.clear();
   renderSubs();
@@ -539,21 +545,23 @@ function renderSubs() {
   const el = $('subs');
   let html = SUB_DEFS.map((d) => {
     const active = activeSubs.has(d.key);
+    const starting = !active && startingSubs.has(d.key);
     return `<div class="sub-card${active ? ' live' : ''}">
-      <div class="sub-head"><b>${esc(d.title)}</b><span class="pill ${active ? 'up' : 'down'}"><span class="dot"></span>${active ? 'live' : 'off'}</span></div>
+      <div class="sub-head"><b>${esc(d.title)}</b><span class="pill ${active ? 'up' : starting ? 'busy' : 'down'}"><span class="dot"></span>${active ? 'live' : starting ? 'starting' : 'off'}</span></div>
       <p>${esc(d.blurb)}</p><div class="mono dim small">${esc(d.sub)}</div>
-      <div class="rf-actions">${active
+      <div class="rf-actions">${active || starting
         ? `<button class="btn small" data-stop="${d.key}">stop</button>`
         : `<button class="btn small primary" data-start="${d.key}">start</button>`}</div>
     </div>`;
   }).join('');
   const wActive = activeSubs.has('storageWatch');
+  const wStarting = !wActive && startingSubs.has('storageWatch');
   html += `<div class="sub-card${wActive ? ' live' : ''}">
-      <div class="sub-head"><b>Storage watch</b><span class="pill ${wActive ? 'up' : 'down'}"><span class="dot"></span>${wActive ? 'live' : 'off'}</span></div>
+      <div class="sub-head"><b>Storage watch</b><span class="pill ${wActive ? 'up' : wStarting ? 'busy' : 'down'}"><span class="dot"></span>${wActive ? 'live' : wStarting ? 'starting' : 'off'}</span></div>
       <p>Watch an account's balance move in real time.</p>
-      <label class="field"><span>SS58 address</span><input id="sw-addr" class="mono" placeholder="qz…" ${wActive ? 'disabled' : ''}></label>
+      <label class="field"><span>SS58 address</span><input id="sw-addr" class="mono" placeholder="qz…" ${wActive || wStarting ? 'disabled' : ''}></label>
       <div class="mono dim small">state_subscribeStorage</div>
-      <div class="rf-actions">${wActive
+      <div class="rf-actions">${wActive || wStarting
         ? `<button class="btn small" data-stop="storageWatch">stop</button>`
         : `<button class="btn small primary" data-start="storageWatch">start</button>`}</div>
     </div>`;
@@ -564,32 +572,73 @@ function renderSubs() {
 
 async function startSub(key) {
   if (!rpc || !rpc.connected) { toast('Connect to an endpoint first.', 'err'); return; }
-  if (activeSubs.has(key)) return;
+  // A start already in flight owns this key: a second click must not open a
+  // second node subscription (the first would be overwritten in activeSubs
+  // and leaked — never unsubscribed, feeding forever).
+  if (activeSubs.has(key) || startingSubs.has(key)) return;
   const def = SUB_DEFS.find((d) => d.key === key);
+  // Validate the storage key BEFORE marking the start: renderSubs() below
+  // re-creates the (now disabled) address input, wiping its value.
+  let storageKeyHex = null;
+  if (!def && key === 'storageWatch') {
+    const k = accountStorageKeyHex($('sw-addr').value);
+    if (!k.ok) { toast(k.error, 'err'); return; }
+    storageKeyHex = k.keyHex;
+  }
+  const myRpc = rpc;
+  const token = (subStartSeq.get(key) || 0) + 1;
+  subStartSeq.set(key, token);
+  const isCurrent = () => subStartSeq.get(key) === token && rpc === myRpc;
+  startingSubs.add(key);
+  renderSubs();
   try {
+    let subId = null;
+    let unsubMethod = null;
     if (def) {
-      const subId = await rpc.subscribe(def.sub, [], (n) => feedLog(key, def.render(n, activeSubs.get(key).prev), n));
-      activeSubs.set(key, { subId, stop: async () => { await rpc.unsubscribe(def.unsub, subId); }, prev: null });
+      unsubMethod = def.unsub;
+      subId = await myRpc.subscribe(def.sub, [], (n) => feedLog(key, def.render(n, activeSubs.get(key)?.prev), n));
     } else if (key === 'storageWatch') {
-      const addr = $('sw-addr').value;
-      const k = accountStorageKeyHex(addr);
-      if (!k.ok) { toast(k.error, 'err'); return; }
-      const subId = await rpc.subscribe('state_subscribeStorage', [[k.keyHex]], (cs) => {
+      unsubMethod = 'state_unsubscribeStorage';
+      subId = await myRpc.subscribe('state_subscribeStorage', [[storageKeyHex]], (cs) => {
         const ch = cs && cs.changes ? cs.changes[0] : null;
         const txt = ch ? `balance key changed @ #${formatNumber(Number(cs.block))} · <span class="mono dim">${esc(shortHex(ch[1] || 'null', 24))}</span>` : 'change set received';
         feedLog(key, txt);
       });
-      activeSubs.set(key, { subId, stop: async () => { await rpc.unsubscribe('state_unsubscribeStorage', subId); } });
+    } else {
+      return;
     }
+    if (!isCurrent()) {
+      // Superseded while subscribing (stop pressed, disconnect, reconnect):
+      // release the just-created subscription on the socket that made it
+      // instead of registering it, and say nothing — the user's newer
+      // action already owns the UI.
+      try { await myRpc.unsubscribe(unsubMethod, subId); } catch {}
+      return;
+    }
+    activeSubs.set(key, { subId, stop: async () => { await myRpc.unsubscribe(unsubMethod, subId); }, prev: null });
     toast('Subscription live.', 'ok');
   } catch (e) {
+    if (!isCurrent()) return; // superseded failure discards itself silently
     const x = explainError(e);
     toast(`${x.title}: ${x.hint}`, 'err');
+  } finally {
+    if (subStartSeq.get(key) === token) startingSubs.delete(key);
+    renderSubs();
+    renderStats();
   }
-  renderSubs();
 }
 
 async function stopSub(key) {
+  // Stopping a start that is still in flight cancels it: bumping the token
+  // makes its continuation release the subscription instead of going live.
+  if (startingSubs.has(key)) {
+    subStartSeq.set(key, (subStartSeq.get(key) || 0) + 1);
+    startingSubs.delete(key);
+    renderSubs();
+    renderStats();
+    toast('Subscription stopped.', '');
+    return;
+  }
   const s = activeSubs.get(key);
   if (!s) return;
   try { await s.stop(); } catch {}
