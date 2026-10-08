@@ -355,6 +355,20 @@ const board = {
   ws: null, id: 0, pending: new Map(), watching: false,
   seen: new Set(), scanning: false
 };
+/* A history scan awaits many RPCs in sequence, so it can land long
+ * after the connection it started on is gone. Without a token, a
+ * superseded scan's late landing rendered unconditionally: its error
+ * path claimed "still watching new heads" (live dot) over the
+ * disconnect's own status, its tail re-enabled the Scan button the
+ * disconnect had disabled, and — after a reconnect — the dead scan
+ * kept issuing block/storage RPCs on the replacement socket and
+ * wedged `scanning` so the new connection could never scan. A
+ * sequence token pinned to the starting socket lets only the latest
+ * scan on the still-current socket render, error, or clean up; a
+ * superseded success or failure discards itself silently, and the
+ * disconnect path (fail) invalidates the token, resets `scanning`
+ * and hides progress so a reconnect starts clean. */
+let boardScanSeq = 0;
 function rpc(method, params) {
   return new Promise((resolve, reject) => {
     if (!board.ws || board.ws.readyState !== 1) return reject(new Error("not connected"));
@@ -503,6 +517,13 @@ $("connBtn").addEventListener("click", () => {
   };
   const fail = () => {
     board.watching = false; board.ws = null;
+    /* Invalidate any in-flight history scan (see boardScanSeq): its
+     * late landing must not render, error, or clean up over this
+     * disconnect state, and the scan UI resets here because the
+     * superseded scan's own tail will (correctly) never run. */
+    boardScanSeq++;
+    board.scanning = false;
+    $("scanProg").hidden = true;
     $("connBtn").textContent = "Connect & watch";
     $("backBtn").disabled = true;
     setStatus("", "Connection failed or closed. The node may be unreachable from this network — the rest of the desk works fully offline.");
@@ -513,6 +534,10 @@ $("connBtn").addEventListener("click", () => {
 
 $("backBtn").addEventListener("click", async () => {
   if (board.scanning || !board.ws || board.ws.readyState !== 1) return;
+  const myScan = ++boardScanSeq;
+  const myWs = board.ws;
+  const isCurrent = () => myScan === boardScanSeq && board.ws === myWs &&
+    board.watching && board.ws && board.ws.readyState === 1;
   board.scanning = true;
   $("backBtn").disabled = true;
   const prog = $("scanProg"); prog.hidden = false;
@@ -520,25 +545,37 @@ $("backBtn").addEventListener("click", async () => {
   setStatus("scan", "Scanning history…");
   try {
     const head = await rpc("chain_getHeader", []);
+    if (!isCurrent()) return;
     const headNum = hexToNum(head.number);
     const N = 720, from = Math.max(1, headNum - N + 1);
     let found = 0;
     for (let n = headNum; n >= from; n--) {
+      if (!isCurrent()) return;
       const hash = await rpc("chain_getBlockHash", [n]);
+      if (!isCurrent()) return;
       const before = board.seen.size;
       await processBlock(hash);
+      if (!isCurrent()) return;
       found += board.seen.size - before;
       const done = headNum - n + 1;
       bar.style.width = Math.round((done / (headNum - from + 1)) * 100) + "%";
       lbl.textContent = `block ${n.toLocaleString("en-US")} — ${found} remark${found === 1 ? "" : "s"} found`;
     }
+    if (!isCurrent()) return;
     setStatus("live", `History scan complete — ${found} remark${found === 1 ? "" : "s"} in the last ${(headNum - from + 1).toLocaleString("en-US")} blocks. Still watching new heads.`);
   } catch (e) {
+    if (!isCurrent()) return;
     setStatus("live", "History scan hit an error (" + e.message + ") — still watching new heads.");
   }
-  prog.hidden = true;
-  board.scanning = false;
-  $("backBtn").disabled = false;
+  /* Only the still-current scan owns this cleanup; a superseded scan
+   * returns above, and its disconnect already reset scanning/progress
+   * (fail) — touching them here would clobber that state or a newer
+   * connection's scan. */
+  if (myScan === boardScanSeq) {
+    prog.hidden = true;
+    board.scanning = false;
+    $("backBtn").disabled = false;
+  }
 });
 
 /* ---------------- init ---------------- */
