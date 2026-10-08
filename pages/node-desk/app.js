@@ -9,6 +9,10 @@ const $ = (id) => document.getElementById(id);
 const SNAP = "../../data/consensus.json";
 let mode = "external";
 let networkHead = null;
+/* Set when the user types into the Network head field: a probe or
+ * snapshot result that lands afterwards must never overwrite a manual
+ * entry (the probe can take up to ~10 s — plenty of time to type). */
+let netHeadEdited = false;
 
 /* ---------- copy buttons ---------- */
 document.addEventListener("click", (e) => {
@@ -186,24 +190,39 @@ function probeRpc() {
 }
 
 async function initSync() {
-  const h = await probeRpc();
   const netInput = $("inNetH");
+  /* A manual entry typed while an await below was in flight wins over
+   * the late result: keep the field (and the networkHead the input
+   * listener already adopted from it), and report the superseded
+   * result in the source line instead of silently applying it. A
+   * field the user edited back to empty has nothing to protect. */
+  const userKept = () => netHeadEdited && netInput.value.trim() !== "";
+  const h = await probeRpc();
   if (h) {
-    networkHead = h;
-    netInput.value = h;
-    netInput.placeholder = "";
-    $("netSrc").innerHTML = `Live from <code>${PUBLIC_RPC}</code> via <code>chain_getHeader</code> — just now.`;
+    if (userKept()) {
+      $("netSrc").innerHTML = `Live probe found head ${h.toLocaleString()} via <code>chain_getHeader</code> — keeping your manual entry ${Number(netInput.value).toLocaleString()}; clear the field and reload to use the probe.`;
+    } else {
+      networkHead = h;
+      netInput.value = h;
+      netInput.placeholder = "";
+      $("netSrc").innerHTML = `Live from <code>${PUBLIC_RPC}</code> via <code>chain_getHeader</code> — just now.`;
+    }
   } else {
     try {
       const r = await fetch(SNAP, { cache: "no-store", signal: timeoutSignal(9000) });
       const S = await r.json();
-      networkHead = Number(S.head);
-      netInput.value = networkHead;
+      const snapHead = Number(S.head);
       const age = Math.max(0, Math.round((Date.now() - Date.parse(S.fetched_at)) / 60000));
-      $("netSrc").innerHTML = `Public RPC unreachable from this browser — using builder snapshot (block ${networkHead.toLocaleString()}, ${age}m old). You can also type the head manually.`;
+      if (userKept()) {
+        $("netSrc").innerHTML = `Public RPC unreachable — builder snapshot reports head ${snapHead.toLocaleString()} (${age}m old), but keeping your manual entry ${Number(netInput.value).toLocaleString()}; clear the field and reload to use the snapshot.`;
+      } else {
+        networkHead = snapHead;
+        netInput.value = networkHead;
+        $("netSrc").innerHTML = `Public RPC unreachable from this browser — using builder snapshot (block ${networkHead.toLocaleString()}, ${age}m old). You can also type the head manually.`;
+      }
     } catch (e) {
       $("netSrc").innerHTML = `Public RPC unreachable and no snapshot — type the network head manually (see the <a href="https://explorer.quantus.com/" target="_blank" rel="noopener">explorer</a>).`;
-      netInput.placeholder = "e.g. 142417";
+      if (!userKept()) netInput.placeholder = "e.g. 142417";
     }
   }
   renderSync();
@@ -226,7 +245,7 @@ function renderSync() {
     : `At the 12 s block target, roughly ${fmtEta(s.etaMin)} to catch up (assuming your node keeps pace with the tip).`;
 }
 $("inLocalH").addEventListener("input", renderSync);
-$("inNetH").addEventListener("input", () => { networkHead = Number($("inNetH").value) || null; renderSync(); });
+$("inNetH").addEventListener("input", () => { netHeadEdited = true; networkHead = Number($("inNetH").value) || null; renderSync(); });
 
 /* ---------- log forensics ---------- */
 function renderLog() {
