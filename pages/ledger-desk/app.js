@@ -166,7 +166,18 @@ function timeoutSignal(ms) {
   return ctl.signal;
 }
 
+/* A scan is a pin on the latest click. Two scans in flight (a double-click
+ * on Scan is enough) share the mutable `detections` list, so a superseded
+ * scan landing late must discard itself entirely: unconditionally, it
+ * appended its candidates to the current scan's list (every candidate
+ * twice, all boxes re-checked — resurrecting one the user had just
+ * unchecked) and "Add selected" then wrote the duplicates into the tax
+ * ledger, double-counting mining income; its failure path likewise
+ * overwrote the current scan's success status with "Could not load
+ * snapshots". Only the latest scan may compute, render, or report. */
+var scanSeq = 0;
 async function runScan() {
+  var seq = ++scanSeq;
   var status = $("scanStatus"), list = $("detectList");
   detections = [];
   $("detectActions").hidden = true;
@@ -185,9 +196,11 @@ async function runScan() {
     var flowsRaw = await (await fetch(DATA + "flows.json", { signal: timeoutSignal(20000) })).json();
     flows = (typeof QFlows !== "undefined" && QFlows.decode) ? QFlows.decode(flowsRaw) : flowsRaw;
   } catch (e) {
+    if (seq !== scanSeq) return; // superseded: a newer scan owns the status
     status.textContent = "Could not load snapshots: " + e.message;
     return;
   }
+  if (seq !== scanSeq) return; // superseded: discard before touching detections
   var headBlock = live.data.blocks[0];
   var anchorMs = Date.parse(headBlock.timestamp);
   var anchorH = headBlock.height;
