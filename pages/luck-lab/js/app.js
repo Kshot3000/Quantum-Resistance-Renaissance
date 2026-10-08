@@ -8,8 +8,8 @@
   var $ = function (id) { return document.getElementById(id); };
 
   // Fallback bundle — ONE capture, never mixed dates: every field below comes
-  // from the 2026-10-08 22:23Z snapshot refresh (consensus @ block 189,029 +
-  // supply @ block 189,029, fetched 14 seconds apart). The previous bundle paired
+  // from the 2026-10-08 23:31Z snapshot refresh (consensus @ block 189,029 +
+  // supply @ block 189,029, fetched 11 seconds apart). The previous bundle paired
   // Oct 1 difficulty/head with an Oct 2 supply-derived reward, which silently
   // skewed every fallback-painted figure. Guarded by tests/luck-core.test.js
   // (cross-checked against energy-observatory's fallback bundle).
@@ -20,7 +20,7 @@
     blocksPerDay: 6845,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
     avgBlockMs: 12622,
     head: 189029,
-    fetchedAt: "2026-10-08T22:23:04.344Z",
+    fetchedAt: "2026-10-08T23:31:59.760Z",
     source: "snapshot"
   };
 

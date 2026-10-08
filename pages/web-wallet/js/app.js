@@ -474,25 +474,41 @@ $('btn-cancel-send').addEventListener('click', () => {
   $('estimate-box').hidden = true;
 });
 
+let broadcastSeq = 0; // token: only the latest broadcast for the pinned wallet/node may render
 $('btn-broadcast').addEventListener('click', async () => {
   err('send-err');
   const unsigned = state.unsigned;
   if (!unsigned) { err('send-err', 'Build the transfer first.'); return; }
+  const kp = state.kp, rpc = state.rpc; // pin the wallet + node this broadcast is for
+  const seq = ++broadcastSeq;
   const btn = $('btn-broadcast'); btn.disabled = true; btn.textContent = 'Signing & broadcasting…';
+  /* The estimate button and form stay live while the submit is in flight,
+   * and Lock/Reconnect can happen too. A continuation that lands after a
+   * newer estimate was pinned, after Lock (kp nulled / replaced by another
+   * wallet), or after a reconnect must render NOTHING: the old code wiped
+   * the newer estimate's pin, hid its review box, showed this broadcast's
+   * hash as the result, painted its failure over the new estimate — and a
+   * failure landing after Lock sat in the DOM behind the unlock screen,
+   * waiting in the next session. An edited-away pin (state.unsigned null,
+   * no newer estimate) does NOT void the render: the transfer really was
+   * submitted and its hash is the truthful result for this same wallet. */
+  const stale = () => seq !== broadcastSeq || state.kp !== kp || state.rpc !== rpc ||
+    (state.unsigned !== null && state.unsigned !== unsigned);
   try {
-    const mod = state.kp.scheme === 87 ? ml_dsa87 : ml_dsa65;
+    const mod = kp.scheme === 87 ? ml_dsa87 : ml_dsa65;
     const { extrinsicHex, signature, pubkey } = finalizeTransfer(unsigned, {
-      scheme: state.kp.scheme,
+      scheme: kp.scheme,
       signFn: (payload) => ({
-        signature: mod.sign(payload, state.kp.secretKey, { context: CTX }),
-        pubkey: state.kp.publicKey,
+        signature: mod.sign(payload, kp.secretKey, { context: CTX }),
+        pubkey: kp.publicKey,
       }),
     });
     // Pre-broadcast self-check: the signature MUST verify under our own public
     // key with the chain's context before it ever touches the network.
     const ok = mod.verify(signature, unsigned.payload, pubkey, { context: CTX });
     if (!ok) throw new Error('local signature self-check failed — refusing to broadcast');
-    const hash = await submitExtrinsic(state.rpc, extrinsicHex);
+    const hash = await submitExtrinsic(rpc, extrinsicHex);
+    if (stale()) return; // superseded while the node answered — discard silently
     state.unsigned = null;
     $('estimate-box').hidden = true;
     $('send-result').hidden = false;
@@ -504,9 +520,12 @@ $('btn-broadcast').addEventListener('click', async () => {
     ex.hidden = false;
     refreshBalance();
   } catch (e) {
+    if (stale()) return; // a superseded failure must not paint over newer state
     err('send-err', 'Broadcast failed: ' + e.message);
   } finally {
-    btn.disabled = false; btn.textContent = '2 · Sign & broadcast';
+    // Only the latest broadcast owns the button: a superseded finally must
+    // not re-enable a newer broadcast's button mid-flight (double submit).
+    if (seq === broadcastSeq) { btn.disabled = false; btn.textContent = '2 · Sign & broadcast'; }
   }
 });
 

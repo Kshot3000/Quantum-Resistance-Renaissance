@@ -13,7 +13,7 @@ var FALLBACK = {
   height: 189029,
   // total supply in plancks (free + reserved + frozen), balances aggregate @ block
   // 189,029, fetched 2026-10-08 — the SAME capture as the difficulty above
-  // (@ block 189,029, fetched 14 seconds apart; never mix snapshot dates in one bundle).
+  // (@ block 189,029, fetched 11 seconds apart; never mix snapshot dates in one bundle).
   // This is total_issuance for the emission formula, NOT mined rewards alone
   // (genesis endowments count toward issuance).
   totalSupplyPlancks: "5791052506292137223",
