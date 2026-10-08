@@ -103,7 +103,13 @@ function renderQr(el, text, size) {
   el.innerHTML = qr.createImgTag(size, 0);
 }
 async function forge() {
-  const S = SCHEMES[scheme];
+  // Pin the scheme at click time: the picker cards stay clickable during the
+  // ~1s forge, and currentKey below must describe the key actually generated —
+  // reading the live `scheme` there would relabel a 65 key as 87 (or vice
+  // versa), making sign throw on the secret-key length and mislabeling the
+  // secret backup's scheme field.
+  const pinnedScheme = scheme;
+  const S = SCHEMES[pinnedScheme];
   $('forgeIdle').hidden = true;
   $('forgeResult').hidden = true;
   $('forgeBusy').hidden = false;
@@ -122,7 +128,7 @@ async function forge() {
   setStep(4, 'done');
   await sleep(260);
 
-  currentKey = { publicKey, secretKey, address, accountId, scheme };
+  currentKey = { publicKey, secretKey, address, accountId, scheme: pinnedScheme };
   secretRevealed = false;
 
   $('resAddress').textContent = address;
