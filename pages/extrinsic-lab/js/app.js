@@ -167,17 +167,45 @@
     return '<div style="margin-bottom:8px">' + title + '</div>' + (args || '<div class="fineprint">no arguments</div>');
   }
 
+  /* ---------- stale-pin invalidation ----------
+   * The autopsy panel and the Verify tab both consume the decoded pin
+   * (state.last / state.lastHex). If the hex box diverges from the pin,
+   * the panel would describe extrinsic A while the box shows B — and
+   * Verify would pronounce A's verdict over B. Any divergence voids
+   * both, with an explanation. Programmatic loads (samples, Live-tab
+   * autopsy) set the box and decode in the same step, so they never
+   * trip this: setting .value fires no input event. */
+  function voidVerify(msg) {
+    var resBox = $('verify-result'), errBox = $('verify-error');
+    if (resBox.hidden) return;
+    resBox.hidden = true; resBox.innerHTML = '';
+    if (msg) { errBox.hidden = false; errBox.innerHTML = '<b>Verdict cleared.</b> ' + esc(msg); }
+  }
+  function voidDecode() {
+    if (!state.last) return;
+    state.last = null; state.lastHex = '';
+    $('decode-result').hidden = true;
+    var errBox = $('decode-error');
+    errBox.hidden = false;
+    errBox.innerHTML = '<b>Autopsy cleared.</b> The hex changed after this extrinsic was decoded, so the old autopsy no longer describes what is in the box. Run Autopsy again to decode the current hex.';
+    voidVerify('The decoded extrinsic changed, so the verdict no longer applies. Decode the current hex and verify again.');
+  }
+
   /* ---------- decode ---------- */
   function doDecode(hexInput) {
     var errBox = $('decode-error'), resBox = $('decode-result');
     errBox.hidden = true; resBox.hidden = true;
+    /* A fresh decode supersedes any verdict earned by the previous one. */
+    voidVerify('A new extrinsic was decoded, so the previous verdict no longer applies. Verify again.');
     var hex = (hexInput != null ? hexInput : $('hex-input').value).trim();
-    if (!hex) { errBox.hidden = false; errBox.innerHTML = '<b>No input.</b> Paste an extrinsic hex first — or pick a lab sample.'; return; }
+    if (!hex) { state.last = null; state.lastHex = ''; errBox.hidden = false; errBox.innerHTML = '<b>No input.</b> Paste an extrinsic hex first — or pick a lab sample.'; return; }
     var d;
     try {
       d = D.decodeExtrinsic(hex);
       d._hex = hex;
     } catch (e) {
+      /* A failed decode must not leave the previous pin verifiable. */
+      state.last = null; state.lastHex = '';
       errBox.hidden = false;
       errBox.innerHTML = '<b>Could not decode.</b> ' + esc(e.message) +
         '<br><span class="conv">Tip: the input must be the full length-prefixed extrinsic hex (starts with 0x…), not just the call data.</span>';
@@ -264,6 +292,9 @@
   });
   $('hex-input').addEventListener('keydown', function (ev) {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') doDecode();
+  });
+  $('hex-input').addEventListener('input', function () {
+    if (state.last && this.value.trim() !== state.lastHex) voidDecode();
   });
 
   /* ---------- lab samples (generated locally, never broadcast) ---------- */
@@ -363,6 +394,13 @@
     }
   }
   $('verify-btn').addEventListener('click', doVerify);
+  /* A verdict is a pin on its context: editing any context field after
+   * a verdict renders voids it (the payload is rebuilt from these). */
+  ['v-spec', 'v-tx', 'v-genesis', 'v-block', 'v-birth'].forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      voidVerify('The verification context changed after the verdict, so it no longer applies. Verify again.');
+    });
+  });
   window.addEventListener('qel:crypto-ready', function () {
     var n = $('crypto-note');
     n.textContent = 'ML-DSA engine ready (65 + 87, FIPS-204)';
@@ -427,6 +465,9 @@
           $('v-spec').value = rt.specVersion;
           $('v-tx').value = rt.transactionVersion;
           $('v-genesis').value = genesis;
+          /* Programmatic writes fire no input event — void any verdict
+           * earned under the old context explicitly. */
+          voidVerify('Fresh context was fetched from the node, so the previous verdict no longer applies. Verify again.');
           var note = 'spec ' + rt.specVersion + ' · tx v' + rt.transactionVersion + ' · finalized #' + blockNum.toLocaleString('en-US');
           var d = state.last;
           if (d && d.version.signed && !d.era.immortal) {
