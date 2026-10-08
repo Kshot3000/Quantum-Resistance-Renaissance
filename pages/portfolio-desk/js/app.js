@@ -460,12 +460,29 @@ function renderAll() {
 /* ---------- add-address flow ---------- */
 
 var pendingAddr = null;
+var validateSeq = 0;       // only the latest validate may render a confirm
+var derivingFor = null;    // address a checkphrase KDF is in flight for
+
+function voidPending(explanation) {
+  validateSeq++;
+  pendingAddr = null;
+  derivingFor = null;
+  $("add-confirm").hidden = true;
+  $("cf-words").innerHTML = "";
+  $("cf-verify").checked = false;
+  updateAddBtn();
+  if (explanation) $("add-msg").textContent = explanation;
+}
 
 function onAddrInput() {
-  pendingAddr = null;
-  $("add-confirm").hidden = true;
-  $("add-msg").textContent = "";
-  $("cf-words").innerHTML = "";
+  var hadPin = pendingAddr !== null || derivingFor !== null || !$("add-confirm").hidden;
+  var wasDeriving = derivingFor !== null;
+  voidPending(hadPin
+    ? (wasDeriving
+      ? "Address changed while its checkphrase was still deriving — that result will be discarded. Validate the new address to see its own words."
+      : "Address changed — the checkphrase confirmation was cleared. Validate the new address to see its own words.")
+    : "");
+  if (!hadPin) $("add-msg").textContent = "";
 }
 
 function onValidate() {
@@ -474,8 +491,18 @@ function onValidate() {
   if (vault.addresses.some(function (e) { return e.address === v.address; })) {
     toast("That address is already in the vault.", "err"); return;
   }
+  var mySeq = ++validateSeq;
   pendingAddr = v.address;
+  derivingFor = v.address;
+  $("add-msg").textContent = "";
   derivePhrase(v.address).then(function (w) {
+    if (mySeq !== validateSeq) return; // superseded or voided — never render
+    derivingFor = null;
+    var now = validateQuantusAddress($("in-addr").value);
+    if (!now.ok || now.address !== v.address || pendingAddr !== v.address) {
+      voidPending("Address changed while its checkphrase was deriving — the result was discarded. Validate the address in the box to see its own words.");
+      return;
+    }
     $("add-confirm").hidden = false;
     $("cf-words").innerHTML = w
       ? w.map(function (x) { return '<span class="pw big">' + esc(x) + "</span>"; }).join("")
@@ -491,13 +518,22 @@ function updateAddBtn() {
 
 function onAddConfirm() {
   if (!pendingAddr) return;
+  var now = validateQuantusAddress($("in-addr").value);
+  if (!now.ok || now.address !== pendingAddr) {
+    voidPending("Address changed since its checkphrase was shown — the confirmation was cleared. Validate the address in the box to see its own words.");
+    return;
+  }
   try {
     QPORT.addToVault(vault, pendingAddr, $("in-nick").value);
   } catch (e) { toast(e.message, "err"); return; }
   saveVault();
   $("in-addr").value = ""; $("in-nick").value = "";
   $("add-confirm").hidden = true;
+  $("cf-words").innerHTML = "";
+  $("cf-verify").checked = false;
   pendingAddr = null;
+  derivingFor = null;
+  validateSeq++;
   toast("Address added. Refreshing balances…", "ok");
   refreshAll();
 }
