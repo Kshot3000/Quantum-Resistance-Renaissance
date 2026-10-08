@@ -174,6 +174,11 @@ function renderSummary(sum){
 
 /* ---------------- audit orchestration ---------------- */
 var running = false;
+/* Audit generation token: Clear (or a newer audit) bumps it, and every
+ * continuation of an older audit checks it before rendering — a superseded
+ * audit discards its late results silently instead of resurrecting them
+ * over state the user has already cleared. */
+var auditSeq = 0;
 
 function parseInput(text){
   var seen = {}, out = [];
@@ -194,63 +199,83 @@ function sampleByAddress(addr){
 async function runAudit(addresses, useSamples){
   if (running) return;
   running = true;
+  var mySeq = ++auditSeq;
+  var isCurrent = function(){ return mySeq === auditSeq; };
   var btn = $("runBtn");
   btn.classList.add("scanning"); btn.disabled = true;
   $("statusLine").textContent = "Validating " + addresses.length + " address(es)…";
   $("resultsGrid").innerHTML = "";
   renderSummary(null);
 
-  var prices = await fetchPrices();
-  var entries = [];
+  try {
+    var prices = await fetchPrices();
+    if (!isCurrent()) return;
+    var entries = [];
 
-  // Validate everything first (fast, local), then fetch in small batches.
-  var jobs = [];
-  for (var i = 0; i < addresses.length; i++){
-    var addr = addresses[i];
-    var sample = useSamples ? sampleByAddress(addr) : null;
-    var v = await C.detectChain(addr);
-    jobs.push({ address: addr, v: v, sample: sample });
-  }
+    // Validate everything first (fast, local), then fetch in small batches.
+    var jobs = [];
+    for (var i = 0; i < addresses.length; i++){
+      var addr = addresses[i];
+      var sample = useSamples ? sampleByAddress(addr) : null;
+      var v = await C.detectChain(addr);
+      if (!isCurrent()) return;
+      jobs.push({ address: addr, v: v, sample: sample });
+    }
 
-  var BATCH = 4;
-  for (var b = 0; b < jobs.length; b += BATCH){
-    var slice = jobs.slice(b, b + BATCH);
-    $("statusLine").textContent = "Scanning chain history… " + Math.min(b + BATCH, jobs.length) + "/" + jobs.length;
-    var results = await Promise.all(slice.map(async function(job){
-      var api = null;
-      if (job.sample){ api = job.sample.api; }
-      else if (job.v.ok && job.v.chain === "btc"){ api = await fetchBTC(job.address, job.v); }
-      else if (job.v.ok && job.v.chain === "eth"){ api = await fetchETH(job.address); }
-      var analysis = C.analyze(job.v, api);
-      var usd = 0, priceOffline = !!prices.offline;
-      if (!priceOffline && api && !api.offline){
-        if (job.v.chain === "btc" && prices.btc) usd = (api.balance_sats || 0) / 1e8 * prices.btc;
-        if (job.v.chain === "eth" && prices.eth){
-          try { usd = Number(BigInt(api.balance_wei || "0")) / 1e18 * prices.eth; }
-          catch (e){ usd = 0; }
+    var BATCH = 4;
+    for (var b = 0; b < jobs.length; b += BATCH){
+      var slice = jobs.slice(b, b + BATCH);
+      $("statusLine").textContent = "Scanning chain history… " + Math.min(b + BATCH, jobs.length) + "/" + jobs.length;
+      var results = await Promise.all(slice.map(async function(job){
+        var api = null;
+        if (job.sample){ api = job.sample.api; }
+        else if (job.v.ok && job.v.chain === "btc"){ api = await fetchBTC(job.address, job.v); }
+        else if (job.v.ok && job.v.chain === "eth"){ api = await fetchETH(job.address); }
+        var analysis = C.analyze(job.v, api);
+        var usd = 0, priceOffline = !!prices.offline;
+        if (!priceOffline && api && !api.offline){
+          if (job.v.chain === "btc" && prices.btc) usd = (api.balance_sats || 0) / 1e8 * prices.btc;
+          if (job.v.chain === "eth" && prices.eth){
+            try { usd = Number(BigInt(api.balance_wei || "0")) / 1e18 * prices.eth; }
+            catch (e){ usd = 0; }
+          }
         }
-      }
-      return { address: job.address, v: job.v, analysis: analysis, usd: usd,
-               priceOffline: priceOffline, isSample: !!job.sample,
-               label: job.sample ? job.sample.label : "" };
-    }));
-    results.forEach(function(entry){
-      entries.push(entry);
-      $("resultsGrid").insertAdjacentHTML("beforeend", renderCard(entry));
-    });
-  }
+        return { address: job.address, v: job.v, analysis: analysis, usd: usd,
+                 priceOffline: priceOffline, isSample: !!job.sample,
+                 label: job.sample ? job.sample.label : "" };
+      }));
+      // Superseded while this batch was in flight (Clear, or a newer
+      // audit): render nothing — the results belong to discarded input.
+      if (!isCurrent()) return;
+      results.forEach(function(entry){
+        entries.push(entry);
+        $("resultsGrid").insertAdjacentHTML("beforeend", renderCard(entry));
+      });
+    }
 
-  var sum = C.summarize(entries);
-  sum.priceOffline = !!prices.offline;
-  renderSummary(sum);
-  var problems = entries.filter(function(e){
-    return e.analysis.verdict === "exposed" || e.analysis.verdict === "latent" ||
-           e.analysis.verdict === "unknown" || e.analysis.verdict === "invalid";
-  }).length;
-  $("statusLine").textContent = "Audit complete: " + entries.length + " address(es), " +
-    problems + " need attention." + (prices.offline ? " (Price feed offline — USD estimates skipped.)" : "");
-  btn.classList.remove("scanning"); btn.disabled = false;
-  running = false;
+    var sum = C.summarize(entries);
+    sum.priceOffline = !!prices.offline;
+    renderSummary(sum);
+    var problems = entries.filter(function(e){
+      return e.analysis.verdict === "exposed" || e.analysis.verdict === "latent" ||
+             e.analysis.verdict === "unknown" || e.analysis.verdict === "invalid";
+    }).length;
+    $("statusLine").textContent = "Audit complete: " + entries.length + " address(es), " +
+      problems + " need attention." + (prices.offline ? " (Price feed offline — USD estimates skipped.)" : "");
+  } catch (e) {
+    // A current audit that throws (e.g. detectChain rejecting when
+    // SubtleCrypto is unavailable) reports honestly instead of wedging;
+    // a superseded audit's failure stays silent.
+    if (isCurrent())
+      $("statusLine").textContent = "Audit failed: " + String(e && e.message || e) + " — nothing was rendered; try again.";
+  } finally {
+    // Only the current audit owns the button/lock: a superseded audit
+    // must not re-enable Run over a newer audit, nor leave it disabled.
+    if (isCurrent()){
+      btn.classList.remove("scanning"); btn.disabled = false;
+      running = false;
+    }
+  }
 }
 
 function init(){
@@ -267,10 +292,20 @@ function init(){
     runAudit(addrs, false);
   });
   $("sampleBtn").addEventListener("click", function(){
+    if (running) return; // an audit is already in flight; don't swap its input
     $("addrInput").value = C.SAMPLES.map(function(s){ return s.address; }).join("\n");
     runAudit(C.SAMPLES.map(function(s){ return s.address; }), true);
   });
   $("clearBtn").addEventListener("click", function(){
+    // Invalidate any in-flight audit FIRST: its late batches must not
+    // resurrect results over the cleared state, and the Run lock is
+    // released here (the superseded audit's finally will not touch it).
+    auditSeq++;
+    if (running){
+      running = false;
+      var btn = $("runBtn");
+      btn.classList.remove("scanning"); btn.disabled = false;
+    }
     $("addrInput").value = ""; $("resultsGrid").innerHTML = "";
     renderSummary(null); $("statusLine").textContent = "";
   });

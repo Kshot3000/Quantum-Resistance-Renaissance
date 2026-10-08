@@ -1,7 +1,7 @@
 {
   "ok": true,
   "source": "https://sqm.quantus.com/v1/graphql",
-  "fetched_at": "2026-10-08T20:19:37.697Z",
+  "fetched_at": "2026-10-08T21:21:04.389Z",
   "data": {
     "status": {
       "block_height": 189029,
