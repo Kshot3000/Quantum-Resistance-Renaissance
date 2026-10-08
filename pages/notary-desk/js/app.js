@@ -98,23 +98,37 @@ function wireDrop(dropId, inputId, onFile) {
   input.addEventListener("change", () => { if (input.files[0]) onFile(input.files[0]); });
 }
 
+/* A drop's hash lands asynchronously (streaming chunks), so two drops in
+ * flight can land out of order. Without a token, the SUPERSEDED file's late
+ * completion overwrote studio.fileHash, the digest field and the drop label
+ * with its digests — the build then anchored the file the user had already
+ * replaced, credited to the wrong name — and its late failure overwrote the
+ * current file's success label with "Hashing failed". A sequence token lets
+ * only the latest drop store, render, or report; a superseded success or
+ * failure discards itself silently. */
+let studioHashSeq = 0;
 wireDrop("drop", "fileInput", async (file) => {
+  const mySeq = ++studioHashSeq;
   const drop = $("drop");
   drop.querySelector(".drop-ico").textContent = "⏳";
   try {
-    studio.fileHash = await hashFile(file, (p) => {
+    const h = await hashFile(file, (p) => {
+      if (mySeq !== studioHashSeq) return;
       drop.querySelector("strong").textContent = "Hashing… " + Math.round(p * 100) + "%";
     });
-    $("digestInput").value = studio.fileHash.sha256;
+    if (mySeq !== studioHashSeq) return;
+    studio.fileHash = h;
+    $("digestInput").value = h.sha256;
     $("algoSel").value = "1";
     drop.querySelector("strong").textContent = "✓ " + file.name;
     drop.querySelector(".hint").textContent =
-      file.size.toLocaleString("en-US") + " bytes · SHA-256 " + studio.fileHash.sha256.slice(0, 16) + "… · BLAKE2b-256 " +
-      studio.fileHash.blake2.slice(0, 16) + "… (digests filled below — pick the algorithm, then build)";
+      file.size.toLocaleString("en-US") + " bytes · SHA-256 " + h.sha256.slice(0, 16) + "… · BLAKE2b-256 " +
+      h.blake2.slice(0, 16) + "… (digests filled below — pick the algorithm, then build)";
   } catch (err) {
+    if (mySeq !== studioHashSeq) return;
     drop.querySelector("strong").textContent = "Hashing failed — try again";
   }
-  drop.querySelector(".drop-ico").textContent = "📥";
+  if (mySeq === studioHashSeq) drop.querySelector(".drop-ico").textContent = "📥";
 });
 
 /* The dropped file's two digests must stay bound to the algorithm selector:
@@ -281,16 +295,28 @@ function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<
  * box (the old behaviour) reported a matching file as "not in your vault".
  * A manual edit that matches neither digest voids the file pairing. */
 let verifyFileHash = null;
+/* Same superseded-drop discipline as the Timestamp Studio (see
+ * studioHashSeq): only the latest Verify Desk drop may store its hash,
+ * fill the digest field, or render its label/error. A superseded file's
+ * late digests would otherwise be checked against the vault as if they
+ * were the file the user last dropped, and its late failure would
+ * overwrite the current file's success label. */
+let verifyHashSeq = 0;
 wireDrop("vDrop", "vFileInput", async (file) => {
+  const mySeq = ++verifyHashSeq;
   const drop = $("vDrop");
   drop.querySelector(".drop-ico").textContent = "⏳";
   try {
     const h = await hashFile(file, null);
+    if (mySeq !== verifyHashSeq) return;
     verifyFileHash = h;
     $("vDigestInput").value = h.sha256;
     drop.querySelector("strong").textContent = "✓ " + file.name + " — digest filled below";
-  } catch { drop.querySelector("strong").textContent = "Hashing failed — try again"; }
-  drop.querySelector(".drop-ico").textContent = "🔍";
+  } catch {
+    if (mySeq !== verifyHashSeq) return;
+    drop.querySelector("strong").textContent = "Hashing failed — try again";
+  }
+  if (mySeq === verifyHashSeq) drop.querySelector(".drop-ico").textContent = "🔍";
 });
 $("vDigestInput").addEventListener("input", () => {
   if (!verifyFileHash) return;
