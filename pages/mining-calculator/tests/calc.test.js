@@ -154,13 +154,13 @@ t("default rig estimate is honest at fallback defaults", function(){
 });
 
 // 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
-t("index.html carries the fallback defaults and v1.9.45 key", function(){
+t("index.html carries the fallback defaults and v1.9.46 key", function(){
   var fs = require("fs"), path = require("path");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="54.569"') >= 0, "in-net defaults to the fallback TH/s figure");
   assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
   assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
-  assert.ok(html.indexOf("app.js?v=1.9.45") >= 0, "app.js cache key bumped to 1.9.45");
+  assert.ok(html.indexOf("app.js?v=1.9.46") >= 0, "app.js cache key bumped to 1.9.46");
   assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
 });
 

@@ -6,6 +6,10 @@
 (function () {
   var D = window.QEL_DECODE, CT = window.QEL_CALLS, E = window.QEL_ENCODE, V = window.QEL_VERIFY;
   var state = { last: null, lastHex: '', ws: null, wsUrl: '', rpcId: 0, rpcPending: {}, liveBlock: null };
+  /* Stale-pin tokens: every async RPC path captures the token current at
+   * click time; a continuation renders only while its token is still the
+   * latest, so a superseded fetch/scan/connect discards itself silently. */
+  var ctxSeq = 0, scanSeq = 0, liveSeq = 0;
 
   /* ---------- tiny utils ---------- */
   function $(id) { return document.getElementById(id); }
@@ -448,11 +452,13 @@
 
   /* Fetch runtime context for the Verify tab via a one-shot connection. */
   $('ctx-btn').addEventListener('click', function () {
+    var myCtx = ++ctxSeq;
     var errBox = $('verify-error');
     errBox.hidden = true;
     var url = $('rpc-url').value.trim();
     setPill('busy', 'fetching context…');
     rpcConnect(url, function (ws) {
+      if (myCtx !== ctxSeq) { try { ws.close(); } catch (e) {} return; }
       var pending = {};
       attachRpc(ws, pending);
       (async function () {
@@ -462,6 +468,7 @@
           var blockNum = parseInt(header.number, 16);
           var rt = await rpcCall(ws, pending, 'state_getRuntimeVersion', []);
           var genesis = await rpcCall(ws, pending, 'chain_getBlockHash', [0]);
+          if (myCtx !== ctxSeq) return;
           $('v-spec').value = rt.specVersion;
           $('v-tx').value = rt.transactionVersion;
           $('v-genesis').value = genesis;
@@ -473,6 +480,7 @@
           if (d && d.version.signed && !d.era.immortal) {
             var birth = V.birthFor(d, blockNum);
             var birthHash = await rpcCall(ws, pending, 'chain_getBlockHash', [birth]);
+            if (myCtx !== ctxSeq) return;
             $('v-birth').value = birthHash;
             $('v-block').value = blockNum;
             note += ' · era-birth #' + birth;
@@ -481,14 +489,18 @@
           }
           toast('Context fetched: ' + note);
         } catch (e) {
+          if (myCtx !== ctxSeq) return;
           errBox.hidden = false;
           errBox.innerHTML = '<b>Context fetch failed.</b> ' + esc(e.message);
         } finally {
           try { ws.close(); } catch (e) {}
-          setPill(state.ws ? 'up' : 'down', state.ws ? 'node: ' + state.wsUrl : 'node: disconnected');
+          /* A superseded fetch never touches the pill — the newer fetch
+           * (or the live connection state it restores) owns it. */
+          if (myCtx === ctxSeq) setPill(state.ws ? 'up' : 'down', state.ws ? 'node: ' + state.wsUrl : 'node: disconnected');
         }
       })();
     }, function (e) {
+      if (myCtx !== ctxSeq) return;
       errBox.hidden = false;
       errBox.innerHTML = '<b>Context fetch failed.</b> ' + esc(e.message) + ' — check the endpoint in the Live blocks tab.';
       setPill(state.ws ? 'up' : 'down', state.ws ? 'node: ' + state.wsUrl : 'node: disconnected');
@@ -497,18 +509,21 @@
 
   /* ---------- live block scanner ---------- */
   function closeLive() {
+    scanSeq++; /* invalidate any in-flight scan: it must not render over this */
     if (state.ws) { try { state.ws.close(); } catch (e) {} state.ws = null; }
     $('live-refresh').disabled = true;
     setPill('down', 'node: disconnected');
   }
   async function scanHead() {
+    var myScan = ++scanSeq;
+    var ws = state.ws, pending = state.rpcPending;
     var errBox = $('live-error'), list = $('live-list'), meta = $('live-meta');
     errBox.hidden = true;
     list.innerHTML = '<div class="fineprint"><span class="spin"></span>Fetching latest finalized block…</div>';
     try {
-      var ws = state.ws, pending = state.rpcPending;
       var headHash = await rpcCall(ws, pending, 'chain_getFinalizedHead', []);
       var block = await rpcCall(ws, pending, 'chain_getBlock', [headHash]);
+      if (myScan !== scanSeq || state.ws !== ws) return;
       var num = parseInt(block.block.header.number, 16);
       var exts = block.block.extrinsics || [];
       state.liveBlock = { number: num, hash: headHash, count: exts.length };
@@ -540,6 +555,7 @@
       });
       if (!exts.length) list.innerHTML = '<div class="fineprint">Block contains no extrinsics.</div>';
     } catch (e) {
+      if (myScan !== scanSeq || state.ws !== ws) return;
       errBox.hidden = false;
       errBox.innerHTML = '<b>Scan failed.</b> ' + esc(e.message);
       list.innerHTML = '';
@@ -556,7 +572,9 @@
       return;
     }
     setPill('busy', 'connecting…');
+    var myLive = ++liveSeq;
     var ws = rpcConnect(url, function (openWs) {
+      if (myLive !== liveSeq) { try { openWs.close(); } catch (e) {} return; }
       state.ws = openWs; state.wsUrl = url; state.rpcPending = {};
       attachRpc(openWs, state.rpcPending);
       openWs.onclose = function () {
@@ -570,6 +588,7 @@
       toast('Connected — scanning latest finalized block');
       scanHead();
     }, function (e) {
+      if (myLive !== liveSeq) return;
       errBox.hidden = false;
       errBox.innerHTML = '<b>Connection failed.</b> ' + esc(e.message) +
         '<br><span class="conv">The lab keeps working offline: paste any extrinsic hex into the Decode tab — no node needed.</span>';
