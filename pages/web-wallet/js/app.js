@@ -529,11 +529,24 @@ function timeoutSignal(ms) {
   return ctl.signal;
 }
 
+let activitySeq = 0; // token: only the latest load for the CURRENT wallet may render
 async function loadActivity() {
+  const seq = ++activitySeq;
+  const kp = state.kp; // pin the wallet this load is for
+  if (!kp) return;
   const list = $('activity-list');
   err('activity-err');
   list.innerHTML = '<p class="muted">Loading…</p>';
-  const addr = state.kp.address;
+  const addr = kp.address;
+  /* A load that lands after a newer load started, after Lock (state.kp
+   * nulled), or after a different wallet was unlocked (a new kp object)
+   * must render nothing: the slower first load would otherwise overwrite
+   * the newer load's transfers with its older response, its late failure
+   * would wipe a newer success with "Indexer unreachable", and a load
+   * finishing after Lock would paint the locked wallet's history into
+   * the DOM behind the unlock screen — where it would still be sitting
+   * in the next wallet's Activity tab. */
+  const stale = () => seq !== activitySeq || state.kp !== kp;
   const query = `query($a:String!){
     transfer(where:{_or:[{from_id:{_eq:$a}},{to_id:{_eq:$a}}]}, order_by:{block_height:desc}, limit:25){
       id from_id to_id amount block_height extrinsic_id timestamp
@@ -545,8 +558,10 @@ async function loadActivity() {
       body: JSON.stringify({ query, variables: { a: addr } }),
       signal: timeoutSignal(10000),
     });
+    if (stale()) return; // superseded while the indexer answered — discard silently
     if (!res.ok) throw new Error('indexer HTTP ' + res.status);
     const j = await res.json();
+    if (stale()) return; // superseded while the body parsed — discard silently
     if (j.errors) throw new Error(j.errors[0].message);
     const rows = j.data.transfer || [];
     if (!rows.length) { list.innerHTML = '<p class="muted">No transfers found for this address.</p>'; return; }
@@ -563,6 +578,7 @@ async function loadActivity() {
       list.appendChild(div);
     }
   } catch (e) {
+    if (stale()) return; // a superseded failure must not wipe a newer load's success
     list.innerHTML = '<p class="muted">Not loaded.</p>';
     err('activity-err', 'Indexer unreachable (' + e.message + '). History is unavailable — nothing was fabricated.');
   }
