@@ -111,6 +111,10 @@ $('rpc-url').value = 'wss://rpc.quantus.network';
 $('btn-issue').addEventListener('click', async () => {
   err('issue-err');
   $('ticket-out').hidden = true;
+  // The ticket a standing verification was pronounced against is the
+  // effective one (pasted field, else the issued ticket): if issuing this
+  // ticket changes it, that verdict must be voided below.
+  const effectiveBefore = effectiveTicketStr();
   const addr = $('ticket-addr').value.trim();
   try {
     const { prefix } = ss58Decode(addr);
@@ -149,6 +153,11 @@ $('btn-issue').addEventListener('click', async () => {
     $('ticket-text').value = hot.ticketStr;
     drawQR($('ticket-qr'), hot.ticketStr);
     $('ticket-out').hidden = false;
+    // A verification pronounced against the previous effective ticket does
+    // not carry over to the ticket just issued (its era/nonce verdicts and
+    // the fee quote's era math all name the old ticket).
+    if (effectiveTicketStr() !== effectiveBefore)
+      voidVerification('A new chain ticket was issued, replacing the ticket this package was verified against — that verdict no longer stands.');
     $('ticket-out').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) {
     setConn('bad', 'offline');
@@ -249,20 +258,49 @@ $('btn-pkg-paste').addEventListener('click', () => {
 });
 
 function activeTicket() {
-  const pasted = $('verify-ticket').value.trim();
-  const str = pasted || hot.ticketStr;
+  const str = effectiveTicketStr();
   if (!str) throw new Error('no ticket available — paste the QAGT1: ticket this package was built against');
   return decodeTicket(str);
 }
 
+/* The ticket string a verification is pronounced against right now: the
+ * pasted field when non-empty, else the ticket this desk issued. */
+function effectiveTicketStr() {
+  return $('verify-ticket').value.trim() || hot.ticketStr;
+}
+
+/* Void a standing verification when the ticket it was pronounced against
+ * is no longer the ticket on screen. The verdict's badge, its era/nonce
+ * freshness verdicts and any fee quote all name THAT ticket — letting them
+ * stand beside a different ticket in the field would pronounce a package
+ * "verified" against a ticket it was never checked against, with Broadcast
+ * armed. The panel stays visible (the Re-verify button lives in it), and
+ * hot.extrinsicHex is kept so Re-verify can re-check the SAME assembled
+ * package against the ticket now on screen — no reassembly needed. */
+function voidVerification(reason) {
+  if (!hot.verified) return;
+  hot.verified = null;
+  $('btn-broadcast').disabled = true;
+  $('btn-quote-fee').disabled = true;
+  $('fee-quote').hidden = true;
+  $('broadcast-result').hidden = true;
+  const badge = $('sig-badge');
+  badge.className = 'sigbadge bad';
+  badge.innerHTML = `<span>⚠ VERIFICATION VOIDED<span class="sub">${reason}</span></span>`;
+  err('broadcast-err', reason + ' Press “Re-verify against this ticket” to pronounce a fresh verdict before quoting or broadcasting.');
+}
+
 function verifyPackage() {
+  const ticketStr = effectiveTicketStr();
   const ticket = activeTicket();
   const decoded = decodeForVerify(hot.extrinsicHex);
   if (decoded.address !== ticket.addr)
     throw new Error('package sender does not match the ticket sender — refusing to verify');
   const mod = decoded.scheme === 87 ? ml_dsa87 : ml_dsa65;
   const { ok, payloadHex } = reverifySigned({ ticket, decoded, mlDsa: mod });
-  hot.verified = { decoded, ok, payloadHex, ticket };
+  // ticketStr is recorded so quote/broadcast can identity-check the ticket
+  // on screen against the one this verdict was pronounced over.
+  hot.verified = { decoded, ok, payloadHex, ticket, ticketStr };
 
   const badge = $('sig-badge');
   badge.className = 'sigbadge ' + (ok ? 'ok' : 'bad');
@@ -283,6 +321,8 @@ function verifyPackage() {
     ['Extrinsic', `${(hot.extrinsicHex.length / 2 - 1).toLocaleString()} bytes`],
   ]);
   $('btn-broadcast').disabled = !ok;
+  $('btn-quote-fee').disabled = false;
+  err('broadcast-err');
   $('fee-quote').hidden = true;
   $('verify-out').hidden = false;
   $('verify-out').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
@@ -294,10 +334,24 @@ $('btn-reverify').addEventListener('click', () => {
   catch (e) { err('receive-err', e.message); }
 });
 
+// Editing the verification ticket voids a standing verdict immediately —
+// the field is a context input of verifyPackage (same discipline as
+// Extrinsic Lab's context fields and this desk's cold-side ticket import).
+$('verify-ticket').addEventListener('input', () => {
+  voidVerification('The verification ticket changed after this package was verified — the verdict was pronounced against the previous ticket and no longer stands.');
+});
+
 $('btn-quote-fee').addEventListener('click', async () => {
   err('broadcast-err');
   const v = hot.verified;
   if (!v || !v.ok) { err('broadcast-err', 'Verify a valid package first.'); return; }
+  // Backstop for ticket changes that never fired 'input' (programmatic or
+  // autofill edits): never quote a package against a ticket it was not
+  // verified against.
+  if (effectiveTicketStr() !== v.ticketStr) {
+    voidVerification('The verification ticket on screen no longer matches the ticket this package was verified against — that verdict no longer stands.');
+    return;
+  }
   // Pin the exact extrinsic that was verified. This handler awaits the node
   // several times, and assembling a new package mid-quote replaces
   // hot.verified/hot.extrinsicHex: reading the hex live would quote the NEW
@@ -377,6 +431,12 @@ $('btn-broadcast').addEventListener('click', async () => {
   err('broadcast-err');
   const v = hot.verified;
   if (!v || !v.ok) return;
+  // Same ticket backstop as the fee quote: never broadcast on the strength
+  // of a verdict pronounced against a different ticket than the one shown.
+  if (effectiveTicketStr() !== v.ticketStr) {
+    voidVerification('The verification ticket on screen no longer matches the ticket this package was verified against — that verdict no longer stands.');
+    return;
+  }
   const hex = hot.extrinsicHex; // the exact bytes this verification pronounced valid
   const btn = $('btn-broadcast'); btn.disabled = true; btn.textContent = 'Broadcasting…';
   try {
