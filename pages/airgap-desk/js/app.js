@@ -396,6 +396,10 @@ function importTicketString(s) {
   try {
     const t = decodeTicket(s);
     cold.ticket = t; cold.ticketStr = s.trim();
+    // A review was pronounced over the PREVIOUS ticket (its sender, era and
+    // genesis): importing a new ticket voids it, so a signature can never be
+    // produced under a review whose "From" names a different ticket.
+    if (cold.reviewed) { cold.reviewed = null; $('cold-review').hidden = true; }
     renderColdTicket();
   } catch (e) { err('cold-ticket-err', e.message); }
 }
@@ -457,10 +461,12 @@ document.querySelectorAll('[data-ck]').forEach((t) => t.addEventListener('click'
 }));
 
 let cpTimer = null;
+let cpSeq = 0; // token: only the latest checkphrase compute may render
 $('cold-dest').addEventListener('input', () => {
   err('cold-dest-err');
   $('cp-box').hidden = true; cold.cpWords = null; cold.reviewed = null;
   clearTimeout(cpTimer);
+  const seq = ++cpSeq; // any edit voids a compute already in flight
   const v = $('cold-dest').value.trim();
   if (!v) return;
   cpTimer = setTimeout(async () => {
@@ -470,11 +476,17 @@ $('cold-dest').addEventListener('input', () => {
       $('cp-hint').textContent = 'computing checkphrase…';
       $('cp-box').hidden = false;
       const words = await window.QTC_CHECK.addressToChecksumAsync(v, window.QTC_WORDLIST);
+      // A newer edit (or a newer compute) superseded this one while the KDF
+      // ran: its words belong to a different field value than the one now
+      // shown — rendering them would let the user "verify" the destination
+      // on screen against another address's checkphrase.
+      if (seq !== cpSeq || $('cold-dest').value.trim() !== v) return;
       cold.cpWords = words;
       $('cp-words').innerHTML = words.map((w) => `<span>${w}</span>`).join('');
       $('cp-hint').textContent = 'Now type them back, in order, to arm signing.';
       $('cp-answer').value = '';
     } catch (e) {
+      if (seq !== cpSeq) return; // a stale failure must not void a newer result
       $('cp-box').hidden = true; cold.cpWords = null;
       err('cold-dest-err', 'Invalid destination: ' + e.message);
     }
