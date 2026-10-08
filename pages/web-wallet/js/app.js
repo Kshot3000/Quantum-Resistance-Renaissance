@@ -295,17 +295,20 @@ async function connectRpc() {
   state.rpcUrl = url;
   if (state.rpc) state.rpc.close();
   state.rpc = new RpcClient(url);
+  const rpc = state.rpc; // pin this attempt: a later Connect supersedes it
   setConn('', 'connecting…');
   err('conn-err');
   try {
-    const rt = await getRuntimeVersion(state.rpc);
-    const latest = await getLatestHeader(state.rpc);
+    const rt = await getRuntimeVersion(rpc);
+    const latest = await getLatestHeader(rpc);
+    if (state.rpc !== rpc) return; // superseded while connecting — render nothing
     setConn('on', 'connected');
     $('cf-chain').textContent = rt.specName || 'quantus';
     $('cf-block').textContent = '#' + latest.number.toLocaleString();
     $('cf-runtime').textContent = `spec ${rt.specVersion} · tx v${rt.transactionVersion}`;
     refreshBalance();
   } catch (e) {
+    if (state.rpc !== rpc) return; // a superseded attempt must not mark the new node offline
     setConn('bad', 'offline');
     err('conn-err', 'Could not reach the node: ' + e.message + '. Balances and sending need a live RPC — everything else works offline.');
   }
@@ -314,11 +317,13 @@ $('btn-connect').addEventListener('click', connectRpc);
 
 async function refreshBalance() {
   if (!state.rpc || !state.rpc.connected) return;
+  const rpc = state.rpc, kp = state.kp; // pin: a lock/reconnect mid-read voids the render
   try {
     const [info, nonce] = await Promise.all([
-      getAccountInfo(state.rpc, state.kp.accountId),
-      getNonce(state.rpc, state.kp.address).catch(() => null),
+      getAccountInfo(rpc, kp.accountId),
+      getNonce(rpc, kp.address).catch(() => null),
     ]);
+    if (state.rpc !== rpc || state.kp !== kp) return; // stale read — render nothing
     if (!info) {
       $('bal-total').textContent = '0';
       $('bal-free').textContent = '0 QTC';
@@ -335,6 +340,7 @@ async function refreshBalance() {
     $('bal-nonce').textContent = String(info.nonce);
     $('bal-source').textContent = 'chain storage · live';
   } catch (e) {
+    if (state.rpc !== rpc || state.kp !== kp) return; // stale failure — render nothing
     $('bal-source').textContent = 'read failed: ' + e.message;
   }
 }
@@ -371,8 +377,15 @@ $('send-amount').addEventListener('input', invalidateUnsigned);
 
 $('btn-max').addEventListener('click', async () => {
   // Fill amount = free balance minus a conservative fee guess (refined at estimate).
+  const rpc = state.rpc, kp = state.kp, amountAtClick = $('send-amount').value;
   try {
-    const info = await getAccountInfo(state.rpc, state.kp.accountId);
+    const info = await getAccountInfo(rpc, kp.accountId);
+    // The user typed (or the wallet/node changed) while the balance read was
+    // in flight: never overwrite what the amount box holds now.
+    if (state.rpc !== rpc || state.kp !== kp || $('send-amount').value !== amountAtClick) {
+      err('send-amount-err', 'Amount changed while reading the balance — Max was not applied. Click Max again to fill from the current balance.');
+      return;
+    }
     if (!info || info.free === 0n) { err('send-amount-err', 'Nothing to send — the wallet is empty.'); return; }
     const guessFee = 5000000000n; // 0.005 QTC headroom; exact fee shown at estimate
     const max = info.free > guessFee + EXISTENTIAL_DEPOSIT ? info.free - guessFee : 0n;
@@ -394,21 +407,33 @@ $('btn-estimate').addEventListener('click', async () => {
   if (amount <= 0n) { err('send-amount-err', 'Amount must be greater than zero.'); return; }
   const btn = $('btn-estimate'); btn.disabled = true; btn.textContent = 'Building…';
   const toRaw = $('send-to').value, amountRaw = $('send-amount').value;
+  const rpc = state.rpc, kp = state.kp; // pin the node + wallet this estimate is for
   try {
-    const unsigned = await buildUnsignedTransfer(state.rpc, {
-      fromAddress: state.kp.address,
-      fromAccountId: state.kp.accountId,
+    const unsigned = await buildUnsignedTransfer(rpc, {
+      fromAddress: kp.address,
+      fromAccountId: kp.accountId,
       destAddress: rcpt.address,
       amountPlancks: amount,
     });
     // Fields edited while the node was building: the result no longer
     // matches the form — discard it instead of pinning a stale transfer.
-    if ($('send-to').value !== toRaw || $('send-amount').value !== amountRaw) {
+    if ($('send-to').value !== toRaw || $('send-amount').value !== amountRaw || state.rpc !== rpc || state.kp !== kp) {
       state.unsigned = null;
       throw new Error('Recipient or amount changed while building — estimate discarded. Build & estimate again.');
     }
     state.unsigned = unsigned;
-    const info = await getAccountInfo(state.rpc, state.kp.accountId);
+    const info = await getAccountInfo(rpc, kp.accountId);
+    /* The balance read is a SECOND await after the pin: an edit during it
+     * fires invalidateUnsigned() (pin nulled, box hidden, "discarded" error
+     * shown) — without this re-check the handler resumed and rendered the
+     * OLD estimate anyway, un-hiding a review whose transfer was no longer
+     * pinned or signable beside the new form values. Identity-check the
+     * pin itself: only discard-explain; never null a NEWER estimate's pin
+     * and never render over it. */
+    if (state.unsigned !== unsigned || state.rpc !== rpc || state.kp !== kp ||
+        $('send-to').value !== toRaw || $('send-amount').value !== amountRaw) {
+      throw new Error('Recipient or amount changed while checking the balance — estimate discarded. Build & estimate again to review the new transfer before signing.');
+    }
     const free = info ? info.free : 0n;
     const total = amount + (unsigned.fee ?? 0n);
     if (free < total) throw new Error(`Insufficient balance: need ${plancksToQtc(total)} QTC (amount + fee) but have ${plancksToQtc(free)} QTC.`);
@@ -427,7 +452,7 @@ $('btn-estimate').addEventListener('click', async () => {
     $('est-era').textContent = `mortal · period ${unsigned.period} · phase ${unsigned.phase} · birth #${unsigned.birth}`;
     const parts = describeExtrinsicParts({
       lengthPrefixLen: 1, bodyLen: '(computed at broadcast)',
-      sigDesc: `${schemeInfo(state.kp.scheme).name}: variant byte + ${state.kp.scheme === 87 ? 4627 : 3309} B sig + ${state.kp.scheme === 87 ? 2592 : 1952} B pubkey`,
+      sigDesc: `${schemeInfo(kp.scheme).name}: variant byte + ${kp.scheme === 87 ? 4627 : 3309} B sig + ${kp.scheme === 87 ? 2592 : 1952} B pubkey`,
       eraDesc: `mortal(${unsigned.period}, ${unsigned.phase})`,
       nonce: unsigned.nonce, tip: '0',
       destShort: shortAddr(rcpt.address),
