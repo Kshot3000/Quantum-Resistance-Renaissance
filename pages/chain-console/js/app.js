@@ -137,6 +137,9 @@ let subStartSeq = new Map(); // key -> latest start token; only that token may r
 let currentTab = 'console';
 let selectedRecipe = null;
 let pendingBroadcast = null;
+let connGen = 0;      // bumped on every connect / disconnect / socket teardown — continuations pinned to an older generation are superseded
+let handshakeSeq = 0; // latest handshake token; only it may render the identity card
+let callSeq = 0;      // latest result-pane call token (runCall + node-identity recipe); only it may render / log / count
 
 /* ---------- connection ---------- */
 
@@ -150,23 +153,35 @@ async function connect(url) {
   const v = validateEndpoint(url);
   if (!v.ok) { toast(v.error, 'err'); return; }
   disconnect(false);
+  const myGen = ++connGen;
   setConnPill('busy', 'connecting…');
-  rpc = new ConsoleRpc(v.url);
-  rpc.onStatus = (s) => {
+  const myRpc = new ConsoleRpc(v.url);
+  rpc = myRpc;
+  myRpc.onStatus = (s) => {
+    if (rpc !== myRpc) return; // a superseded socket must not tear down its replacement
     if (s === 'open') { /* handshake drives the pill */ }
     if (s === 'closed' || s === 'error') {
-      if (connectedUrl) { connectedUrl = null; setConnPill('down', 'disconnected'); renderHandshake(null); toast('Connection lost.', 'err'); }
+      if (connectedUrl) {
+        connectedUrl = null;
+        // The socket is gone: any handshake/call still in flight on it is
+        // superseded, and this teardown owns the busy indicator it leaves.
+        connGen++; handshakeSeq++; callSeq++;
+        setBusy(false);
+        setConnPill('down', 'disconnected'); renderHandshake(null); toast('Connection lost.', 'err');
+      }
     }
   };
   const t0 = performance.now();
   try {
-    await rpc.connect();
+    await myRpc.connect();
+    if (myGen !== connGen || rpc !== myRpc) { try { myRpc.close(); } catch {} return; }
     const ms = performance.now() - t0;
     connectedUrl = v.url;
     setConnPill('up', `connected · ${formatMs(ms)}`);
     toast(`Connected to ${shortHex(v.url, 30)}`, 'ok');
-    await handshake();
+    await handshake(myRpc, myGen);
   } catch (e) {
+    if (myGen !== connGen || rpc !== myRpc) return; // superseded failure discards itself silently
     const x = explainError(e);
     setConnPill('down', 'failed');
     renderHandshake(null);
@@ -177,8 +192,14 @@ async function connect(url) {
 }
 
 function disconnect(silent = true) {
-  // Invalidate any subscribe still in flight: its continuation must not
-  // register a subscription (or report an error) for a dead connection.
+  // Invalidate everything still in flight for this connection — subscribe
+  // starts (below), the handshake, and any result-pane call: their
+  // continuations must not register, render, or report for a dead
+  // connection, and this path owns the busy indicator they leave behind.
+  connGen++;
+  handshakeSeq++;
+  callSeq++;
+  setBusy(false);
   for (const k of startingSubs) subStartSeq.set(k, (subStartSeq.get(k) || 0) + 1);
   startingSubs.clear();
   for (const [, s] of activeSubs) { try { s.stop(); } catch {} }
@@ -191,16 +212,20 @@ function disconnect(silent = true) {
   if (!silent) toast('Disconnected.', '');
 }
 
-async function handshake() {
-  if (!rpc) return;
+async function handshake(myRpc = rpc, gen = connGen) {
+  if (!myRpc) return;
+  const token = ++handshakeSeq;
+  const isCurrent = () => token === handshakeSeq && gen === connGen && rpc === myRpc;
   try {
     const [chain, name, version, props, headHash] = await Promise.all([
-      rpc.call('system_chain'), rpc.call('system_name'), rpc.call('system_version'),
-      rpc.call('system_properties').catch(() => null),
-      rpc.call('chain_getBlockHash', [0]).catch(() => null),
+      myRpc.call('system_chain'), myRpc.call('system_name'), myRpc.call('system_version'),
+      myRpc.call('system_properties').catch(() => null),
+      myRpc.call('chain_getBlockHash', [0]).catch(() => null),
     ]);
+    if (!isCurrent()) return; // superseded (disconnect / reconnect): the newer state owns the card
     renderHandshake({ chain, name, version, props, headHash });
   } catch (e) {
+    if (!isCurrent()) return; // a dead connection's handshake error must not repaint the card
     renderHandshake({ error: explainError(e) });
   }
 }
@@ -222,16 +247,25 @@ function renderHandshake(h) {
 
 async function runCall({ method, params, label, summarizeKey, ctx, onResult }) {
   if (!rpc || !rpc.connected) { toast('Connect to an endpoint first.', 'err'); return null; }
+  const myRpc = rpc;
+  const gen = connGen;
+  const token = ++callSeq;
+  const isCurrent = () => token === callSeq && gen === connGen && rpc === myRpc;
   const t0 = performance.now();
   setBusy(true, label || method);
   try {
-    const result = await rpc.call(method, params);
+    const result = await myRpc.call(method, params);
+    // Superseded while in flight (a newer call started, or the connection
+    // moved): discard silently — the newer call / teardown owns the result
+    // pane, the history, the stats, and the busy indicator.
+    if (!isCurrent()) return null;
     const ms = performance.now() - t0;
     stats.calls++; stats.totalMs += ms;
     pushHistory(method, params, ms, true);
     renderResult({ method, params, result, ms, ok: true, summarizeKey, ctx, onResult });
     return result;
   } catch (e) {
+    if (!isCurrent()) return null; // superseded failure discards itself silently
     const ms = performance.now() - t0;
     stats.errors++; stats.totalMs += ms;
     const x = explainError(e);
@@ -239,8 +273,10 @@ async function runCall({ method, params, label, summarizeKey, ctx, onResult }) {
     renderResult({ method, params, result: null, ms, ok: false, error: x, summarizeKey, ctx });
     return null;
   } finally {
-    setBusy(false);
-    renderStats();
+    if (isCurrent()) {
+      setBusy(false);
+      renderStats();
+    }
   }
 }
 
@@ -443,11 +479,18 @@ async function runSelectedRecipe() {
 
   if (r.custom === 'nodeid') {
     if (!rpc || !rpc.connected) { toast('Connect to an endpoint first.', 'err'); return; }
+    // Same result-pane token discipline as runCall: this composite writes
+    // the same pane, history, and stats, so it takes a callSeq token too.
+    const myRpc = rpc;
+    const gen = connGen;
+    const token = ++callSeq;
+    const isCurrent = () => token === callSeq && gen === connGen && rpc === myRpc;
     setBusy(true, 'node identity');
     const t0 = performance.now();
     try {
       const calls = ['system_chain', 'system_name', 'system_version', 'system_chainType', 'system_nodeRoles'];
-      const results = await Promise.all(calls.map((m) => rpc.call(m)));
+      const results = await Promise.all(calls.map((m) => myRpc.call(m)));
+      if (!isCurrent()) return; // superseded: discard silently, like runCall
       const ms = performance.now() - t0;
       stats.calls += calls.length; stats.totalMs += ms;
       pushHistory('system_* (×5)', calls, ms, true);
@@ -460,9 +503,10 @@ async function runSelectedRecipe() {
         <pre class="json">${highlightJson({ chain, name, version, type, roles })}</pre>`;
       el.dataset.raw = JSON.stringify({ chain, name, version, type, roles });
     } catch (e) {
+      if (!isCurrent()) return; // superseded failure discards itself silently
       const x = explainError(e);
       renderResult({ method: 'system_* (×5)', params: [], result: null, ms: performance.now() - t0, ok: false, error: x });
-    } finally { setBusy(false); renderStats(); }
+    } finally { if (isCurrent()) { setBusy(false); renderStats(); } }
     return;
   }
 
