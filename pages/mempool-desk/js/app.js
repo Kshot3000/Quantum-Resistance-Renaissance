@@ -618,6 +618,8 @@ function renderFeeDesk() {
   box.innerHTML = html;
 }
 
+var pasteQuoteSeq = 0;
+
 function estimatePasted() {
   var hex = $("fee-hex").value.trim();
   var msg = $("fee-paste-msg");
@@ -635,13 +637,25 @@ function estimatePasted() {
   }
   msg.textContent = "Asking the node…";
   msg.className = "form-msg";
+  // The quote names no hex — only fee and byte length — so a quote that
+  // lands after a newer quote was requested, or after the field was
+  // edited, would sit beside a hex it does not describe. Pin the field
+  // value under a sequence token; only the latest quote for the hex
+  // still on screen may render, and a superseded success or failure
+  // discards itself silently.
+  var seq = ++pasteQuoteSeq;
+  function stillCurrent() {
+    return seq === pasteQuoteSeq && $("fee-hex").value.trim() === hex;
+  }
   rpcCall(C.buildPaymentQueryInfo(hex)).then(function (res) {
+    if (!stillCurrent()) return;
     var fee = C.decodePartialFee(res);
     var bytes = C.hexByteLen(hex);
     msg.innerHTML = "Node quote: <strong class='mono'>" + esc(C.formatQtc(fee)) + " QTC</strong> " +
       "<span class='muted'>(" + fee.toString() + " planck · " + bytes.toLocaleString("en-US") + " bytes)</span>";
     msg.className = "form-msg ok";
   }).catch(function (e) {
+    if (!stillCurrent()) return;
     msg.textContent = "Node refused the quote: " + e.message;
     msg.className = "form-msg err";
   });
