@@ -548,6 +548,20 @@ function timeoutSignal(ms) {
   return ctl.signal;
 }
 
+/* An indexer row is rendered as money movement, so it must carry a real
+ * amount (non-negative integer plancks), a real block height, and string
+ * endpoints. Poisoned rows are dropped; a payload whose transfer field
+ * is not a list at all is malformed — never a fabricated "no transfers". */
+function validActivityRow(t) {
+  if (!t || typeof t !== 'object') return false;
+  const amountOk = (typeof t.amount === 'string' && /^\d+$/.test(t.amount)) ||
+    (typeof t.amount === 'number' && Number.isSafeInteger(t.amount) && t.amount >= 0);
+  const h = t.block_height;
+  const heightOk = (typeof h === 'number' && Number.isSafeInteger(h) && h >= 0) ||
+    (typeof h === 'string' && /^\d+$/.test(h));
+  return amountOk && heightOk && typeof t.from_id === 'string' && typeof t.to_id === 'string';
+}
+
 let activitySeq = 0; // token: only the latest load for the CURRENT wallet may render
 async function loadActivity() {
   const seq = ++activitySeq;
@@ -581,15 +595,19 @@ async function loadActivity() {
     if (!res.ok) throw new Error('indexer HTTP ' + res.status);
     const j = await res.json();
     if (stale()) return; // superseded while the body parsed — discard silently
-    if (j.errors) throw new Error(j.errors[0].message);
-    const rows = j.data.transfer || [];
+    if (j && j.errors) throw new Error(j.errors[0] && typeof j.errors[0].message === 'string' ? j.errors[0].message : 'indexer error');
+    const rawRows = j && j.data && Array.isArray(j.data.transfer) ? j.data.transfer : null;
+    if (!rawRows) throw new Error('indexer returned malformed activity data');
+    const rows = rawRows.filter(validActivityRow);
+    if (rawRows.length && !rows.length) throw new Error('indexer returned malformed activity data');
     if (!rows.length) { list.innerHTML = '<p class="muted">No transfers found for this address.</p>'; return; }
     list.innerHTML = '';
     for (const t of rows) {
       const incoming = t.to_id === addr;
       const div = document.createElement('div');
       div.className = 'tx';
-      const when = t.timestamp ? new Date(t.timestamp).toLocaleString() : 'block #' + t.block_height;
+      const whenDate = t.timestamp ? new Date(t.timestamp) : null;
+      const when = whenDate && !isNaN(whenDate) ? whenDate.toLocaleString() : 'block #' + Number(t.block_height).toLocaleString();
       div.innerHTML =
         `<div><div class="amt ${incoming ? 'in' : 'out'}">${incoming ? '+' : '−'}${plancksToQtc(BigInt(t.amount))} QTC</div>` +
         `<div class="meta">${incoming ? 'from' : 'to'} ${shortAddr(incoming ? t.from_id : t.to_id)} · ${when}</div></div>` +

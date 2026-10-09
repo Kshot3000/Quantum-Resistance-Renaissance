@@ -282,3 +282,105 @@ test('units: plancks <-> QTC', () => {
 test('u32le', () => {
   assert.deepEqual(u32le(153), Uint8Array.of(0x99, 0x00, 0x00, 0x00));
 });
+
+/* ---- RPC boundary: node answers are validated before they anchor a
+ * balance, a signing payload, a fee quote, or a broadcast result ---- */
+import {
+  parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex,
+} from '../js/rpc-validate.js';
+import {
+  getRuntimeVersion, getGenesisHash, getLatestHeader, getAccountInfo, getNonce, submitExtrinsic,
+} from '../js/rpc.js';
+import { ss58Encode, hexEncode } from '../js/quantus-crypto.js';
+
+test('rpc-validate: block numbers accept int/decimal/hex, reject garbage', () => {
+  assert.equal(parseBlockNumber(7), 7);
+  assert.equal(parseBlockNumber('42'), 42);
+  assert.equal(parseBlockNumber('0x2fca4'), 195748);
+  assert.equal(parseBlockNumber('0xZZ'), null);
+  assert.equal(parseBlockNumber('garbage'), null);
+  assert.equal(parseBlockNumber(1.5), null);
+  assert.equal(parseBlockNumber(-1), null);
+  assert.equal(parseBlockNumber({}), null);
+  assert.equal(parseBlockNumber(null), null);
+});
+
+test('rpc-validate: hashes are exactly 0x + 64 hex', () => {
+  assert.ok(isHash32('0x' + 'aa'.repeat(32)));
+  assert.ok(!isHash32('0x1234'));
+  assert.ok(!isHash32('aa'.repeat(32)));
+  assert.ok(!isHash32({}));
+  assert.ok(!isHash32(null));
+});
+
+test('rpc-validate: versions and nonces are u32 (no float truncation, no negative wrap)', () => {
+  assert.equal(parseVersionNumber(153), 153);
+  assert.equal(parseVersionNumber(0xffffffff), 0xffffffff);
+  assert.equal(parseVersionNumber(0x100000000), null);
+  assert.equal(parseVersionNumber(153.5), null);
+  assert.equal(parseVersionNumber(-1), null);
+  assert.equal(parseNonce('abc'), null);
+  assert.equal(parseNonce(7), 7);
+});
+
+test('rpc-validate: fee fields whitelist integer shapes (BigInt("-5") is a coercion, not validation)', () => {
+  assert.equal(parseFeeField('100'), 100n);
+  assert.equal(parseFeeField('0x10'), 16n);
+  assert.equal(parseFeeField(42), 42n);
+  assert.equal(parseFeeField(42n), 42n);
+  assert.equal(parseFeeField('-5'), null);
+  assert.equal(parseFeeField('1.5'), null);
+  assert.equal(parseFeeField({}), null);
+  assert.equal(parseFeeField(null), null);
+});
+
+test('rpc-validate: storage hex is 0x + even hex bytes', () => {
+  assert.ok(validStorageHex('0x00ff'));
+  assert.ok(!validStorageHex('0x0'));
+  assert.ok(!validStorageHex('0xZZ'));
+  assert.ok(!validStorageHex(42));
+  assert.ok(!validStorageHex('00ff'));
+});
+
+const stubRpc = (answers) => ({
+  call: async (method) => {
+    if (method in answers) return answers[method];
+    throw new Error('no stub for ' + method);
+  },
+});
+const HH = '0x' + 'aa'.repeat(32);
+
+test('rpc boundary: runtime version is normalized, poison rejected', async () => {
+  const rt = await getRuntimeVersion(stubRpc({ state_getRuntimeVersion: { specName: 'quantus', specVersion: 153, transactionVersion: 6 } }));
+  assert.deepEqual(rt, { specName: 'quantus', specVersion: 153, transactionVersion: 6 });
+  await assert.rejects(() => getRuntimeVersion(stubRpc({ state_getRuntimeVersion: { specName: 'quantus', specVersion: 153.5, transactionVersion: 6 } })), /malformed runtime version/);
+  await assert.rejects(() => getRuntimeVersion(stubRpc({ state_getRuntimeVersion: { specName: {}, specVersion: 153, transactionVersion: 6 } })), /malformed runtime version/);
+});
+
+test('rpc boundary: genesis + latest header require real hashes and heights', async () => {
+  assert.equal(await getGenesisHash(stubRpc({ chain_getBlockHash: HH })), HH);
+  await assert.rejects(() => getGenesisHash(stubRpc({ chain_getBlockHash: '0x1234' })), /malformed genesis hash/);
+  const l = await getLatestHeader(stubRpc({ chain_getBlockHash: HH, chain_getHeader: { number: '0x2fca4' } }));
+  assert.equal(l.number, 195748);
+  await assert.rejects(() => getLatestHeader(stubRpc({ chain_getBlockHash: HH, chain_getHeader: null })), /malformed latest header/);
+  await assert.rejects(() => getLatestHeader(stubRpc({ chain_getBlockHash: HH, chain_getHeader: { number: '0xZZ' } })), /malformed latest header/);
+});
+
+test('rpc boundary: account storage — null is not-on-chain, poison is malformed', async () => {
+  const acct = new Uint8Array(32).fill(7);
+  assert.equal(await getAccountInfo(stubRpc({ state_getStorage: null }), acct), null);
+  await assert.rejects(() => getAccountInfo(stubRpc({ state_getStorage: 42 }), acct), /malformed account storage/);
+  await assert.rejects(() => getAccountInfo(stubRpc({ state_getStorage: '0x' + '00'.repeat(10) }), acct), /malformed account storage/);
+  const blob = new Uint8Array(68);
+  new DataView(blob.buffer).setBigUint64(16, 5000n, true);
+  const info = await getAccountInfo(stubRpc({ state_getStorage: '0x' + hexEncode(blob) }), acct);
+  assert.equal(info.free, 5000n);
+});
+
+test('rpc boundary: nonce and submit hash are validated', async () => {
+  const addr = ss58Encode(new Uint8Array(32).fill(7), 189);
+  assert.equal(await getNonce(stubRpc({ system_accountNextIndex: 7 }), addr), 7);
+  await assert.rejects(() => getNonce(stubRpc({ system_accountNextIndex: 'abc' }), addr), /malformed nonce/);
+  assert.equal(await submitExtrinsic(stubRpc({ author_submitExtrinsic: HH }), '0x84'), HH);
+  await assert.rejects(() => submitExtrinsic(stubRpc({ author_submitExtrinsic: '0x1234' }), '0x84'), /malformed transaction hash/);
+});

@@ -354,5 +354,46 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/rpc-validate.js?v=1.0.0"), "extrinsic: rpc-validate.js cache key present");
 }
 
+// ---- 17. Web Wallet: validate RPC answers at the node boundary ----
+// Batch 12 (2026-10-09 15:19): web-wallet (Tier 1, money-touching) rendered
+// and SIGNED node answers unchecked — Number(rt.specVersion) turned a
+// garbage version into a NaN that u32le silently encoded as 0 in the
+// signing payload, a short fake genesis/birth hash was hex-decoded into
+// the payload as-is, parseInt(header.number) made "#NaN" chain fact, a
+// non-string storage answer threw on startsWith and a truncated blob
+// read out of bounds, Number(nonce) signed NaN nonces, BigInt("-5")
+// rendered a negative fee quote, any submit answer was presented as the
+// tx hash, a raw "null" frame threw on msg.id, and the Activity tab
+// turned a non-list indexer payload into a fabricated "no transfers"
+// (with "Invalid Date" rows for garbage timestamps). Pin: validators in
+// js/rpc-validate.js gate every query in rpc.js, and app.js validates
+// activity rows before rendering them as money movement.
+{
+  const val = read("pages/web-wallet/js/rpc-validate.js");
+  ok(val.includes("export function parseBlockNumber(v)"), "wallet: parseBlockNumber() defined in rpc-validate");
+  ok(val.includes("export function isHash32(s)"), "wallet: isHash32() defined in rpc-validate");
+  ok(val.includes("export function parseVersionNumber(v)"), "wallet: parseVersionNumber() defined in rpc-validate");
+  ok(val.includes("export function parseNonce(v)"), "wallet: parseNonce() defined in rpc-validate");
+  ok(val.includes("export function parseFeeField(v)"), "wallet: parseFeeField() defined in rpc-validate");
+  ok(val.includes("export function validStorageHex(s)"), "wallet: validStorageHex() defined in rpc-validate");
+  const rpc = read("pages/web-wallet/js/rpc.js");
+  ok(rpc.includes("node returned a malformed runtime version"), "wallet: runtime version validated before it anchors a payload");
+  ok(rpc.includes("node returned a malformed genesis hash"), "wallet: genesis hash validated");
+  ok(rpc.includes("node returned a malformed latest header"), "wallet: latest header validated");
+  ok(rpc.includes("node returned a malformed era-birth block hash"), "wallet: era-birth hash validated (it is signed over)");
+  ok(rpc.includes("node returned a malformed account storage blob"), "wallet: account storage validated before decoding");
+  ok(rpc.includes("bytes.length !== 68"), "wallet: account storage must be exactly the AccountInfo length");
+  ok(rpc.includes("node returned a malformed nonce"), "wallet: nonce validated before signing");
+  ok(rpc.includes("node returned a malformed transaction hash"), "wallet: submit answer must be a real hash, else unconfirmed");
+  ok(rpc.includes("Array.isArray(msg)) return"), "wallet: RpcClient ignores non-object frames");
+  ok(!rpc.includes("parseInt(header.number, 16)"), "wallet: no unchecked header parseInt remains");
+  ok(!rpc.includes("BigInt(details.inclusionFee.baseFee)"), "wallet: no raw BigInt() fee coercion remains");
+  const app = read("pages/web-wallet/js/app.js");
+  ok(app.includes("function validActivityRow(t)"), "wallet: activity rows validated before rendering");
+  ok(app.includes("indexer returned malformed activity data"), "wallet: non-list activity payload is malformed, never a fake empty history");
+  const html = read("pages/web-wallet/index.html");
+  ok(html.includes("js/app.js?v=1.39.0"), "wallet: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
