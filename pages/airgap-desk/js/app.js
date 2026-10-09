@@ -108,6 +108,7 @@ document.querySelectorAll('[data-role]').forEach((t) => t.addEventListener('clic
  * ================================================================ */
 $('rpc-url').value = 'wss://rpc.quantus.network';
 
+let issueSeq = 0; // token: only an issue whose click-time inputs still stand may assign/render
 $('btn-issue').addEventListener('click', async () => {
   err('issue-err');
   $('ticket-out').hidden = true;
@@ -122,15 +123,36 @@ $('btn-issue').addEventListener('click', async () => {
   } catch (e) { err('issue-err', 'Invalid sender address: ' + e.message); return; }
 
   const url = $('rpc-url').value.trim() || 'wss://rpc.quantus.network';
+  const seq = ++issueSeq;
+  // The connection standing when this issue began (closed below, replaced
+  // only at this handler's successful end). Another handler — the fee quote —
+  // can establish its OWN hot.rpc while this issue's reads are in flight:
+  // that replacement supersedes this issue, whose late completion must not
+  // clobber the quote's socket assignment or render a ticket for inputs
+  // (sender / node fields) that were edited away mid-flight.
+  const rpcAtStart = hot.rpc;
+  const superseded = () => seq !== issueSeq
+    || $('ticket-addr').value.trim() !== addr
+    || ($('rpc-url').value.trim() || 'wss://rpc.quantus.network') !== url
+    || (hot.rpc !== null && hot.rpc !== rpcAtStart);
   const btn = $('btn-issue'); btn.disabled = true; btn.textContent = 'Reading chain…';
+  let rpc = null;
   try {
     if (hot.rpc) hot.rpc.close();
-    const rpc = new RpcClient(url);
+    rpc = new RpcClient(url);
     setConn('', 'connecting…');
     const [rt, genesis, latest, nonce] = await Promise.all([
       getRuntimeVersion(rpc), getGenesisHash(rpc), getLatestHeader(rpc), getNonce(rpc, addr),
     ]);
     const eraInfo = await getEraBirthHash(rpc, latest.number, DEFAULT_ERA_PERIOD);
+    if (superseded()) {
+      // Discard silently as a ticket: close this issue's own socket, leave
+      // any replacement connection (and its pill) alone, and say why.
+      rpc.close();
+      if (!hot.rpc || hot.rpc === rpcAtStart) setConn('', 'not connected');
+      err('issue-err', 'The sender, node, or connection changed while the ticket was being read — that ticket was discarded. Issue the ticket again for what is on screen now.');
+      return;
+    }
     hot.rpc = rpc; hot.rpcUrl = url;
     setConn('on', 'connected');
     const ticket = makeTicket({
@@ -160,6 +182,10 @@ $('btn-issue').addEventListener('click', async () => {
       voidVerification('A new chain ticket was issued, replacing the ticket this package was verified against — that verdict no longer stands.');
     $('ticket-out').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) {
+    if (rpc) rpc.close();
+    // A superseded issue's failure discards itself too: it must not paint
+    // "offline" over a connection another handler established meanwhile.
+    if (seq !== issueSeq || (hot.rpc && hot.rpc !== rpcAtStart)) return;
     setConn('bad', 'offline');
     err('issue-err', 'Could not issue a ticket: ' + e.message + '. A ticket needs a live node — nothing was fabricated.');
   } finally {
@@ -281,6 +307,10 @@ function voidVerification(reason) {
   if (!hot.verified) return;
   hot.verified = null;
   $('btn-broadcast').disabled = true;
+  // The label belongs to the verdict too: a button left at "Broadcasting…"
+  // (a broadcast this void just superseded) or "Broadcast ✓" would describe
+  // a package that no longer stands.
+  $('btn-broadcast').textContent = 'Broadcast to chain';
   $('btn-quote-fee').disabled = true;
   $('fee-quote').hidden = true;
   $('broadcast-result').hidden = true;
@@ -321,6 +351,10 @@ function verifyPackage() {
     ['Extrinsic', `${(hot.extrinsicHex.length / 2 - 1).toLocaleString()} bytes`],
   ]);
   $('btn-broadcast').disabled = !ok;
+  // A fresh verdict owns the button outright — label included: without this
+  // reset the button kept the PREVIOUS package's "Broadcast ✓" (or an
+  // in-flight "Broadcasting…") while armed to broadcast THIS package.
+  $('btn-broadcast').textContent = 'Broadcast to chain';
   $('btn-quote-fee').disabled = false;
   err('broadcast-err');
   $('fee-quote').hidden = true;
@@ -427,6 +461,7 @@ $('btn-quote-fee').addEventListener('click', async () => {
   }
 });
 
+let broadcastSeq = 0; // token: only the latest broadcast of the still-standing verification may render
 $('btn-broadcast').addEventListener('click', async () => {
   err('broadcast-err');
   const v = hot.verified;
@@ -438,9 +473,22 @@ $('btn-broadcast').addEventListener('click', async () => {
     return;
   }
   const hex = hot.extrinsicHex; // the exact bytes this verification pronounced valid
+  const rpc = hot.rpc; // pin the node this broadcast submits to, like the quote pins its hex
+  const seq = ++broadcastSeq;
+  // The submit await is long, and the desk stays live through it: a new
+  // package can be assembled + verified, or the standing verdict voided
+  // (ticket edit / new ticket), while this broadcast is in flight. A
+  // continuation then renders ONLY while this is still the latest broadcast
+  // AND the package it submitted is still the verified package on screen —
+  // a superseded success must not show the old hash (or a "Broadcast ✓"
+  // label) over the new package, and a superseded failure must not paint
+  // "Broadcast failed" over it or re-enable a button a void disabled.
+  // (Same pin discipline as the fee-quote handler above.)
+  const stale = () => seq !== broadcastSeq || hot.verified !== v || hot.extrinsicHex !== hex;
   const btn = $('btn-broadcast'); btn.disabled = true; btn.textContent = 'Broadcasting…';
   try {
-    const hash = await submitExtrinsic(hot.rpc, hex);
+    const hash = await submitExtrinsic(rpc, hex);
+    if (stale()) return; // superseded in flight: the state on screen owns the panel + button now
     $('broadcast-result').hidden = false;
     $('res-hash').textContent = hash;
     const ex = $('res-explorer');
@@ -450,6 +498,7 @@ $('btn-broadcast').addEventListener('click', async () => {
     $('broadcast-result').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
     btn.textContent = 'Broadcast ✓';
   } catch (e) {
+    if (stale()) return; // superseded failure discards itself silently
     err('broadcast-err', 'Broadcast failed: ' + e.message);
     btn.disabled = false; btn.textContent = 'Broadcast to chain';
   }

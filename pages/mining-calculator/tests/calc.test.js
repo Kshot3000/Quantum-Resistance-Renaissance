@@ -127,7 +127,7 @@ t("fallback bundle is one consistent capture", function(){
   approx(Number(F.totalSupplyPlancks) / 1e12, F.supplyQtc, 0.001); // supplyQtc stored rounded to 4dp
   approx(m.blockReward(F.supplyQtc), 0.3041789, 1e-7);
   assert.strictEqual(F.height, 189029);
-  assert.ok(F.fetchedAt.indexOf("2026-10-08") === 0, "fallback is dated 2026-10-08");
+  assert.ok(F.fetchedAt.indexOf("2026-10-09") === 0, "fallback is dated 2026-10-09");
   // The old bug, pinned: the pre-v1.9.0 static default was 10 GH/s.
   assert.ok(F.netHs > 1e12, "fallback network rate is TH/s-scale, not the old 10 GH/s example");
 });
@@ -154,13 +154,13 @@ t("default rig estimate is honest at fallback defaults", function(){
 });
 
 // 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
-t("index.html carries the fallback defaults and v1.9.51 key", function(){
+t("index.html carries the fallback defaults and v1.9.52 key", function(){
   var fs = require("fs"), path = require("path");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="54.569"') >= 0, "in-net defaults to the fallback TH/s figure");
   assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
   assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
-  assert.ok(html.indexOf("app.js?v=1.9.51") >= 0, "app.js cache key bumped to 1.9.51");
+  assert.ok(html.indexOf("app.js?v=1.9.52") >= 0, "app.js cache key bumped to 1.9.52");
   assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
 });
 
