@@ -317,5 +317,42 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/rpc-core.js?v=1.33.0"), "mempool: rpc-core.js cache key bumped for the boundary fix");
 }
 
+// ---- 16. Extrinsic Lab: validate RPC answers at the node boundary ----
+// Batch 11 (2026-10-09 14:19): extrinsic-lab (Tier 1) esc()'d node answers
+// at render but never validated them — the Verify context fetch wrote
+// rt.specVersion / genesis / header height straight into the verdict
+// inputs (an object genesis became "[object Object]", a garbage header
+// number became finalized "#NaN" and a "NaN" target-block field), the
+// Live scanner parseInt'd the block header unchecked and turned a
+// missing/non-list extrinsics field into a fake EMPTY block, non-string
+// block entries were fed to the decoder as garbage, and a raw "null"
+// socket frame threw inside attachRpc on msg.id. Pin: shared validators
+// in js/rpc-validate.js gate the context fetch (all-or-nothing writes)
+// and the scanner; malformed frames are ignored.
+{
+  const core = read("pages/extrinsic-lab/js/rpc-validate.js");
+  ok(core.includes("function parseBlockNumber(v)"), "extrinsic: parseBlockNumber() defined in rpc-validate");
+  ok(core.includes("function isHash32(s)"), "extrinsic: isHash32() defined in rpc-validate");
+  ok(core.includes("function parseVersionNumber(v)"), "extrinsic: parseVersionNumber() defined in rpc-validate");
+  ok(core.includes("function validExtrinsicHex(s)"), "extrinsic: validExtrinsicHex() defined in rpc-validate");
+  const app = read("pages/extrinsic-lab/js/app.js");
+  ok(app.includes("node returned a malformed finalized head hash"), "extrinsic: context fetch + scanner reject a non-hash finalized head");
+  ok(app.includes("node returned a malformed finalized header"), "extrinsic: context fetch rejects a malformed header");
+  ok(app.includes("node returned a malformed runtime version"), "extrinsic: context fetch rejects a malformed runtime version");
+  ok(app.includes("node returned a malformed genesis hash"), "extrinsic: context fetch rejects a malformed genesis hash");
+  ok(app.includes("node returned a malformed era-birth block hash"), "extrinsic: context fetch rejects a malformed era-birth hash");
+  ok(app.includes("node returned a malformed block header"), "extrinsic: scanner rejects a malformed block header");
+  ok(app.includes("extrinsics is not a list"), "extrinsic: scanner rejects a non-list extrinsics field");
+  ok(app.includes("block state unknown, not empty"), "extrinsic: malformed block is unknown, never a fake empty block");
+  ok(app.includes("malformed entry"), "extrinsic: scanner labels non-hex block entries as malformed");
+  ok(app.includes("Array.isArray(msg)) return"), "extrinsic: attachRpc ignores non-object frames");
+  ok(!app.includes("parseInt(header.number, 16)"), "extrinsic: no unchecked header parseInt remains in the context fetch");
+  ok(!app.includes("parseInt(block.block.header.number, 16)"), "extrinsic: no unchecked header parseInt remains in the scanner");
+  ok(!app.includes("block.block.extrinsics || []"), "extrinsic: no silent non-list-to-empty extrinsics coercion remains");
+  const html = read("pages/extrinsic-lab/index.html");
+  ok(html.includes("js/app.js?v=1.43.0"), "extrinsic: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/rpc-validate.js?v=1.0.0"), "extrinsic: rpc-validate.js cache key present");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -252,5 +252,38 @@ test('compact round-trip all modes', () => {
   assertEq(D.bytesToHex(E.compactEncode(16384n)), '02000100', 'mode2 min');
 });
 
+/* ---------- 10: RPC answer validators (the node is untrusted) ---------- */
+const R = require('../js/rpc-validate.js');
+test('parseBlockNumber accepts int / decimal / 0x-hex only', () => {
+  assertEq(R.parseBlockNumber(195564), 195564, 'int');
+  assertEq(R.parseBlockNumber('195564'), 195564, 'decimal string');
+  assertEq(R.parseBlockNumber('0x2fbec'), 195564, 'hex string');
+  assertEq(R.parseBlockNumber(0), 0, 'zero');
+  for (const bad of [-1, 1.5, NaN, 'garbage', '0xZZ', '12.5', '-3', {}, [], null, undefined, '9007199254740993']) {
+    assertEq(R.parseBlockNumber(bad), null, 'reject ' + JSON.stringify(bad));
+  }
+});
+test('isHash32 accepts exactly 0x + 64 hex digits', () => {
+  assert(R.isHash32('0x' + 'ab'.repeat(32)), 'valid hash');
+  assert(R.isHash32('0x' + 'AB'.repeat(32)), 'uppercase hash');
+  for (const bad of ['0x' + 'ab'.repeat(31), '0x' + 'ab'.repeat(33), 'ab'.repeat(32), '0xZZ' + 'ab'.repeat(31), '', {}, null, 42]) {
+    assert(!R.isHash32(bad), 'reject ' + JSON.stringify(bad));
+  }
+});
+test('parseVersionNumber accepts u32 shapes, rejects objects/floats/negatives', () => {
+  assertEq(R.parseVersionNumber(153), 153, 'int');
+  assertEq(R.parseVersionNumber('6'), 6, 'decimal string');
+  for (const bad of [{ spec: 153 }, 1.5, -1, 'latest', null, undefined]) {
+    assertEq(R.parseVersionNumber(bad), null, 'reject ' + JSON.stringify(bad));
+  }
+});
+test('validExtrinsicHex accepts even 0x hex >= 1 byte only', () => {
+  assert(R.validExtrinsicHex('0x8400'), 'short valid');
+  assert(R.validExtrinsicHex('0x' + 'aa'.repeat(100)), 'long valid');
+  for (const bad of ['0x', '0x0', '0xZZ', 'aa', '', {}, null, 123, ['0x84']]) {
+    assert(!R.validExtrinsicHex(bad), 'reject ' + JSON.stringify(bad));
+  }
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

@@ -4,7 +4,7 @@
  * signature check. Live tab: finalized-block scanner over WebSocket.
  * Reference tab: searchable verified call table. All decoding is local. */
 (function () {
-  var D = window.QEL_DECODE, CT = window.QEL_CALLS, E = window.QEL_ENCODE, V = window.QEL_VERIFY;
+  var D = window.QEL_DECODE, CT = window.QEL_CALLS, E = window.QEL_ENCODE, V = window.QEL_VERIFY, R = window.QEL_RPC;
   var state = { last: null, lastHex: '', ws: null, wsUrl: '', rpcId: 0, rpcPending: {}, liveBlock: null };
   /* Stale-pin tokens: every async RPC path captures the token current at
    * click time; a continuation renders only while its token is still the
@@ -427,7 +427,9 @@
     return new Promise(function (resolve, reject) {
       var id = ++state.rpcId;
       pending[id] = { resolve: resolve, reject: reject };
-      ws.send(JSON.stringify({ jsonrpc: '2.0', id: id, method: method, params: params || [] }));
+      try {
+        ws.send(JSON.stringify({ jsonrpc: '2.0', id: id, method: method, params: params || [] }));
+      } catch (e) { delete pending[id]; reject(e); return; }
       setTimeout(function () {
         if (pending[id]) { delete pending[id]; reject(new Error('RPC timeout: ' + method)); }
       }, 15000);
@@ -437,11 +439,17 @@
     ws.onmessage = function (ev) {
       var msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      /* A frame that parses to null / an array / a scalar is not a
+       * JSON-RPC response — ignore it, never dereference it (a raw
+       * "null" frame used to throw on msg.id inside this handler). */
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
       var p = pending[msg.id];
       if (!p) return;
       delete pending[msg.id];
-      if (msg.error) p.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
-      else p.resolve(msg.result);
+      if (msg.error) {
+        var m = (typeof msg.error.message === 'string' && msg.error.message) ? msg.error.message : null;
+        p.reject(new Error(m || 'RPC error: ' + JSON.stringify(msg.error)));
+      } else p.resolve(msg.result);
     };
   }
   function setPill(mode, text) {
@@ -463,24 +471,38 @@
       attachRpc(ws, pending);
       (async function () {
         try {
+          /* The context is the anchor a signature verdict stands on, so
+           * every answer is validated BEFORE any field is written — a
+           * malformed answer fails the whole fetch honestly and leaves
+           * the previous context untouched (all-or-nothing), instead of
+           * writing "[object Object]" / "NaN" into the verdict inputs. */
           var headHash = await rpcCall(ws, pending, 'chain_getFinalizedHead', []);
+          if (!R.isHash32(headHash)) throw new Error('node returned a malformed finalized head hash — context not fetched');
           var header = await rpcCall(ws, pending, 'chain_getHeader', [headHash]);
-          var blockNum = parseInt(header.number, 16);
+          var blockNum = (header && typeof header === 'object') ? R.parseBlockNumber(header.number) : null;
+          if (blockNum == null) throw new Error('node returned a malformed finalized header — context not fetched');
           var rt = await rpcCall(ws, pending, 'state_getRuntimeVersion', []);
+          var specV = (rt && typeof rt === 'object') ? R.parseVersionNumber(rt.specVersion) : null;
+          var txV = (rt && typeof rt === 'object') ? R.parseVersionNumber(rt.transactionVersion) : null;
+          if (specV == null || txV == null) throw new Error('node returned a malformed runtime version — context not fetched');
           var genesis = await rpcCall(ws, pending, 'chain_getBlockHash', [0]);
+          if (!R.isHash32(genesis)) throw new Error('node returned a malformed genesis hash — context not fetched');
+          var d = state.last;
+          var birth = null, birthHash = null;
+          if (d && d.version.signed && !d.era.immortal) {
+            birth = V.birthFor(d, blockNum);
+            birthHash = await rpcCall(ws, pending, 'chain_getBlockHash', [birth]);
+            if (!R.isHash32(birthHash)) throw new Error('node returned a malformed era-birth block hash — context not fetched');
+          }
           if (myCtx !== ctxSeq) return;
-          $('v-spec').value = rt.specVersion;
-          $('v-tx').value = rt.transactionVersion;
+          $('v-spec').value = specV;
+          $('v-tx').value = txV;
           $('v-genesis').value = genesis;
           /* Programmatic writes fire no input event — void any verdict
            * earned under the old context explicitly. */
           voidVerify('Fresh context was fetched from the node, so the previous verdict no longer applies. Verify again.');
-          var note = 'spec ' + rt.specVersion + ' · tx v' + rt.transactionVersion + ' · finalized #' + blockNum.toLocaleString('en-US');
-          var d = state.last;
-          if (d && d.version.signed && !d.era.immortal) {
-            var birth = V.birthFor(d, blockNum);
-            var birthHash = await rpcCall(ws, pending, 'chain_getBlockHash', [birth]);
-            if (myCtx !== ctxSeq) return;
+          var note = 'spec ' + specV + ' · tx v' + txV + ' · finalized #' + blockNum.toLocaleString('en-US');
+          if (birthHash) {
             $('v-birth').value = birthHash;
             $('v-block').value = blockNum;
             note += ' · era-birth #' + birth;
@@ -522,10 +544,19 @@
     list.innerHTML = '<div class="fineprint"><span class="spin"></span>Fetching latest finalized block…</div>';
     try {
       var headHash = await rpcCall(ws, pending, 'chain_getFinalizedHead', []);
+      if (!R.isHash32(headHash)) throw new Error('node returned a malformed finalized head hash');
       var block = await rpcCall(ws, pending, 'chain_getBlock', [headHash]);
       if (myScan !== scanSeq || state.ws !== ws) return;
-      var num = parseInt(block.block.header.number, 16);
-      var exts = block.block.extrinsics || [];
+      /* The block answer is presented as chain fact, so its shape is
+       * validated whole: a malformed header is not "#NaN", and an
+       * extrinsics field that is not a list is a malformed block —
+       * block state unknown, not empty — never a fake empty block. */
+      var blk = (block && typeof block === 'object') ? block.block : null;
+      var hdr = (blk && typeof blk === 'object') ? blk.header : null;
+      var num = (hdr && typeof hdr === 'object') ? R.parseBlockNumber(hdr.number) : null;
+      if (num == null) throw new Error('node returned a malformed block header');
+      if (!Array.isArray(blk.extrinsics)) throw new Error('node returned a malformed block (extrinsics is not a list) — block state unknown, not empty');
+      var exts = blk.extrinsics;
       state.liveBlock = { number: num, hash: headHash, count: exts.length };
       meta.innerHTML = 'Finalized block <span class="mono">#' + num.toLocaleString('en-US') + '</span> · <span class="mono">' +
         esc(headHash.slice(0, 18)) + '…</span> · ' + exts.length + ' extrinsic' + (exts.length === 1 ? '' : 's');
@@ -534,7 +565,10 @@
         var row = document.createElement('div');
         row.className = 'live-row';
         var decoded = null, label, sub;
-        try {
+        if (!R.validExtrinsicHex(hex)) {
+          label = '<span style="color:var(--amber)">malformed entry</span>';
+          sub = 'not extrinsic hex — the node returned a malformed entry for this slot';
+        } else try {
           decoded = D.decodeExtrinsic(hex);
           label = decoded.call ? esc((decoded.call.palletName || ('pallet ' + decoded.call.palletIndex)) + '.' + (decoded.call.callName || ('call ' + decoded.call.callIndex))) : '—';
           var signer = decoded.signer && decoded.signer.account ? shortAddr(decoded.signer.account.ss58) : (decoded.version.signed ? '?' : 'inherent');
