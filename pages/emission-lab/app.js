@@ -101,18 +101,42 @@ if (typeof window !== "undefined"){
 
   function anchorFromSnapshot(data){
     // Anchor R0 on live indexer rewards: R0 = mean(reward) * DIVISOR (the pallet formula, inverted).
-    var blocks = (data.blocks || []).filter(function(b){ return b.reward; });
+    // Validate BEFORE anchoring (the Consensus Lab lesson, 2026-10-09): the old
+    // filter only required a truthy `reward`, so a partially-malformed snapshot
+    // (non-numeric rewards, unparseable timestamps, all-zero rewards) built a
+    // poisoned anchor — mean/R0/blockTime NaN or 0 — and every renderer ran on
+    // it: hero "NaN%", simulator NaN heights/dates, zero rewards claiming the
+    // full 21M cap as supply. The page only reached fail() by luck, when a
+    // canvas call happened to throw on the NaN coordinates. Now: keep only
+    // blocks whose reward, height AND timestamp all parse to sane values,
+    // require a finite R0 inside (0, MAX_SUPPLY), and require the observed
+    // block time to be finite and plausible — otherwise return null and the
+    // boot routes to fail(): no figures rather than invented ones.
+    if (!data || !Array.isArray(data.blocks)) return null;
+    var blocks = data.blocks.filter(function(b){
+      if (!b) return false;
+      var rw = Number(b.reward), h = Number(b.height);
+      return isFinite(rw) && rw > 0 && isFinite(h) && h > 0 && Math.floor(h) === h &&
+             isFinite(Date.parse(b.timestamp));
+    });
     if (!blocks.length) return null;
-    var rewards = blocks.map(function(b){ return parseInt(b.reward, 10) / PLANCKS; });
+    var rewards = blocks.map(function(b){ return Number(b.reward) / PLANCKS; });
     var mean = rewards.reduce(function(a, b){ return a + b; }, 0) / rewards.length;
     var R0 = mean * EMISSION_DIVISOR;
+    if (!isFinite(mean) || mean <= 0 || !isFinite(R0) || R0 <= 0 || R0 >= MAX_SUPPLY) return null;
     var t0 = Date.parse(blocks[0].timestamp);
     var tN = Date.parse(blocks[blocks.length - 1].timestamp);
     var dh = blocks[0].height - blocks[blocks.length - 1].height;
-    var bt = dh > 0 ? (t0 - tN) / 1000 / dh : 13.7;
+    var bt = 13.7;
+    if (dh > 0){
+      bt = (t0 - tN) / 1000 / dh;
+      if (!isFinite(bt) || bt < 1 || bt > 600) return null; // internally inconsistent snapshot
+    }
+    var fetchedAt = data.fetched_at;
+    if (!fetchedAt || !isFinite(Date.parse(fetchedAt))) fetchedAt = null; // never render "Invalid Date"
     return { R0: R0, meanReward: mean, rewards: rewards, heights: blocks.map(function(b){ return b.height; }),
              height: blocks[0].height, time: t0, blockTime: bt,
-             fetchedAt: data.fetched_at || null };
+             fetchedAt: fetchedAt };
   }
 
   /* Abort a fetch that never settles: a hung request must fall through to

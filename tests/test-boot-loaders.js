@@ -81,5 +81,39 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(src.includes("function showError(msg)"), "observatory: failures route to showError (no figures rather than invented ones)");
 }
 
+// ---- 5. Emission Lab: validate the anchor before any renderer uses it ----
+// Batch 2 (2026-10-09 03:19): anchorFromSnapshot only required a truthy
+// `reward`, so non-numeric rewards / unparseable timestamps / all-zero
+// rewards built a poisoned anchor (NaN mean, R0, blockTime) and the page
+// rendered NaN figures, reaching fail() only if a canvas call threw.
+{
+  const src = read("pages/emission-lab/app.js");
+  const anchor = src.slice(src.indexOf("function anchorFromSnapshot"), src.indexOf("function timeoutSignal"));
+  ok(anchor.includes("Array.isArray(data.blocks)"), "emission: anchor requires a blocks array");
+  ok(anchor.includes("isFinite(Date.parse(b.timestamp))"), "emission: blocks with unparseable timestamps are rejected");
+  ok(anchor.includes("R0 >= MAX_SUPPLY"), "emission: R0 sanity-bounded before anchoring");
+  ok(anchor.includes("bt < 1 || bt > 600"), "emission: observed block time must be finite and plausible");
+  ok(anchor.includes('fetchedAt = null'), "emission: unparseable fetched_at is dropped (never 'Invalid Date')");
+  ok(!src.includes("return b.reward;"), "emission: no truthy-reward-only filter remains");
+  const html = read("pages/emission-lab/index.html");
+  ok(html.includes("app.js?v=1.15.2"), "emission: app.js cache key bumped for the anchor fix");
+}
+
+// ---- 6. Tokenomics: audited clean — keep its fall-through shape ----
+// GraphQL -> snapshot -> local model; every stage guarded, a malformed
+// height at any stage falls through instead of poisoning the tiles.
+{
+  const src = read("pages/tokenomics/app.js");
+  ok(src.includes("fromSnap().catch(local)"), "tokenomics: snapshot failure falls through to the local model");
+  ok(src.includes('if ($("ltHeight").textContent === "—") local();'), "tokenomics: slow stages cannot strand the tiles on —");
+}
+
+// ---- 7. Distribution Planner: no chain load at all (pure local planner) ----
+{
+  const src = read("pages/distribution-planner/js/app.js");
+  ok(!src.includes("fetch("), "distribution: planner never fetches chain data (nothing to strand)");
+  ok(src.includes("revalidate();"), "distribution: boot renders the empty state via revalidate()");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
