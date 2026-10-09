@@ -1,9 +1,9 @@
 {
  "ok": true,
  "source": "https://sqm.quantus.com/v1/graphql (vesting_schedule)",
- "fetched_at": "2026-10-09T16:22:12.504Z",
- "fetched_at_ms": "1791562932503",
- "block_height": 194864,
+ "fetched_at": "2026-10-09T17:22:58.242Z",
+ "fetched_at_ms": "1791566578241",
+ "block_height": 195105,
  "tge_ms": "1788943917807",
  "tge_iso": "2026-09-09T08:51:57.807Z",
  "cohorts": {
@@ -48,7 +48,7 @@
    "schedules": 1,
    "total_plancks": "42000000000000000",
    "claimed_plancks": "0",
-   "vested_plancks": "3488033270928462"
+   "vested_plancks": "3492888705859969"
   },
   "liquidity": {
    "label": "Treasury initial liquidity (id 46)",
@@ -552,7 +552,7 @@
    "start_ms": "1788943917807",
    "end_ms": "1820479917807",
    "last_claim_at_ms": null,
-   "vested_plancks": "3488033270928462"
+   "vested_plancks": "3492888705859969"
   },
   {
    "id": 46,

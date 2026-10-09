@@ -5,6 +5,7 @@ import {
   parseAddressInput, accountStorageKeyHex, buildMapKeyHex, decodeBalanceStorage,
   summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion,
   RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory, formatPartialFeeQtc,
+  parseBlockNumber, isHash32, validPlanckField,
 } from '../js/core.js';
 import { ConsoleRpc } from '../js/rpc-client.js';
 import { ss58Encode, hexEncode } from '../js/lib/quantus-crypto.js';
@@ -115,6 +116,39 @@ t('summarizeHeader null-safe', summarizeHeader(null) === null);
 }
 t('summarizeHealth', summarizeHealth({ isSyncing: false, peers: 3, shouldHavePeers: true }).peers === 3);
 t('summarizeRuntime', summarizeRuntimeVersion({ specName: 'quantus', specVersion: 100 }).specVersion === 100);
+
+/* ---- RPC result validation (node answers are untrusted input) ---- */
+t('parseBlockNumber: int', parseBlockNumber(42) === 42);
+t('parseBlockNumber: hex string', parseBlockNumber('0x162e') === 5678);
+t('parseBlockNumber: decimal string', parseBlockNumber('5678') === 5678);
+t('parseBlockNumber: garbage -> null', parseBlockNumber('garbage!!') === null && parseBlockNumber('0xZZ') === null);
+t('parseBlockNumber: float/negative/object -> null', parseBlockNumber(1.5) === null && parseBlockNumber(-3) === null && parseBlockNumber({}) === null && parseBlockNumber(null) === null);
+t('isHash32', isHash32('0x' + 'ab'.repeat(32)) && !isHash32('0xab') && !isHash32('not-a-hash') && !isHash32({}) && !isHash32(null));
+t('validPlanckField', validPlanckField('1500000000') === '1500000000' && validPlanckField(7) === '7'
+  && validPlanckField({ x: 1 }) === null && validPlanckField('1.5') === null && validPlanckField(-1) === null && validPlanckField(null) === null);
+{
+  const H = (c) => '0x' + c.repeat(32);
+  const h = summarizeHeader({ number: '0x162e', hash: 'zz', parentHash: H('33'), stateRoot: 42, extrinsicsRoot: H('55') });
+  t('header: hex number parsed, bad hashes nulled not fatal', h.number === 5678 && h.hash === null && h.parentHash === H('33') && h.stateRoot === null);
+  t('header: garbage number -> null summary', summarizeHeader({ number: 'garbage!!' }) === null);
+  t('block: garbage header number -> null', summarizeBlock({ header: { number: '0xZZ' }, extrinsics: [] }) === null);
+  t('block: non-array extrinsics -> null', summarizeBlock({ header: { number: 7 }, extrinsics: 'nope' }) === null);
+  const b2 = summarizeBlock({ header: { number: 7 }, extrinsics: ['0x' + 'aa'.repeat(10), 42, null] });
+  t('block: non-string extrinsics dropped from count/bytes', b2.extrinsicCount === 1 && b2.totalBytes === 10);
+  const ps = summarizePeers([
+    { peerId: { x: 1 }, roles: ['FULL'], bestNumber: 'soon', bestHash: 'nothex' },
+    { peerId: 'peer-good', roles: 'FULL', bestNumber: '0x162e', bestHash: H('66') },
+    { peerId: 'peer-badhash', roles: 'FULL', bestNumber: 9, bestHash: 'short' },
+  ]);
+  t('peers: poisoned-identity row dropped, good rows survive', ps.length === 2 && ps[0].peerId === 'peer-good' && ps[0].bestNumber === 5678);
+  t('peers: bad bestHash dashed, not fatal', ps[1].peerId === 'peer-badhash' && ps[1].bestHash === null);
+  t('health: garbage peers -> null', summarizeHealth({ isSyncing: false, peers: 'many', shouldHavePeers: true }) === null);
+  t('health: truthy string is not syncing', summarizeHealth({ isSyncing: 'false', peers: 3, shouldHavePeers: true }).isSyncing === false);
+  t('runtime: object specName -> null', summarizeRuntimeVersion({ specName: { n: 1 }, specVersion: 100 }) === null);
+  t('runtime: string specVersion -> null', summarizeRuntimeVersion({ specName: 'quantus', specVersion: 'abc' }) === null);
+  const rv = summarizeRuntimeVersion({ specName: 'quantus', specVersion: 100, implName: 7, transactionVersion: null });
+  t('runtime: display-only fields nulled', rv.implName === null && rv.transactionVersion === null && rv.specVersion === 100);
+}
 
 /* ---- recipe builders ---- */
 {

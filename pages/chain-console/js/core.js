@@ -143,44 +143,107 @@ export function buildMapKeyHex(pallet, item, address) {
   return { ok: true, keyHex: '0x' + hexEncode(storageKey(pallet.trim(), item.trim(), p.accountId)) };
 }
 
+/* ---------- RPC result validation ----------
+ * Everything a node returns is untrusted input: a broken, malicious, or
+ * simply non-Quantus endpoint can answer any method with any JSON shape.
+ * The summarizers below validate before they summarize — a core field
+ * (a block number, a balance, a peer count) that fails validation drops
+ * the whole summary (the raw JSON still shows; no figure is invented),
+ * while a display-only field (a header's hash, a peer's best hash) is
+ * nulled to a dash so its row survives. */
+
+/* Block heights / counts / versions arrive as JSON integers or as hex
+ * strings ("0x162e"); anything else (floats, negatives, objects, prose)
+ * is not a number the console may present as chain fact. */
+export function parseBlockNumber(v) {
+  if (typeof v === 'number') return Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (typeof v === 'string') {
+    const t = v.trim();
+    if (/^0x[0-9a-fA-F]+$/.test(t) || /^[0-9]+$/.test(t)) {
+      const n = Number(t);
+      return Number.isSafeInteger(n) && n >= 0 ? n : null;
+    }
+  }
+  return null;
+}
+
+/* A 32-byte hash is exactly 0x + 64 hex digits — "not-a-hash", a short
+ * hex string, or an object is not a hash, whatever the node claims. */
+export function isHash32(s) {
+  return typeof s === 'string' && /^0x[0-9a-fA-F]{64}$/.test(s.trim());
+}
+
+/* A planck amount field is a non-negative integer, as a JSON integer or
+ * a pure-digit string; anything else renders as a dash, never String(x). */
+export function validPlanckField(v) {
+  if (typeof v === 'number') return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
+  if (typeof v === 'string' && /^[0-9]+$/.test(v.trim())) return v.trim();
+  return null;
+}
+
 /* ---------- result summarizers (one per recipe) ---------- */
 
 export function summarizeHeader(h) {
   if (!h || typeof h !== 'object') return null;
-  return { number: h.number, hash: h.hash || null, parentHash: h.parentHash, stateRoot: h.stateRoot, extrinsicsRoot: h.extrinsicsRoot };
+  const number = parseBlockNumber(h.number);
+  if (number === null) return null; // the height is the identity of a header — no valid number, no summary
+  const hashField = (v) => (isHash32(v) ? v : null); // display-only: dash a bad hash, keep the block
+  return { number, hash: hashField(h.hash), parentHash: hashField(h.parentHash), stateRoot: hashField(h.stateRoot), extrinsicsRoot: hashField(h.extrinsicsRoot) };
 }
 
 export function summarizeBlock(block) {
-  if (!block || typeof block !== 'object') return null;
-  const extrinsics = Array.isArray(block.extrinsics) ? block.extrinsics : [];
+  if (!block || typeof block !== 'object' || !block.header || typeof block.header !== 'object') return null;
+  const number = parseBlockNumber(block.header.number);
+  if (number === null) return null;
+  if (block.extrinsics !== undefined && !Array.isArray(block.extrinsics)) return null;
+  const extrinsics = (block.extrinsics || []).filter((x) => typeof x === 'string');
   return {
-    number: block.header ? block.header.number : null,
-    hash: block.header ? block.header.hash || null : null,
+    number,
+    hash: isHash32(block.header.hash) ? block.header.hash : null,
     extrinsicCount: extrinsics.length,
-    totalBytes: extrinsics.reduce((a, x) => a + (typeof x === 'string' ? x.length / 2 - 1 : 0), 0),
+    totalBytes: extrinsics.reduce((a, x) => a + x.length / 2 - 1, 0),
   };
 }
 
 export function summarizePeers(peers) {
   if (!Array.isArray(peers)) return null;
-  return peers.map((p) => ({
-    peerId: p.peerId, roles: p.roles,
-    bestNumber: p.bestHash ? p.bestNumber : p.bestNumber,
-    bestHash: p.bestHash ? shortHex(p.bestHash) : null,
-  }));
+  const rows = [];
+  for (const p of peers) {
+    if (!p || typeof p !== 'object') continue;
+    if (typeof p.peerId !== 'string' || !p.peerId) continue;   // a row without a usable identity is dropped
+    const bestNumber = parseBlockNumber(p.bestNumber);
+    if (bestNumber === null) continue;                          // its "best block" is the row's fact — garbage drops the row
+    rows.push({
+      peerId: p.peerId,
+      roles: typeof p.roles === 'string' ? p.roles : null,
+      bestNumber,
+      bestHash: isHash32(p.bestHash) ? shortHex(p.bestHash) : null, // display-only: dashed, not fatal
+    });
+  }
+  return rows;
 }
 
 export function summarizeHealth(h) {
   if (!h || typeof h !== 'object') return null;
-  return { isSyncing: !!h.isSyncing, peers: h.peers, shouldHavePeers: !!h.shouldHavePeers };
+  const peers = parseBlockNumber(h.peers);
+  if (peers === null) return null;
+  // Strict === true: a truthy string like "false" must not read as syncing.
+  return { isSyncing: h.isSyncing === true, peers, shouldHavePeers: h.shouldHavePeers === true };
 }
 
 export function summarizeRuntimeVersion(rv) {
   if (!rv || typeof rv !== 'object') return null;
+  if (typeof rv.specName !== 'string' || !rv.specName) return null;
+  const specVersion = parseBlockNumber(rv.specVersion);
+  if (specVersion === null) return null; // spec name+version are the summary's identity
+  const ver = (v) => parseBlockNumber(v);
   return {
-    specName: rv.specName, implName: rv.implName,
-    specVersion: rv.specVersion, implVersion: rv.implVersion,
-    transactionVersion: rv.transactionVersion, stateVersion: rv.stateVersion,
+    specName: rv.specName,
+    implName: typeof rv.implName === 'string' && rv.implName ? rv.implName : null,
+    specVersion,
+    implVersion: ver(rv.implVersion),
+    transactionVersion: ver(rv.transactionVersion),
+    stateVersion: ver(rv.stateVersion),
   };
 }
 

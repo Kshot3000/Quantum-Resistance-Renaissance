@@ -9,6 +9,7 @@ import {
   parseAddressInput, decodeBalanceStorage, buildMapKeyHex, accountStorageKeyHex,
   summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion,
   historyEntry, loadHistory, saveHistory, normalizeHex, isHex, formatPartialFeeQtc,
+  parseBlockNumber, isHash32, validPlanckField,
 } from './core.js';
 import { ConsoleRpc } from './rpc-client.js';
 import { RECIPES, RECIPE_CATEGORIES, getRecipe } from './recipes.js';
@@ -46,7 +47,7 @@ const SUMMARIZERS = {
       + kvRow('Parent', esc(shortHex(h.parentHash || '—', 16)), true) + kvRow('State root', esc(shortHex(h.stateRoot || '—', 16)), true);
   },
   hash(r) {
-    if (typeof r !== 'string') return null;
+    if (!isHash32(r)) return null; // a "hash" that is not 32 bytes of hex is not presented as one
     return kvRow('Hash', esc(r), true);
   },
   block(r) {
@@ -64,24 +65,35 @@ const SUMMARIZERS = {
       + kvRow('Frozen', `${esc(d.frozenQtc)} QTC`) + kvRow('Total', `${esc(d.totalQtc)} QTC`)
       + (d.belowEd ? `<div class="note warn">Below the 0.001 QTC existential deposit — this account can be reaped.</div>` : '');
   },
-  nonce(r) { return kvRow('Next nonce', `<b>${formatNumber(r)}</b>`); },
+  nonce(r) {
+    const n = parseBlockNumber(r);
+    if (n === null) return null; // a nonce that is not a non-negative integer is not a nonce
+    return kvRow('Next nonce', `<b>${formatNumber(n)}</b>`);
+  },
   storage(r) {
     if (r === null) return `<div class="note warn">Empty — nothing stored at this key.</div>`;
+    if (typeof r !== 'string' || !isHex(r) || r.length % 2 !== 0) return null; // storage bytes are even-length 0x-hex or they are not bytes
     return kvRow('Bytes', formatNumber(r.length / 2 - 1) + ' B') + kvRow('Value', esc(shortHex(r, 40)), true);
   },
   runtime(r) {
     const v = summarizeRuntimeVersion(r);
     if (!v) return null;
-    return kvRow('Spec', esc(`${v.specName} v${v.specVersion}`), true) + kvRow('Impl', esc(`${v.implName} v${v.implVersion}`), true)
-      + kvRow('Transaction version', esc(String(v.transactionVersion))) + kvRow('State version', esc(String(v.stateVersion)));
+    const ver = (x) => (x === null ? '—' : String(x));
+    return kvRow('Spec', esc(`${v.specName} v${v.specVersion}`), true)
+      + kvRow('Impl', v.implName ? esc(`${v.implName} v${ver(v.implVersion)}`) : '—', true)
+      + kvRow('Transaction version', esc(ver(v.transactionVersion))) + kvRow('State version', esc(ver(v.stateVersion)));
   },
   properties(r) {
     if (!r || typeof r !== 'object') return null;
-    return kvRow('SS58 prefix', esc(String(r.ss58Format))) + kvRow('Decimals', esc(String(r.tokenDecimals)))
-      + kvRow('Symbol', esc(String(r.tokenSymbol)));
+    // Each property is display-only here: a malformed one dashes instead of
+    // rendering String(x) — "[object Object]" is not a chain property.
+    const int = (v) => { const n = parseBlockNumber(v); return n === null ? '—' : String(n); };
+    const sym = typeof r.tokenSymbol === 'string' && r.tokenSymbol.length <= 16 ? r.tokenSymbol : '—';
+    return kvRow('SS58 prefix', esc(int(r.ss58Format))) + kvRow('Decimals', esc(int(r.tokenDecimals)))
+      + kvRow('Symbol', esc(sym));
   },
   metadata(r) {
-    if (typeof r !== 'string') return null;
+    if (typeof r !== 'string' || !isHex(r) || r.length % 2 !== 0) return null;
     const bytes = r.length / 2 - 1;
     return kvRow('Metadata size', `<b>${formatNumber(bytes)} bytes</b>`)
       + `<div class="note">Full metadata is a multi-megabyte SCALE blob — decode it in Polkadot-JS Apps, not here. The console fetched it only to prove the node serves it.</div>`;
@@ -102,26 +114,39 @@ const SUMMARIZERS = {
   },
   sync(r) {
     if (!r || typeof r !== 'object') return null;
-    const gap = (r.highestBlock ?? 0) - (r.currentBlock ?? 0);
-    return kvRow('Starting block', formatNumber(r.startingBlock ?? '—')) + kvRow('Current block', formatNumber(r.currentBlock ?? '—'))
-      + kvRow('Highest known', formatNumber(r.highestBlock ?? '—'))
+    const start = parseBlockNumber(r.startingBlock);
+    const cur = parseBlockNumber(r.currentBlock);
+    const high = parseBlockNumber(r.highestBlock);
+    if (start === null || cur === null || high === null) return null; // a gap computed from garbage is a lie in both directions
+    const gap = high - cur;
+    return kvRow('Starting block', formatNumber(start)) + kvRow('Current block', formatNumber(cur))
+      + kvRow('Highest known', formatNumber(high))
       + kvRow('Gap', gap <= 0 ? '<b class="green">synced</b>' : `<b class="amber">${formatNumber(gap)} blocks behind</b>`);
   },
   fee(r) {
     if (!r || typeof r !== 'object') return null;
     const pf = r.partialFee;
     const qtc = formatPartialFeeQtc(pf);
-    return kvRow('Partial fee', `<b>${esc(qtc)} QTC</b>`) + kvRow('Raw (planck)', esc(String(pf)), true)
-      + kvRow('Weight', esc(JSON.stringify(r.weight))) + kvRow('Class', esc(String(r.class)));
+    const raw = validPlanckField(pf);
+    const weight = r.weight && typeof r.weight === 'object' ? JSON.stringify(r.weight) : null;
+    return kvRow('Partial fee', `<b>${esc(qtc)} QTC</b>`) + kvRow('Raw (planck)', esc(raw ?? '—'), true)
+      + kvRow('Weight', esc(weight ?? '—')) + kvRow('Class', esc(typeof r.class === 'string' ? r.class : '—'));
   },
   feedetails(r) {
     if (!r || typeof r !== 'object') return null;
-    const inc = r.inclusionFee || {};
-    return kvRow('Base fee', esc(String(inc.baseFee ?? '—')), true) + kvRow('Length fee', esc(String(inc.lenFee ?? '—')), true)
-      + kvRow('Weight fee', esc(String(inc.adjustedWeightFee ?? '—')), true) + kvRow('Tip', esc(String(r.tip ?? '—')), true);
+    const inc = r.inclusionFee && typeof r.inclusionFee === 'object' ? r.inclusionFee : {};
+    const amt = (v) => esc(validPlanckField(v) ?? '—');
+    return kvRow('Base fee', amt(inc.baseFee), true) + kvRow('Length fee', amt(inc.lenFee), true)
+      + kvRow('Weight fee', amt(inc.adjustedWeightFee), true) + kvRow('Tip', amt(r.tip), true);
   },
   submit(r) {
-    return `<div class="note ok">Accepted by the node. Transaction hash:</div>` + kvRow('Tx hash', esc(String(r)), true)
+    // The one write path in the console: only a real 32-byte hash may be
+    // presented as an accepted transaction. Anything else means the
+    // broadcast's fate is unknown — say so, never invent a hash.
+    if (!isHash32(r)) {
+      return `<div class="note warn">The node answered, but not with a transaction hash — treat this broadcast as <b>unconfirmed</b> and check the Mempool Desk / explorer before re-sending (a re-send could double-spend the nonce). The raw response is below.</div>`;
+    }
+    return `<div class="note ok">Accepted by the node. Transaction hash:</div>` + kvRow('Tx hash', esc(r), true)
       + `<div class="note">Watch it in the Mempool Desk or the explorer — acceptance is not finality.</div>`;
   },
 };
@@ -223,6 +248,13 @@ async function handshake(myRpc = rpc, gen = connGen) {
       myRpc.call('chain_getBlockHash', [0]).catch(() => null),
     ]);
     if (!isCurrent()) return; // superseded (disconnect / reconnect): the newer state owns the card
+    // The identity card is only as good as its types: a node (or a broken
+    // proxy) answering system_chain with an object must not be rendered as
+    // a chain named "[object Object]".
+    if (typeof chain !== 'string' || !chain || typeof name !== 'string' || !name || typeof version !== 'string' || !version) {
+      renderHandshake({ error: { title: 'Malformed node identity', hint: 'The endpoint answered the identity calls with unexpected types — system_chain, system_name and system_version must be strings. Do not trust this endpoint.' } });
+      return;
+    }
     renderHandshake({ chain, name, version, props, headHash });
   } catch (e) {
     if (!isCurrent()) return; // a dead connection's handshake error must not repaint the card
@@ -234,12 +266,13 @@ function renderHandshake(h) {
   const el = $('handshake');
   if (!h) { el.innerHTML = `<div class="hs-empty">Not connected. Pick an endpoint and connect — the node's identity card appears here.</div>`; return; }
   if (h.error) { el.innerHTML = `<div class="note warn">${esc(h.error.title)} — ${esc(h.error.hint)}</div>`; return; }
-  const p = h.props || {};
+  const p = h.props && typeof h.props === 'object' ? h.props : {};
+  const int = (v) => { const n = parseBlockNumber(v); return n === null ? '—' : String(n); };
   el.innerHTML = `<div class="hs-grid">`
     + kvRow('Chain', esc(String(h.chain))) + kvRow('Node', esc(`${h.name} ${h.version}`))
-    + kvRow('SS58', esc(String(p.ss58Format ?? '—'))) + kvRow('Decimals', esc(String(p.tokenDecimals ?? '—')))
-    + kvRow('Symbol', esc(String(p.tokenSymbol ?? '—')))
-    + kvRow('Genesis', h.headHash ? esc(shortHex(h.headHash, 14)) : '—', true)
+    + kvRow('SS58', esc(int(p.ss58Format))) + kvRow('Decimals', esc(int(p.tokenDecimals)))
+    + kvRow('Symbol', esc(typeof p.tokenSymbol === 'string' && p.tokenSymbol.length <= 16 ? p.tokenSymbol : '—'))
+    + kvRow('Genesis', isHash32(h.headHash) ? esc(shortHex(h.headHash, 14)) : '—', true)
     + `</div><div class="hs-foot">Live values, read from the node you connected to — not from this page's source.</div>`;
 }
 
@@ -495,6 +528,12 @@ async function runSelectedRecipe() {
       stats.calls += calls.length; stats.totalMs += ms;
       pushHistory('system_* (×5)', calls, ms, true);
       const [chain, name, version, type, roles] = results;
+      // Same identity-type gate as the handshake: garbage types here are a
+      // failed call, not an identity card full of "[object Object]".
+      if (typeof chain !== 'string' || !chain || typeof name !== 'string' || !name || typeof version !== 'string' || !version
+        || typeof type !== 'string' || !Array.isArray(roles) || roles.some((x) => typeof x !== 'string')) {
+        throw new Error('the node returned a malformed identity (system_chain / system_name / system_version / system_chainType / system_nodeRoles had unexpected types)');
+      }
       const el = $('result');
       el.innerHTML = `<div class="res-head"><span class="res-method mono">node identity</span>
         <span class="res-meta"><b class="green">ok</b> · ${formatMs(ms)}</span></div>
@@ -573,15 +612,27 @@ const SUB_DEFS = [
     key: 'newHeads', title: 'New heads', sub: 'chain_subscribeNewHeads', unsub: 'chain_unsubscribeNewHeads',
     blurb: 'Every new block, live, with block times.',
     render(n, prev) {
-      const num = Number(n.number);
+      // A notification is untrusted like any other result: a head whose
+      // number does not parse is not logged as "#NaN" chain fact — the
+      // render returns null and the caller skips the feed row entirely.
+      if (!n || typeof n !== 'object') return null;
+      const num = parseBlockNumber(n.number);
+      if (num === null) return null;
       const dt = prev && prev.t ? ` · +${((Date.now() - prev.t) / 1000).toFixed(1)}s` : '';
-      return `#${formatNumber(num)}${dt} · <span class="mono dim">${esc(shortHex(n.hash || '', 12))}</span>`;
+      const hash = isHash32(n.hash) ? ` · <span class="mono dim">${esc(shortHex(n.hash, 12))}</span>` : '';
+      return `#${formatNumber(num)}${dt}${hash}`;
     },
   },
   {
     key: 'finalized', title: 'Finalized heads', sub: 'chain_subscribeFinalizedHeads', unsub: 'chain_unsubscribeFinalizedHeads',
     blurb: 'Only the heads the network irreversibly agrees on.',
-    render(n) { return `#${formatNumber(Number(n.number))} finalized · <span class="mono dim">${esc(shortHex(n.hash || '', 12))}</span>`; },
+    render(n) {
+      if (!n || typeof n !== 'object') return null;
+      const num = parseBlockNumber(n.number);
+      if (num === null) return null;
+      const hash = isHash32(n.hash) ? ` · <span class="mono dim">${esc(shortHex(n.hash, 12))}</span>` : '';
+      return `#${formatNumber(num)} finalized${hash}`;
+    },
   },
 ];
 
@@ -640,12 +691,26 @@ async function startSub(key) {
     let unsubMethod = null;
     if (def) {
       unsubMethod = def.unsub;
-      subId = await myRpc.subscribe(def.sub, [], (n) => feedLog(key, def.render(n, activeSubs.get(key)?.prev), n));
+      subId = await myRpc.subscribe(def.sub, [], (n) => {
+        const html = def.render(n, activeSubs.get(key)?.prev);
+        if (html) feedLog(key, html, n); // null render = malformed notification: no feed row, no fake head
+      });
     } else if (key === 'storageWatch') {
       unsubMethod = 'state_unsubscribeStorage';
       subId = await myRpc.subscribe('state_subscribeStorage', [[storageKeyHex]], (cs) => {
-        const ch = cs && cs.changes ? cs.changes[0] : null;
-        const txt = ch ? `balance key changed @ #${formatNumber(Number(cs.block))} · <span class="mono dim">${esc(shortHex(ch[1] || 'null', 24))}</span>` : 'change set received';
+        // A storage change set is { block: <32-byte HASH>, changes: [[key,
+        // value|null]] } — the block field is a hash, never a height:
+        // Number(hash) used to print a 77-digit invented "block number".
+        // Malformed change sets are skipped, not narrated.
+        if (!cs || typeof cs !== 'object' || !Array.isArray(cs.changes) || !cs.changes.length) return;
+        const ch = cs.changes[0];
+        if (!Array.isArray(ch)) return;
+        const val = ch[1];
+        if (val !== null && !(typeof val === 'string' && isHex(val))) return;
+        const at = isHash32(cs.block) ? ` @ block <span class="mono dim">${esc(shortHex(cs.block, 12))}</span>` : '';
+        const txt = val === null
+          ? `balance key cleared${at} · <span class="mono dim">value removed</span>`
+          : `balance key changed${at} · <span class="mono dim">${esc(shortHex(val, 24))}</span>`;
         feedLog(key, txt);
       });
     } else {

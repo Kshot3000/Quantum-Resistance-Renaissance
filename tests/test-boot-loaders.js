@@ -257,5 +257,31 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.2.0"), "explorer: app.js cache key bumped for the boundary fix");
 }
 
+// ---- 14. Chain Console: validate RPC results at the summarizer boundary ----
+// Batch 9 (2026-10-09 12:19): chain-console (Tier 1) esc()'d node answers at
+// render but never validated them — garbage heights/peers/fees rendered as
+// NaN or "[object Object]" chain fact, a non-hash broadcast answer was
+// claimed as an accepted tx hash, subscription heads logged "#NaN", and the
+// storage watch printed Number(cs.block) — a 77-digit invented block number
+// from a field that is a 32-byte HASH. Pin: shared validators in core.js
+// gate every summarizer, the submit path requires a real hash, and the
+// storage watch treats cs.block as a hash.
+{
+  const core = read("pages/chain-console/js/core.js");
+  ok(core.includes("export function parseBlockNumber(v)"), "console: parseBlockNumber() defined in core");
+  ok(core.includes("export function isHash32(s)"), "console: isHash32() defined in core");
+  ok(core.includes("export function validPlanckField(v)"), "console: validPlanckField() defined in core");
+  ok(core.includes("if (number === null) return null"), "console: header/block summarizers drop a garbage height");
+  const app = read("pages/chain-console/js/app.js");
+  ok(app.includes("if (!isHash32(r)) return null"), "console: hash summarizer requires a 32-byte hash");
+  ok(app.includes("treat this broadcast as <b>unconfirmed</b>"), "console: non-hash submit answer is unconfirmed, never an accepted tx hash");
+  ok(app.includes("Malformed node identity"), "console: handshake rejects non-string identity values");
+  ok(!app.includes("Number(cs.block)"), "console: storage watch no longer Number()s the block hash");
+  ok(app.includes("balance key changed${at}"), "console: storage watch renders the block as a hash");
+  ok(app.includes("if (html) feedLog(key, html, n)"), "console: malformed head notifications produce no feed row");
+  const html = read("pages/chain-console/index.html");
+  ok(html.includes("js/app.js?v=1.43.0"), "console: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
