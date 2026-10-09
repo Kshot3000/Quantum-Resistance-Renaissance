@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+650,146% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+643,163% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">29/29 consensus tests green · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -1002,27 +1002,49 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
     });
   });
 
-  /* Live height: prefer same-origin snapshot (CORS-safe on Pages), try direct indexer first. */
+  /* Live height: prefer same-origin snapshot (CORS-safe on Pages), try direct indexer first.
+   * Polls are pinned to their start (heightSeq): only the latest poll may render,
+   * so a slow poll landing after a newer one discards itself instead of painting
+   * its stale height — or its 'offline' — over the fresh one. The snapshot is
+   * fetched lazily, only when the direct call fails, with the fleet-standard 9s
+   * timeout (an unbounded fetch could outlive the 60s interval and land polls
+   * out of order), and a snapshot height older than the one already displayed
+   * never regresses the chip: the snapshot file is refreshed only periodically,
+   * while a direct result is the indexer's own word and renders as-is. */
   var chip=document.getElementById('liveChip'), hEl=document.getElementById('liveHeight');
+  var heightSeq=0, shownHeight=null;
   function applyHeight(h){
-    if(h==null) throw new Error('empty');
-    hEl.textContent='#'+Number(h).toLocaleString();
+    if(h==null||isNaN(Number(h))) throw new Error('empty');
+    shownHeight=Number(h);
+    hEl.textContent='#'+shownHeight.toLocaleString();
     chip.classList.add('on');chip.classList.remove('err');
   }
   function fetchHeight(){
-    var direct=fetch('https://sqm.quantus.com/v1/graphql',{
+    var seq=++heightSeq;
+    function current(){return seq===heightSeq;}
+    fetch('https://sqm.quantus.com/v1/graphql',{
       method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({query:'query { chain_stats_by_pk(id: "global") { block_height } }'}),
       signal:AbortSignal.timeout?AbortSignal.timeout(3500):undefined
     }).then(function(r){return r.json();}).then(function(j){
       return j && j.data && j.data.chain_stats_by_pk && j.data.chain_stats_by_pk.block_height;
-    });
-    var snap=fetch('data/live.json?t='+Math.floor(Date.now()/60000),{cache:'no-store'})
-      .then(function(r){return r.json();})
-      .then(function(p){return p && p.data && p.data.status && p.data.status.block_height;});
-    direct.then(applyHeight).catch(function(){
-      return snap.then(applyHeight);
+    }).then(function(h){
+      if(!current()) return;
+      applyHeight(h);
     }).catch(function(){
+      if(!current()) return;
+      return fetch('data/live.json?t='+Math.floor(Date.now()/60000),{
+        cache:'no-store',
+        signal:AbortSignal.timeout?AbortSignal.timeout(9000):undefined
+      }).then(function(r){return r.json();})
+      .then(function(p){return p && p.data && p.data.status && p.data.status.block_height;})
+      .then(function(h){
+        if(!current()) return;
+        if(h!=null&&shownHeight!=null&&Number(h)<shownHeight) return;
+        applyHeight(h);
+      });
+    }).catch(function(){
+      if(!current()) return;
       hEl.textContent='offline';
       chip.classList.add('err');chip.classList.remove('on');
     });
