@@ -327,6 +327,145 @@ function timeoutSignal(ms) {
   return ctl.signal;
 }
 
+/* ================= load-boundary validation (2026-10-09) =================
+ * The snapshot was trusted blindly except for a truthy `ok`: one top-200
+ * row with free_plancks "1.5"/"oops" threw BigInt() inside renderHero and
+ * killed the whole desk; a null address wedged shortAddr after the hero
+ * had painted; a bracket with an unknown key or non-numeric sum made the
+ * Gini/bracket renders NaN or threw; a move with a garbage amount rendered
+ * literally as "0.oops" QTC; genesis_allocation missing threw in
+ * renderMoves on `.to` of undefined; an unparseable fetched_at rendered
+ * as "Invalid Date". Now the whole payload is validated BEFORE DATA is
+ * assigned: core aggregates (supply, vesting, brackets) must be fully
+ * valid or the snapshot fails honestly; row collections (top, moves,
+ * genesis) drop invalid entries individually, top is re-sorted by free
+ * balance and re-ranked from the survivors, and every renderer downstream
+ * can rely on pure-digit plancks, valid prefix-189 addresses, liquid ==
+ * free - locked, claimed <= vesting total, and a parseable fetched_at. */
+function decStr(v){
+  if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) return BigInt(v).toString();
+  if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return String(v);
+  return null;
+}
+function nonNegInt(v){
+  var s = decStr(v);
+  if (s === null) return null;
+  var n = Number(s);
+  return Number.isSafeInteger(n) ? n : null;
+}
+function validAddr(a){ return typeof a === "string" && validateAddress(a).ok; }
+var BRACKET_KEYS = { whale: 1, shark: 1, dolphin: 1, fish: 1, shrimp: 1, dust: 1 };
+var MAX_SUPPLY_PLANCKS = 21000000n * 1000000000000n; // 21M QTC cap
+
+function cleanTopEntry(raw, seen){
+  if (!raw || typeof raw !== "object") return null;
+  if (!validAddr(raw.address) || seen[raw.address]) return null;
+  var free = decStr(raw.free_plancks), locked = decStr(raw.locked_plancks), liquid = decStr(raw.liquid_plancks);
+  if (free === null || locked === null || liquid === null) return null;
+  if (BigInt(locked) > BigInt(free)) return null;
+  if (BigInt(liquid) !== BigInt(free) - BigInt(locked)) return null; // the circ view assumes this identity
+  seen[raw.address] = true;
+  var bm = nonNegInt(raw.blocks_mined);
+  return {
+    rank: 0, address: raw.address, free_plancks: free,
+    reserved_plancks: decStr(raw.reserved_plancks) || "0",
+    frozen_plancks: decStr(raw.frozen_plancks) || "0",
+    locked_plancks: locked, liquid_plancks: liquid,
+    is_vesting_pool: raw.is_vesting_pool === true,
+    is_genesis_recipient: raw.is_genesis_recipient === true,
+    is_multisig: raw.is_multisig === true,
+    is_guardian: raw.is_guardian === true,
+    is_high_security: raw.is_high_security === true,
+    blocks_mined: bm // null when malformed — tagList/lookup render it as absent, never NaN
+  };
+}
+function cleanMove(raw, maxHeight){
+  if (!raw || typeof raw !== "object") return null;
+  var amount = decStr(raw.amount);
+  if (amount === null || BigInt(amount) <= 0n) return null;
+  var fee = raw.fee == null ? "0" : decStr(raw.fee);
+  if (fee === null) return null;
+  var from = raw.from_id == null ? null : raw.from_id;
+  if (from !== null && from !== "0".repeat(48) && !validAddr(from)) return null;
+  if (!validAddr(raw.to_id)) return null;
+  var bh = nonNegInt(raw.block_height);
+  if (bh === null || bh < 1 || bh > maxHeight) return null; // a move "from the future" is not this snapshot's data
+  if (typeof raw.timestamp !== "string" || !isFinite(Date.parse(raw.timestamp))) return null;
+  return { amount: amount, fee: fee, from_id: from, to_id: raw.to_id, block_height: bh, timestamp: raw.timestamp };
+}
+function validateSnapshot(raw){
+  if (!raw || typeof raw !== "object" || raw.ok !== true) return null;
+  if (typeof raw.fetched_at !== "string" || !isFinite(Date.parse(raw.fetched_at))) return null;
+  var height = nonNegInt(raw.block_height);
+  if (height === null || height < 1) return null;
+  var accounts = nonNegInt(raw.accounts_total), transfers = nonNegInt(raw.transfers_total);
+  if (accounts === null || transfers === null) return null;
+  if (!raw.supply_plancks || typeof raw.supply_plancks !== "object") return null;
+  var sFree = decStr(raw.supply_plancks.free), sRes = decStr(raw.supply_plancks.reserved), sFro = decStr(raw.supply_plancks.frozen);
+  if (sFree === null || sRes === null || sFro === null) return null;
+  var supplyTotal = BigInt(sFree) + BigInt(sRes) + BigInt(sFro);
+  if (supplyTotal <= 0n || supplyTotal > MAX_SUPPLY_PLANCKS) return null;
+  if (!raw.vesting || typeof raw.vesting !== "object") return null;
+  var vSched = nonNegInt(raw.vesting.schedules), vTotal = decStr(raw.vesting.total_plancks), vClaimed = decStr(raw.vesting.claimed_plancks);
+  if (vSched === null || vTotal === null || vClaimed === null) return null;
+  if (BigInt(vClaimed) > BigInt(vTotal)) return null;
+  if (BigInt(vTotal) - BigInt(vClaimed) > supplyTotal) return null; // locked cannot exceed the supply it sits in
+  // Brackets are aggregates this page cannot rebuild (they cover all
+  // accounts, not just the top 200) — any malformed bracket fails the
+  // snapshot honestly rather than displaying a partial distribution.
+  if (!Array.isArray(raw.brackets) || !raw.brackets.length) return null;
+  var seenKeys = {}, brackets = [], hasWhale = false;
+  for (var i = 0; i < raw.brackets.length; i++){
+    var b = raw.brackets[i];
+    if (!b || typeof b !== "object" || !BRACKET_KEYS[b.key] || seenKeys[b.key]) return null;
+    if (typeof b.label !== "string" || !b.label) return null;
+    var bCount = nonNegInt(b.count), bSum = decStr(b.sum_plancks);
+    if (bCount === null || bSum === null) return null;
+    seenKeys[b.key] = true;
+    if (b.key === "whale") hasWhale = true;
+    brackets.push({ key: b.key, label: b.label, count: bCount, sum_plancks: bSum });
+  }
+  if (!hasWhale) return null;
+  if (!Array.isArray(raw.top)) return null;
+  var seenAddr = {}, top = [];
+  raw.top.forEach(function(r){ var e = cleanTopEntry(r, seenAddr); if (e) top.push(e); });
+  if (!top.length) return null;
+  top.sort(function(a, b){
+    var x = BigInt(a.free_plancks), y = BigInt(b.free_plancks);
+    return x < y ? 1 : x > y ? -1 : 0;
+  });
+  top.forEach(function(e, idx){ e.rank = idx + 1; }); // rank is derived — rebuild it from the survivors
+  if (!Array.isArray(raw.whale_moves_alltime) || !Array.isArray(raw.whale_moves_recent)) return null;
+  function cleanMoves(list){
+    var out = [];
+    list.forEach(function(m){ var c = cleanMove(m, height); if (c) out.push(c); });
+    return out;
+  }
+  var genesis = [];
+  if (Array.isArray(raw.genesis_allocation)){
+    raw.genesis_allocation.forEach(function(g){
+      if (!g || typeof g !== "object") return;
+      var amt = decStr(g.amount_plancks), bh = nonNegInt(g.block_height);
+      if (amt === null || BigInt(amt) <= 0n || bh === null || bh < 1) return;
+      if (!(g.from === "0".repeat(48) || validAddr(g.from)) || !validAddr(g.to)) return; // genesis origin may be the mint sentinel
+      if (typeof g.timestamp !== "string" || !isFinite(Date.parse(g.timestamp))) return;
+      genesis.push({ amount_plancks: amt, from: g.from, to: g.to, block_height: bh, timestamp: g.timestamp });
+    });
+  }
+  return {
+    ok: true, source: typeof raw.source === "string" ? raw.source : "",
+    fetched_at: raw.fetched_at, block_height: height,
+    accounts_total: accounts, transfers_total: transfers,
+    supply_plancks: { free: sFree, reserved: sRes, frozen: sFro },
+    mined_plancks: decStr(raw.mined_plancks) || "0",
+    vesting: { schedules: vSched, total_plancks: vTotal, claimed_plancks: vClaimed },
+    genesis_allocation: genesis, brackets: brackets, top: top,
+    whale_moves_alltime: cleanMoves(raw.whale_moves_alltime),
+    whale_moves_recent: cleanMoves(raw.whale_moves_recent),
+    params: raw.params && typeof raw.params === "object" ? raw.params : {}
+  };
+}
+
 function loadSnapshot(){
   /* Test hook for headless QA: window.__qtcwhales_mock = full snapshot payload */
   if (typeof window !== "undefined" && window.__qtcwhales_mock){
@@ -655,8 +794,8 @@ function abyss(){
 
 function boot(){
   loadSnapshot().then(function(d){
-    DATA = d;
-    if (!DATA || !DATA.ok) throw new Error("bad snapshot");
+    DATA = validateSnapshot(d); // null unless every core field checks out — never render poison
+    if (!DATA) throw new Error("bad snapshot");
     bind();
     renderAll();
   }).catch(function(e){
@@ -678,6 +817,7 @@ if (typeof module !== "undefined" && module.exports){
     lockedPlancks: lockedPlancks, circPlancks: circPlancks, giniEstimate: giniEstimate,
     bracketLoQTC: bracketLoQTC, bracketHiQTC: bracketHiQTC, tagList: tagList,
     validateAddress: validateAddress, ss58Decode: ss58Decode, ss58Encode: ss58Encode,
+    validateSnapshot: validateSnapshot,
     QUANTUS_PREFIX: QUANTUS_PREFIX, PLANCKS_PER_QTC: PLANCKS_PER_QTC
   };
 }

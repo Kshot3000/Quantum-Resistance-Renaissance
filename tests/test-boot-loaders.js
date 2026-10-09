@@ -138,5 +138,27 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.29.0"), "vesting: app.js cache key bumped for the boundary fix");
 }
 
+// ---- 9. Whale Watch: validate the whole snapshot at the load boundary ----
+// Batch 4 (2026-10-09 07:19): whale-watch trusted its snapshot except for a
+// truthy `ok` — one top row with free_plancks "1.5" threw BigInt() in the
+// hero, a garbage move amount rendered as "0.oops" QTC, an unknown bracket
+// key NaN'd the Gini, a missing genesis_allocation threw in renderMoves,
+// and a bad fetched_at rendered "Invalid Date". Pin: validateSnapshot()
+// gates DATA assignment, core aggregates fail honestly, row collections
+// drop invalid entries, ranks are rebuilt from the survivors.
+{
+  const src = read("pages/whale-watch/app.js");
+  ok(src.includes("function validateSnapshot(raw)"), "whale: validateSnapshot() defined");
+  ok(src.includes("DATA = validateSnapshot(d);"), "whale: DATA assigned only from the validated snapshot");
+  ok(!src.includes("DATA = d;"), "whale: no assign-before-validate loader remains");
+  ok(src.includes("BigInt(liquid) !== BigInt(free) - BigInt(locked)"), "whale: top entries must satisfy liquid == free - locked");
+  ok(src.includes("e.rank = idx + 1"), "whale: ranks rebuilt from validated survivors");
+  ok(src.includes("MAX_SUPPLY_PLANCKS"), "whale: supply sanity-bounded by the 21M cap");
+  ok(src.includes("BigInt(vClaimed) > BigInt(vTotal)"), "whale: vesting claimed > total fails the snapshot");
+  ok(src.includes("function cleanMove(raw, maxHeight)"), "whale: moves validated against the snapshot height");
+  const html = read("pages/whale-watch/index.html");
+  ok(html.includes("app.js?v=1.20.0"), "whale: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
