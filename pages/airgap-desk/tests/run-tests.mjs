@@ -232,6 +232,65 @@ test('protocol: ss58 prefix constant is 189', () => {
   assert.equal(QUANTUS_SS58_PREFIX, 189);
 });
 
+/* ---------------- RPC answer validators (rpc-validate.js) ---------------- */
+import {
+  parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex,
+} from '../js/lib/rpc-validate.js';
+
+test('rpc-validate: block numbers accept int / decimal / hex, reject garbage', () => {
+  assert.equal(parseBlockNumber(1234500), 1234500);
+  assert.equal(parseBlockNumber('1234500'), 1234500);
+  assert.equal(parseBlockNumber('0x12d644'), 1234500);
+  assert.equal(parseBlockNumber('garbage!!'), null);
+  assert.equal(parseBlockNumber(1.5), null);
+  assert.equal(parseBlockNumber(-1), null);
+  assert.equal(parseBlockNumber(NaN), null);
+  assert.equal(parseBlockNumber({}), null);
+  assert.equal(parseBlockNumber(null), null);
+});
+
+test('rpc-validate: hashes are exactly 0x + 64 hex digits', () => {
+  assert.equal(isHash32('0x' + 'ab'.repeat(32)), true);
+  assert.equal(isHash32('0x1234'), false);
+  assert.equal(isHash32('ab'.repeat(32)), false);
+  assert.equal(isHash32({ hash: '0x' + 'ab'.repeat(32) }), false);
+  assert.equal(isHash32(null), false);
+});
+
+test('rpc-validate: versions and nonces are u32 integers', () => {
+  assert.equal(parseVersionNumber(101), 101);
+  assert.equal(parseVersionNumber(0xffffffff), 0xffffffff);
+  assert.equal(parseVersionNumber(0x100000000), null);
+  assert.equal(parseVersionNumber(1.5), null);
+  assert.equal(parseVersionNumber(-1), null);
+  assert.equal(parseVersionNumber('garbage'), null);
+  assert.equal(parseNonce(5), 5);
+  assert.equal(parseNonce('abc'), null);
+  assert.equal(parseNonce(-5), null);
+  assert.equal(parseNonce(3.7), null);
+});
+
+test('rpc-validate: fee fields whitelist non-negative integer shapes', () => {
+  assert.equal(parseFeeField('1000'), 1000n);
+  assert.equal(parseFeeField('0x10'), 16n);
+  assert.equal(parseFeeField(42), 42n);
+  assert.equal(parseFeeField(7n), 7n);
+  assert.equal(parseFeeField('-5'), null);
+  assert.equal(parseFeeField(-5), null);
+  assert.equal(parseFeeField('1.5'), null);
+  assert.equal(parseFeeField(1.5), null);
+  assert.equal(parseFeeField(null), null);
+  assert.equal(parseFeeField({}), null);
+});
+
+test('rpc-validate: storage hex must be 0x-prefixed even-length hex', () => {
+  assert.equal(validStorageHex('0x' + 'ab'.repeat(68)), true);
+  assert.equal(validStorageHex('ab'.repeat(68)), false);
+  assert.equal(validStorageHex('0x'), false);
+  assert.equal(validStorageHex('0xabc'), false);
+  assert.equal(validStorageHex(1234), false);
+});
+
 test('xxhash128: canonical Substrate vector (chain-verified 2026-09-30)', () => {
   // twox_128("System") as the Quantus chain computes it: XxHash64 seeds 0 and 1.
   // Verified against sp-crypto-hashing 0.1.0 (behind the chain's sp-core 39.0.0),

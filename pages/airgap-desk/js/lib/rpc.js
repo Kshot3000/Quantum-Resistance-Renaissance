@@ -1,4 +1,4 @@
-/* QTC Web Wallet — Substrate JSON-RPC client + chain queries (ES module).
+/* QTC Airgap Desk — Substrate JSON-RPC client + chain queries (ES module).
  *
  * Connects to any Substrate WebSocket RPC (default: the upstream-documented
  * mainnet node wss://rpc.quantus.network, also used by the Mempool Desk).
@@ -7,6 +7,7 @@
  */
 import { hexEncode, hexDecode } from './quantus-crypto.js';
 import { ss58Decode } from './quantus-crypto.js';
+import { parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex } from './rpc-validate.js';
 import { SYSTEM_ACCOUNT_KEY } from './xxhash.js?v=1.39.0';
 import { decodeAccountInfo, eraBirth, encodeMortalEra, buildTransferCall, buildSigningPayload, buildExtrinsic, DILITHIUM65_VARIANT, DILITHIUM87_VARIANT } from './scale.js';
 
@@ -55,10 +56,17 @@ export class RpcClient {
     ws.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch { return; }
+      // A frame that parses to null / an array / a scalar is not an RPC
+      // response — ignore it instead of throwing on msg.id.
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
       if (msg.id !== undefined && this.pending.has(msg.id)) {
         const { resolve, reject } = this.pending.get(msg.id);
         this.pending.delete(msg.id);
-        if (msg.error) reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+        if (msg.error) {
+          const m = typeof msg.error === 'string' ? msg.error
+            : (msg.error && typeof msg.error.message === 'string' ? msg.error.message : 'RPC error');
+          reject(new Error(m));
+        }
         else resolve(msg.result);
       }
     };
@@ -89,41 +97,69 @@ export class RpcClient {
   get connected() { return !!(this.ws && this.ws.readyState === WebSocket.OPEN); }
 }
 
-/* ---- chain queries ---- */
+/* ---- chain queries ----
+ * Every helper validates the node's answer before returning it (see
+ * rpc-validate.js): a malformed answer throws an honest "node returned a
+ * malformed …" error. The hot desk issues chain tickets from these
+ * answers — a ticket baked from a garbage spec version, a short genesis
+ * hash, a NaN head or a negative nonce would be rendered as chain fact
+ * here and rejected (or worse, mis-signed against) on the cold side. */
 
 export async function getRuntimeVersion(rpc) {
-  return rpc.call('state_getRuntimeVersion');
+  const rt = await rpc.call('state_getRuntimeVersion');
+  if (!rt || typeof rt !== 'object') throw new Error('node returned a malformed runtime version');
+  const specVersion = parseVersionNumber(rt.specVersion);
+  const transactionVersion = parseVersionNumber(rt.transactionVersion);
+  if (specVersion === null || transactionVersion === null)
+    throw new Error('node returned a malformed runtime version');
+  return { ...rt, specVersion, transactionVersion };
 }
 
 export async function getGenesisHash(rpc) {
-  return rpc.call('chain_getBlockHash', [0]);
+  const hash = await rpc.call('chain_getBlockHash', [0]);
+  if (!isHash32(hash)) throw new Error('node returned a malformed genesis hash');
+  return hash;
 }
 
 export async function getLatestHeader(rpc) {
   const hash = await rpc.call('chain_getBlockHash');
+  if (!isHash32(hash)) throw new Error('node returned a malformed head hash');
   const header = await rpc.call('chain_getHeader', [hash]);
-  return { hash, number: parseInt(header.number, 16) };
+  if (!header || typeof header !== 'object') throw new Error('node returned a malformed header');
+  const number = parseBlockNumber(header.number);
+  if (number === null) throw new Error('node returned a malformed header number');
+  return { hash, number };
 }
 
 export async function getEraBirthHash(rpc, currentNumber, period = 64) {
   const phase = currentNumber % period;
   const birth = eraBirth(currentNumber, period, phase);
   const hash = await rpc.call('chain_getBlockHash', [birth]);
+  if (!isHash32(hash)) throw new Error('node returned a malformed era-birth hash');
   return { era: encodeMortalEra(period, phase), birth, birthHash: hash, period, phase };
 }
 
-/* Balance via System.Account storage (Twox64Concat key built locally). */
+/* Balance via System.Account storage (Twox64Concat key built locally).
+ * A null answer means the account is not on chain yet. Anything else must
+ * be 0x hex of exactly the 68-byte AccountInfo layout — a truncated blob
+ * throws inside the decoder and an over-long one would silently decode
+ * its first 68 bytes as the account's balances. */
 export async function getAccountInfo(rpc, accountId) {
   const key = SYSTEM_ACCOUNT_KEY(accountId);
   const hex = '0x' + hexEncode(key);
   const res = await rpc.call('state_getStorage', [hex]);
-  if (!res) return null;
-  return decodeAccountInfo(hexDecode(res.startsWith('0x') ? res.slice(2) : res));
+  if (res === null || res === undefined) return null;
+  if (!validStorageHex(res)) throw new Error('node returned malformed account storage');
+  const bytes = hexDecode(res.slice(2));
+  if (bytes.length !== 68) throw new Error('node returned malformed account storage');
+  return decodeAccountInfo(bytes);
 }
 
 export async function getNonce(rpc, ss58Address) {
   const n = await rpc.call('system_accountNextIndex', [ss58Address]);
-  return Number(n);
+  const nonce = parseNonce(n);
+  if (nonce === null) throw new Error('node returned a malformed nonce');
+  return nonce;
 }
 
 /* ---- transfer construction ---- */
@@ -158,7 +194,13 @@ export async function buildUnsignedTransfer(rpc, { fromAddress, fromAccountId, d
   let fee = null;
   try {
     const details = await rpc.call('payment_queryFeeDetails', ['0x' + hexEncode(placeholder), latest.hash]);
-    fee = BigInt(details.inclusionFee.baseFee) + BigInt(details.inclusionFee.lenFee) + BigInt(details.inclusionFee.adjustedWeightFee);
+    const f = details && typeof details === 'object' ? details.inclusionFee : null;
+    const parts = f && typeof f === 'object'
+      ? [parseFeeField(f.baseFee), parseFeeField(f.lenFee), parseFeeField(f.adjustedWeightFee)]
+      : [null];
+    // Any malformed field voids the quote (fee stays null = "not quoted")
+    // — a negative field must never net against the others.
+    fee = parts.every((p) => p !== null) ? parts.reduce((a, b) => a + b, 0n) : null;
   } catch { fee = null; }
   return {
     call, era, nonce, tip: tipPlancks, specVersion, txVersion,
@@ -191,5 +233,11 @@ export function finalizeTransfer(unsigned, { signFn, scheme }) {
 }
 
 export async function submitExtrinsic(rpc, extrinsicHex) {
-  return rpc.call('author_submitExtrinsic', [extrinsicHex]);
+  const hash = await rpc.call('author_submitExtrinsic', [extrinsicHex]);
+  // Only a 32-byte hash confirms the broadcast. Anything else (an object,
+  // a short string, null) means the node's answer cannot be trusted as a
+  // tx hash — the extrinsic may or may not have landed.
+  if (!isHash32(hash))
+    throw new Error('broadcast unconfirmed — the node did not return a transaction hash; check the explorer before retrying');
+  return hash;
 }

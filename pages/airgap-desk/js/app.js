@@ -15,6 +15,7 @@ import {
   RpcClient, getRuntimeVersion, getGenesisHash, getLatestHeader, getEraBirthHash,
   getAccountInfo, getNonce, submitExtrinsic,
 } from './lib/rpc.js';
+import { parseFeeField } from './lib/rpc-validate.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { keypairFromMnemonic, keypairFromSeed, validateMnemonic, loadWordlist } from './lib/mnemonic.js';
 import { ss58Decode, hexEncode } from './lib/quantus-crypto.js';
@@ -377,6 +378,9 @@ $('verify-ticket').addEventListener('input', () => {
 
 $('btn-quote-fee').addEventListener('click', async () => {
   err('broadcast-err');
+  // A new quote attempt owns the panel outright: the previous quote must
+  // not stay rendered beside a "quote failed" error as if it were fresh.
+  $('fee-quote').hidden = true;
   const v = hot.verified;
   if (!v || !v.ok) { err('broadcast-err', 'Verify a valid package first.'); return; }
   // Backstop for ticket changes that never fired 'input' (programmatic or
@@ -411,8 +415,17 @@ $('btn-quote-fee').addEventListener('click', async () => {
     setConn('on', 'connected');
     const details = await hot.rpc.call('payment_queryFeeDetails', [hex, latest.hash]);
     if (stale()) discard();
-    const f = details.inclusionFee;
-    const fee = BigInt(f.baseFee) + BigInt(f.lenFee) + BigInt(f.adjustedWeightFee);
+    // The fee fields are validated before BigInt ever sees them:
+    // BigInt("-5") would otherwise render a negative "node-quoted" fee,
+    // and a missing inclusionFee would surface as a TypeError instead of
+    // the honest fact — the node did not quote a fee.
+    const f = details && typeof details === 'object' ? details.inclusionFee : null;
+    const feeParts = f && typeof f === 'object'
+      ? [parseFeeField(f.baseFee), parseFeeField(f.lenFee), parseFeeField(f.adjustedWeightFee)]
+      : [null];
+    if (feeParts.some((p) => p === null))
+      throw new Error('node did not quote a fee (malformed fee answer)');
+    const fee = feeParts.reduce((a, b) => a + b, 0n);
     const info = await getAccountInfo(hot.rpc, v.decoded.accountId);
     if (stale()) discard();
     const free = info ? info.free : 0n;
@@ -464,6 +477,9 @@ $('btn-quote-fee').addEventListener('click', async () => {
 let broadcastSeq = 0; // token: only the latest broadcast of the still-standing verification may render
 $('btn-broadcast').addEventListener('click', async () => {
   err('broadcast-err');
+  // Same panel discipline as the quote: a failed (or unconfirmed) attempt
+  // must not leave the previous broadcast's hash standing beside it.
+  $('broadcast-result').hidden = true;
   const v = hot.verified;
   if (!v || !v.ok) return;
   // Same ticket backstop as the fee quote: never broadcast on the strength

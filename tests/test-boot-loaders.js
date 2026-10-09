@@ -432,5 +432,44 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/app.js?v=1.3.0"), "safesend: app.js cache key bumped for the boundary fix");
 }
 
+// Batch 14 (2026-10-09 17:19): airgap-desk (Tier 1) hot side trusted
+// node answers exactly like the pre-hardening Web Wallet: the issue flow
+// baked Number(rt.specVersion) / parseInt(header.number, 16) /
+// Number(nonce) and unvalidated genesis + era-birth hashes into the chain
+// ticket a cold signer signs against (garbage spec, "#NaN" head, NaN/-5
+// nonce and a [object Object] genesis all rendered as issued tickets),
+// the fee quote BigInt()'d fee fields (a "-5" field rendered a negative
+// "node-quoted" fee), a garbage head during a quote pronounced the era
+// EXPIRED at #NaN, over-long account storage was decoded from its first
+// 68 bytes, and any submit answer was presented as the tx hash. Pin:
+// lib/rpc-validate.js gates every helper in lib/rpc.js, the quote parses
+// fee fields strictly, and submit requires a 32-byte hash.
+{
+  const val = read("pages/airgap-desk/js/lib/rpc-validate.js");
+  ok(val.includes("export function parseBlockNumber"), "airgap: parseBlockNumber validator present");
+  ok(val.includes("export function parseFeeField"), "airgap: parseFeeField validator present");
+  ok(val.includes("export function isHash32"), "airgap: isHash32 validator present");
+  const rpc = read("pages/airgap-desk/js/lib/rpc.js");
+  ok(rpc.includes("from './rpc-validate.js'"), "airgap: rpc.js imports the validators");
+  ok(rpc.includes("node returned a malformed runtime version"), "airgap: runtime version validated before it anchors a ticket");
+  ok(rpc.includes("node returned a malformed genesis hash"), "airgap: genesis hash validated before it anchors a ticket");
+  ok(rpc.includes("node returned a malformed header number"), "airgap: header number validated, never parseInt-NaN");
+  ok(rpc.includes("node returned a malformed nonce"), "airgap: nonce validated before it anchors a ticket");
+  ok(rpc.includes("node returned a malformed era-birth hash"), "airgap: era-birth hash validated");
+  ok(rpc.includes("bytes.length !== 68"), "airgap: account storage must be exactly the 68-byte AccountInfo layout");
+  ok(rpc.includes("broadcast unconfirmed"), "airgap: a non-hash submit answer is an unconfirmed broadcast, never a tx hash");
+  ok(rpc.includes("Array.isArray(msg)"), "airgap: non-object socket frames are ignored, not dereferenced");
+  ok(!rpc.includes("parseInt(header.number, 16)"), "airgap: no parseInt header coercion remains");
+  ok(!rpc.includes("BigInt(details.inclusionFee.baseFee)"), "airgap: no raw BigInt() fee coercion remains in rpc.js");
+  const app = read("pages/airgap-desk/js/app.js");
+  ok(app.includes("parseFeeField(f.baseFee)"), "airgap: fee quote validates fee fields before BigInt");
+  ok(app.includes("node did not quote a fee (malformed fee answer)"), "airgap: a malformed fee answer is an honest no-quote, not a TypeError");
+  ok(!app.includes("BigInt(f.baseFee)"), "airgap: no raw BigInt() fee coercion remains in app.js");
+  ok(app.includes("$('fee-quote').hidden = true;"), "airgap: a quote attempt hides the previous quote until a fresh one lands");
+  ok(app.includes("$('broadcast-result').hidden = true;"), "airgap: a broadcast attempt hides the previous result until a fresh one lands");
+  const html = read("pages/airgap-desk/index.html");
+  ok(html.includes("js/app.js?v=1.43.0"), "airgap: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
