@@ -283,5 +283,39 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/app.js?v=1.43.0"), "console: app.js cache key bumped for the boundary fix");
 }
 
+// ---- 15. Mempool Desk: validate RPC answers at the node boundary ----
+// Batch 10 (2026-10-09 13:19): mempool-desk (Tier 1) esc()'d node answers
+// at render but never validated them — String(chain) rendered an object
+// identity as "[object Object]", garbage header numbers rendered as
+// "#NaN"/"#garbage", a non-array pool answer silently became a fake
+// EMPTY pool, garbage pool entries were counted and listed as
+// extrinsics, a "-5" partialFee passed BigInt() and rendered as a
+// negative fee quote, an object txWatch subscription id was String()'d
+// into a LIVE watcher, a garbage notification `from` displayed verbatim,
+// and a raw null frame threw in routeMessage. Pin: shared validators in
+// rpc-core.js gate the handshake, heads, pool, fees, and subscriptions.
+{
+  const core = read("pages/mempool-desk/js/rpc-core.js");
+  ok(core.includes("function parseBlockNumber(v)"), "mempool: parseBlockNumber() defined in rpc-core");
+  ok(core.includes("function isHash32(s)"), "mempool: isHash32() defined in rpc-core");
+  ok(core.includes("function validSubscriptionId(v)"), "mempool: validSubscriptionId() defined in rpc-core");
+  ok(core.includes("function validExtrinsicHex(s)"), "mempool: validExtrinsicHex() defined in rpc-core");
+  ok(core.includes("malformed partialFee in queryInfo result"), "mempool: decodePartialFee rejects negative/float/object fees");
+  ok(core.includes('if (typeof raw.from === "string" && /^[A-Za-z0-9]{20,70}$/.test(raw.from)) from = raw.from'),
+    "mempool: notification from is kept only when address-shaped");
+  const app = read("pages/mempool-desk/js/app.js");
+  ok(app.includes("node returned a malformed chain name"), "mempool: handshake rejects a non-string chain name");
+  ok(app.includes("Array.isArray(msg)) return"), "mempool: routeMessage ignores non-object frames");
+  ok(app.includes("node returned a malformed pool"), "mempool: non-array pool answer is malformed, never a fake empty pool");
+  ok(app.includes("pool state unknown, not empty"), "mempool: malformed pool drops last-good figures honestly");
+  ok(app.includes("node returned a malformed subscription id"), "mempool: txWatch subscribe validates the subscription id");
+  ok(app.includes("Node returned a malformed fee quote"), "mempool: pasted quote labels a malformed fee honestly");
+  ok(!app.includes("state.chain = String(chain)"), "mempool: no String() chain coercion remains");
+  ok(!app.includes("state.pool = Array.isArray(list) ? list : []"), "mempool: no silent non-array-to-empty pool coercion remains");
+  const html = read("pages/mempool-desk/index.html");
+  ok(html.includes("js/app.js?v=1.36.0"), "mempool: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/rpc-core.js?v=1.33.0"), "mempool: rpc-core.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

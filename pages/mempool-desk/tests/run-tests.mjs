@@ -165,3 +165,56 @@ test("shorten and txWatchSupported", () => {
 test("EXPECTED_SS58_PREFIX is 189", () => {
   assert.equal(C.EXPECTED_SS58_PREFIX, 189);
 });
+
+test("RPC answer validators: heights, hashes, subscription ids, extrinsics", () => {
+  assert.equal(C.parseBlockNumber(256), 256);
+  assert.equal(C.parseBlockNumber("256"), 256);
+  assert.equal(C.parseBlockNumber("0x100"), 256);
+  assert.equal(C.parseBlockNumber("garbage!!"), null);
+  assert.equal(C.parseBlockNumber("0xZZ"), null);
+  assert.equal(C.parseBlockNumber(1.5), null);
+  assert.equal(C.parseBlockNumber(-3), null);
+  assert.equal(C.parseBlockNumber({ number: 5 }), null);
+  assert.equal(C.parseBlockNumber(null), null);
+  assert.ok(C.isHash32("0x" + "ab".repeat(32)));
+  assert.ok(!C.isHash32("0x1234"));
+  assert.ok(!C.isHash32({ hash: 1 }));
+  assert.ok(!C.isHash32("ab".repeat(32))); // missing 0x
+  assert.equal(C.validSubscriptionId("sub-1"), "sub-1");
+  assert.equal(C.validSubscriptionId(7), "7");
+  assert.equal(C.validSubscriptionId({ id: "evil" }), null);
+  assert.equal(C.validSubscriptionId(""), null);
+  assert.equal(C.validSubscriptionId(null), null);
+  assert.equal(C.validSubscriptionId(1.5), null);
+  assert.ok(C.validExtrinsicHex("0x" + "aa".repeat(100)));
+  assert.ok(!C.validExtrinsicHex("garbage!!"));
+  assert.ok(!C.validExtrinsicHex("0x123")); // odd length
+  assert.ok(!C.validExtrinsicHex({ x: 1 }));
+  assert.ok(!C.validExtrinsicHex("0x")); // no bytes
+});
+
+test("decodePartialFee rejects non-integer and negative fees", () => {
+  assert.equal(C.decodePartialFee({ partialFee: "0" }), 0n);
+  assert.equal(C.decodePartialFee({ partialFee: "0x10" }), 16n);
+  assert.throws(() => C.decodePartialFee({ partialFee: "-5" }));
+  assert.throws(() => C.decodePartialFee({ partialFee: -5 }));
+  assert.throws(() => C.decodePartialFee({ partialFee: "1.5" }));
+  assert.throws(() => C.decodePartialFee({ partialFee: 1.5 }));
+  assert.throws(() => C.decodePartialFee({ partialFee: { fee: 1 } }));
+  assert.throws(() => C.decodePartialFee({ partialFee: "1e3" }));
+  assert.throws(() => C.decodePartialFee({ partialFee: "" }));
+});
+
+test("parseTxWatchNotification sanitizes a garbage from", () => {
+  const raw = {
+    tx_hash: "0x9a3cb7f1" + "ab".repeat(28),
+    from: "qzfromaddress000000000000000000000000000000000000",
+    amount: "5000000000000",
+    asset_id: null,
+  };
+  assert.equal(C.parseTxWatchNotification(raw).from, raw.from);
+  assert.equal(C.parseTxWatchNotification({ ...raw, from: "!!!not-an-address!!!" }).from, "");
+  assert.equal(C.parseTxWatchNotification({ ...raw, from: { addr: 1 } }).from, "");
+  assert.equal(C.parseTxWatchNotification({ ...raw, from: "<script>alert(1)</script>" }).from, "");
+  assert.equal(C.formatCompact(-5n), "—");
+});

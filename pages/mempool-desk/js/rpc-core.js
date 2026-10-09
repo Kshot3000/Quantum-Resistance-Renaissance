@@ -43,7 +43,10 @@ function formatQtc(planck) {
 
 function formatCompact(planck) {
   // Short display for feeds: "1.5K QTC", "2.3M QTC", "450 QTC".
-  var qtc = Number(planck) / 1e12;
+  var p;
+  try { p = typeof planck === "bigint" ? planck : BigInt(String(planck)); } catch (e) { return "—"; }
+  if (p < 0n) return "—";
+  var qtc = Number(p) / 1e12;
   if (!isFinite(qtc)) return "—";
   var abs = Math.abs(qtc);
   var v, unit;
@@ -128,6 +131,39 @@ function checkAddress(addr, decodeFn) {
 
 var HEX_RE = /^0x[0-9a-fA-F]+$/;
 
+/* ---------- RPC answer validators (the node is an untrusted boundary) ---------- */
+
+function parseBlockNumber(v) {
+  // A block height arrives as a JSON integer, a decimal string, or a
+  // 0x-hex string — anything else (floats, objects, "garbage", "0xZZ")
+  // is not a height and must never render as one (or as NaN).
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string") {
+    if (/^\d+$/.test(v)) { var n = Number(v); return Number.isSafeInteger(n) ? n : null; }
+    if (/^0x[0-9a-fA-F]+$/.test(v)) { var h = parseInt(v, 16); return Number.isSafeInteger(h) ? h : null; }
+  }
+  return null;
+}
+
+function isHash32(s) {
+  return typeof s === "string" && /^0x[0-9a-fA-F]{64}$/.test(s);
+}
+
+function validSubscriptionId(v) {
+  // JSON-RPC subscription ids are strings or integers. Anything else
+  // (an object String()'d to "[object Object]") is not a subscription.
+  if (typeof v === "string") {
+    return v.length > 0 && v.length <= 128 && !/\s/.test(v) ? v : null;
+  }
+  if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return String(v);
+  return null;
+}
+
+function validExtrinsicHex(s) {
+  // A pool entry is extrinsic Bytes: even-length 0x hex, at least 1 byte.
+  return typeof s === "string" && HEX_RE.test(s) && s.length % 2 === 0 && s.length >= 4;
+}
+
 function parseTxWatchNotification(raw) {
   // Validates the upstream shape: {tx_hash, from, amount, asset_id}.
   // Returns {txHash, from, amountPlanck:BigInt, assetId|null}. Throws on garbage.
@@ -142,9 +178,15 @@ function parseTxWatchNotification(raw) {
   if (assetId !== null && (!Number.isInteger(assetId) || assetId < 0)) {
     throw new Error("bad asset_id");
   }
+  // `from` is display-only: keep it only when it is shaped like an
+  // address (base58-ish, plausible length). Anything else — markup,
+  // punctuation, an object — becomes "" and renders as the honest
+  // "unsigned / non-standard" label instead of garbage-as-sender.
+  var from = "";
+  if (typeof raw.from === "string" && /^[A-Za-z0-9]{20,70}$/.test(raw.from)) from = raw.from;
   return {
     txHash: raw.tx_hash,
-    from: typeof raw.from === "string" ? raw.from : "",
+    from: from,
     amountPlanck: BigInt(raw.amount),
     assetId: assetId,
     receivedAt: Date.now(),
@@ -197,10 +239,26 @@ function sortPoolByFee(rows) {
 
 function decodePartialFee(queryInfoResult) {
   // payment_queryInfo -> {weight:{...}, class:"normal", partialFee:"12345"}.
-  if (!queryInfoResult || typeof queryInfoResult.partialFee === "undefined") {
+  // The fee is money: only a non-negative integer (digit string, 0x-hex
+  // string, safe-integer number, or BigInt) is a fee. BigInt(String(x))
+  // alone would happily convert "-5" into a negative fee and render it
+  // as a node quote — reject everything that is not a clean integer.
+  if (!queryInfoResult || typeof queryInfoResult !== "object" ||
+      typeof queryInfoResult.partialFee === "undefined") {
     throw new Error("no partialFee in queryInfo result");
   }
-  return BigInt(String(queryInfoResult.partialFee));
+  var f = queryInfoResult.partialFee;
+  if (typeof f === "bigint") {
+    if (f < 0n) throw new Error("malformed partialFee in queryInfo result");
+    return f;
+  }
+  if (typeof f === "number") {
+    if (!Number.isSafeInteger(f) || f < 0) throw new Error("malformed partialFee in queryInfo result");
+    return BigInt(f);
+  }
+  if (typeof f === "string" && /^\d+$/.test(f)) return BigInt(f);
+  if (typeof f === "string" && /^0x[0-9a-fA-F]+$/.test(f)) return BigInt(f);
+  throw new Error("malformed partialFee in queryInfo result");
 }
 
 /* ---------- timing ---------- */
@@ -268,6 +326,10 @@ var api = {
   isWsUrl: isWsUrl,
   normalizeEndpoint: normalizeEndpoint,
   checkAddress: checkAddress,
+  parseBlockNumber: parseBlockNumber,
+  isHash32: isHash32,
+  validSubscriptionId: validSubscriptionId,
+  validExtrinsicHex: validExtrinsicHex,
   parseTxWatchNotification: parseTxWatchNotification,
   assetLabel: assetLabel,
   hexByteLen: hexByteLen,

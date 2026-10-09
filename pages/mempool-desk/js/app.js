@@ -163,13 +163,18 @@ function rpcCall(payload) {
 function routeMessage(raw) {
   var msg;
   try { msg = JSON.parse(raw); } catch (e) { return; }
+  // A frame that parses to null / an array / a scalar is not a JSON-RPC
+  // message — ignore it instead of throwing on msg.id.
+  if (!msg || typeof msg !== "object" || Array.isArray(msg)) return;
   if (msg.id !== undefined && msg.id !== null && state.pending.has(msg.id)) {
     var p = state.pending.get(msg.id);
     state.pending.delete(msg.id);
     clearTimeout(p.timer);
     if (msg.error) {
-      var err = new Error(msg.error.message || "RPC error");
-      err.code = msg.error.code;
+      var emsg = typeof msg.error === "string" ? msg.error
+        : (msg.error && typeof msg.error.message === "string" ? msg.error.message : "RPC error");
+      var err = new Error(emsg);
+      err.code = (msg.error && typeof msg.error === "object") ? msg.error.code : undefined;
       p.reject(err);
     } else {
       p.resolve(msg.result);
@@ -185,16 +190,18 @@ function handleSubscription(msg) {
   var sub = msg.params.subscription;
   var result = msg.params.result;
   if (msg.method === "chain_subscribeNewHeads" || msg.method === "chain_newHead") {
-    if (result && result.number !== undefined) {
-      var n = result.number;
-      var num = typeof n === "string" && n.indexOf("0x") === 0 ? parseInt(n, 16) : n;
+    if (result && typeof result === "object") {
+      // The height must parse as a height — a garbage number used to
+      // render "#NaN" (or the raw string) as the chain head.
+      var num = C.parseBlockNumber(result.number);
+      if (num === null) return;
       state.head = { number: num, hash: null };
       renderConn();
       renderPoolHeader();
       renderHero();
       // The Header notification carries no block hash; ask the node for it.
-      rpcCall(C.buildRpc("chain_getBlockHash", [n])).then(function (h) {
-        if (state.head && state.head.number === num) {
+      rpcCall(C.buildRpc("chain_getBlockHash", [result.number])).then(function (h) {
+        if (state.head && state.head.number === num && C.isHash32(h)) {
           state.head.hash = h;
           renderConn();
         }
@@ -324,23 +331,34 @@ function openSocket() {
   };
 }
 
+function validIdentity(v) {
+  // Chain name / node version are identity strings. String()-coercing
+  // anything else presented "[object Object]" as the chain's name.
+  return typeof v === "string" && v.trim().length > 0 && v.length <= 256;
+}
+
 function handshake() {
   var calls = C.buildHandshake();
   return rpcCall(calls[0]).then(function (chain) {
-    state.chain = String(chain);
+    if (!validIdentity(chain)) throw new Error("node returned a malformed chain name");
+    state.chain = chain;
     return rpcCall(calls[1]);
   }).then(function (version) {
-    state.version = String(version);
+    if (!validIdentity(version)) throw new Error("node returned a malformed node version");
+    state.version = version;
     return rpcCall(calls[2]);
   }).then(function (header) {
-    if (header && header.number !== undefined) {
-      var n = header.number;
-      state.head = {
-        number: typeof n === "string" && n.indexOf("0x") === 0 ? parseInt(n, 16) : n,
-        hash: null,
-      };
+    if (header && typeof header === "object") {
+      var num = C.parseBlockNumber(header.number);
+      if (num === null) {
+        // Identity is fine; only the head is unusable. Stay connected
+        // with the head honestly unknown — never render the garbage.
+        logConn("node returned a malformed head — head unknown until the next notification", true);
+        return;
+      }
+      state.head = { number: num, hash: null };
       return rpcCall(C.buildRpc("chain_getBlockHash", [])).then(function (h) {
-        state.head.hash = h;
+        if (C.isHash32(h)) state.head.hash = h;
       }).catch(function () { /* head hash optional */ });
     }
   });
@@ -349,7 +367,12 @@ function handshake() {
 function subscribeHeads() {
   var p = C.buildNewHeadsSubscribe();
   rpcCall(p).then(function (subId) {
-    logConn("subscribed to new heads (" + C.shorten(String(subId), 8, 4) + ")");
+    var sid = C.validSubscriptionId(subId);
+    if (sid === null) {
+      logConn("new-heads subscription failed: node returned a malformed subscription id — head will refresh on pool polls", true);
+      return;
+    }
+    logConn("subscribed to new heads (" + C.shorten(sid, 8, 4) + ")");
   }).catch(function (e) {
     logConn("new-heads subscription failed: " + e.message + " — head will refresh on pool polls", true);
   });
@@ -406,7 +429,23 @@ function startPoolPolling() {
 
 function pollPool() {
   rpcCall(C.buildPendingExtrinsics()).then(function (list) {
-    state.pool = Array.isArray(list) ? list : [];
+    // The pool is chain state, not a suggestion: a non-array answer is
+    // a malformed answer, NOT an empty pool — presenting it as "0
+    // pending" would be a fabricated figure. Entries are extrinsic
+    // Bytes; rows that are not valid hex drop, and a non-empty answer
+    // with zero valid entries is malformed as a whole.
+    if (!Array.isArray(list)) {
+      var err = new Error("node returned a malformed pool (expected an array of extrinsic hex strings)");
+      err.malformedPool = true;
+      throw err;
+    }
+    var valid = list.filter(function (x) { return C.validExtrinsicHex(x); });
+    if (list.length && !valid.length) {
+      var err2 = new Error("node returned a malformed pool (no valid extrinsic hex in the answer)");
+      err2.malformedPool = true;
+      throw err2;
+    }
+    state.pool = valid;
     state.poolLastPoll = Date.now();
     state.poolError = null;
     try {
@@ -420,7 +459,15 @@ function pollPool() {
     }
     renderPool();
   }).catch(function (e) {
-    if (e.code === -32601) {
+    if (e.malformedPool) {
+      // Pool state is unknown, not empty: drop the last-good figures so
+      // nothing stale is presented as the current pool.
+      state.pool = [];
+      state.poolSummary = null;
+      state.poolLastPoll = 0;
+      state.poolError = "Pool poll failed: " + e.message + " — pool state unknown, not empty.";
+      logConn(state.poolError, true);
+    } else if (e.code === -32601) {
       state.poolUnsupported = true;
       state.poolError = "This node does not expose author_pendingExtrinsics (common on public RPCs) — the pool gauge is unavailable here. txWatch watchers and head tracking still work.";
       logConn("author_pendingExtrinsics not available on this node", true);
@@ -456,6 +503,14 @@ function renderPool() {
     meta.textContent = "Pool polling disabled for this node.";
     drawSparkline();
     renderGauge(null);
+    return;
+  }
+  if (!state.poolLastPoll && state.poolError) {
+    body.innerHTML = "<div class='qmb-error'>" + esc(state.poolError) + "</div>";
+    meta.textContent = "Pool state unknown.";
+    drawSparkline();
+    renderGauge(null);
+    renderHero();
     return;
   }
   if (!state.poolLastPoll) {
@@ -649,7 +704,15 @@ function estimatePasted() {
   }
   rpcCall(C.buildPaymentQueryInfo(hex)).then(function (res) {
     if (!stillCurrent()) return;
-    var fee = C.decodePartialFee(res);
+    var fee;
+    try {
+      fee = C.decodePartialFee(res);
+    } catch (e) {
+      // A malformed fee is not a node refusal and not a quote — say so.
+      msg.textContent = "Node returned a malformed fee quote — no fee shown.";
+      msg.className = "form-msg err";
+      return;
+    }
     var bytes = C.hexByteLen(hex);
     msg.innerHTML = "Node quote: <strong class='mono'>" + esc(C.formatQtc(fee)) + " QTC</strong> " +
       "<span class='muted'>(" + fee.toString() + " planck · " + bytes.toLocaleString("en-US") + " bytes)</span>";
@@ -713,17 +776,29 @@ function subscribeWatcher(w) {
   }
   rpcCall(p).then(function (subId) {
     if (state.reqToWatcher.get(p.id) === w.address) state.reqToWatcher.delete(p.id);
+    // A subscription id is a string or an integer — String()-coercing
+    // an object answer registered a "[object Object]" subscription
+    // and marked the watcher LIVE on a subscription that does not exist.
+    var sid = C.validSubscriptionId(subId);
+    if (sid === null) {
+      if (!stillCurrent()) return;
+      w.status = "error";
+      w.note = "node returned a malformed subscription id";
+      logConn("txWatch subscribe failed for " + C.shorten(w.address, 12, 8) + ": malformed subscription id", true);
+      renderWatchers();
+      return;
+    }
     if (!stillCurrent()) {
       // Superseded. If the socket that granted the subscription is
       // still the current one, the subscription is live on the node
       // for an address nobody watches — release it instead of leaking
       // it into subToWatcher. (On a dead socket it died with it.)
       if (state.ws === ws && ws) {
-        try { rpcCall(C.buildTxWatchUnsubscribe(String(subId))).catch(function () {}); } catch (e) {}
+        try { rpcCall(C.buildTxWatchUnsubscribe(sid)).catch(function () {}); } catch (e) {}
       }
       return;
     }
-    w.subId = String(subId);
+    w.subId = sid;
     w.status = "live";
     state.subToWatcher.set(w.subId, w.address);
     logConn("txWatch live for " + C.shorten(w.address, 12, 8));
