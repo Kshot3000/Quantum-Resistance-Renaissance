@@ -82,6 +82,63 @@ function derivePhrase(addr) {
   return QTC_CHECK.addressToChecksumAsync(addr, QTC_WORDLIST).catch(function () { return null; });
 }
 
+/* A stored rule is only safe if every field the rule FORM validates also
+ * validates here. The form checks type, watched address, and threshold
+ * before a rule exists; anything that bypasses the form — a backup import,
+ * or state written by an older build — must pass the same checks, because
+ * a rule whose threshold parseQtcToPlancks cannot parse makes
+ * evaluateRules throw on EVERY scan (and in the unguarded self-test),
+ * wedging the tower until the rule is hunted down and deleted by hand.
+ * Returns a clean rule object (no id — the caller assigns one), or null. */
+function sanitizeRule(r) {
+  if (!r || typeof r !== "object") return null;
+  var t = QWATCH.RULE_TYPES[r.type];
+  if (!t) return null;
+  var clean = {
+    type: r.type,
+    severity: ["info", "warn", "crit"].indexOf(r.severity) !== -1 ? r.severity : "info",
+    enabled: r.enabled !== false,
+  };
+  if (t.scope === "address") {
+    var v = validateQuantusAddress(r.address);
+    if (!v.ok) return null;
+    if (!state.watchlist.some(function (x) { return x.address === v.address; })) return null;
+    clean.address = v.address;
+  }
+  if (ruleNeedsThreshold(r.type)) {
+    var thr = String(r.threshold == null ? "" : r.threshold).trim();
+    if (!thr) return null;
+    try {
+      if (r.type === "chain_stall") {
+        if (!(parseFloat(thr) > 0)) return null;
+      } else if (r.type === "balance_change") {
+        clean.changeMode = r.changeMode === "pct" ? "pct" : "abs";
+        if (clean.changeMode === "pct") { if (!(parseFloat(thr) > 0)) return null; }
+        else QWATCH.parseQtcToPlancks(thr);
+      } else {
+        QWATCH.parseQtcToPlancks(thr);
+      }
+    } catch (e) { return null; }
+    clean.threshold = thr;
+  }
+  return clean;
+}
+
+/* Repair state stored by older builds/imports before the first scan runs:
+ * drop any stored rule the sanitizer rejects (it could only have come
+ * from a pre-validation import or a hand-edited backup), keeping its id. */
+(function repairStoredRules() {
+  if (!state.rules.length) return;
+  var kept = [];
+  state.rules.forEach(function (r) {
+    var clean = sanitizeRule(r);
+    if (!clean) return;
+    clean.id = typeof r.id === "string" && r.id ? r.id : nextRuleId();
+    kept.push(clean);
+  });
+  if (kept.length !== state.rules.length) { state.rules = kept; save(); }
+})();
+
 /* ---------- data loading (live-first, snapshot fallback) ---------- */
 var chainData = null; // {live: {ok, source, fetchedAt, data}|null, source:"live"|"snapshot", ...}
 function fetchJson(url, timeoutMs) {
@@ -576,18 +633,32 @@ $("file-import").addEventListener("change", function (ev) {
           added++;
         }
       });
+      var addedRules = 0, skippedRules = 0;
       (p.rules || []).forEach(function (r) {
-        if (QWATCH.RULE_TYPES[r.type]) {
-          r.id = nextRuleId();
-          state.rules.push(r);
-        }
+        var clean = sanitizeRule(r);
+        if (!clean) { skippedRules++; return; }
+        // Addresses dedupe above; rules must too — re-importing a backup
+        // (or a rule repeated inside one file) must not double every rule
+        // and fire every alert twice under two rule ids.
+        var dup = state.rules.some(function (x) {
+          return x.type === clean.type && (x.address || null) === (clean.address || null) &&
+            (x.threshold || null) === (clean.threshold || null) &&
+            (x.changeMode || null) === (clean.changeMode || null) &&
+            x.severity === clean.severity && !!x.enabled === clean.enabled;
+        });
+        if (dup) { skippedRules++; return; }
+        clean.id = nextRuleId();
+        state.rules.push(clean);
+        addedRules++;
       });
       save(); renderAll();
       // backfill checkphrases for imported entries
       state.watchlist.filter(function (x) { return !x.checkphrase; }).forEach(function (x) {
         derivePhrase(x.address).then(function (w) { x.checkphrase = w; save(); renderWatchlist(); });
       });
-      toast("Imported " + added + " new addresses and " + (p.rules || []).length + " rules.", "ok");
+      toast("Imported " + added + " new address" + (added === 1 ? "" : "es") + " and " +
+        addedRules + " rules" +
+        (skippedRules ? " (" + skippedRules + " skipped — invalid or duplicate)" : "") + ".", "ok");
     } catch (e) { toast("Import failed: " + e.message, "err"); }
     ev.target.value = "";
   };
