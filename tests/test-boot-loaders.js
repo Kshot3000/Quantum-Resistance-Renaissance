@@ -160,5 +160,29 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.20.0"), "whale: app.js cache key bumped for the boundary fix");
 }
 
+// ---- 10. Governance Tracker: validate the whole snapshot at the load boundary ----
+// Batch 5 (2026-10-09 08:19): governance-tracker trusted its snapshot except
+// for a truthy `referenda` — an event with a null type threw in
+// renderTimeline and wiped the whole board, a garbage tally rendered as
+// "NaN ayes", a non-array referenda painted the "No referenda" lie, a
+// poisoned extrinsic row wiped an otherwise-valid board, a garbage
+// referendum_index built a ref-NaN card, an unknown track silently used
+// fast_upgrade thresholds, and a bad fetched_at rendered "Invalid Date".
+// Pin: validateSnapshot() gates BOTH load paths (fetch and the QA mock),
+// rows drop individually, all-invalid referenda fail honestly.
+{
+  const src = read("pages/governance-tracker/js/app.js");
+  ok(src.includes("function validateSnapshot(raw)"), "governance: validateSnapshot() defined");
+  ok(src.includes("function cleanRefEvent(raw)"), "governance: per-event validator defined");
+  ok((src.match(/validateSnapshot\(/g) || []).length >= 3, "governance: validator gates fetch AND mock load paths");
+  ok(src.includes("!STATUS_META[raw.type]"), "governance: event type must be a known lifecycle state");
+  ok(src.includes("!trackById(track)"), "governance: unknown track events are rejected (no fallback thresholds)");
+  ok(src.includes("tallyOk(raw.tally_ayes)"), "governance: tallies must be null or non-negative integers");
+  ok(src.includes("d.referenda.length && !refs.length"), "governance: all-invalid referenda fail honestly (no empty-board lie)");
+  ok(src.includes('throw new Error("snapshot failed validation")'), "governance: invalid snapshot throws into the boot catch");
+  const html = read("pages/governance-tracker/index.html");
+  ok(html.includes("js/app.js?v=1.43.0"), "governance: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

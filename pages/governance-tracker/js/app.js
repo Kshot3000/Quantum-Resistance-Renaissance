@@ -23,23 +23,119 @@ function timeoutSignal(ms) {
   return ctl.signal;
 }
 
+/* Load-boundary validation: the renderers dereference event fields blindly
+ * (e.type.toLowerCase() in the timeline, parseFloat tallies, new Date on
+ * fetched_at), so one poisoned row used to wipe the whole board, render
+ * "NaN ayes", or print "Invalid Date". Core corruption — an unparseable
+ * fetched_at, a non-array collection, or a snapshot whose referendum
+ * events are ALL invalid — fails the load honestly; malformed rows drop
+ * individually and the board renders from the survivors, re-sorted into
+ * chronological order so status/tally derivation sees the true sequence. */
+var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // prefix-189 shape (qz + 47 base58), as in Vesting Desk
+
+function nonNegInt(v) {
+  if (typeof v === "number") return Number.isInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v.trim())) {
+    var n = parseInt(v, 10);
+    return isFinite(n) ? n : null;
+  }
+  return null;
+}
+function strOrNull(v) { return typeof v === "string" ? v : null; }
+function tallyOk(v) { return v === null || v === undefined || nonNegInt(v) !== null; }
+
+function cleanRefEvent(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  var idx = nonNegInt(raw.referendum_index);
+  if (idx === null) return null;
+  if (typeof raw.type !== "string" || !STATUS_META[raw.type]) return null;
+  if (typeof raw.timestamp !== "string" || !isFinite(Date.parse(raw.timestamp))) return null;
+  var track = nonNegInt(raw.track);
+  if (track === null || !trackById(track)) return null; // unknown track: no honest thresholds exist for it
+  if (!tallyOk(raw.tally_ayes) || !tallyOk(raw.tally_nays) || !tallyOk(raw.tally_bare_ayes)) return null;
+  var size = nonNegInt(raw.proposal_size_bytes);
+  if (size !== null && size > GOV.max_proposal_size_bytes) size = null; // implausible size: show "—", never a fabricated deposit
+  return {
+    referendum_index: idx, track: track,
+    track_name: strOrNull(raw.track_name), type: raw.type,
+    title: strOrNull(raw.title), description: strOrNull(raw.description),
+    origin: strOrNull(raw.origin),
+    is_runtime_upgrade: raw.is_runtime_upgrade === true,
+    tally_ayes: raw.tally_ayes == null ? null : raw.tally_ayes,
+    tally_nays: raw.tally_nays == null ? null : raw.tally_nays,
+    tally_bare_ayes: raw.tally_bare_ayes == null ? null : raw.tally_bare_ayes,
+    proposal_preimage_hash: strOrNull(raw.proposal_preimage_hash),
+    proposal_size_bytes: size,
+    proposal_calls: strOrNull(raw.proposal_calls),
+    proposal_summary: strOrNull(raw.proposal_summary),
+    proposal_storage: strOrNull(raw.proposal_storage),
+    timestamp: raw.timestamp,
+    actor_id: typeof raw.actor_id === "string" && ADDR_RE.test(raw.actor_id) ? raw.actor_id : null,
+    block_id: strOrNull(raw.block_id),
+    extrinsic_id: strOrNull(raw.extrinsic_id)
+  };
+}
+
+function cleanExtrinsic(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  if (typeof raw.pallet !== "string" || !raw.pallet) return null;
+  if (typeof raw.call !== "string" || !raw.call) return null;
+  if (typeof raw.timestamp !== "string" || !isFinite(Date.parse(raw.timestamp))) return null;
+  return {
+    pallet: raw.pallet, call: raw.call, timestamp: raw.timestamp,
+    signer_id: typeof raw.signer_id === "string" && ADDR_RE.test(raw.signer_id) ? raw.signer_id : null,
+    block_id: strOrNull(raw.block_id),
+    success: raw.success,
+    args: raw.args === undefined ? null : raw.args,
+    index_in_block: raw.index_in_block === undefined ? null : raw.index_in_block
+  };
+}
+
+function cleanUpgrade(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  if (typeof raw.timestamp !== "string" || !isFinite(Date.parse(raw.timestamp))) return null;
+  return { id: strOrNull(raw.id), block_id: strOrNull(raw.block_id), timestamp: raw.timestamp };
+}
+
+function byTimestamp(a, b) { return Date.parse(a.timestamp) - Date.parse(b.timestamp); }
+
+function validateSnapshot(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  if (raw.ok !== undefined && raw.ok !== true) return null;
+  var d = raw.data && typeof raw.data === "object" ? raw.data : raw;
+  var fetched = d.fetched_at || raw.fetched_at;
+  if (typeof fetched !== "string" || !isFinite(Date.parse(fetched))) return null;
+  if (!Array.isArray(d.referenda)) return null;
+  if (d.extrinsics !== undefined && !Array.isArray(d.extrinsics)) return null;
+  if (d.upgrades !== undefined && !Array.isArray(d.upgrades)) return null;
+  var refs = [];
+  d.referenda.forEach(function (r) { var c = cleanRefEvent(r); if (c) refs.push(c); });
+  if (d.referenda.length && !refs.length) return null; // claimed referenda, none valid — fail honestly, never an empty-board lie
+  refs.sort(byTimestamp);
+  var exts = [];
+  (d.extrinsics || []).forEach(function (x) { var c = cleanExtrinsic(x); if (c) exts.push(c); });
+  exts.sort(byTimestamp);
+  var ups = [];
+  (d.upgrades || []).forEach(function (u) { var c = cleanUpgrade(u); if (c) ups.push(c); });
+  ups.sort(byTimestamp);
+  return { referenda: refs, extrinsics: exts, upgrades: ups, fetched_at: fetched };
+}
+
 function loadSnapshot() {
   // QA hook: headless file:// cannot fetch() across origins, so the QA harness may
   // inject the snapshot (the real data/governance.json content) before navigation.
   if (typeof window !== "undefined" && window.__qgov_mock) {
-    var mk = window.__qgov_mock;
-    var d = mk.data || mk;
-    d.fetched_at = d.fetched_at || mk.fetched_at || null;
-    return Promise.resolve(d);
+    var v = validateSnapshot(window.__qgov_mock);
+    if (!v) return Promise.reject(new Error("snapshot failed validation"));
+    return Promise.resolve(v);
   }
   return fetch(SNAPSHOT, { cache: "no-store", signal: timeoutSignal(9000) }).then(function (r) {
     if (!r.ok) throw new Error("snapshot HTTP " + r.status);
     return r.json();
   }).then(function (j) {
-    var d = j.data || j;
-    d.fetched_at = d.fetched_at || j.fetched_at;
-    if (!d.referenda) throw new Error("snapshot missing referenda");
-    return d;
+    var v = validateSnapshot(j);
+    if (!v) throw new Error("snapshot failed validation");
+    return v;
   });
 }
 
