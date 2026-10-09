@@ -65,6 +65,13 @@ $("verNote").textContent = "Checkphrase core validated 1,171/1,171 upstream test
 
 /* ---------- checkphrase verifier ---------- */
 var lastAddr = "", lastWords = null;
+/* Sequence token for the poisoning demo's async KDF. EVERY path that
+ * changes what the displayed checkphrase is bound to — an address edit or
+ * example fill (voidDerived), a new derive, a new poison run — bumps it, so
+ * a tampered-phrase result that lands late can be told apart from the
+ * current one and discarded instead of rendering over newer state. */
+var poisonSeq = 0;
+var POISON_LABEL = "Tamper with one character — show the poisoning demo";
 var KYLE = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
 var GENESIS = "qzka7DZXAT7GnzgXQfxiSwrPKRWgW6m6G89QRsQiLThThZ6Cw"; // upstream genesis vesting table
 
@@ -92,6 +99,12 @@ function renderPlaceholderWords() {
   }
 }
 function voidDerived(msg) {
+  /* Invalidate any in-flight poison KDF and own the button's full state —
+   * its LABEL is part of that state: a void landing mid-demo must not
+   * leave the button reading "Deriving tampered phrase…" for a demo that
+   * will never render. */
+  poisonSeq++;
+  $("poisonBtn").textContent = POISON_LABEL;
   if (!lastAddr && !lastWords) return;
   lastAddr = ""; lastWords = null;
   $("poisonBtn").disabled = true;
@@ -110,6 +123,7 @@ $("exKyle").addEventListener("click", function () { $("addrInput").value = KYLE;
 $("exGenesis").addEventListener("click", function () { $("addrInput").value = GENESIS; voidDerived(CHANGED_MSG); });
 
 $("deriveBtn").addEventListener("click", function () {
+  poisonSeq++; // a new derive supersedes any poison demo still in flight
   var addr = $("addrInput").value.trim();
   if (!addr) { $("resNote").textContent = "Paste an address first."; return; }
   var wrap = $("progWrap"), bar = $("progBar"), note = $("progNote");
@@ -133,6 +147,14 @@ $("deriveBtn").addEventListener("click", function () {
     $("poisonCard").hidden = true;
   }).catch(function (e) {
     wrap.hidden = true; $("deriveBtn").disabled = false;
+    if ($("addrInput").value.trim() !== addr) {
+      /* Same pin as the success path: this failure belongs to the previous
+       * address. Painting its error would blame the address now in the box
+       * for a derivation it never attempted. */
+      lastAddr = addr; lastWords = ["discarded"]; // make voidDerived act, then clear
+      voidDerived("The address changed while deriving — that attempt failed for the previous address and was discarded. Derive again for the address now in the box.");
+      return;
+    }
     $("resNote").textContent = "Error: " + e.message;
   });
 });
@@ -152,10 +174,24 @@ $("poisonBtn").addEventListener("click", function () {
   renderWords($("origWords"), lastWords, false);
   $("poisonCard").hidden = false;
   $("poisonBtn").disabled = true; $("poisonBtn").textContent = "Deriving tampered phrase…";
+  /* Pin this run to the derivation it demos. A void (address edit / example
+   * fill), a new derive, or a newer poison run bumps poisonSeq and/or moves
+   * lastAddr; a completion that finds either moved is stale — it must not
+   * render its tampered words, re-enable the button over a void, or scroll
+   * a hidden card. */
+  var pinAddr = lastAddr, myPoison = ++poisonSeq;
+  function stale() { return myPoison !== poisonSeq || lastAddr !== pinAddr; }
   QTC_CHECK.addressToChecksumAsync(tamp, QTC_WORDLIST, null).then(function (tw) {
+    if (stale()) return;
     renderWords($("tampWords"), tw, true);
-    $("poisonBtn").disabled = false; $("poisonBtn").textContent = "Tamper with one character — show the poisoning demo";
+    $("poisonBtn").disabled = false; $("poisonBtn").textContent = POISON_LABEL;
     $("poisonCard").scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "nearest" });
+  }).catch(function (e) {
+    if (stale()) return;
+    /* Without this catch a failed demo wedged the button disabled at
+     * "Deriving tampered phrase…" forever (unhandled rejection). */
+    $("poisonBtn").disabled = false; $("poisonBtn").textContent = POISON_LABEL;
+    $("resNote").textContent = "Poisoning demo failed: " + e.message;
   });
 });
 
