@@ -244,6 +244,12 @@ function u32le(n){
   n = n >>> 0;
   return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
 }
+/* A u32 argument must be a whole number inside [0, 2^32): u32le's >>> 0 would
+ * otherwise wrap silently (proposal 4294967297 encoding as proposal 1, an
+ * expiry of 4294967390 encoding as block 94 while the UI shows the big one). */
+function isU32(n){
+  return typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 4294967295;
+}
 function u64le(bn){
   bn = BigInt(bn);
   var out = [];
@@ -324,7 +330,15 @@ function deriveMultisigAddress(signerKeys /* array of 64-hex-char strings */,
     return { ok: false, error: "Threshold must be a positive integer." };
   if (t > sorted.length)
     return { ok: false, error: "Threshold cannot exceed the signer count." };
-  var n = BigInt(nonce);
+  var n;
+  if (typeof nonce === "bigint") n = nonce;
+  else if (typeof nonce === "number"){
+    if (!Number.isInteger(nonce))
+      return { ok: false, error: "Nonce must be a whole number (0 or greater)." };
+    n = BigInt(nonce);
+  }
+  else if (typeof nonce === "string" && /^\d+$/.test(nonce.trim())) n = BigInt(nonce.trim());
+  else return { ok: false, error: "Nonce must be a whole number (0 or greater)." };
   if (n < 0n || n > 18446744073709551615n)
     return { ok: false, error: "Nonce must fit in a u64." };
   var keyBytes = sorted.map(fromHex);
@@ -392,7 +406,8 @@ function encodePropose(multisigHex, innerCallHex, expiryBlock){
   if (!ms || ms.length !== 32) return { ok: false, error: "Bad multisig address bytes." };
   if (!call || call.length === 0) return { ok: false, error: "Bad inner call bytes." };
   if (call.length > MAX_CALL_SIZE) return { ok: false, error: "Inner call exceeds 10 KB." };
-  var exp = Number(expiryBlock) >>> 0;
+  if (!isU32(Number(expiryBlock))) return { ok: false, error: "Expiry block must be a whole block number that fits in a u32." };
+  var exp = Number(expiryBlock);
   var bytes = [PALLET_INDEX, CALL_IDX.propose].concat(ms)
     .concat(boundedBytes(call)).concat(u32le(exp));
   return { ok: true, hex: toHex(bytes), call: "Multisig.propose", expiry: exp };
@@ -401,6 +416,7 @@ function encodeApprove(multisigHex, proposalId, innerCallHex){
   var ms = fromHex(multisigHex), call = fromHex(innerCallHex);
   if (!ms || ms.length !== 32) return { ok: false, error: "Bad multisig address bytes." };
   if (!call || call.length === 0) return { ok: false, error: "Bad inner call bytes." };
+  if (!isU32(proposalId)) return { ok: false, error: "Proposal id must be a whole number that fits in a u32." };
   var bytes = [PALLET_INDEX, CALL_IDX.approve].concat(ms)
     .concat(u32le(proposalId)).concat(boundedBytes(call));
   return { ok: true, hex: toHex(bytes), call: "Multisig.approve" };
@@ -408,12 +424,14 @@ function encodeApprove(multisigHex, proposalId, innerCallHex){
 function encodeCancel(multisigHex, proposalId){
   var ms = fromHex(multisigHex);
   if (!ms || ms.length !== 32) return { ok: false, error: "Bad multisig address bytes." };
+  if (!isU32(proposalId)) return { ok: false, error: "Proposal id must be a whole number that fits in a u32." };
   var bytes = [PALLET_INDEX, CALL_IDX.cancel].concat(ms).concat(u32le(proposalId));
   return { ok: true, hex: toHex(bytes), call: "Multisig.cancel" };
 }
 function encodeRemoveExpired(multisigHex, proposalId){
   var ms = fromHex(multisigHex);
   if (!ms || ms.length !== 32) return { ok: false, error: "Bad multisig address bytes." };
+  if (!isU32(proposalId)) return { ok: false, error: "Proposal id must be a whole number that fits in a u32." };
   var bytes = [PALLET_INDEX, CALL_IDX.remove_expired].concat(ms).concat(u32le(proposalId));
   return { ok: true, hex: toHex(bytes), call: "Multisig.remove_expired" };
 }
@@ -427,6 +445,7 @@ function encodeExecute(multisigHex, proposalId, innerCallHex){
   var ms = fromHex(multisigHex), call = fromHex(innerCallHex);
   if (!ms || ms.length !== 32) return { ok: false, error: "Bad multisig address bytes." };
   if (!call || call.length === 0) return { ok: false, error: "Bad inner call bytes." };
+  if (!isU32(proposalId)) return { ok: false, error: "Proposal id must be a whole number that fits in a u32." };
   var bytes = [PALLET_INDEX, CALL_IDX.execute].concat(ms)
     .concat(u32le(proposalId)).concat(boundedBytes(call));
   return { ok: true, hex: toHex(bytes), call: "Multisig.execute" };
@@ -454,7 +473,10 @@ function blocksToHuman(blocks){
   return mins + "m";
 }
 function expiryBlockNow(chainHeight, blocksAhead){
-  return (Number(chainHeight) >>> 0) + (Number(blocksAhead) >>> 0);
+  /* No >>> 0 here: wrapping either input (or the sum) would make the encoded
+   * expiry differ from the one the UI displays. Oversize sums are rejected
+   * by encodePropose's u32 check instead. */
+  return Number(chainHeight) + Number(blocksAhead);
 }
 
 var MsigCore = {

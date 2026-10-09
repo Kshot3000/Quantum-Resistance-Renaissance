@@ -163,8 +163,12 @@ $("b-build").addEventListener("click", function(){
     out.innerHTML = '<div class="empty-state">Amount must be a positive QTC value (up to 12 decimals).</div>';
     return;
   }
-  if (!(height >= 1)){
-    out.innerHTML = '<div class="empty-state">Enter the current chain height — <code>propose</code> needs an expiry block.</div>';
+  if (!(height >= 1) || Math.floor(height) !== height){
+    out.innerHTML = '<div class="empty-state">Enter the current chain height as a whole block number — <code>propose</code> needs an expiry block.</div>';
+    return;
+  }
+  if (!(window_ >= 1)){
+    out.innerHTML = '<div class="empty-state">Pick a proposal window of at least 1 block.</div>';
     return;
   }
   if (window_ > C.MAX_EXPIRY_DURATION){
@@ -183,6 +187,11 @@ $("b-build").addEventListener("click", function(){
   var cancel = C.encodeCancel(vaultHex, pid);
   var remove = C.encodeRemoveExpired(vaultHex, pid);
   var claim = C.encodeClaimDeposits(vaultHex);
+  var badEnc = [propose, approve, execute, cancel, remove, claim].filter(function(x){ return !x.ok; })[0];
+  if (badEnc){
+    out.innerHTML = '<div class="empty-state">' + esc(badEnc.error) + "</div>";
+    return;
+  }
   var innerName = kind === "transfer_all" ? "Balances.transfer_all" : "Balances.transfer_keep_alive";
   var html = payloadCard("Inner call — " + innerName,
     inner.hex,
@@ -210,9 +219,50 @@ $("b-build").addEventListener("click", function(){
 
 /* ---------- 04 proposal board (local only) ---------- */
 var LS_KEY = "msig-board-v1";
+var BOARD_STATUSES = ["active", "approved", "executed", "expired"];
+/* The board is persisted state with more than one possible writer (the form,
+ * older app versions, a hand-edited store). Validate at the store boundary:
+ * one malformed entry used to wedge renderBoard forever — p.vault.slice on a
+ * non-string, or callFingerprint's blake2b on a null fromHex — so loadBoard
+ * drops/coerces anything the renderer cannot safely dereference and repairs
+ * the stored copy when it changed anything. */
+function sanitizeBoard(raw){
+  if (!Array.isArray(raw)) return [];
+  var out = [];
+  raw.forEach(function(p){
+    if (!p || typeof p !== "object") return;
+    if (typeof p.vault !== "string") return;
+    var d = C.ss58Decode(p.vault);
+    if (!d.ok || d.prefix !== C.SS58_PREFIX || d.key.length !== 32) return;
+    if (typeof p.callHex !== "string") return;
+    var callBytes = C.fromHex(p.callHex.replace(/^0x/i, ""));
+    if (!callBytes || callBytes.length === 0) return;
+    var expiry = Number(p.expiry);
+    if (!isFinite(expiry) || expiry < 1) return;
+    var threshold = Math.max(1, Math.floor(Number(p.threshold)) || 1);
+    var approvals = Math.floor(Number(p.approvals));
+    if (!isFinite(approvals) || approvals < 0) approvals = 0;
+    out.push({
+      vault: p.vault,
+      id: Math.max(0, Math.floor(Number(p.id)) || 0),
+      callHex: C.toHex(callBytes),
+      expiry: Math.floor(expiry),
+      threshold: threshold,
+      approvals: Math.min(threshold, approvals),
+      status: BOARD_STATUSES.indexOf(p.status) >= 0 ? p.status : "active"
+    });
+  });
+  return out;
+}
 function loadBoard(){
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
+  var raw;
+  try { raw = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
   catch (e){ return []; }
+  var clean = sanitizeBoard(raw);
+  if (JSON.stringify(clean) !== JSON.stringify(raw)){
+    try { saveBoard(clean); } catch (e){ /* store full/blocked — render the clean copy anyway */ }
+  }
+  return clean;
 }
 function saveBoard(b){ localStorage.setItem(LS_KEY, JSON.stringify(b)); }
 function callFingerprint(callHex){
@@ -249,6 +299,7 @@ $("board-list").addEventListener("click", function(e){
   if (!b) return;
   var items = loadBoard();
   var i = Number(b.getAttribute("data-i"));
+  if (!items[i]) return;
   var act = b.getAttribute("data-bact");
   if (act === "del") items.splice(i, 1);
   else if (act === "approve"){ items[i].approvals = Math.min(items[i].threshold, items[i].approvals + 1); }

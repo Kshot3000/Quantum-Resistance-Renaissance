@@ -131,6 +131,34 @@ ok(cm.ok, "create_multisig ok");
 eq(cm.hex.slice(0, 4), "1300", "create_multisig = 0x13 0x00");
 eq(cm.derived.ss58, r1.ss58, "create payload derives same address");
 
+/* nonce must never throw: a bad nonce used to raise inside deriveVault's
+ * input handler, leaving the PREVIOUS vault address on screen */
+["-", "1.5", "abc", "1e3", "0x10", "", " "].forEach(function(n){
+  let r;
+  try { r = C.deriveMultisigAddress(V1_SIGNERS, 2, n); }
+  catch (e) { r = { ok: true, error: "THREW " + e.message }; }
+  ok(!r.ok, "rejects nonce " + JSON.stringify(n) + " without throwing", r.error);
+});
+ok(!C.deriveMultisigAddress(V1_SIGNERS, 2, 1.5).ok, "rejects fractional numeric nonce");
+ok(!C.deriveMultisigAddress(V1_SIGNERS, 2, NaN).ok, "rejects NaN nonce");
+eq(C.deriveMultisigAddress(V1_SIGNERS, 2, "42").nonce, "42", "accepts decimal-string nonce");
+eq(C.deriveMultisigAddress(V1_SIGNERS, 2, 42).nonce, "42", "accepts numeric nonce");
+eq(C.deriveMultisigAddress(V1_SIGNERS, 2, 42n).nonce, "42", "accepts BigInt nonce");
+ok(!C.deriveMultisigAddress(V1_SIGNERS, 2, "18446744073709551616").ok, "rejects nonce > u64 max");
+
+/* u32 arguments must never wrap silently in a payload */
+ok(!C.encodeApprove(ms, 4294967296, callHex).ok, "approve rejects proposal id 2^32 (was: wrapped to 0)");
+ok(!C.encodeApprove(ms, 4294967297, callHex).ok, "approve rejects proposal id 2^32+1 (was: wrapped to 1)");
+ok(!C.encodeApprove(ms, -1, callHex).ok, "approve rejects negative proposal id");
+ok(!C.encodeApprove(ms, 1.5, callHex).ok, "approve rejects fractional proposal id");
+ok(C.encodeApprove(ms, 4294967295, callHex).ok, "approve accepts u32-max proposal id");
+ok(!C.encodeCancel(ms, 4294967296).ok, "cancel rejects proposal id 2^32");
+ok(!C.encodeRemoveExpired(ms, -1).ok, "remove_expired rejects negative proposal id");
+ok(!C.encodeExecute(ms, 4294967296, callHex).ok, "execute rejects proposal id 2^32");
+ok(!C.encodePropose(ms, callHex, 4294967390).ok, "propose rejects expiry > u32 max (was: encoded as block 94)");
+ok(C.encodePropose(ms, callHex, 4294967295).ok, "propose accepts u32-max expiry");
+eq(C.expiryBlockNow(4294967290, 100), 4294967390, "expiryBlockNow does not wrap the sum the UI displays");
+
 /* expiry helpers */
 eq(C.blocksToHuman(100800), "14d 0h", "max expiry = 14 days");
 eq(C.blocksToHuman(7200), "1d 0h", "7200 blocks = 1 day");
