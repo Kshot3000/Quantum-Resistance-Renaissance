@@ -18,6 +18,77 @@
     setTimeout(function () { ctl.abort(); }, ms);
     return ctl.signal;
   }
+  /* ---- load-boundary validation (2026-10-09) ----
+   * Both payloads (live GraphQL rows, baked snapshot) are validated
+   * schedule-by-schedule BEFORE anything renders: a malformed row used to
+   * poison the whole desk — BigInt("1.5") threw in the enrichment loop
+   * outside the fetch try/catch, a null beneficiary wedged renderTable
+   * after the hero had painted, the snapshot's by_cohort was trusted
+   * blindly ("oops" totals threw in renderCohorts; wrong totals would
+   * have displayed as fact), and an unparseable fetched_at rendered
+   * literally as "Invalid Date". Now: invalid schedules are DROPPED,
+   * by_cohort is REBUILT from the survivors on both paths, fetched_at is
+   * derived from fetched_at_ms when unparseable, and the desk fails
+   * honestly (boot's "data unavailable") only when nothing valid remains. */
+  const ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
+  const MS_MIN = 946684800000, MS_MAX = 4102444800000; // 2000-01-01 .. 2100-01-01
+  function decStr(v) {
+    // Canonical decimal string for a non-negative integer, or null.
+    // Strings must be pure digits ("1.5"/"1e3"/"-5"/"null" all reject);
+    // numbers only when safe integers (planck amounts exceed 2^53, so a
+    // numeric amount has already lost precision — reject rather than lie).
+    if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) return BigInt(v).toString();
+    if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return String(v);
+    return null;
+  }
+  function msStr(v) {
+    const s = decStr(v);
+    if (s === null) return null;
+    const n = Number(s);
+    return n >= MS_MIN && n <= MS_MAX ? s : null;
+  }
+  function validSchedule(raw, seenIds) {
+    if (!raw || typeof raw !== "object") return null;
+    const idStr = decStr(raw.id);
+    if (idStr === null) return null;
+    const id = Number(idStr);
+    if (!Number.isSafeInteger(id) || seenIds.has(id)) return null;
+    if (typeof raw.beneficiary !== "string" || !ADDR_RE.test(raw.beneficiary)) return null;
+    const total = decStr(raw.total_plancks);
+    const claimed = decStr(raw.claimed_plancks);
+    if (total === null || claimed === null) return null;
+    if (BigInt(total) <= 0n || BigInt(claimed) > BigInt(total)) return null;
+    const cliff = msStr(raw.cliff_ms), start = msStr(raw.start_ms), end = msStr(raw.end_ms);
+    if (cliff === null || start === null || end === null) return null;
+    if (!(BigInt(start) < BigInt(end)) || BigInt(cliff) > BigInt(end)) return null;
+    // A malformed last-claim stamp is cosmetic, not money-critical:
+    // sanitize it to null instead of dropping an otherwise valid schedule.
+    const last = raw.last_claim_at_ms == null ? null : msStr(raw.last_claim_at_ms);
+    seenIds.add(id);
+    return {
+      id, beneficiary: raw.beneficiary, cohort: VC.cohortOf(start, end),
+      total_plancks: total, claimed_plancks: claimed,
+      cliff_ms: cliff, start_ms: start, end_ms: end, last_claim_at_ms: last,
+    };
+  }
+  function validateSchedules(rows) {
+    const seen = new Set();
+    const out = [];
+    for (const r of rows) { const s = validSchedule(r, seen); if (s) out.push(s); }
+    return out;
+  }
+  function buildByCohort(schedules) {
+    const by_cohort = {};
+    for (const s of schedules) {
+      const b = by_cohort[s.cohort] || (by_cohort[s.cohort] = {
+        label: "", schedules: 0, total_plancks: "0", claimed_plancks: "0", vested_plancks: "0" });
+      b.schedules += 1;
+      b.total_plancks = (BigInt(b.total_plancks) + BigInt(s.total_plancks)).toString();
+      b.claimed_plancks = (BigInt(b.claimed_plancks) + BigInt(s.claimed_plancks)).toString();
+    }
+    return by_cohort;
+  }
+
   async function loadData() {
     // Live attempt first (works from explorer.quantus.com / quantus.com origins;
     // fails on GitHub Pages CORS and in offline sandboxes -> snapshot fallback).
@@ -36,16 +107,42 @@
       const json = await res.json();
       clearTimeout(to);
       if (json.errors) throw new Error("graphql");
+      const rows = json.data && json.data.schedules;
+      if (!Array.isArray(rows)) throw new Error("live payload malformed");
+      const schedules = validateSchedules(rows.map((s) => ({
+        id: s && s.id, beneficiary: s && s.beneficiary,
+        total_plancks: s && s.total, claimed_plancks: s && s.claimed,
+        cliff_ms: s && s.cliff, start_ms: s && s.start, end_ms: s && s.end,
+        last_claim_at_ms: s ? s.last_claim_at : null,
+      })));
+      if (!schedules.length) throw new Error("live payload: no valid schedules");
       const nowMs = String(Date.now());
-      DATA = normalizeLive(json.data.schedules, nowMs);
-      DATA.live = true;
+      DATA = {
+        ok: true, source: "https://sqm.quantus.com/v1/graphql (live)",
+        fetched_at: new Date(Number(nowMs)).toISOString(), fetched_at_ms: nowMs,
+        block_height: null, schedules, by_cohort: buildByCohort(schedules), live: true,
+      };
     } catch (e) {
       const res = await fetch("../../data/vesting.json", { signal: timeoutSignal(9000) });
       if (!res.ok) throw new Error("snapshot fetch failed: " + res.status);
-      DATA = await res.json();
-      DATA.live = false;
+      const raw = await res.json();
+      if (!raw || !Array.isArray(raw.schedules)) throw new Error("snapshot malformed");
+      const fetchedMs = msStr(raw.fetched_at_ms);
+      if (fetchedMs === null) throw new Error("snapshot fetched_at_ms invalid");
+      const schedules = validateSchedules(raw.schedules);
+      if (!schedules.length) throw new Error("snapshot: no valid schedules");
+      const fetchedAt = (typeof raw.fetched_at === "string" && isFinite(Date.parse(raw.fetched_at)))
+        ? raw.fetched_at : new Date(Number(fetchedMs)).toISOString();
+      const bh = decStr(raw.block_height);
+      DATA = {
+        ok: true, source: raw.source || "snapshot", fetched_at: fetchedAt,
+        fetched_at_ms: fetchedMs,
+        block_height: bh === null ? null : Number(bh),
+        schedules, by_cohort: buildByCohort(schedules), live: false,
+      };
     }
     // Enrich every schedule with pallet-exact vested/claimable at DATA time.
+    // Safe by construction: validation guarantees every BigInt() parses.
     const now = BigInt(DATA.fetched_at_ms);
     for (const s of DATA.schedules) {
       const vested = VC.vestedAmount(BigInt(s.total_plancks), BigInt(s.cliff_ms),
@@ -54,29 +151,6 @@
       s.claimable_now = VC.claimableEstimate(
         BigInt(s.total_plancks), BigInt(s.claimed_plancks), vested).toString();
     }
-  }
-
-  function normalizeLive(rows, nowMs) {
-    const schedules = rows.map((s) => ({
-      id: Number(s.id), beneficiary: s.beneficiary,
-      cohort: VC.cohortOf(s.start, s.end),
-      total_plancks: String(s.total), claimed_plancks: String(s.claimed),
-      cliff_ms: String(s.cliff), start_ms: String(s.start), end_ms: String(s.end),
-      last_claim_at_ms: s.last_claim_at == null ? null : String(s.last_claim_at),
-    }));
-    const by_cohort = {};
-    for (const s of schedules) {
-      const b = by_cohort[s.cohort] || (by_cohort[s.cohort] = {
-        label: "", schedules: 0, total_plancks: "0", claimed_plancks: "0", vested_plancks: "0" });
-      b.schedules += 1;
-      b.total_plancks = (BigInt(b.total_plancks) + BigInt(s.total_plancks)).toString();
-      b.claimed_plancks = (BigInt(b.claimed_plancks) + BigInt(s.claimed_plancks)).toString();
-    }
-    return {
-      ok: true, source: "https://sqm.quantus.com/v1/graphql (live)",
-      fetched_at: new Date(Number(nowMs)).toISOString(), fetched_at_ms: nowMs,
-      block_height: null, schedules, by_cohort, live: true,
-    };
   }
 
   /* ---------------- hero badge + now panel ---------------- */
@@ -139,6 +213,7 @@
       const b = DATA.by_cohort[key];
       if (!b) continue;
       const rows = DATA.schedules.filter((s) => s.cohort === key);
+      if (!rows.length) continue; // by_cohort is rebuilt from schedules, but never deref an empty cohort
       let vested = 0n, claimable = 0n;
       for (const s of rows) {
         vested += VC.vestedAmount(BigInt(s.total_plancks), BigInt(s.cliff_ms),

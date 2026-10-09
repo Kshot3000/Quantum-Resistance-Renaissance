@@ -115,5 +115,28 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(src.includes("revalidate();"), "distribution: boot renders the empty state via revalidate()");
 }
 
+// ---- 8. Vesting Desk: validate every schedule at the load boundary ----
+// Batch 3 (2026-10-09 06:19): vesting-desk trusted both payloads blindly —
+// BigInt("1.5") threw in enrichment outside the fetch try/catch, a null
+// beneficiary wedged renderTable after partial paint, the snapshot's
+// by_cohort was trusted ("oops" totals threw; wrong totals would display
+// as fact), and a bad fetched_at rendered as "Invalid Date". Pin: every
+// schedule validates, invalid ones drop, by_cohort is rebuilt from the
+// survivors on BOTH paths, no assign-before-validate snapshot load.
+{
+  const src = read("pages/vesting-desk/app.js");
+  ok(src.includes("function validateSchedules(rows)"), "vesting: validateSchedules() defined");
+  ok(src.includes("function validSchedule(raw, seenIds)"), "vesting: per-schedule validator defined");
+  ok(src.includes("ADDR_RE"), "vesting: beneficiary must be a prefix-189-shaped qz address");
+  ok(src.includes("BigInt(claimed) > BigInt(total)"), "vesting: claimed > total schedules are rejected");
+  ok((src.match(/by_cohort: buildByCohort\(schedules\)/g) || []).length === 2,
+    "vesting: by_cohort rebuilt from validated schedules on live AND snapshot paths");
+  ok(!src.includes("DATA = await res.json()"), "vesting: no assign-before-validate snapshot load remains");
+  ok(!src.includes("function normalizeLive"), "vesting: unvalidated normalizeLive is gone");
+  ok(src.includes("snapshot: no valid schedules"), "vesting: all-invalid payload fails honestly instead of rendering poison");
+  const html = read("pages/vesting-desk/index.html");
+  ok(html.includes("app.js?v=1.29.0"), "vesting: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
