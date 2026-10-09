@@ -55,14 +55,39 @@ Studio.blocksPerDay = function () { return 86400 / Studio.CHAIN.BLOCK_TIME_S; };
  *                   not the 12 s target (the chain currently runs slower)
  * Any field that is missing or implausible comes back null; the caller
  * keeps its dated static fallback for that field and says so. */
+/* Snapshot scalar validation: the indexer emits plancks and hashrate as
+ * integer strings and heights as integers — accept only that shape.
+ * Number() alone accepts fractional ("…2547.5") and scientific ("6.5e18")
+ * strings for fields that are never fractional on chain, so a poisoned
+ * snapshot could silently rewrite the earnings defaults; a garbage
+ * fetched_at was likewise String()-coerced and rendered verbatim into
+ * the provenance hint's innerHTML. Invalid fields come back null and
+ * the caller keeps its dated static fallback for that field. */
+function intField(v) {
+  if (typeof v === "string") {
+    if (!/^\d+$/.test(v.trim())) return null;
+    var n = Number(v.trim());
+    return isFinite(n) ? n : null;
+  }
+  if (typeof v === "number") return Number.isInteger(v) ? v : null;
+  return null;
+}
+function validHeight(v) {
+  var h = intField(v);
+  return (h != null && h > 0) ? h : null;
+}
+function validFetchedAt(v) {
+  if (typeof v !== "string" || !v) return null;
+  return isFinite(Date.parse(v)) ? v : null;
+}
 Studio.deriveNetworkDefaults = function (consensus, supply) {
   var out = { netGH: null, supplyQtc: null, blocksPerDay: null, avgBlockMs: null, height: null, fetchedAt: null };
   if (consensus && consensus.current) {
-    var hs = Number(consensus.current.est_hashrate_hs);
-    if (isFinite(hs) && hs > 0) out.netGH = hs / 1e9;
-    var h = Number(consensus.current.height || consensus.head);
-    if (isFinite(h) && h > 0) out.height = h;
-    if (consensus.fetched_at) out.fetchedAt = String(consensus.fetched_at);
+    var hs = intField(consensus.current.est_hashrate_hs);
+    if (hs != null && hs > 0) out.netGH = hs / 1e9;
+    out.height = validHeight(consensus.current.height);
+    if (out.height == null) out.height = validHeight(consensus.head);
+    out.fetchedAt = validFetchedAt(consensus.fetched_at);
   }
   if (consensus && consensus.block_times_ms) {
     var avg = Number(consensus.block_times_ms.avg_ms);
@@ -72,14 +97,18 @@ Studio.deriveNetworkDefaults = function (consensus, supply) {
     }
   }
   if (supply && supply.total_supply_plancks != null) {
-    var qtc = Number(supply.total_supply_plancks) / 1e12;
-    if (isFinite(qtc) && qtc >= Studio.CHAIN.GENESIS_MINT && qtc <= Studio.CHAIN.MAX_SUPPLY) out.supplyQtc = qtc;
-    if (!out.fetchedAt && supply.fetched_at) out.fetchedAt = String(supply.fetched_at);
-    if (!out.height && supply.block_height) out.height = Number(supply.block_height) || null;
+    var plancks = intField(supply.total_supply_plancks);
+    if (plancks != null) {
+      var qtc = plancks / 1e12;
+      if (qtc >= Studio.CHAIN.GENESIS_MINT && qtc <= Studio.CHAIN.MAX_SUPPLY) out.supplyQtc = qtc;
+      if (!out.fetchedAt) out.fetchedAt = validFetchedAt(supply.fetched_at);
+      if (out.height == null) out.height = validHeight(supply.block_height);
+    }
   }
   return out;
 };
 Studio.estimate = function (userMH, netGH, supply, blocksPerDay) {
+  if (!isFinite(supply) || supply < 0) return null;
   var reward = Studio.blockReward(supply);
   var bpd = (isFinite(blocksPerDay) && blocksPerDay > 0) ? blocksPerDay : Studio.blocksPerDay();
   if (!(userMH > 0) || !(netGH > 0)) return null;
@@ -366,8 +395,9 @@ $("rigList").addEventListener("click", function (e) {
 var earnPace = null; // observed blocks/day once snapshots land
 var netDirty = false, supDirty = false;
 function fmtUtc(iso) {
+  if (!iso) return "unknown time";
   var d = new Date(iso);
-  return isNaN(d) ? String(iso || "") : d.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  return isNaN(d) ? "unknown time" : d.toISOString().slice(0, 16).replace("T", " ") + " UTC";
 }
 /* Abort a fetch that never settles: a hung request must fall through to
  * the app's error/fallback path, not strand the page on "Loading…" forever. */

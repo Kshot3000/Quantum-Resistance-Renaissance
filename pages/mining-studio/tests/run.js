@@ -97,6 +97,39 @@ ok("derive rejects implausible fields", dbad.netGH === null && dbad.blocksPerDay
 var dpart = Studio.deriveNetworkDefaults(CONS, null);
 ok("derive partial: consensus only", dpart.netGH > 0 && dpart.supplyQtc === null && dpart.blocksPerDay > 0);
 
+/* load-boundary hardening (2026-10-09): the indexer emits plancks/hashrate
+ * as integer strings and heights as integers — fractional/scientific
+ * strings, float heights, and unparseable fetched_at values are poison,
+ * not defaults. Pre-fix, Number()/String() coercion accepted all of them:
+ * "6.5e18" plancks rewrote supply to 6,500,000, a markup-bearing
+ * fetched_at was rendered verbatim into the hint's innerHTML, and a
+ * float height was cited as the capture height. */
+var dpoison = Studio.deriveNetworkDefaults(
+  { fetched_at: '<b id="pwn">PWNED</b>', head: 194177.9, current: { height: 194177.9, est_hashrate_hs: "9.9e13" }, block_times_ms: { avg_ms: 15000 } },
+  { fetched_at: "garbage!!", block_height: -5, total_supply_plancks: "6.5e18" });
+ok("derive rejects sci hashrate", dpoison.netGH === null, dpoison.netGH);
+ok("derive rejects float height (no supply fallback either)", dpoison.height === null, dpoison.height);
+ok("derive drops garbage fetched_at from both snapshots", dpoison.fetchedAt === null, dpoison.fetchedAt);
+ok("derive rejects sci plancks", dpoison.supplyQtc === null, dpoison.supplyQtc);
+ok("derive keeps valid pace amid poison", Math.abs(dpoison.blocksPerDay - 86400000 / 15000) < 1e-9);
+var dfrac = Studio.deriveNetworkDefaults(null, { total_supply_plancks: "5763610080351232263.5" });
+ok("derive rejects fractional plancks", dfrac.supplyQtc === null);
+var dtsfall = Studio.deriveNetworkDefaults(
+  { fetched_at: "not-a-date", current: { height: 151372, est_hashrate_hs: "45125262984795" } }, SUP);
+ok("derive falls back to supply fetched_at when consensus is garbage",
+   dtsfall.fetchedAt === SUP.fetched_at && dtsfall.height === 151372, dtsfall.fetchedAt);
+var dhfall = Studio.deriveNetworkDefaults(
+  { current: { height: 1.5, est_hashrate_hs: "45125262984795" } }, SUP);
+ok("derive falls back to supply integer height when consensus height is a float",
+   dhfall.height === SUP.block_height, dhfall.height);
+
+/* estimate supply guard: a cleared/negative supply field must dash the
+ * earnings, never paint "NaN QTC" (blockReward(NaN) is NaN). */
+ok("estimate null on NaN supply", Studio.estimate(1200, 50, NaN) === null);
+ok("estimate null on negative supply", Studio.estimate(1200, 50, -100) === null);
+var ecap = Studio.estimate(1200, 50, 22000000);
+ok("estimate past cap is zero, not null", !!ecap && ecap.reward === 0 && ecap.qtcPerDay === 0);
+
 /* estimate pace param (backward compatible) */
 var ep = Studio.estimate(1200, 50, 5720000, 6000);
 ok("estimate honors pace param", Math.abs(ep.networkBlocksPerDay - 6000) < 1e-12 && Math.abs(ep.qtcPerDay - ep.share * 6000 * ep.reward) < 1e-12);
@@ -125,7 +158,7 @@ ok("fallback curSupply within emission bounds", Number(csVal) >= 5670000 && Numb
 var hintM = html.match(/id="supplyHint"[^>]*>([\s\S]*?)<\/p>/);
 ok("fallback hint cites a dated capture height", !!hintM && /block 1[0-9]{2},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
 ok("fallback hint difficulty matches painted netHash (one capture)",
-   !!hintM && /548,530,756,814,725/.test(hintM[1]) && Math.abs(Number(nhVal) - 548530756814725 / 12 / 1e9) < 1,
+   !!hintM && /554,698,933,634,280/.test(hintM[1]) && Math.abs(Number(nhVal) - 554698933634280 / 12 / 1e9) < 1,
    nhVal);
 ok("stale 45,125 example gone", !/45,125/.test(html));
 

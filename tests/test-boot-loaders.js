@@ -184,5 +184,28 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/app.js?v=1.43.0"), "governance: app.js cache key bumped for the boundary fix");
 }
 
+// ---- 11. Mining Studio: validate snapshot scalars at the load boundary ----
+// Batch 6 (2026-10-09 09:19): deriveNetworkDefaults trusted every scalar —
+// Number() accepted fractional/scientific plancks and hashrate strings,
+// heights accepted floats (and any truthy Number on the supply fallback),
+// and fetched_at was String()-coerced, then rendered verbatim by fmtUtc
+// into the hint's innerHTML (a markup-bearing fetched_at injected markup).
+// estimate() also returned NaN figures for a NaN supply. Pin: integer-
+// string validation for plancks/hashrate/heights, parseable-only
+// fetched_at, fmtUtc "unknown time", and the estimate supply guard.
+{
+  const src = read("pages/mining-studio/app.js");
+  ok(src.includes("function intField(v)"), "studio: intField() defined");
+  ok(src.includes("/^\\d+$/"), "studio: integer fields require a pure-digit string");
+  ok(src.includes("function validFetchedAt(v)"), "studio: validFetchedAt() defined");
+  ok(src.includes("isFinite(Date.parse(v)) ? v : null"), "studio: fetched_at must parse before it is kept");
+  ok(!src.includes("String(consensus.fetched_at)") && !src.includes("String(supply.fetched_at)"),
+    "studio: no raw String() fetched_at coercion remains");
+  ok(src.includes('return isNaN(d) ? "unknown time"'), "studio: fmtUtc renders unknown time, never the raw string");
+  ok(src.includes("if (!isFinite(supply) || supply < 0) return null;"), "studio: estimate rejects a non-finite/negative supply");
+  const html = read("pages/mining-studio/index.html");
+  ok(html.includes("app.js?v=1.2.0"), "studio: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
