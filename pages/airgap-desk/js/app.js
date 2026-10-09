@@ -537,22 +537,39 @@ function importTicketString(s) {
   } catch (e) { err('cold-ticket-err', e.message); }
 }
 
-$('btn-cold-ticket').addEventListener('click', () => importTicketString($('cold-ticket-paste').value));
+let ticketImportSeq = 0; // token: only the latest ticket import (file, paste, or camera) may land
+
+$('btn-cold-ticket').addEventListener('click', () => {
+  ticketImportSeq++; // a paste import supersedes any file read still in flight
+  importTicketString($('cold-ticket-paste').value);
+});
 
 $('cold-ticket-file').addEventListener('change', async (e) => {
   err('cold-ticket-err');
+  const seq = ++ticketImportSeq;
   try {
     const f = e.target.files[0];
     if (!f) return;
     let text;
     if (/\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)) text = await decodeQRImage(f);
     else text = await f.text();
+    // A newer import (another file, the paste button, a camera scan)
+    // landed while this file was being read/decoded: this ticket is no
+    // longer the one the user last chose — discard it silently rather
+    // than replacing cold.ticket and the paste field under them. The
+    // cold desk builds and signs against cold.ticket, so a stale landing
+    // would pronounce the transfer against a ticket already replaced.
+    if (seq !== ticketImportSeq) return;
     const m = text.match(/QAGT1:[A-Za-z0-9\-_]+/);
     if (!m) throw new Error('no chain ticket found in that file');
     $('cold-ticket-paste').value = m[0];
     importTicketString(m[0]);
-  } catch (ex) { err('cold-ticket-err', ex.message); }
-  e.target.value = '';
+  } catch (ex) {
+    if (seq !== ticketImportSeq) return; // a superseded failure discards itself too
+    err('cold-ticket-err', ex.message);
+  } finally {
+    e.target.value = '';
+  }
 });
 
 $('btn-cold-camera').addEventListener('click', async () => {
@@ -563,6 +580,7 @@ $('btn-cold-camera').addEventListener('click', async () => {
     $('btn-cold-camera-stop').hidden = false;
     coldCam = await startCameraScan($('cold-video'), (text) => {
       if (/^QAGT1:/.test(text)) {
+        ticketImportSeq++; // a scanned import supersedes any file read still in flight
         $('cold-ticket-paste').value = text;
         importTicketString(text);
         $('btn-cold-camera-stop').click();

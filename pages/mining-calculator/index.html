@@ -106,9 +106,9 @@
           <select id="in-user-unit"><option>H/s</option><option>kH/s</option><option selected>MH/s</option><option>GH/s</option><option>TH/s</option></select></div>
         </label>
         <label>Network hashrate
-          <div class="row"><input id="in-net" type="number" min="0" step="any" value="54.569">
+          <div class="row"><input id="in-net" type="number" min="0" step="any" value="52.706">
           <select id="in-net-unit"><option>H/s</option><option>kH/s</option><option>MH/s</option><option>GH/s</option><option selected>TH/s</option></select></div>
-          <span class="hint" id="net-hint">From the builder's chain snapshot (Oct 9, 2026, block 189,029): difficulty-implied network rate &asymp;54.57 TH/s. It refreshes automatically when the latest snapshot loads — edit it and your number wins.</span>
+          <span class="hint" id="net-hint">From the builder's chain snapshot (Oct 9, 2026, block 191,394): difficulty-implied network rate &asymp;52.71 TH/s. It refreshes automatically when the latest snapshot loads — edit it and your number wins.</span>
         </label>
         <label>Rig power draw (watts)
           <input id="in-watts" type="number" min="0" step="any" value="450">
@@ -124,7 +124,7 @@
           <summary>Advanced: override chain state</summary>
           <label>Current supply (QTC)
             <input id="in-supply" type="number" min="0" step="any">
-            <span class="hint" id="supply-hint">Defaults to total issuance from the Oct 9, 2026 chain snapshot (5,791,053 QTC — genesis endowments included, as the emission formula requires) and refreshes with it. Override if you know a fresher figure — the block reward recalculates.</span>
+            <span class="hint" id="supply-hint">Defaults to total issuance from the Oct 9, 2026 chain snapshot (5,792,513 QTC — genesis endowments included, as the emission formula requires) and refreshes with it. Override if you know a fresher figure — the block reward recalculates.</span>
           </label>
         </details>
       </div>
@@ -159,7 +159,7 @@
       <div class="stat"><span class="k">Daily emission (observed pace)</span><span class="v" id="s-daily">&mdash;</span></div>
       <div class="stat"><span class="k">Miners' share of cap</span><span class="v">73% &middot; 15.33M QTC</span></div>
     </div>
-    <p class="hint" id="stats-src">Network state from the dated fallback capture (Oct 9, 2026, block 189,029) — refreshes automatically when the latest snapshot loads.</p>
+    <p class="hint" id="stats-src">Network state from the dated fallback capture (Oct 9, 2026, block 191,394) — refreshes automatically when the latest snapshot loads.</p>
   </section>
 
   <section class="card" id="howto">
@@ -194,7 +194,7 @@
   </footer>
 </main>
 
-<script src="app.js?v=1.9.52"></script>
+<script src="app.js?v=1.9.53"></script>
 <script src="../../assets/app-nav.js?v=1.8.0"></script>
 </body>
 </html>
