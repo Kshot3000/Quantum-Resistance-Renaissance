@@ -231,5 +231,31 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.40.0"), "nodedesk: app.js cache key bumped for the boundary fix");
 }
 
+// ---- 13. Block Explorer: validate GraphQL responses at the load boundary ----
+// Batch 8 (2026-10-09 11:19): block-explorer (Tier 1) trusted indexer
+// responses except for esc() at render — an extrinsics count reached
+// innerHTML unescaped (markup injection), fmtQTC mangled garbage amounts
+// into "0.abc", garbage timestamps rendered "Invalid Date", float/negative
+// heights were printed and interpolated raw into hrefs, and a null data
+// payload threw a TypeError misreported as unreachable. Pin: cleaners gate
+// every view, fmt helpers reject non-integer/non-digit input, gql rejects
+// a missing data payload.
+{
+  const src = read("pages/block-explorer/app.js");
+  ok(src.includes("function cleanHome(d)"), "explorer: cleanHome() defined");
+  ok(src.includes("function cleanBlock(raw)"), "explorer: cleanBlock() defined");
+  ok(src.includes("function cleanAccount(raw)"), "explorer: cleanAccount() defined");
+  ok(src.includes("function validPlanck(v)"), "explorer: validPlanck() defined");
+  ok(src.includes("cleanHome(d)"), "explorer: home view gates on cleanHome");
+  ok(src.includes("indexer returned malformed home data"), "explorer: malformed home fails honestly");
+  ok(src.includes("indexer returned malformed block data"), "explorer: malformed block fails honestly");
+  ok(src.includes("indexer returned no data"), "explorer: gql rejects a missing data payload");
+  ok(src.includes('!/^-?\\d+$/.test(String(planckStr))'), "explorer: fmtQTC rejects non-digit planck strings");
+  ok(!src.includes("b.extrinsics_aggregate && b.extrinsics_aggregate.aggregate) ? b.extrinsics_aggregate.aggregate.count"),
+    "explorer: no raw extrinsics-count interpolation remains");
+  const html = read("pages/block-explorer/index.html");
+  ok(html.includes("app.js?v=1.2.0"), "explorer: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

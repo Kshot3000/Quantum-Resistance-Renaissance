@@ -18,13 +18,28 @@ function esc(s){
 }
 
 function fmtInt(n){
-  if (n === null || n === undefined || isNaN(n)) return "—";
-  return Math.floor(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  /* Counts and heights are unsigned integers on chain. A float, a
+   * negative, or a non-numeric value is not a figure to floor or print —
+   * it is malformed data, and renders as a dash, never as fact. */
+  var v;
+  if (typeof n === "number") v = n;
+  else if (typeof n === "string" && /^\d+$/.test(n)) v = Number(n);
+  else return "—";
+  if (!isFinite(v) || Math.floor(v) !== v || v < 0) return "—";
+  return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 /* planck string -> QTC, trimmed to 4 decimals */
 function fmtQTC(planckStr){
   if (planckStr === null || planckStr === undefined) return "—";
+  /* Planck amounts are unsigned integer strings. Anything else ("abc",
+   * "1.5", "6.5e18") used to be mangled into a plausible-looking figure
+   * ("0.abc"); it is malformed data and renders as a dash instead. */
+  if (typeof planckStr === "number"){
+    if (!isFinite(planckStr) || Math.floor(planckStr) !== planckStr || planckStr < 0) return "—";
+    planckStr = String(planckStr);
+  }
+  if (!/^-?\d+$/.test(String(planckStr))) return "—";
   var neg = false, s = String(planckStr);
   if (s.charAt(0) === "-"){ neg = true; s = s.slice(1); }
   s = s.replace(/^0+/, "") || "0";
@@ -102,10 +117,161 @@ function prettyArgs(args){
   }
 }
 
+/* ---------------- load-boundary validation ----------------
+ * Indexer (GraphQL) responses are an untrusted boundary, exactly like the
+ * fleet's snapshot files: every field a renderer dereferences is validated
+ * before it is used, because the sinks differ per field — an unescaped
+ * extrinsics count reached innerHTML verbatim (markup injection), a
+ * garbage reward/amount was mangled by fmtQTC into a plausible figure
+ * ("0.abc"), a garbage timestamp rendered literally as "Invalid Date",
+ * a float/negative height was printed as fact and interpolated raw into
+ * hrefs, and a null data payload threw a TypeError that the views then
+ * misreported. Core objects (home stats, a block, an extrinsic, an
+ * account's balances) fail honestly when malformed; row collections
+ * (blocks, transfers, extrinsics, events) drop the poisoned rows and
+ * render the survivors. */
+function validCount(v){
+  if (typeof v === "number") return (isFinite(v) && Math.floor(v) === v && v >= 0) ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
+  return null;
+}
+function validHeight(v){
+  var n = validCount(v);
+  return (n !== null && n > 0) ? n : null;
+}
+function validPlanck(v){
+  if (typeof v === "number") return (isFinite(v) && Math.floor(v) === v && v >= 0) ? String(v) : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) return v;
+  return null;
+}
+function validTimestamp(v){
+  return (typeof v === "string" && isFinite(Date.parse(v))) ? v : null;
+}
+function validHashStr(v){
+  return (typeof v === "string" && /^0x[0-9a-fA-F]{8,}$/.test(v)) ? v : null;
+}
+function validIdStr(v){
+  return (typeof v === "string" && /^[\w-]+$/.test(v)) ? v : null;
+}
+function validName(v){
+  return (typeof v === "string" && /^\w+$/.test(v)) ? v : null;
+}
+
+function cleanStats(raw){
+  if (!raw || typeof raw !== "object") return null;
+  var bh = validHeight(raw.block_height);
+  var ac = validCount(raw.total_accounts);
+  var ti = validCount(raw.total_immediate_transfers);
+  var ts = validCount(raw.total_scheduled_transfers);
+  if (bh === null || ac === null || ti === null || ts === null) return null;
+  return { block_height: bh, total_accounts: ac, total_immediate_transfers: ti, total_scheduled_transfers: ts };
+}
+
+function cleanBlockRow(raw){
+  if (!raw || typeof raw !== "object") return null;
+  var height = validHeight(raw.height);
+  var hash = validHashStr(raw.hash);
+  var ts = validTimestamp(raw.timestamp);
+  var reward = validPlanck(raw.reward);
+  if (height === null || hash === null || ts === null || reward === null) return null;
+  if (!isQz(raw.mined_by_id || "")) return null;
+  var cnt = null;
+  if (raw.extrinsics_aggregate && raw.extrinsics_aggregate.aggregate)
+    cnt = validCount(raw.extrinsics_aggregate.aggregate.count);
+  return { height: height, hash: hash, timestamp: ts, reward: reward,
+    mined_by_id: raw.mined_by_id, extrinsicsCount: cnt };
+}
+
+function cleanTransferRow(raw){
+  if (!raw || typeof raw !== "object") return null;
+  var id = validIdStr(raw.id);
+  var amount = validPlanck(raw.amount);
+  var height = validHeight(raw.block_height);
+  var ts = validTimestamp(raw.timestamp);
+  if (id === null || amount === null || height === null || ts === null) return null;
+  if (!isQz(raw.from_id || "") || !isQz(raw.to_id || "")) return null;
+  if (raw.fee !== undefined && raw.fee !== null && validPlanck(raw.fee) === null) return null;
+  return { id: id, amount: amount, from_id: raw.from_id, to_id: raw.to_id,
+    block_height: height, timestamp: ts, fee: raw.fee };
+}
+
+function cleanExtrinsicRow(raw){
+  if (!raw || typeof raw !== "object") return null;
+  var id = validIdStr(raw.id) || validHashStr(raw.id);
+  var idx = validCount(raw.index_in_block);
+  var pallet = validName(raw.pallet);
+  var call = validName(raw.call);
+  var fee = validPlanck(raw.fee);
+  if (id === null || idx === null || pallet === null || call === null || fee === null) return null;
+  if (typeof raw.success !== "boolean") return null;
+  if (raw.signer_id !== null && raw.signer_id !== undefined && !isQz(raw.signer_id)) return null;
+  return { id: id, index_in_block: idx, pallet: pallet, call: call,
+    signer_id: raw.signer_id || null, success: raw.success, fee: fee, args: raw.args };
+}
+
+function cleanEventRow(raw){
+  if (!raw || typeof raw !== "object") return null;
+  var id = validIdStr(raw.id);
+  var type = validName(raw.type);
+  if (id === null || type === null) return null;
+  if (raw.extrinsic_id !== null && raw.extrinsic_id !== undefined &&
+      validIdStr(raw.extrinsic_id) === null && validHashStr(raw.extrinsic_id) === null) return null;
+  return { id: id, type: type, extrinsic_id: raw.extrinsic_id || null };
+}
+
+function cleanBlock(raw){
+  var base = cleanBlockRow(raw);
+  if (!base) return null;
+  if (!Array.isArray(raw.extrinsics) || !Array.isArray(raw.events)) return null;
+  base.extrinsics = raw.extrinsics.map(cleanExtrinsicRow).filter(Boolean);
+  base.events = raw.events.map(cleanEventRow).filter(Boolean);
+  return base;
+}
+
+function cleanExtrinsic(raw){
+  var base = cleanExtrinsicRow(raw);
+  if (!base) return null;
+  var ts = validTimestamp(raw.timestamp);
+  if (ts === null) return null;
+  base.timestamp = ts;
+  base.blockHeight = null;
+  if (raw.block !== null && raw.block !== undefined){
+    base.blockHeight = validHeight(raw.block && raw.block.height);
+    if (base.blockHeight === null) return null;
+  }
+  return base;
+}
+
+function cleanAccount(raw){
+  if (!raw || typeof raw !== "object") return null;
+  var free = validPlanck(raw.free);
+  var frozen = validPlanck(raw.frozen);
+  var reserved = validPlanck(raw.reserved);
+  if (free === null || frozen === null || reserved === null) return null;
+  return { free: free, frozen: frozen, reserved: reserved,
+    is_deposit_only: raw.is_deposit_only === true, is_guardian: raw.is_guardian === true,
+    is_high_security: raw.is_high_security === true, is_multisig: raw.is_multisig === true };
+}
+
+function cleanHome(d){
+  if (!d || typeof d !== "object") return null;
+  var stats = cleanStats(d.stats);
+  if (!stats) return null;
+  if (!Array.isArray(d.blocks) || !Array.isArray(d.transfers)) return null;
+  return { stats: stats,
+    blocks: d.blocks.map(cleanBlockRow).filter(Boolean),
+    transfers: d.transfers.map(cleanTransferRow).filter(Boolean) };
+}
+
 var API = { esc: esc, fmtInt: fmtInt, fmtQTC: fmtQTC, ageFmt: ageFmt,
   shortHash: shortHash, isHex64: isHex64, isQz: isQz, isHeight: isHeight,
   detectQuery: detectQuery, parseRoute: parseRoute, routeFor: routeFor,
-  prettyArgs: prettyArgs };
+  prettyArgs: prettyArgs, validCount: validCount, validHeight: validHeight,
+  validPlanck: validPlanck, validTimestamp: validTimestamp,
+  cleanStats: cleanStats, cleanBlockRow: cleanBlockRow,
+  cleanTransferRow: cleanTransferRow, cleanExtrinsicRow: cleanExtrinsicRow,
+  cleanEventRow: cleanEventRow, cleanBlock: cleanBlock,
+  cleanExtrinsic: cleanExtrinsic, cleanAccount: cleanAccount, cleanHome: cleanHome };
 if (typeof module !== "undefined" && module.exports) module.exports = API;
 
 /* ---------------- fetch layer ---------------- */
@@ -132,8 +298,12 @@ function gql(query){
     return res.json();
   }).then(function(json){
     clearTimeout(timer);
+    if (!json || typeof json !== "object")
+      throw new Error("indexer returned a malformed response");
     if (json.errors && json.errors.length)
       throw new Error("indexer: " + json.errors.map(function(e){ return e.message; }).join("; "));
+    if (!json.data || typeof json.data !== "object")
+      throw new Error("indexer returned no data");
     return json.data;
   }).catch(function(err){
     clearTimeout(timer);
@@ -240,9 +410,11 @@ function vHome(){
   function load(){
     gql(Q_HOME).then(function(d){
       if (!alive(my)) return;
-      var st = d.stats || {};
-      var blocks = d.blocks || [];
-      var txs = d.transfers || [];
+      var clean = cleanHome(d);
+      if (!clean) throw new Error("indexer returned malformed home data");
+      var st = clean.stats;
+      var blocks = clean.blocks;
+      var txs = clean.transfers;
       setBadge("live", "height " + fmtInt(st.block_height));
 
       var statHtml =
@@ -254,12 +426,12 @@ function vHome(){
         '</div>';
 
       var blockRows = blocks.map(function(b){
-        var n = (b.extrinsics_aggregate && b.extrinsics_aggregate.aggregate) ? b.extrinsics_aggregate.aggregate.count : "—";
+        var n = (b.extrinsicsCount === null || b.extrinsicsCount === undefined) ? "—" : String(b.extrinsicsCount);
         return '<tr>' +
           '<td class="num"><a class="hash" href="#/block/' + b.height + '">' + fmtInt(b.height) + '</a></td>' +
           '<td class="hash" data-copy="' + esc(b.hash) + '" title="Click to copy">' + esc(shortHash(b.hash)) + '</td>' +
           '<td class="age" data-ts="' + esc(b.timestamp) + '"></td>' +
-          '<td class="num">' + n + '</td>' +
+          '<td class="num">' + esc(n) + '</td>' +
           '<td><a class="acct" href="#/account/' + esc(b.mined_by_id) + '">' + esc(shortHash(b.mined_by_id, 8, 6)) + '</a></td>' +
           '<td class="num">' + esc(fmtQTC(b.reward)) + '</td>' +
           '</tr>';
@@ -333,11 +505,14 @@ function vBlock(key){
   showLoading("loading block…");
   gql(qBlock(key)).then(function(d){
     if (!alive(my)) return;
-    var b = (d.b && d.b[0]) || null;
-    if (!b){
+    if (!d || !Array.isArray(d.b)) throw new Error("indexer returned malformed block data");
+    var rawB = d.b[0] || null;
+    if (!rawB){
       showError("Block not found", "No block matches “" + key + "” in the indexer. It may not be indexed yet, or the input may be off.", function(){ vBlock(key); });
       return;
     }
+    var b = cleanBlock(rawB);
+    if (!b) throw new Error("indexer returned malformed block data");
     setBadge("live", "height " + fmtInt(b.height));
     var xt = b.extrinsics || [];
     var ev = b.events || [];
@@ -416,13 +591,17 @@ function vExtrinsic(id){
   showLoading("loading extrinsic…");
   gql(qExtrinsic(id)).then(function(d){
     if (!alive(my)) return;
-    var x = (d.x && d.x[0]) || null;
-    if (!x){
+    if (!d || !Array.isArray(d.x)) throw new Error("indexer returned malformed extrinsic data");
+    var rawX = d.x[0] || null;
+    if (!rawX){
       showError("Extrinsic not found", "No extrinsic matches “" + id + "”.", function(){ vExtrinsic(id); });
       return;
     }
-    var height = (x.block && x.block.height) || null;
-    var evs = d.ev || [];
+    var x = cleanExtrinsic(rawX);
+    if (!x) throw new Error("indexer returned malformed extrinsic data");
+    if (!Array.isArray(d.ev)) throw new Error("indexer returned malformed extrinsic data");
+    var height = x.blockHeight;
+    var evs = d.ev.map(cleanEventRow).filter(Boolean);
     var evRows = evs.map(function(e){
       return '<div class="event-row"><span class="etype">' + esc(e.type) + '</span><span class="mono" style="color:var(--ink-faint)">' + esc(shortHash(e.id, 12, 6)) + '</span></div>';
     }).join("");
@@ -458,9 +637,14 @@ function vAccount(id){
   showLoading("loading account…");
   gql(qAccount(id)).then(function(d){
     if (!alive(my)) return;
-    var a = d.a || null;
-    var txs = d.t || [];
-    var mined = (d.mined && d.mined.aggregate) ? d.mined.aggregate.count : 0;
+    if (!d || typeof d !== "object" || !Array.isArray(d.t)) throw new Error("indexer returned malformed account data");
+    var a = null;
+    if (d.a !== null && d.a !== undefined){
+      a = cleanAccount(d.a);
+      if (!a) throw new Error("indexer returned malformed account data");
+    }
+    var txs = d.t.map(cleanTransferRow).filter(Boolean);
+    var mined = (d.mined && d.mined.aggregate) ? validCount(d.mined.aggregate.count) : null;
     setBadge("live", "account lookup");
 
     var flags = [];
@@ -521,8 +705,11 @@ function vHash(key){
       'x: extrinsic(where: {id: {_eq: "' + key + '"}}, limit: 1) { id } }')
   .then(function(d){
     if (!alive(my)) return;
-    if (d.b && d.b.length){ location.hash = "#/block/" + d.b[0].height; return; }
-    if (d.x && d.x.length){ location.hash = "#/extrinsic/" + d.x[0].id; return; }
+    if (!d || typeof d !== "object") throw new Error("indexer returned malformed hash data");
+    var bh = (d.b && d.b[0]) ? validHeight(d.b[0].height) : null;
+    if (bh !== null){ location.hash = "#/block/" + bh; return; }
+    var xid = (d.x && d.x[0]) ? (validIdStr(d.x[0].id) || validHashStr(d.x[0].id)) : null;
+    if (xid !== null){ location.hash = "#/extrinsic/" + xid; return; }
     showError("Hash not found", "“" + key + "” matches no indexed block or extrinsic. It may be from before the indexer's retention window, or mistyped.", function(){ vHash(key); });
   }).catch(function(err){
     if (!alive(my)) return;

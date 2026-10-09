@@ -108,5 +108,67 @@ t("prettyArgs formats json", function(){
   assert.strictEqual(A.prettyArgs("{not json"), "{not json");
 });
 
+/* --- load-boundary validation (indexer responses are untrusted) --- */
+t("fmt hardening: garbage never becomes a figure", function(){
+  assert.strictEqual(A.fmtQTC("abc"), "—");
+  assert.strictEqual(A.fmtQTC("1.5"), "—");
+  assert.strictEqual(A.fmtQTC("6.5e18"), "—");
+  assert.strictEqual(A.fmtQTC(""), "—");
+  assert.strictEqual(A.fmtInt(-5), "—");
+  assert.strictEqual(A.fmtInt(194626.9), "—");
+  assert.strictEqual(A.fmtInt("garbage"), "—");
+  assert.strictEqual(A.fmtInt("135564"), "135,564");
+});
+t("validators: shapes", function(){
+  assert.strictEqual(A.validHeight(135564), 135564);
+  assert.strictEqual(A.validHeight(0), null);
+  assert.strictEqual(A.validHeight(-5), null);
+  assert.strictEqual(A.validHeight(1.5), null);
+  assert.strictEqual(A.validHeight("oops"), null);
+  assert.strictEqual(A.validCount(0), 0);
+  assert.strictEqual(A.validPlanck("310000000000"), "310000000000");
+  assert.strictEqual(A.validPlanck("1.5"), null);
+  assert.strictEqual(A.validPlanck(-1), null);
+  assert.ok(A.validTimestamp("2026-09-29T19:00:00.792+00:00"));
+  assert.strictEqual(A.validTimestamp("garbage!!"), null);
+  assert.strictEqual(A.validTimestamp(12345), null);
+});
+var GOOD_MINER = "qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv";
+var GOOD_SENDER = "qzo4QjZzBFC4gL72EjtG7kQkemGmP67wWmruLLN9sgMNAQSzb";
+t("cleanBlockRow drops poison, keeps good rows", function(){
+  var good = { height: 135568, hash: "0x" + "ab".repeat(32), timestamp: "2026-09-29T19:00:20.000+00:00", reward: "310000000000", mined_by_id: GOOD_MINER, extrinsics_aggregate: { aggregate: { count: '<b id="pwn">X</b>' } } };
+  var c = A.cleanBlockRow(good);
+  assert.ok(c && c.height === 135568 && c.extrinsicsCount === null); // markup count -> dash, not injection
+  assert.strictEqual(A.cleanBlockRow({ ...good, reward: "abc" }), null);
+  assert.strictEqual(A.cleanBlockRow({ ...good, timestamp: "garbage" }), null);
+  assert.strictEqual(A.cleanBlockRow({ ...good, height: 135568.9 }), null);
+  assert.strictEqual(A.cleanBlockRow({ ...good, mined_by_id: "not-an-address" }), null);
+  assert.strictEqual(A.cleanBlockRow(null), null);
+});
+t("cleanTransferRow drops poison", function(){
+  var good = { id: "0000135565-6452c-000004", amount: "310000000000", from_id: GOOD_SENDER, to_id: GOOD_MINER, block_height: 135565, timestamp: "2026-09-29T19:00:08.755+00:00" };
+  assert.ok(A.cleanTransferRow(good));
+  assert.strictEqual(A.cleanTransferRow({ ...good, amount: "oops" }), null);
+  assert.strictEqual(A.cleanTransferRow({ ...good, block_height: '"><svg onload=1>' }), null);
+  assert.strictEqual(A.cleanTransferRow({ ...good, from_id: "garbage" }), null);
+});
+t("cleanHome: malformed stats fail, poisoned rows drop", function(){
+  var home = { stats: { block_height: 135568, total_accounts: 6595, total_immediate_transfers: 154203, total_scheduled_transfers: 12 },
+    blocks: [], transfers: [] };
+  assert.ok(A.cleanHome(home));
+  assert.strictEqual(A.cleanHome({ ...home, stats: { ...home.stats, block_height: "oops" } }), null);
+  assert.strictEqual(A.cleanHome(null), null);
+  assert.strictEqual(A.cleanHome({ ...home, blocks: {} }), null);
+});
+t("cleanAccount / cleanExtrinsicRow boundaries", function(){
+  assert.ok(A.cleanAccount({ free: "1000", frozen: "0", reserved: "0" }));
+  assert.strictEqual(A.cleanAccount({ free: "1.5", frozen: "0", reserved: "0" }), null);
+  var x = { id: "0x" + "ab".repeat(32), index_in_block: 1, pallet: "Balances", call: "transfer_allow_death", signer_id: GOOD_SENDER, success: true, fee: "3552989979", args: "{}" };
+  assert.ok(A.cleanExtrinsicRow(x));
+  assert.strictEqual(A.cleanExtrinsicRow({ ...x, index_in_block: "<b>pwn</b>" }), null);
+  assert.strictEqual(A.cleanExtrinsicRow({ ...x, fee: "abc" }), null);
+  assert.strictEqual(A.cleanExtrinsicRow({ ...x, success: "yes" }), null);
+});
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
