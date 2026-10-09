@@ -108,7 +108,7 @@
   <section class="panel" id="verifier">
     <div class="p-head">
       <h2><span class="p-ico">🔏</span> Checkphrase Verifier</h2>
-      <p>Paste any address and this page derives its human checkphrase with the <strong>actual upstream algorithm</strong> — PBKDF2-HMAC-SHA256, 40,000 iterations, salt <code>"human-readable-checksum"</code>, five 11-bit words from the 2,048-word list — validated byte-for-byte against all <strong>1,171 upstream test vectors</strong>. 100% client-side; your address never leaves this tab.</p>
+      <p>Paste a Quantus address and this page first <strong>SS58-validates it</strong> — base58 charset, checksum, Quantus prefix 189, 32-byte key — so a mistyped or foreign address is rejected with the reason instead of being handed a phrase. A valid address gets its human checkphrase from the <strong>actual upstream algorithm</strong> — PBKDF2-HMAC-SHA256, 40,000 iterations, salt <code>"human-readable-checksum"</code>, five 11-bit words from the 2,048-word list — validated byte-for-byte against all <strong>1,171 upstream test vectors</strong>. 100% client-side; your address never leaves this tab.</p>
     </div>
     <div class="ver-grid">
       <div class="ver-input card">
@@ -291,6 +291,7 @@
 
 <script src="js/wordlist.js?v=1.0.0"></script>
 <script src="js/checkphrase-core.js?v=1.0.0"></script>
-<script src="js/app.js?v=1.2.0"></script>
+<script src="js/ss58.js?v=1.0.0"></script>
+<script src="js/app.js?v=1.3.0"></script>
 </body>
 </html>

@@ -2,6 +2,14 @@
  * Checkphrase crypto lives in js/checkphrase-core.js (validated 1171/1171 upstream vectors).
  * Delay constants mirror the chain runtime: MinDelayPeriodBlocks = 2,
  * DefaultDelay = DAYS = 7200 blocks, TargetBlockTime = 12s.
+ *
+ * Input boundary (this app has no RPC/load boundary — it is fully local, so
+ * its boundary is user input): the verifier SS58-validates the pasted string
+ * (js/ss58.js — base58 charset, checksum, Quantus prefix 189, 32-byte key,
+ * the same gate Contact Vault applies) BEFORE any phrase is derived, so a
+ * corrupted or foreign address never gets an authoritative-looking
+ * checkphrase; the simulator parses amount and delay strictly (planck-exact
+ * amount shape, whole-block delays) instead of parseFloat/parseInt coercion.
  */
 (function () {
 "use strict";
@@ -9,6 +17,7 @@
 var BLOCK_MS = 12000;
 var MIN_DELAY_BLOCKS = 2;
 var DEFAULT_DELAY_BLOCKS = 7200;
+var MAX_SUPPLY_QTC = 21000000; // the chain's hard cap — no transfer can exceed it
 
 function $(id) { return document.getElementById(id); }
 
@@ -122,10 +131,40 @@ $("addrInput").addEventListener("input", function () {
 $("exKyle").addEventListener("click", function () { $("addrInput").value = KYLE; voidDerived(CHANGED_MSG); });
 $("exGenesis").addEventListener("click", function () { $("addrInput").value = GENESIS; voidDerived(CHANGED_MSG); });
 
+/* A checkphrase is only meaningful for the exact, uncorrupted Quantus
+ * address it was derived from. Gate derivation on a real SS58 decode:
+ * a mistyped character (checksum mismatch), a non-base58 string, or a
+ * foreign chain's address must be rejected with the reason — never
+ * rendered as a five-word phrase a user could read back as verified. */
+function rejectAddress(msg) {
+  lastAddr = ""; lastWords = null;
+  poisonSeq++;
+  $("poisonBtn").disabled = true;
+  $("poisonBtn").textContent = POISON_LABEL;
+  $("poisonCard").hidden = true;
+  renderPlaceholderWords();
+  $("resNote").textContent = msg;
+}
+function quantusAddressError(addr) {
+  if (typeof QSS58 === "undefined" || !QSS58.ss58Decode)
+    return "The address validator failed to load, so no checkphrase can be derived safely. Reload the page.";
+  var dec = QSS58.ss58Decode(addr);
+  if (!dec.ok) return "Not a valid Quantus address — " + dec.error;
+  if (dec.prefix !== QSS58.QUANTUS_PREFIX)
+    return "Not a Quantus address — this string is a valid SS58 address for prefix " + dec.prefix +
+      ", not Quantus (prefix " + QSS58.QUANTUS_PREFIX + "). Its Quantus checkphrase would be meaningless.";
+  if (!dec.key || dec.key.length !== 32)
+    return "Not a Quantus account address — it decodes cleanly but carries a " +
+      (dec.key ? dec.key.length : 0) + "-byte key, not the 32-byte account key Quantus uses.";
+  return null;
+}
+
 $("deriveBtn").addEventListener("click", function () {
   poisonSeq++; // a new derive supersedes any poison demo still in flight
   var addr = $("addrInput").value.trim();
   if (!addr) { $("resNote").textContent = "Paste an address first."; return; }
+  var addrErr = quantusAddressError(addr);
+  if (addrErr) { rejectAddress(addrErr + " No checkphrase was derived."); return; }
   var wrap = $("progWrap"), bar = $("progBar"), note = $("progNote");
   wrap.hidden = false; bar.style.width = "0%"; note.textContent = "Running 40,000 KDF iterations…";
   $("deriveBtn").disabled = true; $("poisonBtn").disabled = true;
@@ -208,24 +247,58 @@ function fmtBlocks(b) {
   return (h / 24).toFixed(h % 24 === 0 ? 0 : 1) + " d";
 }
 function fmtNum(n) { return n.toLocaleString("en-US"); }
+function fmtAmt(n) { return n.toLocaleString("en-US", { maximumFractionDigits: 12 }); }
+/* Strict whole-block delay: digits only. parseInt("7200.9") silently
+ * truncated to 7200 and parseInt("2.5") to 2 — a delay the user never
+ * chose was scheduled under their amount. Fractional or non-numeric
+ * input is rejected, never rounded. */
+function parseDelayStrict(raw) {
+  var s = String(raw).trim();
+  if (!/^\d+$/.test(s)) return null;
+  var b = Number(s);
+  return Number.isSafeInteger(b) ? b : null;
+}
+/* Planck-exact amount shape (mirrors the Web Wallet's parseQTC): a whole
+ * number of QTC with at most 12 decimals — one planck is 0.000000000001.
+ * parseFloat accepted sub-planck dust (rendered "1e-13 QTC") and amounts
+ * beyond the 21M supply cap as schedulable transfers. */
+function parseAmountStrict(raw) {
+  var s = String(raw).trim();
+  if (!/^\d+(\.\d{1,12})?$/.test(s)) return null;
+  var a = Number(s);
+  return Number.isFinite(a) ? a : null;
+}
+function railDelayText(b) {
+  return fmtNum(b) + " blocks ≈ " + fmtBlocks(b) +
+    " on mainnet (12 s blocks). Below the 2-block runtime minimum is rejected by the chain.";
+}
+function activatePreset(blocks) {
+  document.querySelectorAll(".preset").forEach(function (x) {
+    x.classList.toggle("active", +x.dataset.blocks === blocks);
+  });
+  $("railDelay").textContent = railDelayText(blocks);
+}
 
 document.querySelectorAll(".preset").forEach(function (p) {
   p.addEventListener("click", function () {
     document.querySelectorAll(".preset").forEach(function (x) { x.classList.remove("active"); });
     p.classList.add("active");
     $("customBlocks").value = "";
-    $("railDelay").textContent = fmtNum(+p.dataset.blocks) + " blocks ≈ " + fmtBlocks(+p.dataset.blocks) +
-      " on mainnet (12 s blocks). Below the 2-block runtime minimum is rejected by the chain.";
+    $("railDelay").textContent = railDelayText(+p.dataset.blocks);
   });
 });
 $("customBlocks").addEventListener("input", function () {
-  if ($("customBlocks").value.trim()) {
-    document.querySelectorAll(".preset").forEach(function (x) { x.classList.remove("active"); });
-    var b = parseInt($("customBlocks").value, 10);
-    if (Number.isInteger(b) && b > 0)
-      $("railDelay").textContent = fmtNum(b) + " blocks ≈ " + fmtBlocks(b) +
-        " on mainnet (12 s blocks). Below the 2-block runtime minimum is rejected by the chain.";
+  if (!$("customBlocks").value.trim()) {
+    /* Clearing the custom field must restore a preset. It used to leave
+     * NO preset active, and Schedule then dereferenced
+     * querySelector(".preset.active").dataset — a TypeError that killed
+     * the button with no error shown. */
+    activatePreset(DEFAULT_DELAY_BLOCKS);
+    return;
   }
+  document.querySelectorAll(".preset").forEach(function (x) { x.classList.remove("active"); });
+  var b = parseDelayStrict($("customBlocks").value);
+  if (b !== null && b > 0) $("railDelay").textContent = railDelayText(b);
 });
 
 function simLog(msg, cls) {
@@ -273,11 +346,31 @@ $("scheduleBtn").addEventListener("click", function () {
   clearSim();
   var err = $("simErr"); err.hidden = true;
   var dest = $("simAddr").value.trim();
-  var amt = parseFloat($("simAmt").value);
+  var amt = parseAmountStrict($("simAmt").value);
   var custom = $("customBlocks").value.trim();
-  var blocks = custom ? parseInt(custom, 10) : +document.querySelector(".preset.active").dataset.blocks;
+  var blocks;
+  if (custom) {
+    blocks = parseDelayStrict(custom);
+    if (blocks === null) {
+      err.textContent = "Delay must be a whole number of blocks — fractional or non-numeric delays are rejected, not rounded.";
+      err.hidden = false; return;
+    }
+  } else {
+    /* Defensive: the custom-clear path restores the default preset, but
+     * Schedule must never dereference a missing active preset again. */
+    var act = document.querySelector(".preset.active");
+    blocks = act ? +act.dataset.blocks : DEFAULT_DELAY_BLOCKS;
+  }
   if (!dest) { err.textContent = "Enter a recipient address (any string works in the simulation)."; err.hidden = false; return; }
+  if (amt === null) {
+    err.textContent = "Amount must look like 1.5 — a QTC amount with at most 12 decimals (one planck is 0.000000000001 QTC).";
+    err.hidden = false; return;
+  }
   if (!(amt > 0)) { err.textContent = "Amount must be greater than zero."; err.hidden = false; return; }
+  if (amt > MAX_SUPPLY_QTC) {
+    err.textContent = "Amount exceeds the total QTC supply cap of 21,000,000 — no account can send more QTC than will ever exist.";
+    err.hidden = false; return;
+  }
   if (!Number.isInteger(blocks) || blocks < MIN_DELAY_BLOCKS) {
     err.textContent = "Delay must be a whole number of blocks ≥ 2 (the runtime minimum)."; err.hidden = false; return;
   }
@@ -286,7 +379,7 @@ $("scheduleBtn").addEventListener("click", function () {
   $("simEmpty").hidden = true; $("simActive").hidden = false; $("liveDot").hidden = false;
   $("simLog").innerHTML = "";
   var short = dest.length > 26 ? dest.slice(0, 22) + "…" + dest.slice(-4) : dest;
-  $("txAmt").textContent = amt + " QTC";
+  $("txAmt").textContent = fmtAmt(amt) + " QTC";
   $("txDest").textContent = short; $("txDest").title = dest;
 
   // Demo clock: compress the window to ~45s max so any delay is watchable.
@@ -294,7 +387,7 @@ $("scheduleBtn").addEventListener("click", function () {
   var remaining = blocks;
   simState = { blocks: blocks, remaining: remaining, rate: rate, amt: amt, cancelled: false };
 
-  simLog("<b>schedule_transfer_with_delay</b> dispatched — " + amt + " QTC → escrow hold, delay " + fmtNum(blocks) + " blocks.");
+  simLog("<b>schedule_transfer_with_delay</b> dispatched — " + fmtAmt(amt) + " QTC → escrow hold, delay " + fmtNum(blocks) + " blocks.");
   simLog("Demo clock: <b>" + rate + " block" + (rate > 1 ? "s" : "") + "/sec</b> (simulated). On mainnet this window is " + fmtBlocks(blocks) + ".", "warn");
   setStep("created");
   $("cdNum").textContent = fmtNum(blocks); $("cdLbl").textContent = "blocks remaining";
@@ -316,7 +409,7 @@ $("scheduleBtn").addEventListener("click", function () {
       document.querySelector('.tl-step[data-s="done"] .lbl').textContent = "Executed";
       $("cdNum").textContent = "0"; $("cdLbl").textContent = "window elapsed";
       $("cancelBtn").disabled = true; $("liveDot").hidden = true;
-      simLog("<b>Delay expired</b> — Scheduler pallet executed the transfer: " + amt + " QTC delivered to the recipient.");
+      simLog("<b>Delay expired</b> — Scheduler pallet executed the transfer: " + fmtAmt(amt) + " QTC delivered to the recipient.");
       simLog("Sender's cancellation window is now closed. This is final.", "warn");
     }
   }, 1000);
@@ -330,7 +423,7 @@ $("cancelBtn").addEventListener("click", function () {
   $("cancelBtn").disabled = true; $("liveDot").hidden = true;
   $("cdLbl").textContent = "cancelled with " + fmtNum(simState.remaining) + " blocks left";
   simLog("<b>cancel(tx_id)</b> dispatched by the sender.", "warn");
-  simLog("Escrow hold released — full <b>" + simState.amt + " QTC</b> returned to the sender. No reversal fee on sender-cancelled one-time transfers; only the cancel extrinsic's network fee.", "warn");
+  simLog("Escrow hold released — full <b>" + fmtAmt(simState.amt) + " QTC</b> returned to the sender. No reversal fee on sender-cancelled one-time transfers; only the cancel extrinsic's network fee.", "warn");
 });
 
 })();

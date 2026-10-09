@@ -20,14 +20,14 @@ const NETWORK_DEFAULTS = {
   // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
   // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
   // and dated for the no-fetch path (file://, offline). All four figures come from
-  // ONE capture (2026-10-09 20:21Z): consensus difficulty @195,788 and total
-  // issuance @195,788, 1 seconds apart — never mix snapshot dates in one bundle
+  // ONE capture (2026-10-09 21:30Z): consensus difficulty @196,067 and total
+  // issuance @196,067, 2 seconds apart — never mix snapshot dates in one bundle
   // (the Sept-30 bundle survived to Oct 2 at half the real hashrate and skewed
   // every fallback-path earnings figure ~2x; guarded in tests).
-  blockRewardQTC: 0.3040446, // emission formula: (21M − 5,797,772.4086 total issuance) / 50M, data/supply.json @195788, 2026-10-09
-  blockRewardLabel: "0.3040 QTC · emission formula @ height 195788, 2026-10-09",
-  netHashHS: 43008159070530, // difficulty 516097908846369 / 12s, data/consensus.json @195788, 2026-10-09
-  netHashLabel: "≈43.01 TH/s · from difficulty 516097908846369 @ height 195788, 2026-10-09",
+  blockRewardQTC: 0.3040414, // emission formula: (21M − 5,797,930.7378 total issuance) / 50M, data/supply.json @196067, 2026-10-09
+  blockRewardLabel: "0.3040 QTC · emission formula @ height 196067, 2026-10-09",
+  netHashHS: 42816297723267, // difficulty 513795572679205 / 12s, data/consensus.json @196067, 2026-10-09
+  netHashLabel: "≈42.82 TH/s · from difficulty 513795572679205 @ height 196067, 2026-10-09",
 };
 
 const SOURCES = [

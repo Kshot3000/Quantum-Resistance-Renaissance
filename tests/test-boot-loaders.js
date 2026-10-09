@@ -395,5 +395,42 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/app.js?v=1.39.0"), "wallet: app.js cache key bumped for the boundary fix");
 }
 
+// Batch 13 (2026-10-09 16:19): safesend (Tier 1) has no RPC/load boundary
+// — it is fully local, so its boundary is user input, and it was open on
+// every side: the checkphrase verifier derived an authoritative-looking
+// phrase for ANY string (a checksum-corrupted address, "hello world!!",
+// a Bitcoin address all rendered five words + "Derived locally from
+// N-character address"), clearing the custom delay left no preset active
+// and Schedule threw a TypeError on .dataset.blocks (dead button, no
+// error shown), parseFloat scheduled sub-planck dust ("1e-13 QTC") and
+// amounts beyond the 21M supply cap, and parseInt silently truncated
+// fractional delays (2.5 -> 2 blocks). Pin: the verifier SS58-gates
+// before deriving (the Contact Vault gate), and the simulator parses
+// amount/delay strictly and can never dereference a missing preset.
+{
+  const ss58 = read("pages/safesend/js/ss58.js");
+  ok(ss58.includes("function ss58Decode(addr)"), "safesend: vendored ss58Decode() present");
+  ok(ss58.includes("var QUANTUS_PREFIX = 189;"), "safesend: SS58 codec pins Quantus prefix 189");
+  ok(ss58.includes("Checksum mismatch"), "safesend: SS58 decoder verifies the checksum");
+  const app = read("pages/safesend/js/app.js");
+  ok(app.includes("function quantusAddressError(addr)"), "safesend: verifier gate defined");
+  ok(app.includes("QSS58.ss58Decode(addr)"), "safesend: gate decodes SS58 before deriving");
+  ok(app.includes("dec.prefix !== QSS58.QUANTUS_PREFIX"), "safesend: gate requires the Quantus prefix");
+  ok(app.includes("dec.key.length !== 32"), "safesend: gate requires a 32-byte account key");
+  ok(app.includes("No checkphrase was derived."), "safesend: rejection states no phrase was derived");
+  ok(app.includes("function parseDelayStrict(raw)"), "safesend: strict delay parser defined");
+  ok(app.includes("function parseAmountStrict(raw)"), "safesend: strict amount parser defined");
+  ok(app.includes("/^\\d+(\\.\\d{1,12})?$/"), "safesend: amount shape is planck-exact (max 12 decimals)");
+  ok(app.includes("amt > MAX_SUPPLY_QTC"), "safesend: amounts above the supply cap are rejected");
+  ok(app.includes("var MAX_SUPPLY_QTC = 21000000;"), "safesend: supply cap pinned at 21,000,000 QTC");
+  ok(app.includes("activatePreset(DEFAULT_DELAY_BLOCKS)"), "safesend: clearing custom restores the default preset");
+  ok(app.includes("act ? +act.dataset.blocks : DEFAULT_DELAY_BLOCKS"), "safesend: Schedule falls back instead of dereferencing a missing preset");
+  ok(!app.includes('parseInt($("customBlocks")'), "safesend: no parseInt coercion of the custom delay remains");
+  ok(!app.includes('parseFloat($("simAmt")'), "safesend: no parseFloat coercion of the amount remains");
+  const html = read("pages/safesend/index.html");
+  ok(html.includes("js/ss58.js?v=1.0.0"), "safesend: ss58.js loaded with its cache key");
+  ok(html.includes("js/app.js?v=1.3.0"), "safesend: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
