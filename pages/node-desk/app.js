@@ -2,7 +2,7 @@
 import {
   BOOTNODES, PORTS, CHAIN_SPECS, PUBLIC_RPC,
   validateInnerHash, validateNodeName, validatePortNumber,
-  buildNodeCommand, firewallRules, analyzeLog, syncProgress, fmtEta,
+  buildNodeCommand, firewallRules, analyzeLog, syncProgress, fmtEta, parseSnapshot,
 } from "./node-core.js";
 
 const $ = (id) => document.getElementById(id);
@@ -50,11 +50,13 @@ async function loadSnapshot() {
     const r = await fetch(SNAP, { cache: "no-store", signal: timeoutSignal(9000) });
     if (!r.ok) throw new Error("HTTP " + r.status);
     const S = await r.json();
-    const age = Math.max(0, Math.round((Date.now() - Date.parse(S.fetched_at)) / 60000));
-    $("snapPill").textContent = `snapshot · block ${Number(S.head).toLocaleString()} · ${age}m old`;
+    const snap = parseSnapshot(S);
+    if (!snap) throw new Error("snapshot failed validation");
+    const age = snap.ageMin;
+    $("snapPill").textContent = `snapshot · block ${snap.head.toLocaleString()} · ${age}m old`;
     $("snapPill").classList.add("live");
     $("heroStats").innerHTML = `
-      <div class="hstat"><div class="k">Network head</div><div class="v">${Number(S.head).toLocaleString()}</div><div class="s">via builder snapshot · ${age}m old</div></div>
+      <div class="hstat"><div class="k">Network head</div><div class="v">${snap.head.toLocaleString()}</div><div class="s">via builder snapshot · ${age}m old</div></div>
       <div class="hstat"><div class="k">P2P port</div><div class="v">30333 <small>/tcp</small></div><div class="s">the only public port</div></div>
       <div class="hstat"><div class="k">Block target</div><div class="v">12 <small>s</small></div><div class="s">Homestead-style retarget</div></div>
       <div class="hstat"><div class="k">Freshness gate</div><div class="v">24 <small>h</small></div><div class="s">--max-tip-age before mining</div></div>`;
@@ -210,9 +212,12 @@ async function initSync() {
   } else {
     try {
       const r = await fetch(SNAP, { cache: "no-store", signal: timeoutSignal(9000) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
       const S = await r.json();
-      const snapHead = Number(S.head);
-      const age = Math.max(0, Math.round((Date.now() - Date.parse(S.fetched_at)) / 60000));
+      const snap = parseSnapshot(S);
+      if (!snap) throw new Error("snapshot failed validation");
+      const snapHead = snap.head;
+      const age = snap.ageMin;
       if (userKept()) {
         $("netSrc").innerHTML = `Public RPC unreachable — builder snapshot reports head ${snapHead.toLocaleString()} (${age}m old), but keeping your manual entry ${Number(netInput.value).toLocaleString()}; clear the field and reload to use the snapshot.`;
       } else {

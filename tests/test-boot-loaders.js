@@ -207,5 +207,29 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.2.0"), "studio: app.js cache key bumped for the boundary fix");
 }
 
+// ---- 12. Node Desk: validate snapshot scalars at BOTH load boundaries ----
+// Batch 7 (2026-10-09 10:19): node-desk's loadSnapshot() and initSync()'s
+// snapshot fallback trusted consensus.json via Number()/Date.parse
+// coercion — a garbage/missing head rendered "block NaN" with the pill
+// marked live, a float head rendered "194,626.9", a negative head was
+// adopted into the sync input, a garbage fetched_at rendered "NaNm old",
+// and the fallback never even checked r.ok. Pin: a shared parseSnapshot()
+// in node-core.js (positive-integer head, parseable fetched_at) gates both
+// loaders; an invalid snapshot is treated as NO snapshot.
+{
+  const core = read("pages/node-desk/node-core.js");
+  ok(core.includes("export function parseSnapshot(S, nowMs)"), "nodedesk: parseSnapshot() defined in node-core");
+  ok(core.includes("Number.isInteger(S.head)"), "nodedesk: numeric head must be an integer");
+  ok(core.includes("/^\\d+$/"), "nodedesk: string head must be pure digits");
+  ok(core.includes("if (!Number.isFinite(t)) return null;"), "nodedesk: fetched_at must parse");
+  const src = read("pages/node-desk/app.js");
+  ok((src.match(/parseSnapshot\(S\)/g) || []).length === 2, "nodedesk: validator gates BOTH snapshot loaders");
+  ok((src.match(/snapshot failed validation/g) || []).length >= 2, "nodedesk: invalid snapshot throws into the honest fallback on both paths");
+  ok(!src.includes("Number(S.head)"), "nodedesk: no raw Number(S.head) coercion remains");
+  ok(!src.includes("Date.parse(S.fetched_at)"), "nodedesk: no raw Date.parse(S.fetched_at) age remains");
+  const html = read("pages/node-desk/index.html");
+  ok(html.includes("app.js?v=1.40.0"), "nodedesk: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

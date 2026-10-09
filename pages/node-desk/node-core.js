@@ -289,6 +289,30 @@ export function syncProgress(localHeight, networkHeight) {
   return { behind, pct, etaMin, synced: behind === 0 };
 }
 
+/* ---------- snapshot parsing ----------
+ * The builder snapshot (data/consensus.json) is a load boundary: its
+ * scalars must be validated, never coerced. Number() accepts fractional,
+ * negative and scientific spellings the indexer never emits for a block
+ * height, and Date.parse of a garbage fetched_at yields a NaN age that
+ * renders as "NaNm old". A snapshot whose head is not a positive integer
+ * or whose capture time does not parse is NO snapshot — callers must
+ * fall back honestly (protocol constants / manual entry), never render
+ * the poisoned values. Returns { head, ageMin } or null. */
+export function parseSnapshot(S, nowMs) {
+  if (!S || typeof S !== "object") return null;
+  let head = null;
+  if (typeof S.head === "number" && Number.isInteger(S.head) && S.head > 0) head = S.head;
+  else if (typeof S.head === "string" && /^\d+$/.test(S.head.trim())) {
+    const n = Number(S.head.trim());
+    if (Number.isSafeInteger(n) && n > 0) head = n;
+  }
+  if (head === null) return null;
+  const t = Date.parse(S.fetched_at);
+  if (!Number.isFinite(t)) return null;
+  const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+  return { head, ageMin: Math.max(0, Math.round((now - t) / 60000)) };
+}
+
 export function fmtEta(min) {
   if (min <= 0) return "caught up";
   if (min < 60) return `≈ ${min} min at 12 s/block`;

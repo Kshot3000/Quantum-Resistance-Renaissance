@@ -7,7 +7,7 @@ import {
   BOOTNODES, PORTS, CHAIN_SPECS,
   validateInnerHash, validateNodeName, validatePortNumber, validateBootnode, shq,
   buildNodeCommand, firewallRules, classifyLogLine, analyzeLog,
-  syncProgress, fmtEta,
+  syncProgress, fmtEta, parseSnapshot,
 } from "../node-core.js";
 
 let pass = 0, fail = 0;
@@ -146,6 +146,24 @@ eq("synced", s.synced, true);
 eq("bad input", syncProgress("x", 100), null);
 eq("fmtEta caught up", fmtEta(0), "caught up");
 ok("fmtEta hours", fmtEta(180).includes("3 h"));
+
+/* --- snapshot parsing (load boundary) --- */
+const NOW = Date.parse("2026-10-09T15:00:00.000Z");
+const GOOD = { head: 194626, fetched_at: "2026-10-09T14:55:00.000Z" };
+eq("snapshot ok head", parseSnapshot(GOOD, NOW).head, 194626);
+eq("snapshot ok age", parseSnapshot(GOOD, NOW).ageMin, 5);
+eq("snapshot digit-string head", parseSnapshot({ head: "194626", fetched_at: GOOD.fetched_at }, NOW).head, 194626);
+eq("snapshot future clamps to 0m", parseSnapshot({ head: 1, fetched_at: "2026-10-09T15:05:00.000Z" }, NOW).ageMin, 0);
+eq("snapshot garbage head", parseSnapshot({ head: "oops", fetched_at: GOOD.fetched_at }, NOW), null);
+eq("snapshot float head", parseSnapshot({ head: 194626.9, fetched_at: GOOD.fetched_at }, NOW), null);
+eq("snapshot negative head", parseSnapshot({ head: -5, fetched_at: GOOD.fetched_at }, NOW), null);
+eq("snapshot zero head", parseSnapshot({ head: 0, fetched_at: GOOD.fetched_at }, NOW), null);
+eq("snapshot missing head", parseSnapshot({ fetched_at: GOOD.fetched_at }, NOW), null);
+eq("snapshot scientific head", parseSnapshot({ head: "1.9e5", fetched_at: GOOD.fetched_at }, NOW), null);
+eq("snapshot garbage fetched_at", parseSnapshot({ head: 194626, fetched_at: "garbage!!" }, NOW), null);
+eq("snapshot missing fetched_at", parseSnapshot({ head: 194626 }, NOW), null);
+eq("snapshot null payload", parseSnapshot(null, NOW), null);
+eq("snapshot non-object payload", parseSnapshot("194626", NOW), null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
