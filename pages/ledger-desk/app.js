@@ -28,18 +28,17 @@ function save() {
   } catch (e) { /* storage full/blocked: session-only */ }
 }
 function load() {
+  var parsed = null;
   try {
     var raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
-    state = JSON.parse(raw, function (k, v) {
-      if (typeof v === "string" && v.indexOf("bigint:") === 0) return BigInt(v.slice(7));
-      return v;
-    });
-  } catch (e) { state = { addresses: [], events: [], prices: [], method: "FIFO" }; }
-  if (!state.addresses) state.addresses = [];
-  if (!state.events) state.events = [];
-  if (!state.prices) state.prices = [];
-  if (!state.method) state.method = "FIFO";
+    if (raw) parsed = JSON.parse(raw);
+  } catch (e) { parsed = null; }
+  /* Sanitize at the storage boundary (L.sanitizeState): the old reviver
+   * converted "bigint:..." strings inline, so ONE corrupt value aborted
+   * the whole parse and silently reset the entire vault; a plain garbage
+   * quantity survived the reviver and then threw inside normEvent on
+   * every render, bricking the app until the user cleared site data. */
+  state = L.sanitizeState(parsed);
 }
 
 function priceLookup(ms) {
@@ -201,71 +200,151 @@ async function runScan() {
     return;
   }
   if (seq !== scanSeq) return; // superseded: discard before touching detections
-  var headBlock = live.data.blocks[0];
-  var anchorMs = Date.parse(headBlock.timestamp);
-  var anchorH = headBlock.height;
-  var blockS = miners.window.observed_block_time_s;
-  var existingRefs = {};
-  state.events.forEach(function (e) { if (e.ref) existingRefs[e.ref] = 1; });
-  var vault = {};
-  state.addresses.forEach(function (a) { vault[a.address] = 1; });
 
-  // --- mining income: per-bucket counts x modeled reward at bucket midpoint
-  state.addresses.forEach(function (va) {
-    var addr = va.address;
-    var winBlocks = (miners.window_miners && miners.window_miners[addr]) || 0;
-    (miners.buckets || []).forEach(function (b) {
-      var c = (b.miners && b.miners[addr]) || 0;
-      if (!c) return;
-      var mid = Math.floor((b.start + b.end) / 2);
-      var qty = BigInt(c) * L.rewardModelPlancks(mid, ANCHOR_HEIGHT, ANCHOR_REWARD);
-      if (qty <= 0n) return;
-      var ref = "mine:" + addr + ":" + b.start + "-" + b.end;
-      if (existingRefs[ref]) return;
-      detections.push({ key: ref, ref: ref, dateMs: tsForHeight(b.end, anchorH, anchorMs, blockS),
-        type: "mining_income", address: addr, qtyPlanck: qty,
-        note: c + " blocks in " + b.start + "\u2013" + b.end + " \u00d7 modeled reward",
-        flag: "modeled" });
-    });
-    // pre-window aggregate: clearly labeled, user splits by tax year
-    var all = (miners.all_time || []).find(function (r) { return r.address === addr; });
-    var pre = all ? all.blocks - winBlocks : 0;
-    if (pre > 0) {
-      var preMid = Math.floor(miners.window.start_height / 2);
-      var preQty = BigInt(pre) * L.rewardModelPlancks(preMid, ANCHOR_HEIGHT, ANCHOR_REWARD);
-      var preRef = "mine-pre:" + addr;
-      if (!existingRefs[preRef]) {
-        detections.push({ key: preRef, ref: preRef,
-          dateMs: tsForHeight(miners.window.start_height, anchorH, anchorMs, blockS),
-          type: "mining_income", address: addr, qtyPlanck: preQty,
-          note: pre.toLocaleString("en-US") + " blocks 1\u2013" + miners.window.start_height +
-            " \u00d7 avg modeled reward \u2014 AGGREGATE, split by tax year from your miner logs",
-          flag: "aggregate" });
+  /* Snapshot boundary: these files anchor every inferred date and amount
+   * in a tax ledger, so their cores are validated before any math touches
+   * them, and every row is validated before it becomes a candidate. The
+   * pre-fix scan dereferenced live.data.blocks[0] unguarded (empty list ->
+   * uncaught throw, status stuck on "Loading snapshots\u2026"), accepted a
+   * garbage head timestamp / block time (candidates dated "NaN-NaN-NaN"),
+   * and let ONE poisoned row (amount "12.5", fee "abc", a fractional
+   * bucket count) throw mid-loop — killing the whole scan, good rows and
+   * all. Core corruption fails the scan honestly; poisoned rows are
+   * skipped and counted in the status line. */
+  function scanFail(msg) {
+    if (seq !== scanSeq) return;
+    detections = [];
+    list.innerHTML = "";
+    $("detectActions").hidden = true;
+    status.textContent = msg;
+  }
+  var headBlock = (live && live.data && Array.isArray(live.data.blocks)) ? live.data.blocks[0] : null;
+  var anchorMs = headBlock ? Date.parse(headBlock.timestamp) : NaN;
+  var anchorH = headBlock ? Number(headBlock.height) : NaN;
+  if (!headBlock || !isFinite(anchorMs) || !Number.isInteger(anchorH) || anchorH < 0) {
+    scanFail("Snapshots are malformed (live snapshot has no valid head block) \u2014 scan aborted; nothing was inferred.");
+    return;
+  }
+  var blockS = (miners && miners.window) ? Number(miners.window.observed_block_time_s) : NaN;
+  if (!isFinite(blockS) || blockS <= 0 || blockS > 3600) {
+    scanFail("Snapshots are malformed (miners snapshot has no valid block time) \u2014 scan aborted; nothing was inferred.");
+    return;
+  }
+  if (!miners || !Array.isArray(miners.buckets) || !Number.isInteger(Number(miners.window.start_height))) {
+    scanFail("Snapshots are malformed (miners snapshot is missing its buckets/window) \u2014 scan aborted; nothing was inferred.");
+    return;
+  }
+  if (!flows || !Array.isArray(flows.transfers)) {
+    scanFail("Snapshots are malformed (flows snapshot has no transfers list) \u2014 scan aborted; nothing was inferred.");
+    return;
+  }
+  // A block count is an integer >= 0 (number, or integer string); anything
+  // else (2.5, "abc", -1) is a poisoned row, never a BigInt conversion.
+  function validCount(v) {
+    if (typeof v === "string" && /^\d+$/.test(v.trim())) v = Number(v);
+    return (typeof v === "number" && Number.isInteger(v) && v >= 0) ? v : null;
+  }
+
+  var found = [], skipped = 0;
+  try {
+    var existingRefs = {};
+    state.events.forEach(function (e) { if (e.ref) existingRefs[e.ref] = 1; });
+    var vault = {};
+    state.addresses.forEach(function (a) { vault[a.address] = 1; });
+
+    // --- mining income: per-bucket counts x modeled reward at bucket midpoint
+    state.addresses.forEach(function (va) {
+      var addr = va.address;
+      var winRaw = (miners.window_miners && miners.window_miners[addr]);
+      var winBlocks = (winRaw === undefined || winRaw === null) ? 0 : validCount(winRaw);
+      miners.buckets.forEach(function (b) {
+        if (!b || !Number.isInteger(Number(b.start)) || !Number.isInteger(Number(b.end))) { skipped++; return; }
+        var cRaw = (b.miners && b.miners[addr]);
+        if (cRaw === undefined || cRaw === null) return; // address simply absent from this bucket
+        var c = validCount(cRaw);
+        if (c === null) { skipped++; return; }
+        if (!c) return;
+        var mid = Math.floor((Number(b.start) + Number(b.end)) / 2);
+        var qty = BigInt(c) * L.rewardModelPlancks(mid, ANCHOR_HEIGHT, ANCHOR_REWARD);
+        if (qty <= 0n) return;
+        var ref = "mine:" + addr + ":" + b.start + "-" + b.end;
+        if (existingRefs[ref]) return;
+        found.push({ key: ref, ref: ref, dateMs: tsForHeight(Number(b.end), anchorH, anchorMs, blockS),
+          type: "mining_income", address: addr, qtyPlanck: qty,
+          note: c + " blocks in " + b.start + "\u2013" + b.end + " \u00d7 modeled reward",
+          flag: "modeled" });
+      });
+      // pre-window aggregate: clearly labeled, user splits by tax year.
+      // Needs a trustworthy window count to split against; without one the
+      // split could double-count the bucket rows above, so it is skipped.
+      var all = (Array.isArray(miners.all_time) ? miners.all_time : []).find(function (r) { return r && r.address === addr; });
+      var allBlocks = all ? validCount(all.blocks) : null;
+      var pre = (allBlocks !== null && winBlocks !== null) ? allBlocks - winBlocks : 0;
+      if (pre > 0) {
+        var startH = Number(miners.window.start_height);
+        var preMid = Math.floor(startH / 2);
+        var preQty = BigInt(pre) * L.rewardModelPlancks(preMid, ANCHOR_HEIGHT, ANCHOR_REWARD);
+        var preRef = "mine-pre:" + addr;
+        if (!existingRefs[preRef]) {
+          found.push({ key: preRef, ref: preRef,
+            dateMs: tsForHeight(startH, anchorH, anchorMs, blockS),
+            type: "mining_income", address: addr, qtyPlanck: preQty,
+            note: pre.toLocaleString("en-US") + " blocks 1\u2013" + startH +
+              " \u00d7 avg modeled reward \u2014 AGGREGATE, split by tax year from your miner logs",
+            flag: "aggregate" });
+        }
       }
-    }
-  });
+    });
 
-  // --- transfers touching vault addresses (snapshot floor: >= 1 QTC)
-  (flows.transfers || []).forEach(function (t) {
-    var fromMine = !!vault[t.from_id], toMine = !!vault[t.to_id];
-    if (!fromMine && !toMine) return;
-    var ref = "tx:" + t.id;
-    if (existingRefs[ref]) return;
-    var bothMine = fromMine && toMine;
-    detections.push({ key: ref, ref: ref, dateMs: Date.parse(t.timestamp),
-      type: toMine ? "transfer_in" : "transfer_out",
-      address: toMine ? t.to_id : t.from_id,
-      qtyPlanck: BigInt(t.amount),
-      feePlanck: BigInt(t.fee || "0"),
-      note: "block " + t.block_height + " \u00b7 " + String(t.extrinsic_id).slice(0, 18) + "\u2026" +
-        (bothMine ? " \u00b7 both ends are yours \u2014 marked internal" : ""),
-      internal: bothMine, flag: null });
-  });
-
+    // --- transfers touching vault addresses (snapshot floor: >= 1 QTC)
+    flows.transfers.forEach(function (t) {
+      if (!t || typeof t !== "object") { skipped++; return; }
+      var fromMine = !!vault[t.from_id], toMine = !!vault[t.to_id];
+      if (!fromMine && !toMine) return;
+      if (t.id === null || t.id === undefined) { skipped++; return; }
+      var ref = "tx:" + t.id;
+      if (existingRefs[ref]) return;
+      var amt = L.toBigIntOrNull(t.amount);
+      var fee = (t.fee === null || t.fee === undefined) ? 0n : L.toBigIntOrNull(t.fee);
+      if (amt === null || amt < 0n || fee === null || fee < 0n) { skipped++; return; }
+      /* A missing/unparseable timestamp does NOT poison the row: the
+       * indexer snapshot carries null timestamps on real rows (the
+       * genesis allocation among them), and the amount/parties are chain
+       * fact. Estimate the date from the block height — the same model
+       * the mining detections use — and flag it, in the list and in the
+       * ledger event it becomes. Only a row with no usable timestamp AND
+       * no usable height is skipped. (Pre-fix these rows rendered dated
+       * "NaN-NaN-NaN".) */
+      var when = Date.parse(t.timestamp);
+      var estFlag = null;
+      if (!isFinite(when)) {
+        var bh = Number(t.block_height);
+        if (!Number.isInteger(bh) || bh < 0) { skipped++; return; }
+        when = tsForHeight(bh, anchorH, anchorMs, blockS);
+        estFlag = "date estimated";
+      }
+      var bothMine = fromMine && toMine;
+      found.push({ key: ref, ref: ref, dateMs: when,
+        type: toMine ? "transfer_in" : "transfer_out",
+        address: toMine ? t.to_id : t.from_id,
+        qtyPlanck: amt,
+        feePlanck: fee,
+        note: "block " + t.block_height + " \u00b7 " + String(t.extrinsic_id).slice(0, 18) + "\u2026" +
+          (estFlag ? " \u00b7 timestamp missing in snapshot \u2014 date estimated from block height" : "") +
+          (bothMine ? " \u00b7 both ends are yours \u2014 marked internal" : ""),
+        internal: bothMine, flag: estFlag });
+    });
+  } catch (e) {
+    scanFail("Scan failed on malformed snapshot data: " + e.message);
+    return;
+  }
+  if (seq !== scanSeq) return; // superseded during compute: discard
+  detections = found;
   detections.sort(function (a, b) { return a.dateMs - b.dateMs; });
-  status.textContent = detections.length ?
+  var skipNote = skipped ? " (" + skipped + " malformed snapshot rows skipped)" : "";
+  status.textContent = (detections.length ?
     detections.length + " candidate events found. Review, then add the ones that are yours." :
-    "No new on-chain activity for your vault addresses in these snapshots.";
+    "No new on-chain activity for your vault addresses in these snapshots.") + skipNote;
   renderDetections();
   $("detectActions").hidden = !detections.length;
 }

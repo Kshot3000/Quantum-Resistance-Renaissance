@@ -284,9 +284,84 @@ function parseCsv(text) {
   return rows.filter(function (r) { return r.length > 1 || r[0] !== ""; });
 }
 
+// ---- Stored-state boundary -------------------------------------------------
+// localStorage is user-writable (devtools, a hand-edited vault export, an
+// older buggy build): nothing read back from it may reach the BigInt
+// constructors in normEvent/priceLookup unchecked. One poisoned row used to
+// either abort the JSON reviver (silently resetting the ENTIRE vault) or
+// throw inside every render (bricking the app until site data was cleared
+// by hand) — and the poison re-saved itself on every save(). sanitizeState
+// is the single gate: valid rows survive verbatim, poisoned rows are
+// dropped, borderline fields are coerced to their honest neutral value
+// (bad fee -> 0, bad price -> unpriced, bad method -> FIFO).
+function toBigIntOrNull(v) {
+  if (typeof v === "bigint") return v;
+  if (typeof v === "number") return Number.isSafeInteger(v) ? BigInt(v) : null;
+  if (typeof v === "string") {
+    var t = v.trim();
+    if (t.indexOf("bigint:") === 0) t = t.slice(7); // save() encoding
+    return /^-?\d+$/.test(t) ? BigInt(t) : null;
+  }
+  return null;
+}
+function sanitizeState(raw) {
+  var clean = { addresses: [], events: [], prices: [], method: "FIFO" };
+  if (!raw || typeof raw !== "object") return clean;
+  if (Array.isArray(raw.addresses)) {
+    raw.addresses.forEach(function (a) {
+      if (!a || typeof a.address !== "string" || !a.address) return;
+      clean.addresses.push({
+        address: a.address,
+        label: typeof a.label === "string" ? a.label : "",
+        words: Array.isArray(a.words) ? a.words.filter(function (w) { return typeof w === "string"; }) : [],
+        addedAt: (typeof a.addedAt === "number" && isFinite(a.addedAt)) ? a.addedAt : 0
+      });
+    });
+  }
+  if (Array.isArray(raw.events)) {
+    raw.events.forEach(function (e, i) {
+      if (!e || typeof e !== "object") return;
+      if (!INFLOW[e.type] && !OUTFLOW[e.type]) return; // unknown type: engine would only flag it
+      var dateMs = Number(e.dateMs);
+      if (!isFinite(dateMs)) return;
+      var qty = toBigIntOrNull(e.qtyPlanck);
+      if (qty === null || qty <= 0n) return; // an event without a real quantity is not an event
+      var fee = toBigIntOrNull(e.feePlanck);
+      if (fee === null || fee < 0n) fee = 0n;
+      var price = null;
+      if (e.priceMicro !== null && e.priceMicro !== undefined) {
+        price = toBigIntOrNull(e.priceMicro);
+        if (price === null || price < 0n) price = null; // unpriced beats poisoned
+      }
+      clean.events.push({
+        id: (typeof e.id === "string" && e.id) ? e.id : "ev-restored-" + i,
+        dateMs: dateMs, type: e.type,
+        address: typeof e.address === "string" ? e.address : "",
+        qtyPlanck: qty, priceMicro: price, feePlanck: fee,
+        note: typeof e.note === "string" ? e.note : "",
+        source: typeof e.source === "string" ? e.source : "manual",
+        ref: typeof e.ref === "string" ? e.ref : "",
+        internal: !!e.internal,
+        flags: Array.isArray(e.flags) ? e.flags.filter(function (f) { return typeof f === "string"; }) : []
+      });
+    });
+  }
+  if (Array.isArray(raw.prices)) {
+    raw.prices.forEach(function (p) {
+      if (!p || typeof p.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(p.day)) return;
+      var micro = toBigIntOrNull(p.micro);
+      if (micro === null || micro < 0n) return;
+      clean.prices.push({ day: p.day, micro: micro });
+    });
+  }
+  if (raw.method === "FIFO" || raw.method === "LIFO" || raw.method === "HIFO") clean.method = raw.method;
+  return clean;
+}
+
 var api = {
   PLANCK: PLANCK, QUANTUM: QUANTUM, EMISSION_DIVISOR: EMISSION_DIVISOR,
   MICRO: MICRO, LONG_TERM_DAYS: LONG_TERM_DAYS,
+  toBigIntOrNull: toBigIntOrNull, sanitizeState: sanitizeState,
   rewardModelPlancks: rewardModelPlancks,
   parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc,
   parseUsdPerQtcToMicro: parseUsdPerQtcToMicro, formatUsd: formatUsd,

@@ -210,4 +210,61 @@ t("eventsToCsv escapes and parses back", () => {
   assert.equal(rows[1][5], "1.500000");
 });
 
+// --- stored-state boundary (sanitizeState / toBigIntOrNull) ---
+t("toBigIntOrNull accepts only exact integers", () => {
+  assert.equal(L.toBigIntOrNull(5n), 5n);
+  assert.equal(L.toBigIntOrNull(5), 5n);
+  assert.equal(L.toBigIntOrNull("bigint:2000000000000"), 2000000000000n);
+  assert.equal(L.toBigIntOrNull("-42"), -42n);
+  assert.equal(L.toBigIntOrNull("bigint:abc"), null);
+  assert.equal(L.toBigIntOrNull("12.5"), null);
+  assert.equal(L.toBigIntOrNull(2.5), null);
+  assert.equal(L.toBigIntOrNull("abc"), null);
+  assert.equal(L.toBigIntOrNull(null), null);
+  assert.equal(L.toBigIntOrNull({}), null);
+  assert.equal(L.toBigIntOrNull(9007199254740993), null); // unsafe integer
+});
+t("sanitizeState keeps valid rows and drops poisoned ones", () => {
+  const good = { id: "e1", dateMs: D("2026-01-15T12:00:00Z"), type: "buy", address: "",
+    qtyPlanck: "bigint:2000000000000", priceMicro: "bigint:3000000", feePlanck: "bigint:0",
+    note: "ok", source: "manual", ref: "", internal: false, flags: [] };
+  const s = L.sanitizeState({ addresses: [{ address: "qzAddr", label: "miner", words: ["a", 7, "b"], addedAt: 5 },
+      { address: 42 }, { label: "no address" }],
+    events: [good,
+      { ...good, id: "bomb", qtyPlanck: "bigint:abc" },
+      { ...good, id: "junk", qtyPlanck: "abc" },
+      { ...good, id: "nodate", dateMs: "garbage" },
+      { ...good, id: "badtype", type: "rug_pull" },
+      { ...good, id: "negqty", qtyPlanck: "-5" }],
+    prices: [{ day: "2026-01-01", micro: "xyz" }, { day: "2026-01-10", micro: "bigint:2500000" },
+      { day: "Jan 10", micro: "bigint:1" }],
+    method: "SIDEWAYS" });
+  assert.equal(s.addresses.length, 1);
+  assert.deepEqual(s.addresses[0].words, ["a", "b"]);
+  assert.equal(s.events.length, 1);
+  assert.equal(s.events[0].qtyPlanck, 2000000000000n);
+  assert.equal(s.events[0].priceMicro, 3000000n);
+  assert.equal(s.prices.length, 1);
+  assert.equal(s.prices[0].micro, 2500000n);
+  assert.equal(s.method, "FIFO");
+});
+t("sanitizeState coerces borderline fields to honest neutrals", () => {
+  const s = L.sanitizeState({ events: [{ id: "e", dateMs: 1000, type: "sell",
+    qtyPlanck: "1000", priceMicro: "garbage", feePlanck: "-9" }], method: "LIFO" });
+  assert.equal(s.events[0].feePlanck, 0n);       // bad fee -> 0, never negative
+  assert.equal(s.events[0].priceMicro, null);   // bad price -> unpriced, not poisoned
+  assert.equal(s.method, "LIFO");
+  assert.deepEqual(L.sanitizeState(null), { addresses: [], events: [], prices: [], method: "FIFO" });
+  assert.deepEqual(L.sanitizeState("junk"), { addresses: [], events: [], prices: [], method: "FIFO" });
+});
+t("sanitized state runs the ledger without throwing", () => {
+  const s = L.sanitizeState({ events: [{ id: "e", dateMs: D("2026-01-15T12:00:00Z"), type: "buy",
+    qtyPlanck: "bigint:2000000000000", priceMicro: "bigint:3000000", feePlanck: "bigint:0" }],
+    prices: [{ day: "2026-01-10", micro: "bigint:2500000" }] });
+  const lookup = (ms) => { let best = null; s.prices.forEach((p) => { if (p.day <= L.dayKey(ms)) best = p.micro; }); return best; };
+  const res = L.runLedger(s.events, s.method, lookup);
+  assert.equal(res.lots.length, 1);
+  assert.equal(res.lots[0].qtyPlanck, 2000000000000n);
+});
+
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nAll " + n + " tests passed.");
