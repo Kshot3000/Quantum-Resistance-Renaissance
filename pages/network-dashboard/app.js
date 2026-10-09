@@ -96,17 +96,18 @@ if (typeof module !== "undefined" && module.exports) module.exports = API;
 /* ---------------- fetch layer ---------------- */
 
 var SNAPSHOT = "../../data/live.json";
-var lastFetchedAt = null;
-var dataMode = "snapshot"; /* snapshot | live | mock */
 
+/* Every fetch resolves a self-describing result {data, mode, fetchedAt} —
+ * never shared globals: a superseded poll landing late must not be able to
+ * relabel (or redate) a newer poll's render through a mutated dataMode. */
 function gql(query){
   /* Test hook for headless QA:
    * QA injects window.__qtcdash_mock = {ok:true,data:{...}} before load. */
   if (typeof window !== "undefined" && window.__qtcdash_mock){
     var m = window.__qtcdash_mock;
-    dataMode = "mock";
-    lastFetchedAt = new Date().toISOString();
-    return m.ok ? Promise.resolve(m.data) : Promise.reject(new Error(m.error || "mock indexer failure"));
+    return m.ok
+      ? Promise.resolve({ data: m.data, mode: "mock", fetchedAt: new Date().toISOString() })
+      : Promise.reject(new Error(m.error || "mock indexer failure"));
   }
   /* Browser CORS: sqm.quantus.com only allowlists explorer.quantus.com / quantus.com.
    * On GitHub Pages we load a same-origin snapshot refreshed about hourly by the
@@ -118,20 +119,26 @@ function gql(query){
 function fetchDirect(query){
   var ctl = new AbortController();
   var timer = setTimeout(function(){ ctl.abort(); }, 4000);
+  /* The timer stays armed until the body is parsed: clearing it when the
+   * headers land (the old code) left res.json() with no timeout at all, so a
+   * stalled body could strand this poll past the 60s refresh interval and
+   * into the next poll — the overlap the refresh sequence token now has to
+   * defend against. Whatever settles first clears it exactly once. */
   return fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query: query }),
     signal: ctl.signal
   }).then(function(res){
-    clearTimeout(timer);
     if (!res.ok) throw new Error("indexer HTTP " + res.status);
     return res.json();
   }).then(function(json){
+    clearTimeout(timer);
     if (json.errors) throw new Error("indexer: " + json.errors[0].message);
-    dataMode = "live";
-    lastFetchedAt = new Date().toISOString();
-    return json.data;
+    return { data: json.data, mode: "live", fetchedAt: new Date().toISOString() };
+  }).catch(function(err){
+    clearTimeout(timer);
+    throw err;
   });
 }
 
@@ -151,9 +158,7 @@ function fetchSnapshot(){
     return res.json();
   }).then(function(payload){
     if (!payload || !payload.ok || !payload.data) throw new Error("snapshot empty");
-    dataMode = "snapshot";
-    lastFetchedAt = payload.fetched_at || null;
-    return payload.data;
+    return { data: payload.data, mode: "snapshot", fetchedAt: payload.fetched_at || null };
   });
 }
 
@@ -345,18 +350,48 @@ function drawChart(){
 /* ---------------- refresh loop ---------------- */
 
 var refreshTimer = null;
+var refreshSeq = 0;
+var displayedHeight = null; /* block height of the telemetry currently on screen */
+var lastGoodLabel = null;
+
+function incomingHeight(data){
+  var st = data && data.status;
+  if (st && typeof st.block_height === "number") return st.block_height;
+  var blocks = (data && data.blocks) || [];
+  return blocks.length && typeof blocks[0].height === "number" ? blocks[0].height : null;
+}
 
 function refresh(){
+  var mySeq = ++refreshSeq;
   setPill("", "connecting…");
-  gql(QUERY).then(function(data){
-    var modeLabel = dataMode === "live"
+  gql(QUERY).then(function(result){
+    /* A superseded poll renders nothing: its slow snapshot (or its failure)
+     * must not paint over a newer poll's fresher telemetry. */
+    if (mySeq !== refreshSeq) return;
+    var data = result.data;
+    var h = incomingHeight(data);
+    if (result.mode === "snapshot" && h !== null && displayedHeight !== null && h < displayedHeight){
+      /* The snapshot file is refreshed only periodically, so a current poll
+       * whose direct call failed can carry a height older than the one
+       * already on screen. Discard it instead of regressing the dashboard;
+       * a direct (live) result is the indexer's own word and renders as-is. */
+      if (lastGoodLabel) setPill("on", lastGoodLabel);
+      return;
+    }
+    var modeLabel = result.mode === "live"
       ? "live · direct indexer"
-      : ("snapshot · updated " + (lastFetchedAt ? new Date(lastFetchedAt).toLocaleString() : "recently"));
+      : ("snapshot · updated " + (result.fetchedAt ? new Date(result.fetchedAt).toLocaleString() : "recently"));
     setPill("on", modeLabel);
+    lastGoodLabel = modeLabel;
     renderStats(data);
     renderBlocks(data.blocks);
+    if (h !== null) displayedHeight = h;
   }).catch(function(err){
+    if (mySeq !== refreshSeq) return;
     setPill("err", "indexer unreachable");
+    /* Keep last good telemetry on screen — the pill carries the failure.
+     * Only a dashboard that has never rendered paints the error row. */
+    if (displayedHeight !== null) return;
     els.blocksBody.innerHTML = '<tr><td colspan="4" class="perror">Could not load chain data (' +
       String(err && err.message || err) + '). Direct indexer is CORS-locked to official domains; the same-origin snapshot was also unreachable. Retrying…</td></tr>';
     els.chartNote.textContent = "Daily activity unavailable — snapshot and indexer both failed.";
