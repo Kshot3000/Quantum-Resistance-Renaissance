@@ -310,10 +310,29 @@ function redrawCharts(a){
 }
 
 /* ================= boot ================= */
+/* Boot failure must be VISIBLE: if the live query and the snapshot both
+ * fail (or a malformed snapshot reaches computeAudit), the audit cannot
+ * run — say so, instead of stranding the page on "loading…" and "…"
+ * placeholders with an unhandled rejection in the console. No figures are
+ * shown rather than stale or invented ones. */
+function showBootError(e){
+  $("data-mode").textContent = "unavailable — audit not run";
+  ["f-protocol","f-recorded","f-reported","f-gap","f-height"].forEach(function(id){ $(id).textContent = "—"; });
+  var hero = document.querySelector(".hero");
+  if (!hero || $("audit-error")) return;
+  var d = document.createElement("div");
+  d.id = "audit-error";
+  d.className = "audit-error";
+  d.innerHTML = "<strong>Could not load the supply data.</strong> " + A.esc(e && e.message ? e.message : String(e)) +
+    " Both the live indexer query and the same-origin snapshot (<code>../../data/supply.json</code>) failed or were malformed, so the audit was not run. No figures are shown rather than stale or invented ones.";
+  hero.appendChild(d);
+}
 async function boot(){
   initTabs();
   ledgerRain();
-  var d = await loadSupply();
+  var d;
+  try { d = await loadSupply(); }
+  catch (e) { showBootError(e); return; }
   var blocks = null;
   try {
     var live = await fetchJson("../../data/live.json", 8000);
@@ -321,14 +340,17 @@ async function boot(){
   } catch (e) {}
   window.__blocks = blocks;
   var t0 = Date.now();
-  var a = A.computeAudit(d);
-  window.__audit = a;
-  window.__supplyData = d;
-  renderHero(a, d);
-  renderVerdict(a, d);
-  renderLedgers(a, d);
-  renderGenesis(a, d);
-  redrawCharts(a);
+  var a;
+  try {
+    a = A.computeAudit(d);
+    window.__audit = a;
+    window.__supplyData = d;
+    renderHero(a, d);
+    renderVerdict(a, d);
+    renderLedgers(a, d);
+    renderGenesis(a, d);
+    redrawCharts(a);
+  } catch (e) { showBootError(e); return; }
   window.__auditMs = Date.now() - t0;
   addEventListener("resize", function(){
     if ($("tab-curve").classList.contains("active")) redrawCharts(a);

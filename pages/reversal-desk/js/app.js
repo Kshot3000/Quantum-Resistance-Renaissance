@@ -217,15 +217,30 @@
 
   /* quota simulator */
   var quotaTxs = [];
+  /* The reference height for quota windows and ages is the LIVE snapshot
+   * height. It used to fall back to a hard-coded 146270 — the height on the
+   * day the desk was built — which went stale by tens of thousands of
+   * blocks: with the snapshot slow or down, "Add transaction" fabricated a
+   * tx at that ancient height and every age was measured against it. When
+   * the live height is unknown, the only honest reference is the newest
+   * simulated block itself (ages become relative to it, and the note says
+   * so); renderLive re-runs renderQuota the moment the real height lands. */
+  function quotaRefHeight() {
+    if (window.__revHeight) return { h: window.__revHeight, live: true };
+    if (quotaTxs.length) return { h: Math.max.apply(null, quotaTxs), live: false };
+    return { h: 0, live: false };
+  }
   function renderQuota() {
-    var nowH = window.__revHeight || 146270;
+    var ref = quotaRefHeight();
+    var nowH = ref.h;
     var q = RC.quotaCheck(quotaTxs.slice().sort(function (a, b) { return a - b; }), nowH);
     $("qRemain").textContent = q.remaining + " / 16";
     $("qBar").style.width = (q.inWindow / 16 * 100) + "%";
     $("qBar").className = "qfill" + (q.remaining === 0 ? " full" : q.remaining <= 4 ? " low" : "");
-    $("qNote").innerHTML = q.allowed
+    $("qNote").innerHTML = (q.allowed
       ? "Quota has room — the next signed extrinsic will be admitted."
-      : "<span class='bad'>Quota exhausted — the next signed extrinsic is rejected until the oldest entry ages past 7 200 blocks.</span>";
+      : "<span class='bad'>Quota exhausted — the next signed extrinsic is rejected until the oldest entry ages past 7 200 blocks.</span>") +
+      (ref.live ? "" : " <span class='dim'>Live height unknown — ages are measured against the newest simulated block.</span>");
     var list = $("qList");
     list.innerHTML = "";
     quotaTxs.slice().sort(function (a, b) { return b - a; }).forEach(function (b, i) {
@@ -266,7 +281,7 @@
     return ctl.signal;
   }
   function loadSnapshot() {
-    fetch("../../data/reversal.json?v=1.50.1", { cache: "no-store", signal: timeoutSignal(9000) })
+    fetch("../../data/reversal.json?v=1.50.2", { cache: "no-store", signal: timeoutSignal(9000) })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -295,6 +310,10 @@
     renderQueue(d);
     // re-run planner ETA now that we know the height
     updatePlanner();
+    // re-base the quota simulator onto the real height: entries added
+    // before the snapshot landed were aged against the newest simulated
+    // block, which is wrong the moment the true height is known
+    renderQuota();
   }
   function txRow(kind, r) {
     var tr = el("tr");
@@ -361,9 +380,17 @@
       $(id).addEventListener("change", updateHS);
     });
     $("qAdd").addEventListener("click", function () {
-      var nowH = window.__revHeight || 146270;
       var v = parseInt($("qBlock").value, 10);
-      if (!Number.isFinite(v)) v = nowH;
+      if (!Number.isFinite(v)) {
+        /* No explicit block: default to the live height — and if that is
+         * unknown, refuse rather than fabricate a height (the old code
+         * silently used a hard-coded 146270 from build day). */
+        if (!window.__revHeight) {
+          $("qNote").innerHTML = "<span class='bad'>Enter a block number — the live height is unavailable, so there is no honest default to add at.</span>";
+          return;
+        }
+        v = window.__revHeight;
+      }
       quotaTxs.push(v);
       renderQuota();
     });
