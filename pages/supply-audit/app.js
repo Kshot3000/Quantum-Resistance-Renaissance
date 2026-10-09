@@ -71,9 +71,13 @@ async function loadSupply(){
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ query: gqlQuery() })
     });
-    clearTimeout(t);
     if (!r.ok) throw new Error("HTTP " + r.status);
+    /* The abort timer stays armed until the body is parsed: clearing it
+     * here (headers landed) would leave r.json() unbounded, so a stalled
+     * body could hang the audit forever and the snapshot fallback below
+     * would never run. */
     var j = await r.json();
+    clearTimeout(t);
     if (j.errors) throw new Error("GraphQL error");
     var core = j.data, poolFree = null;
     try {
@@ -82,10 +86,11 @@ async function loadSupply(){
       var pq = await fetch(A.ENDPOINT, { method: "POST", signal: pctl.signal,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ query: `query { account_by_pk(id: "${core.genesis[0].to_id}") { free } }` }) });
-      clearTimeout(pt);
+      /* Same body rule as the main query: pt stays armed across pq.json(). */
       var pj = await pq.json();
+      clearTimeout(pt);
       poolFree = pj.data && pj.data.account_by_pk ? pj.data.account_by_pk.free : null;
-    } catch (e) {}
+    } catch (e) { clearTimeout(pt); }
     return toSnapshot(core, new Date().toISOString(), poolFree);
   } catch (e) {
     var snap = await fetchJson("../../data/supply.json");

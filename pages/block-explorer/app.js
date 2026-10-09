@@ -125,10 +125,13 @@ function gql(query){
     body: JSON.stringify({ query: query }),
     signal: ctl.signal
   }).then(function(res){
-    clearTimeout(timer);
+    /* The timer stays armed until the body is parsed: clearing it here, when
+     * the headers land, would leave res.json() with no timeout at all, so a
+     * stalled body could hang every explorer view on "loading" forever. */
     if (!res.ok) throw new Error("indexer HTTP " + res.status);
     return res.json();
   }).then(function(json){
+    clearTimeout(timer);
     if (json.errors && json.errors.length)
       throw new Error("indexer: " + json.errors.map(function(e){ return e.message; }).join("; "));
     return json.data;

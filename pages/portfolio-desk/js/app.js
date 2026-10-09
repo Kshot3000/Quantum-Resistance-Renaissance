@@ -103,7 +103,11 @@ function fetchJson(url, timeoutMs) {
   var ctrl = new AbortController();
   var t = setTimeout(function () { ctrl.abort(); }, timeoutMs || FETCH_TIMEOUT_MS);
   return fetch(url, { signal: ctrl.signal, cache: "no-store" })
-    .then(function (r) { clearTimeout(t); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    /* The timer stays armed until the body is parsed: clearing it when the
+     * headers land would leave r.json() with no timeout, so a stalled
+     * snapshot body could hang the desk's data load forever. */
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (j) { clearTimeout(t); return j; })
     .catch(function (e) { clearTimeout(t); throw e; });
 }
 

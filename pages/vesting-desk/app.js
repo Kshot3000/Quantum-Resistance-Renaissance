@@ -28,9 +28,13 @@
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ query: LIVE_QUERY }), signal: ctl.signal,
       });
-      clearTimeout(to);
       if (!res.ok) throw new Error("HTTP " + res.status);
+      /* The abort timer stays armed until the body is parsed: clearing it
+       * here (headers landed) would leave res.json() unbounded, so a
+       * stalled body could hang loadData forever and the snapshot fallback
+       * in the catch below would never run. */
       const json = await res.json();
+      clearTimeout(to);
       if (json.errors) throw new Error("graphql");
       const nowMs = String(Date.now());
       DATA = normalizeLive(json.data.schedules, nowMs);
