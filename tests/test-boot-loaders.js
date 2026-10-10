@@ -864,7 +864,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.5"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.6"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -897,7 +897,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.5"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.6"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -932,7 +932,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.4"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.5"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -970,7 +970,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.3"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.4"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1043,6 +1043,36 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(src.includes('raw.reserved_plancks == null ? "0" : decStr(raw.reserved_plancks)'), "whale2: present-but-malformed reserved drops its row, never silently zeroed");
   const html = read("pages/whale-watch/index.html");
   ok(html.includes("app.js?v=1.21.0"), "whale2: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 32 (2026-10-10 17:19): tokenomics (Tier 2) — the live tiles
+// anchor modeled supply + block reward to a single external scalar,
+// the block height, arriving via direct GraphQL and the live.json
+// snapshot fallback. Both paths were guarded only by `h > 0` (Batch 6
+// pinned the fall-through shape but never the validation): an absurd
+// height (9,007,199,254,740,991) painted with supply 21,000,000 /
+// reward 0.0000, a boolean painted block 1, fractional/scientific
+// heights coerced mid-block, and the snapshot's ok flag + fetched_at
+// were never consulted (far-future capture time; status height
+// disagreeing with the snapshot's own blocks[0]). Pin: one boundary
+// (fleet validBlockHeight + liveHeightFromGraphQL /
+// liveHeightFromSnapshot) gates both paths, snapshot requires ok:true,
+// a real capture time, and status/blocks[0] agreement.
+{
+  const src = read("pages/tokenomics/app.js");
+  ok(src.includes("function validBlockHeight(v)"), "tokenomics2: validBlockHeight() defined (fleet 1..10,000,000 shape)");
+  ok(src.includes("function liveHeightFromGraphQL(j)"), "tokenomics2: liveHeightFromGraphQL() defined");
+  ok(src.includes("function liveHeightFromSnapshot(p)"), "tokenomics2: liveHeightFromSnapshot() defined");
+  ok(src.includes("p.ok !== true"), "tokenomics2: snapshot must carry ok:true");
+  ok(src.includes("fetchedMs > Date.now() + 3600000"), "tokenomics2: a future fetched_at fails the snapshot");
+  ok(src.includes("fetchedMs < GENESIS_FLOOR_MS"), "tokenomics2: a pre-genesis fetched_at fails the snapshot");
+  ok(src.includes("bh !== h"), "tokenomics2: status height must agree with blocks[0]");
+  ok(src.includes("var h = liveHeightFromGraphQL(j);"), "tokenomics2: GraphQL height goes through the boundary");
+  ok(src.includes("var h = liveHeightFromSnapshot(p);"), "tokenomics2: snapshot height goes through the boundary");
+  ok(!src.includes("if (h > 0)"), "tokenomics2: no coercion-only height guard remains");
+  ok(src.includes("liveHeightFromSnapshot: liveHeightFromSnapshot"), "tokenomics2: Node module hook exports the boundary");
+  const html = read("pages/tokenomics/index.html");
+  ok(html.includes("app.js?v=1.10.0"), "tokenomics2: app.js cache key bumped for the boundary fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -261,6 +261,50 @@ function emitChartSVG(years){
   return s;
 }
 
+/* ---------------- live-height boundary ----------------
+ * The live tiles anchor modeled supply + block reward to ONE external
+ * scalar — the block height — arriving via two paths: a direct GraphQL
+ * call and the data/live.json snapshot fallback. Both used to be guarded
+ * only by `h > 0`, which is coercion, not validation: an absurd height
+ * (9,007,199,254,740,991) painted as the block with supply 21,000,000 /
+ * reward 0.0000; a boolean true painted block 1; fractional and
+ * scientific-notation heights coerced silently mid-block; and the
+ * snapshot's ok flag and fetched_at were never consulted, so a
+ * far-future capture time or a status height disagreeing with the
+ * snapshot's own newest block row anchored anyway. Every height now
+ * passes this one boundary before it can anchor a tile; anything else
+ * falls through to the next stage (snapshot, then the local model). */
+var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain exists from Sept 2026
+function validBlockHeight(v){
+  var n;
+  if (typeof v === "number") n = v;
+  else if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) n = Number(v);
+  else return null; // booleans, null, objects, "2.02e5", "202000.5" all reject
+  return (Number.isSafeInteger(n) && n >= 1 && n <= 10000000) ? n : null;
+}
+function liveHeightFromGraphQL(j){
+  if (!j || typeof j !== "object" || j.errors) return null;
+  var d = j.data && j.data.chain_stats_by_pk;
+  if (!d || typeof d !== "object") return null;
+  return validBlockHeight(d.block_height);
+}
+function liveHeightFromSnapshot(p){
+  if (!p || typeof p !== "object" || p.ok !== true) return null;
+  var fetchedMs = Date.parse(p.fetched_at);
+  if (!isFinite(fetchedMs) || fetchedMs < GENESIS_FLOOR_MS || fetchedMs > Date.now() + 3600000) return null;
+  if (!p.data || typeof p.data !== "object" || !p.data.status || typeof p.data.status !== "object") return null;
+  var h = validBlockHeight(p.data.status.block_height);
+  if (h === null) return null;
+  // status and the newest block row are two copies of the same truth:
+  // where the snapshot carries both, they must agree exactly.
+  if (p.data.blocks != null){
+    if (!Array.isArray(p.data.blocks) || !p.data.blocks.length) return null;
+    var bh = p.data.blocks[0] && validBlockHeight(p.data.blocks[0].height);
+    if (bh === null || bh !== h) return null;
+  }
+  return h;
+}
+
 var API = { CHAIN: CHAIN, GENESIS_BUCKETS: GENESIS_BUCKETS, MINER_BUCKET: MINER_BUCKET,
   FUNDING: FUNDING, fmtInt: fmtInt, fmtQTC: fmtQTC, fmtDate: fmtDate,
   daysSinceTGE: daysSinceTGE, unlockedAt: unlockedAt, genesisUnlocked: genesisUnlocked,
@@ -268,7 +312,9 @@ var API = { CHAIN: CHAIN, GENESIS_BUCKETS: GENESIS_BUCKETS, MINER_BUCKET: MINER_
   rewardAtDays: rewardAtDays, milestoneDay: milestoneDay,
   wormholeFee: wormholeFee, hsFee: hsFee, q2qtc: q2qtc,
   qtcToPlancksExact: qtcToPlancksExact, fmtPlancksExact: fmtPlancksExact, fmtQuanta: fmtQuanta,
-  vestChartSVG: vestChartSVG, emitChartSVG: emitChartSVG };
+  vestChartSVG: vestChartSVG, emitChartSVG: emitChartSVG,
+  validBlockHeight: validBlockHeight, liveHeightFromGraphQL: liveHeightFromGraphQL,
+  liveHeightFromSnapshot: liveHeightFromSnapshot };
 if (typeof module !== "undefined" && module.exports) module.exports = API;
 
 /* ---------------- DOM wiring (browser only) ---------------- */
@@ -456,8 +502,8 @@ $("hsInput").addEventListener("input", renderHs); renderHs();
       return fetch("../../data/live.json?t=" + Math.floor(Date.now()/60000), { cache: "no-store", signal: (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(9000) : undefined })
         .then(function(r){ return r.json(); })
         .then(function(p){
-          var h = p && p.data && p.data.status && p.data.status.block_height;
-          if (h > 0){ setTiles(h, true); $("ltHeightSrc").textContent = "snapshot · sqm.quantus.com"; }
+          var h = liveHeightFromSnapshot(p);
+          if (h !== null){ setTiles(h, true); $("ltHeightSrc").textContent = "snapshot · sqm.quantus.com"; }
           else local();
         });
     }
@@ -466,8 +512,8 @@ $("hsInput").addEventListener("input", renderHs); renderHs();
       body: JSON.stringify({ query: 'query { chain_stats_by_pk(id: "global") { block_height } }' }),
       signal: (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(3500) : undefined
     }).then(function(r){ return r.json(); }).then(function(j){
-      var h = j && j.data && j.data.chain_stats_by_pk && j.data.chain_stats_by_pk.block_height;
-      if (h > 0) setTiles(h, true);
+      var h = liveHeightFromGraphQL(j);
+      if (h !== null) setTiles(h, true);
       else throw new Error("empty");
     }).catch(function(){ return fromSnap().catch(local); });
     setTimeout(function(){ if ($("ltHeight").textContent === "—") local(); }, 8000);

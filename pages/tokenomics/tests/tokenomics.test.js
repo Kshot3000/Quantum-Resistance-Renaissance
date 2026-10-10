@@ -198,6 +198,70 @@ t("emitChartSVG: milestone markers + 21M cap line", () => {
   assert.ok(svg.includes("21M cap"));
 });
 
+t("validBlockHeight: fleet shape — strict integer 1..10,000,000 only", () => {
+  assert.equal(A.validBlockHeight(202000), 202000);
+  assert.equal(A.validBlockHeight("202000"), 202000); // canonical digit string
+  assert.equal(A.validBlockHeight(1), 1);
+  assert.equal(A.validBlockHeight(10000000), 10000000);
+  // Everything the old `h > 0` guard coerced or waved through:
+  assert.equal(A.validBlockHeight(9007199254740991), null); // absurd height painted pre-fix
+  assert.equal(A.validBlockHeight(10000001), null);
+  assert.equal(A.validBlockHeight(202000.5), null);         // fractional anchored mid-block
+  assert.equal(A.validBlockHeight("2.02e5"), null);         // scientific string coerced
+  assert.equal(A.validBlockHeight("202000.5"), null);
+  assert.equal(A.validBlockHeight(" 202000"), null);
+  assert.equal(A.validBlockHeight(true), null);            // painted block 1 pre-fix
+  assert.equal(A.validBlockHeight(0), null);
+  assert.equal(A.validBlockHeight(-5), null);
+  assert.equal(A.validBlockHeight(null), null);
+  assert.equal(A.validBlockHeight(undefined), null);
+  assert.equal(A.validBlockHeight(NaN), null);
+  assert.equal(A.validBlockHeight({}), null);
+  assert.equal(A.validBlockHeight([202000]), null);
+});
+
+t("liveHeightFromGraphQL: only a validated height anchors", () => {
+  const good = { data: { chain_stats_by_pk: { block_height: 202000 } } };
+  assert.equal(A.liveHeightFromGraphQL(good), 202000);
+  assert.equal(A.liveHeightFromGraphQL({ data: { chain_stats_by_pk: { block_height: 9007199254740991 } } }), null);
+  assert.equal(A.liveHeightFromGraphQL({ data: { chain_stats_by_pk: { block_height: 202000.5 } } }), null);
+  assert.equal(A.liveHeightFromGraphQL({ data: { chain_stats_by_pk: { block_height: true } } }), null);
+  assert.equal(A.liveHeightFromGraphQL({ errors: [{ message: "x" }], data: null }), null);
+  assert.equal(A.liveHeightFromGraphQL({ data: null }), null);
+  assert.equal(A.liveHeightFromGraphQL(null), null);
+  assert.equal(A.liveHeightFromGraphQL("202000"), null);
+});
+
+t("liveHeightFromSnapshot: ok, real capture time, status/blocks agreement", () => {
+  const now = new Date().toISOString();
+  const mk = (mut) => {
+    const p = { ok: true, fetched_at: now,
+      data: { status: { block_height: 202000 }, blocks: [{ height: 202000 }, { height: 201999 }] } };
+    if (mut) mut(p);
+    return p;
+  };
+  assert.equal(A.liveHeightFromSnapshot(mk()), 202000);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.ok = false; })), null);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { delete p.ok; })), null);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.fetched_at = "2999-01-01T00:00:00.000Z"; })), null);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.fetched_at = "2020-01-01T00:00:00.000Z"; })), null);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.fetched_at = "not a date"; })), null);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.data.status.block_height = 9007199254740991; p.data.blocks[0].height = 9007199254740991; })), null);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.data.blocks[0].height = 202500; })), null); // two copies disagree
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.data.blocks = []; })), null);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.data.blocks = "oops"; })), null);
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { delete p.data.blocks; })), 202000); // blocks optional
+  assert.equal(A.liveHeightFromSnapshot(mk(p => { p.data.status = null; })), null);
+  assert.equal(A.liveHeightFromSnapshot(null), null);
+});
+
+t("liveHeightFromSnapshot: the REAL data/live.json passes its own boundary", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const real = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "data", "live.json"), "utf8"));
+  assert.equal(A.liveHeightFromSnapshot(real), real.data.status.block_height);
+});
+
 t("formatters", () => {
   assert.equal(A.fmtInt(5670000), "5,670,000");
   assert.equal(A.fmtInt(null), "—");
