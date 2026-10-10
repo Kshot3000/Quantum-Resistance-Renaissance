@@ -44,6 +44,131 @@ function esc(s){
 /* Round down to the leaf quantum (the ZK-tree amount scale factor). */
 function quantize(x){ return x - (x % LEAF_QUANTUM); }
 
+/* ---------------- payload boundary (fleet pattern) ----------------
+ * Every field that crosses from the live indexer or data/supply.json is
+ * validated by sanitizeSupply BEFORE it anchors a verdict figure, a
+ * ledger row, or a genesis entry. A malformed CORE payload rejects
+ * wholesale (throws): the caller reads that exactly like a failed load
+ * — no figures rather than invented ones. Cross-checks that cost
+ * nothing and catch the historically real failure modes:
+ *  - the genesis total must equal the sum of its own transfer list
+ *    (the 2026-09-30 pipeline once truncated that list to 3 rows);
+ *  - no money total may exceed the 21M hard cap, and genesis + mined
+ *    (the provable money stock) may not exceed it either;
+ *  - vesting claimed may not exceed vesting total;
+ *  - the mint-sentinel id must be the canonical MintingAccount;
+ *  - addresses must be prefix-189 SS58 shape (qz + 47 base58 chars,
+ *    as in Vesting Desk / Governance Tracker);
+ *  - block_height is bounded (MAX_HEIGHT) so a poisoned height cannot
+ *    make baseline() iterate effectively forever.
+ */
+var MAX_HEIGHT = 10000000;
+var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
+
+function nonNegInt(v){
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v)){
+    var n = Number(v);
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  return null;
+}
+function validPlancks(v){
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
+  return null;
+}
+function validAddress(v){
+  return typeof v === "string" && ADDR_RE.test(v) ? v : null;
+}
+function malformed(field){
+  throw new Error("malformed supply payload: " + field);
+}
+function planckField(v, field){
+  var p = validPlancks(v);
+  if (p === null) malformed(field);
+  if (BigInt(p) > MAX_SUPPLY) malformed(field + " exceeds the 21M cap");
+  return p;
+}
+function countField(v, field, min){
+  var n = nonNegInt(v);
+  if (n === null || n < min) malformed(field);
+  return n;
+}
+function sanitizeSupply(d){
+  if (!d || typeof d !== "object" || Array.isArray(d)) malformed("payload is not an object");
+  if (d.ok !== true) malformed("ok flag");
+  if (typeof d.fetched_at !== "string" || !isFinite(Date.parse(d.fetched_at))) malformed("fetched_at");
+  var h = countField(d.block_height, "block_height", 1);
+  if (h > MAX_HEIGHT) malformed("block_height beyond sanity bound");
+  var accounts = countField(d.accounts_total, "accounts_total", 1);
+  if (d.mint_sentinel_id !== MINT_SENTINEL) malformed("mint_sentinel_id is not the canonical minting account");
+
+  var g = d.genesis;
+  if (!g || typeof g !== "object" || Array.isArray(g)) malformed("genesis");
+  if (!Array.isArray(g.transfers) || g.transfers.length < 1 || g.transfers.length > 100) malformed("genesis.transfers");
+  var gCount = countField(g.count, "genesis.count", 1);
+  if (gCount !== g.transfers.length) malformed("genesis.count != transfers length");
+  var gTotal = planckField(g.total_plancks, "genesis.total_plancks");
+  var sum = 0n, transfers = [];
+  g.transfers.forEach(function(t, i){
+    if (!t || typeof t !== "object" || Array.isArray(t)) malformed("genesis.transfers[" + i + "]");
+    var amt = planckField(t.amount_plancks, "genesis.transfers[" + i + "].amount_plancks");
+    if (BigInt(amt) <= 0n) malformed("genesis.transfers[" + i + "].amount_plancks is not positive");
+    var from = validAddress(t.from), to = validAddress(t.to);
+    if (from === null || to === null) malformed("genesis.transfers[" + i + "] address");
+    sum += BigInt(amt);
+    transfers.push({ amount_plancks: amt, from: from, to: to });
+  });
+  if (sum !== BigInt(gTotal)) malformed("genesis.total_plancks != sum of its transfers");
+
+  var m = d.mined;
+  if (!m || typeof m !== "object" || Array.isArray(m)) malformed("mined");
+  var rewardEvents = countField(m.reward_events, "mined.reward_events", 1);
+  var minedTotal = planckField(m.total_plancks, "mined.total_plancks");
+  if (BigInt(minedTotal) <= 0n) malformed("mined.total_plancks is not positive");
+  if (BigInt(gTotal) + BigInt(minedTotal) > MAX_SUPPLY) malformed("genesis + mined exceeds the 21M cap");
+
+  var b = d.balances_plancks;
+  if (!b || typeof b !== "object" || Array.isArray(b)) malformed("balances_plancks");
+  var free = planckField(b.free, "balances_plancks.free");
+  var reserved = planckField(b.reserved, "balances_plancks.reserved");
+  var frozen = planckField(b.frozen, "balances_plancks.frozen");
+  var balTotal = BigInt(free) + BigInt(reserved) + BigInt(frozen);
+  if (balTotal <= 0n) malformed("balances_plancks total is not positive");
+  if (balTotal > MAX_SUPPLY) malformed("balances_plancks total exceeds the 21M cap");
+
+  var v = d.vesting;
+  if (!v || typeof v !== "object" || Array.isArray(v)) malformed("vesting");
+  var schedules = countField(v.schedules, "vesting.schedules", 0);
+  var vestTotal = planckField(v.total_plancks, "vesting.total_plancks");
+  var vestClaimed = planckField(v.claimed_plancks, "vesting.claimed_plancks");
+  if (BigInt(vestClaimed) > BigInt(vestTotal)) malformed("vesting.claimed_plancks exceeds vesting.total_plancks");
+  var poolAccount = (v.pool_account === null || v.pool_account === undefined) ? null : validAddress(v.pool_account);
+  if (v.pool_account !== null && v.pool_account !== undefined && poolAccount === null) malformed("vesting.pool_account");
+  var poolFree = (v.pool_free_plancks === null || v.pool_free_plancks === undefined)
+    ? null : planckField(v.pool_free_plancks, "vesting.pool_free_plancks");
+
+  var ms = d.mint_sentinel;
+  if (!ms || typeof ms !== "object" || Array.isArray(ms)) malformed("mint_sentinel");
+  var sentinelFree = planckField(ms.free_plancks, "mint_sentinel.free_plancks");
+  var sentinelOutCount = countField(ms.out_nongenesis_count, "mint_sentinel.out_nongenesis_count", 0);
+  var sentinelOut = planckField(ms.out_nongenesis_plancks, "mint_sentinel.out_nongenesis_plancks");
+
+  return {
+    ok: true, source: typeof d.source === "string" ? d.source : ENDPOINT,
+    fetched_at: d.fetched_at, live: d.live === true,
+    block_height: h, accounts_total: accounts, mint_sentinel_id: MINT_SENTINEL,
+    genesis: { count: gCount, total_plancks: gTotal, transfers: transfers },
+    mined: { reward_events: rewardEvents, total_plancks: minedTotal },
+    balances_plancks: { free: free, reserved: reserved, frozen: frozen },
+    vesting: { schedules: schedules, total_plancks: vestTotal, claimed_plancks: vestClaimed,
+      pool_account: poolAccount, pool_free_plancks: poolFree },
+    mint_sentinel: { free_plancks: sentinelFree,
+      out_nongenesis_count: sentinelOutCount, out_nongenesis_plancks: sentinelOut }
+  };
+}
+
 /* Fee-free baseline recurrence: S <- S + Q((C - S) / D), iterated `height` times.
  * Returns { supply, samples } with [height, supply] checkpoints. */
 function baseline(s0, height, step){
@@ -63,7 +188,8 @@ function subsidyAt(s){
 
 /* Full audit from a supply snapshot (data/supply.json shape).
  * All money stays BigInt. Returns every figure the UI renders. */
-function computeAudit(d){
+function computeAudit(raw){
+  var d = sanitizeSupply(raw);
   var s0 = BigInt(d.genesis.total_plancks);
   var h = d.block_height;
   var base = baseline(s0, h, Math.max(1, Math.floor(h / 140)));
@@ -98,6 +224,7 @@ return {
   LEAF_QUANTUM: LEAF_QUANTUM, MINT_SENTINEL: MINT_SENTINEL, ENDPOINT: ENDPOINT,
   fmtQtc: fmtQtc, fmtInt: fmtInt, esc: esc,
   quantize: quantize, baseline: baseline, subsidyAt: subsidyAt,
-  computeAudit: computeAudit
+  nonNegInt: nonNegInt, validPlancks: validPlancks, validAddress: validAddress,
+  sanitizeSupply: sanitizeSupply, computeAudit: computeAudit
 };
 });

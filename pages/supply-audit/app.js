@@ -91,9 +91,14 @@ async function loadSupply(){
       clearTimeout(pt);
       poolFree = pj.data && pj.data.account_by_pk ? pj.data.account_by_pk.free : null;
     } catch (e) { clearTimeout(pt); }
-    return toSnapshot(core, new Date().toISOString(), poolFree);
+    /* A malformed LIVE payload must fall back to the snapshot, not
+     * anchor the audit: sanitize here, inside the try, so a rejection
+     * lands in the catch below exactly like a failed fetch. */
+    return A.sanitizeSupply(toSnapshot(core, new Date().toISOString(), poolFree));
   } catch (e) {
-    var snap = await fetchJson("../../data/supply.json");
+    /* A malformed SNAPSHOT has nowhere left to fall back to: sanitize
+     * throws out to boot(), which paints the honest boot error. */
+    var snap = A.sanitizeSupply(await fetchJson("../../data/supply.json"));
     snap.live = false;
     return snap;
   }
@@ -309,6 +314,24 @@ function redrawCharts(a){
   drawRewards(a, window.__blocks || null);
 }
 
+/* The recent-blocks overlay is AUXILIARY data: it may refine a chart,
+ * it must never be able to kill the audit. Rows whose reward is not a
+ * sane planck string (digit-only, <= 10 QTC — current subsidy is
+ * ~0.30 QTC, fees included) are dropped, never handed to BigInt in
+ * drawRewards, where a throw used to route the whole boot into
+ * showBootError and dash figures the supply data had proven good. */
+function cleanBlocks(blocks){
+  if (!Array.isArray(blocks)) return null;
+  var out = [];
+  blocks.forEach(function(b){
+    if (!b || typeof b !== "object" || Array.isArray(b)) return;
+    var reward = A.validPlancks(b.reward);
+    if (reward === null || BigInt(reward) > 10000000000000n) return;
+    out.push({ reward: reward });
+  });
+  return out.length ? out : null;
+}
+
 /* ================= boot ================= */
 /* Boot failure must be VISIBLE: if the live query and the snapshot both
  * fail (or a malformed snapshot reaches computeAudit), the audit cannot
@@ -336,7 +359,7 @@ async function boot(){
   var blocks = null;
   try {
     var live = await fetchJson("../../data/live.json", 8000);
-    if (live && live.data && live.data.blocks) blocks = live.data.blocks;
+    if (live && live.data && live.data.blocks) blocks = cleanBlocks(live.data.blocks);
   } catch (e) {}
   window.__blocks = blocks;
   var t0 = Date.now();

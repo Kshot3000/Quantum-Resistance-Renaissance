@@ -156,9 +156,9 @@ ok("fallback netHash plausible GH/s band", Number(nhVal) >= 1000 && Number(nhVal
 ok("fallback curSupply paints a value", csVal !== null && csVal !== "" && isFinite(Number(csVal)), csVal);
 ok("fallback curSupply within emission bounds", Number(csVal) >= 5670000 && Number(csVal) <= 21000000, csVal);
 var hintM = html.match(/id="supplyHint"[^>]*>([\s\S]*?)<\/p>/);
-ok("fallback hint cites a dated capture height", !!hintM && /block 1[0-9]{2},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
+ok("fallback hint cites a dated capture height", !!hintM && /block [0-9]{1,3},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
 ok("fallback hint difficulty matches painted netHash (one capture)",
-   !!hintM && /518,876,596,207,403/.test(hintM[1]) && Math.abs(Number(nhVal) - 518876596207403 / 12 / 1e9) < 1,
+   !!hintM && /517,577,692,050,191/.test(hintM[1]) && Math.abs(Number(nhVal) - 517577692050191 / 12 / 1e9) < 1,
    nhVal);
 ok("stale 45,125 example gone", !/45,125/.test(html));
 

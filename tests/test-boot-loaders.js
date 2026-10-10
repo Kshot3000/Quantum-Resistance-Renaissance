@@ -59,7 +59,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok((src.match(/showBootError\(e\)/g) || []).length >= 3, "supply: both boot stages (load + compute/render) are guarded");
   ok(src.includes('"unavailable — audit not run"'), "supply: data-mode reports unavailable instead of loading…");
   const html = read("pages/supply-audit/index.html");
-  ok(html.includes('app.js?v=1.30.0'), "supply: app.js cache key bumped for the boot fix");
+  ok(html.includes('app.js?v=1.31.0'), "supply: app.js cache key bumped for the boot fix");
 }
 
 // ---- 3. Reversal Desk: no stale hard-coded height; quota re-bases on load ----
@@ -773,6 +773,39 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes('if (valid === null) return "—";'), "netdash: fmtQTC rejects non-planck input instead of passing it through");
   const html = read("pages/network-dashboard/index.html");
   ok(html.includes("app.js?v=1.9.0"), "netdash: app.js cache key bumped for the boundary fix");
+}
+
+// Batch 24 (2026-10-10 09:19): supply-audit (Tier 2) — the second Tier 2
+// boundary batch. computeAudit + the renderers trusted every supply
+// payload raw: a genesis total that disagreed with its own transfer
+// list anchored the PASS verdict (the class of the 2026-09-30 3-row
+// truncation), a negative mined total rendered as fact, a swapped
+// mint-sentinel id was quoted as evidence, vesting claimed > total
+// produced a negative unclaimed, malformed genesis addresses rendered
+// truncated as fact — and one poisoned reward in the AUXILIARY
+// data/live.json threw inside drawRewards, routing the whole boot to
+// showBootError and dashing figures the supply data had proven good.
+// Pin: sanitizeSupply() lives in audit-core (shared with node tests),
+// computeAudit sanitizes before any math, loadSupply sanitizes the
+// live payload inside its try (malformed live -> snapshot fallback)
+// and the snapshot on the fallback path (malformed snapshot -> boot
+// error), and cleanBlocks() drops poisoned recent-block rows instead
+// of letting them reach BigInt.
+{
+  const core = read("pages/supply-audit/js/audit-core.js");
+  ok(core.includes("function sanitizeSupply(d)"), "supply2: sanitizeSupply() defined in audit-core");
+  ok(core.includes("genesis.total_plancks != sum of its transfers"), "supply2: genesis total cross-checked against its transfer list");
+  ok(core.includes("d.mint_sentinel_id !== MINT_SENTINEL"), "supply2: mint-sentinel id pinned to the canonical account");
+  ok(core.includes("vesting.claimed_plancks exceeds vesting.total_plancks"), "supply2: vesting claimed bounded by vesting total");
+  ok(core.includes("var d = sanitizeSupply(raw);"), "supply2: computeAudit sanitizes before any math");
+  const app = read("pages/supply-audit/app.js");
+  ok(app.includes("return A.sanitizeSupply(toSnapshot(core"), "supply2: live payload sanitized inside loadSupply's try (fallback on malformed)");
+  ok(app.includes("var snap = A.sanitizeSupply(await fetchJson("), "supply2: snapshot sanitized on the fallback path");
+  ok(app.includes("function cleanBlocks(blocks)"), "supply2: cleanBlocks() defined for the auxiliary live.json overlay");
+  ok(app.includes("blocks = cleanBlocks(live.data.blocks);"), "supply2: recent blocks cleaned before they reach drawRewards");
+  const html = read("pages/supply-audit/index.html");
+  ok(html.includes("js/audit-core.js?v=1.29.0"), "supply2: audit-core cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.31.0"), "supply2: app.js cache key bumped for the boundary fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

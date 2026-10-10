@@ -72,14 +72,18 @@ ok("fmtQtc custom decimals", A.fmtQtc(1234567890123456789n, 2) === "1,234,567.89
 ok("fmtInt", A.fmtInt(139887) === "139,887");
 
 // ---------- computeAudit on a synthetic fixture ----------
+const POOL_ADDR = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7"; // real genesis pool (snapshot)
 const fixture = {
+  ok: true,
+  fetched_at: "2026-10-10T00:00:00.000Z",
   block_height: 2,
   accounts_total: 10,
   mint_sentinel_id: A.MINT_SENTINEL,
-  genesis: { count: 1, total_plancks: S0.toString(), transfers: [] },
+  genesis: { count: 1, total_plancks: S0.toString(),
+    transfers: [{ amount_plancks: S0.toString(), from: A.MINT_SENTINEL, to: POOL_ADDR }] },
   mined: { reward_events: 2, total_plancks: "610000000000" },
   balances_plancks: { free: (S0 + 610000000000n + 50000000000n).toString(), reserved: "0", frozen: "0" },
-  vesting: { schedules: 1, total_plancks: "1000000000000000", claimed_plancks: "0", pool_account: "x", pool_free_plancks: "1000000000000000" },
+  vesting: { schedules: 1, total_plancks: "1000000000000000", claimed_plancks: "0", pool_account: POOL_ADDR, pool_free_plancks: "1000000000000000" },
   mint_sentinel: { free_plancks: "0", out_nongenesis_count: 4, out_nongenesis_plancks: "1220000000000" },
 };
 const fa = A.computeAudit(fixture);
@@ -127,6 +131,48 @@ ok("reward events ≈ block height", Math.abs(real.mined.reward_events - real.bl
 ok("fee wedge positive (fees recycled)", ra.feeWedge > 0n, A.fmtQtc(ra.feeWedge) + " QTC");
 ok("subsidy now ≈ 0.30 QTC", ra.subsidy >= 300000000000n && ra.subsidy < 320000000000n,
   A.fmtQtc(ra.subsidy) + " QTC");
+
+// ---------- sanitizeSupply: the payload boundary ----------
+// Every malformed core field must reject wholesale (throw) BEFORE it
+// can anchor a verdict figure; the cleaned copy normalizes counts to
+// numbers and planck strings to canonical digit strings.
+const cloneFixture = () => JSON.parse(JSON.stringify(fixture));
+function rejects(name, mut) {
+  const d = cloneFixture();
+  mut(d);
+  let threw = false;
+  try { A.sanitizeSupply(d); } catch (e) { threw = /malformed supply payload/.test(e.message); }
+  ok("sanitize rejects " + name, threw);
+}
+ok("sanitize accepts the valid fixture", !!A.sanitizeSupply(cloneFixture()));
+ok("sanitize normalizes height/counts to numbers",
+  A.sanitizeSupply(cloneFixture()).block_height === 2 && A.sanitizeSupply(cloneFixture()).accounts_total === 10);
+rejects("non-object payload", (d) => { d.genesis = null; });
+rejects("missing ok flag", (d) => { delete d.ok; });
+rejects("unparseable fetched_at", (d) => { d.fetched_at = "not-a-date"; });
+rejects("string block_height", (d) => { d.block_height = "2;evil"; });
+rejects("fractional block_height", (d) => { d.block_height = 2.5; });
+rejects("block_height beyond sanity bound", (d) => { d.block_height = 10000001; });
+rejects("negative accounts_total", (d) => { d.accounts_total = -5; });
+rejects("swapped mint_sentinel_id", (d) => { d.mint_sentinel_id = POOL_ADDR; });
+rejects("genesis count != transfers length", (d) => { d.genesis.count = 22; });
+rejects("genesis total != sum of transfers", (d) => { d.genesis.total_plancks = (S0 + 1000000000000n).toString(); });
+rejects("genesis markup amount", (d) => { d.genesis.transfers[0].amount_plancks = "123<img src=x>"; });
+rejects("genesis negative amount", (d) => { d.genesis.transfers[0].amount_plancks = "-5"; });
+rejects("genesis malformed address", (d) => { d.genesis.transfers[0].to = "evil<img src=x>"; });
+rejects("negative mined total", (d) => { d.mined.total_plancks = "-610000000000"; });
+rejects("zero mined total", (d) => { d.mined.total_plancks = "0"; });
+rejects("mined total beyond cap", (d) => { d.mined.total_plancks = (A.MAX_SUPPLY + 1n).toString(); });
+rejects("null balance (aggregate sum missing)", (d) => { d.balances_plancks.free = null; });
+rejects("balances total beyond cap", (d) => { d.balances_plancks.free = A.MAX_SUPPLY.toString(); d.balances_plancks.reserved = "1"; });
+rejects("vesting claimed > total", (d) => { d.vesting.claimed_plancks = (BigInt(d.vesting.total_plancks) + 1n).toString(); });
+rejects("vesting malformed pool address", (d) => { d.vesting.pool_account = "x"; });
+rejects("sentinel outflow markup string", (d) => { d.mint_sentinel.out_nongenesis_plancks = "12a3"; });
+ok("sanitize accepts a null pool balance (unavailable != malformed)",
+  A.sanitizeSupply(Object.assign(cloneFixture(), {})).vesting.pool_free_plancks === "1000000000000000" &&
+  (() => { const d = cloneFixture(); d.vesting.pool_free_plancks = null; return A.sanitizeSupply(d).vesting.pool_free_plancks === null; })());
+ok("computeAudit rejects a malformed payload (no silent figures)",
+  (() => { const d = cloneFixture(); d.mined.total_plancks = "-1"; try { A.computeAudit(d); return false; } catch { return true; } })());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log("FAILURES:\n - " + failures.join("\n - ")); process.exit(1); }
