@@ -40,7 +40,9 @@ async function gql(query, timeoutMs) {
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     var json = await res.json();
-    if (json.errors) throw new Error("GraphQL error");
+    if (!json || typeof json !== "object" || Array.isArray(json)) throw new Error("indexer returned a malformed response");
+    if (Array.isArray(json.errors) && json.errors.length) throw new Error("GraphQL error");
+    if (!json.data || typeof json.data !== "object" || Array.isArray(json.data)) throw new Error("indexer returned a malformed response");
     return json.data;
   } finally { clearTimeout(t); }
 }
@@ -61,9 +63,13 @@ async function loadData() {
   // decode restores the v1 object rows buildGraph expects. v1 files pass
   // through untouched.
   snap = (typeof QFlows !== "undefined" && QFlows.decode) ? QFlows.decode(await r.json()) : await r.json();
+  if (!snap || typeof snap !== "object" || !Array.isArray(snap.transfers)) throw new Error("snapshot is malformed");
+  var m = F.sanitizeSnapshotMeta(snap.meta);
+  if (!m) throw new Error("snapshot metadata is malformed");
   snapGraph = F.buildGraph(snap.transfers);
-  var m = snap.meta;
-  $("snap-badge").textContent = "snapshot: " + snap.transfers.length.toLocaleString() +
+  if (!snapGraph.rows.length) throw new Error("snapshot contained no valid transfers");
+  var rows = snapGraph.rows;
+  $("snap-badge").textContent = "snapshot: " + rows.length.toLocaleString() +
     " transfers · blocks " + m.window_from.toLocaleString() + "–" + m.chain_height.toLocaleString() +
     " + all-time top " + 600 + " · " + m.captured_at.slice(0, 10);
   $("method-window").textContent =
@@ -71,8 +77,8 @@ async function loadData() {
     m.window_from.toLocaleString() + "–" + m.chain_height.toLocaleString() +
     ", captured " + m.captured_at.slice(0, 16).replace("T", " ") + " UTC), plus the 600 largest " +
     "transfers of all time, plus the full 22-transfer block-1 genesis allocation — " +
-    snap.transfers.length.toLocaleString() + " transfers across " +
-    new Set(snap.transfers.flatMap(function (t) { return [t.from_id, t.to_id]; })).size.toLocaleString() +
+    rows.length.toLocaleString() + " transfers across " +
+    new Set(rows.flatMap(function (t) { return [t.from_id, t.to_id]; })).size.toLocaleString() +
     " addresses.";
   // Live probe (badge only; trace console does its own live attempt per address).
   try {
@@ -97,8 +103,16 @@ async function liveTraceRows(addr) {
   var q = "{ a: transfer(where: { from_id: { _eq: \"" + addr + "\" } }, order_by: { block_height: desc }, limit: 500) { " + FIELDS + " }" +
           "  b: transfer(where: { to_id: { _eq: \"" + addr + "\" } }, order_by: { block_height: desc }, limit: 500) { " + FIELDS + " } }";
   var d = await gql(q, 8000);
+  if (!Array.isArray(d.a) || !Array.isArray(d.b)) throw new Error("indexer returned a malformed response");
   var seen = new Set(), rows = [];
-  (d.a.concat(d.b)).forEach(function (r) { if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+  (d.a.concat(d.b)).forEach(function (r) {
+    // Dedupe on the transfer's id when it has one; id-less rows
+    // dedupe on their own facts, never one shared `undefined` key.
+    var key = r && (typeof r.id === "string" && r.id || typeof r.id === "number")
+      ? "id:" + r.id
+      : "facts:" + (r && r.from_id) + ">" + (r && r.to_id) + "@" + (r && r.block_height) + ":" + (r && r.amount);
+    if (!seen.has(key)) { seen.add(key); rows.push(r); }
+  });
   return rows;
 }
 
@@ -110,7 +124,8 @@ async function doTrace(addr, direction, hops) {
   if (liveOk) {
     try {
       rows = await liveTraceRows(addr);
-      if (rows.length) { graph = F.buildGraph(rows); mode = "live"; }
+      var liveGraph = F.buildGraph(rows);
+      if (liveGraph.rows.length) { graph = liveGraph; mode = "live"; }
     } catch (e) { /* fall through to snapshot */ }
   }
   // Superseded while the live query was in flight: a newer trace owns

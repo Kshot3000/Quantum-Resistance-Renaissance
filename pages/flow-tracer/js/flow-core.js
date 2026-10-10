@@ -10,20 +10,115 @@ var PLANCKS_PER_QTC = 1000000000000n;
 
 function toBig(x) { return typeof x === "bigint" ? x : BigInt(x); }
 
-/* Build adjacency indexes over a row list. */
+/* ---- load/RPC boundary ----
+ * Every row that reaches the graph crossed a trust boundary first: the
+ * same-origin snapshot file (rewritten by scripts on a schedule) or a
+ * live Subsquid answer. Classification per field:
+ *   core — amount (a non-negative integer planck count), block_height,
+ *          and non-empty string from/to: a row missing any of them is
+ *          dropped, never repaired into a plausible-looking transfer
+ *          (pre-fix, buildGraph's toBig() THREW on one fractional or
+ *          garbage amount/fee and killed the whole app);
+ *   poison — a non-object row, or a second row carrying an id already
+ *          kept (an id IS a transfer's identity: the live per-address
+ *          query returns the same transfer in both directions, and a
+ *          duplicate kept twice would double-count every total);
+ *   absent-but-recoverable — a garbage timestamp coerces to null, a
+ *          missing/garbage fee coerces to "0" (the fee is carried for
+ *          completeness; it anchors no total and no render here), a
+ *          non-string extrinsic_id coerces to null, and an id-less row
+ *          gets a fact-derived synthetic id — pre-fix every id-less row
+ *          shared trace()'s seenEdge key `undefined`, so all but the
+ *          first silently vanished from every trace.
+ */
+function validPlancks(v) {
+  if (typeof v === "bigint") return v >= 0n ? v.toString() : null;
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
+  return null;
+}
+
+function nonNegInt(v) {
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) {
+    var n = Number(v);
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  return null;
+}
+
+function parseHeight(v) { return nonNegInt(v); }
+
+function parseableTs(v) {
+  if (typeof v === "string" && v && Number.isFinite(Date.parse(v))) return v;
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return new Date(v).toISOString();
+  return null;
+}
+
+function sanitizeTransfer(r, i) {
+  if (!r || typeof r !== "object" || Array.isArray(r)) return null;
+  var amount = validPlancks(r.amount);
+  if (amount === null) return null; // core field
+  var height = parseHeight(r.block_height);
+  if (height === null) return null; // core field
+  if (typeof r.from_id !== "string" || !r.from_id) return null;
+  if (typeof r.to_id !== "string" || !r.to_id) return null;
+  var fee = r.fee == null ? "0" : validPlancks(r.fee);
+  if (fee === null) fee = "0"; // recoverable: anchors nothing in this app
+  var id = null;
+  if (typeof r.id === "string" && r.id) id = r.id;
+  else if (typeof r.id === "number" && Number.isFinite(r.id)) id = String(r.id);
+  if (!id) id = "row-" + i + ":" + r.from_id + ">" + r.to_id + "@" + height + ":" + amount;
+  return {
+    id: id, amount: amount, from_id: r.from_id, to_id: r.to_id,
+    block_height: height, timestamp: parseableTs(r.timestamp),
+    fee: fee, extrinsic_id: typeof r.extrinsic_id === "string" && r.extrinsic_id ? r.extrinsic_id : null,
+  };
+}
+
+function sanitizeTransfers(rows) {
+  if (!Array.isArray(rows)) return [];
+  var out = [], seenId = new Set();
+  for (var i = 0; i < rows.length; i++) {
+    var clean = sanitizeTransfer(rows[i], i);
+    if (!clean) continue;
+    if (seenId.has(clean.id)) continue; // a duplicate id is the same transfer, never a second one
+    seenId.add(clean.id);
+    out.push(clean);
+  }
+  return out;
+}
+
+/* Snapshot meta anchors the badge and the methodology window: both
+ * heights and the capture time are core (they are presented as chain
+ * fact), so a malformed meta fails the load honestly instead of
+ * rendering "[object Object]" bounds or a fake capture date. */
+function sanitizeSnapshotMeta(m) {
+  if (!m || typeof m !== "object" || Array.isArray(m)) return null;
+  var from = parseHeight(m.window_from), head = parseHeight(m.chain_height);
+  if (from === null || head === null || from > head) return null;
+  var captured = parseableTs(m.captured_at);
+  if (captured === null) return null;
+  return { window_from: from, chain_height: head, captured_at: captured };
+}
+
+/* Build adjacency indexes over a row list. Rows are sanitized at this
+ * boundary (see above), so every graph consumer — snapshot, live, or
+ * test — sees only rows whose BigInt math cannot throw. */
 function buildGraph(rows) {
   var out = new Map(), inn = new Map(), norm = [];
-  for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
+  var clean = sanitizeTransfers(rows);
+  for (var i = 0; i < clean.length; i++) {
+    var r = clean[i];
     var row = {
       id: r.id,
       amount: toBig(r.amount),
       from_id: r.from_id,
       to_id: r.to_id,
       block_height: r.block_height,
-      timestamp: r.timestamp || null,
-      fee: r.fee == null ? 0n : toBig(r.fee),
-      extrinsic_id: r.extrinsic_id || null,
+      timestamp: r.timestamp,
+      fee: toBig(r.fee),
+      extrinsic_id: r.extrinsic_id,
     };
     norm.push(row);
     if (!out.has(row.from_id)) out.set(row.from_id, []);
@@ -314,6 +409,13 @@ function fmtTime(ts) {
 
 var api = {
   PLANCKS_PER_QTC: PLANCKS_PER_QTC,
+  validPlancks: validPlancks,
+  nonNegInt: nonNegInt,
+  parseHeight: parseHeight,
+  parseableTs: parseableTs,
+  sanitizeTransfer: sanitizeTransfer,
+  sanitizeTransfers: sanitizeTransfers,
+  sanitizeSnapshotMeta: sanitizeSnapshotMeta,
   buildGraph: buildGraph,
   trace: trace,
   aggregateEdges: aggregateEdges,

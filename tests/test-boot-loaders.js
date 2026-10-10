@@ -591,5 +591,37 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/desk-core.js?v=1.32.0"), "portfolio: desk-core.js cache key bumped for the boundary fix");
 }
 
+// Batch 18 (2026-10-09 22:19): flow-tracer (Tier 2) — its snapshot and
+// live indexer answers crossed into BigInt graph math with no
+// validation: buildGraph's toBig() threw on ONE fractional/garbage
+// amount or fee (killing the whole boot), snap.meta was dereferenced
+// raw (object bounds rendered "[object Object]", fake capture dates
+// presented as fact), id-less rows all shared trace()'s seenEdge key
+// `undefined` (every id-less transfer after the first vanished), and
+// the live dedupe collapsed id-less rows the same way. Pin: sanitizers
+// in flow-core.js gate every row at buildGraph and the snapshot meta;
+// the app validates the GraphQL envelope and the per-direction arrays,
+// counts only sanitized rows, and fails a zero-valid-transfer snapshot
+// honestly instead of booting an empty graph.
+{
+  const core = read("pages/flow-tracer/js/flow-core.js");
+  ok(core.includes("function sanitizeTransfer(r, i)"), "flowtracer: sanitizeTransfer() defined in flow-core");
+  ok(core.includes("function sanitizeTransfers(rows)"), "flowtracer: sanitizeTransfers() defined in flow-core");
+  ok(core.includes("function sanitizeSnapshotMeta(m)"), "flowtracer: sanitizeSnapshotMeta() defined in flow-core");
+  ok(core.includes("a duplicate id is the same transfer, never a second one"), "flowtracer: duplicate transfer ids are dropped, never double-counted");
+  ok(core.includes("shared trace()'s seenEdge key `undefined`"), "flowtracer: id-less rows get fact-derived ids, never a shared key");
+  ok(core.includes("var clean = sanitizeTransfers(rows);"), "flowtracer: buildGraph sanitizes at the boundary");
+  const app = read("pages/flow-tracer/app.js");
+  ok(app.includes("indexer returned a malformed response"), "flowtracer: a malformed indexer answer is rejected, never dereferenced");
+  ok(app.includes("if (!Array.isArray(d.a) || !Array.isArray(d.b)) throw"), "flowtracer: live per-direction arrays are shape-checked");
+  ok(app.includes("dedupe on their own facts, never one shared `undefined` key"), "flowtracer: live id-less rows dedupe on their own facts");
+  ok(app.includes("var m = F.sanitizeSnapshotMeta(snap.meta);"), "flowtracer: snapshot meta is sanitized before it anchors the badge");
+  ok(app.includes('throw new Error("snapshot contained no valid transfers")'), "flowtracer: a zero-valid-transfer snapshot fails honestly");
+  ok(app.includes("if (liveGraph.rows.length) { graph = liveGraph; mode = \"live\"; }"), "flowtracer: a poison-only live answer never suppresses the snapshot graph");
+  const html = read("pages/flow-tracer/index.html");
+  ok(html.includes("js/flow-core.js?v=1.31.0"), "flowtracer: flow-core.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.33.0"), "flowtracer: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -242,5 +242,81 @@ t("fmtTime handles null timestamp", () => {
   assert.ok(F.fmtTime("2026-09-30T15:01:24.781+00:00").startsWith("2026-09-30 15:01"));
 });
 
+/* --- load/RPC boundary (2026-10-09) --- */
+t("validPlancks accepts only non-negative integer plancks", () => {
+  assert.equal(F.validPlancks("1500000000000"), "1500000000000");
+  assert.equal(F.validPlancks(42), "42");
+  assert.equal(F.validPlancks(42n), "42");
+  assert.equal(F.validPlancks("007"), "7");
+  assert.equal(F.validPlancks("12.5"), null);
+  assert.equal(F.validPlancks("-5"), null);
+  assert.equal(F.validPlancks(-5n), null);
+  assert.equal(F.validPlancks("abc"), null);
+  assert.equal(F.validPlancks(null), null);
+  assert.equal(F.validPlancks(1.5), null);
+});
+t("sanitizeTransfers drops core poison, coerces recoverable fields", () => {
+  const clean = F.sanitizeTransfers([
+    { id: "ok", amount: "2000000000000", from_id: "A", to_id: "B", block_height: 10, timestamp: "2026-01-01T00:00:00Z", fee: "5", extrinsic_id: "0x1" },
+    { id: "frac", amount: "12.5", from_id: "A", to_id: "B", block_height: 11, timestamp: null, fee: "0", extrinsic_id: null },
+    { id: "neg", amount: "-5", from_id: "A", to_id: "B", block_height: 12, timestamp: null, fee: "0", extrinsic_id: null },
+    { id: "badh", amount: "1", from_id: "A", to_id: "B", block_height: "x", timestamp: null, fee: "0", extrinsic_id: null },
+    { id: "nofrom", amount: "1", to_id: "B", block_height: 13, timestamp: null, fee: "0", extrinsic_id: null },
+    null,
+    "not-a-row",
+    { id: "coerce", amount: "1", from_id: "A", to_id: "B", block_height: 14, timestamp: "garbage", fee: "junk", extrinsic_id: 7 },
+  ]);
+  assert.equal(clean.length, 2);
+  assert.equal(clean[0].id, "ok");
+  assert.equal(clean[0].fee, "5");
+  assert.equal(clean[1].id, "coerce");
+  assert.equal(clean[1].timestamp, null); // garbage timestamp coerces, never renders as fact
+  assert.equal(clean[1].fee, "0"); // garbage fee coerces: it anchors no total in this app
+  assert.equal(clean[1].extrinsic_id, null);
+});
+t("sanitizeTransfers gives id-less rows fact-derived ids and dedupes duplicate ids", () => {
+  const clean = F.sanitizeTransfers([
+    { amount: "1", from_id: "A", to_id: "B", block_height: 10, timestamp: null, fee: "0", extrinsic_id: null },
+    { amount: "2", from_id: "A", to_id: "C", block_height: 11, timestamp: null, fee: "0", extrinsic_id: null },
+    { id: "dup", amount: "3", from_id: "A", to_id: "D", block_height: 12, timestamp: null, fee: "0", extrinsic_id: null },
+    { id: "dup", amount: "3", from_id: "A", to_id: "D", block_height: 12, timestamp: null, fee: "0", extrinsic_id: null },
+  ]);
+  assert.equal(clean.length, 3);
+  assert.ok(clean[0].id && clean[1].id && clean[0].id !== clean[1].id);
+});
+t("sanitizeTransfers of a non-array is empty, never a throw", () => {
+  assert.deepEqual(F.sanitizeTransfers("garbage"), []);
+  assert.deepEqual(F.sanitizeTransfers(null), []);
+  assert.deepEqual(F.sanitizeTransfers(undefined), []);
+});
+t("buildGraph survives a poisoned payload instead of throwing", () => {
+  const g = F.buildGraph([
+    { id: "a", amount: "12.5", from_id: "x", to_id: "y", block_height: 9, timestamp: null, fee: "0", extrinsic_id: null },
+    { id: "b", amount: "1000", from_id: "x", to_id: "y", block_height: 9, timestamp: null, fee: "garbage", extrinsic_id: null },
+    null,
+  ]);
+  assert.equal(g.rows.length, 1);
+  assert.equal(g.rows[0].amount, 1000n);
+  assert.equal(g.rows[0].fee, 0n);
+});
+t("trace keeps every id-less transfer (no shared undefined seenEdge key)", () => {
+  const g = F.buildGraph([
+    { amount: "1000000000000", from_id: "A", to_id: "B", block_height: 10, timestamp: null, fee: "0", extrinsic_id: null },
+    { amount: "2000000000000", from_id: "A", to_id: "C", block_height: 11, timestamp: null, fee: "0", extrinsic_id: null },
+  ]);
+  const tr = F.trace(g, "A", { direction: "out", maxHops: 1, maxNodes: 100 });
+  assert.equal(tr.edges.length, 2);
+  assert.ok(tr.nodes.has("B") && tr.nodes.has("C"));
+});
+t("sanitizeSnapshotMeta validates heights and capture time", () => {
+  const okMeta = F.sanitizeSnapshotMeta({ window_from: 182261, chain_height: 197261, captured_at: "2026-10-10T02:21:57.562Z" });
+  assert.equal(okMeta.window_from, 182261);
+  assert.equal(okMeta.chain_height, 197261);
+  assert.equal(F.sanitizeSnapshotMeta({ window_from: { evil: 1 }, chain_height: 10, captured_at: "2026-10-10T00:00:00Z" }), null);
+  assert.equal(F.sanitizeSnapshotMeta({ window_from: 50, chain_height: 10, captured_at: "2026-10-10T00:00:00Z" }), null);
+  assert.equal(F.sanitizeSnapshotMeta({ window_from: 1, chain_height: 10, captured_at: "not-a-date" }), null);
+  assert.equal(F.sanitizeSnapshotMeta(null), null);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;
