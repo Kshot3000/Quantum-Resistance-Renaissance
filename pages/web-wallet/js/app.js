@@ -79,6 +79,34 @@ function copyText(t, btn) {
 }
 function shortAddr(a) { return a.length > 18 ? a.slice(0, 10) + '…' + a.slice(-8) : a; }
 
+/* Scrub every per-wallet render back to its initial placeholder. Locking
+ * zeroes the in-memory secret key, but the DOM is memory too: without this,
+ * the revealed recovery-phrase words, the Security tab's public key/account
+ * id, the dashboard address/QR/balances, the send form, and the activity
+ * history all stayed rendered behind the unlock screen — and the NEXT
+ * wallet unlocked in the same page would inherit them as stale identity. */
+function scrubWalletDom() {
+  const words = $('sec-words');
+  words.innerHTML = ''; words.hidden = true;
+  $('btn-reveal-mnemonic').textContent = 'Reveal (asks password)';
+  $('sec-pub').textContent = '—';
+  $('sec-acct').textContent = '—';
+  $('addr').textContent = '';
+  $('scheme-name').textContent = '';
+  const qr = $('qr'), qctx = qr.getContext('2d');
+  qctx.clearRect(0, 0, qr.width, qr.height);
+  for (const id of ['bal-total', 'bal-free', 'bal-reserved', 'bal-frozen', 'bal-nonce', 'bal-source'])
+    $(id).textContent = '—';
+  $('send-to').value = ''; $('send-amount').value = '';
+  err('send-to-err'); err('send-amount-err'); err('send-err');
+  $('estimate-box').hidden = true;
+  $('ext-payload').value = '';
+  $('send-result').hidden = true;
+  $('res-hash').textContent = '—'; $('res-status').textContent = '—';
+  $('activity-list').innerHTML = '<p class="muted">Not loaded yet.</p>';
+  err('activity-err');
+}
+
 function setConn(state_, label) {
   const pill = $('conn-pill');
   pill.classList.remove('on', 'bad');
@@ -117,6 +145,7 @@ function lock() {
   state.kp = null; state.mnemonic = null; state.unsigned = null;
   if (state.rpc) { state.rpc.close(); state.rpc = null; }
   clearTimeout(state.lockTimer);
+  scrubWalletDom();
   $('lock-btn').hidden = true;
   setConn('', 'offline');
   boot();
@@ -264,12 +293,14 @@ $('btn-forget').addEventListener('click', () => {
 /* ---------------- app shell ---------------- */
 
 function openApp(kp, mnemonic) {
+  scrubWalletDom(); // a new session never inherits the previous wallet's renders
   state.kp = kp; state.mnemonic = mnemonic || null;
   $('lock-btn').hidden = false;
   show('view-app');
   $('addr').textContent = kp.address;
   $('scheme-name').textContent = schemeInfo(kp.scheme).name;
   drawQR($('qr'), kp.address);
+  fillSecurity();
   armLockTimer();
   connectRpc();
 }
@@ -639,13 +670,15 @@ $('btn-reveal-mnemonic').addEventListener('click', async () => {
   } catch { alert('Wrong password.'); }
 });
 
-$('sec-pub').textContent = '';
 function fillSecurity() {
+  if (!state.kp) return;
   $('sec-pub').textContent = '0x' + hexEncode(state.kp.publicKey);
   $('sec-acct').textContent = '0x' + hexEncode(state.kp.accountId);
 }
-// fill when security tab first opened
-document.querySelector('[data-view="security"]').addEventListener('click', fillSecurity, { once: true });
+// Refill on EVERY Security-tab open (and in openApp): a { once: true } fill
+// pinned the first wallet's keys forever — after Forget + a different wallet,
+// the Security tab kept presenting the previous wallet's public key/account id.
+document.querySelector('[data-view="security"]').addEventListener('click', fillSecurity);
 
 $('btn-export-vault').addEventListener('click', () => {
   const blob = exportVaultFile();

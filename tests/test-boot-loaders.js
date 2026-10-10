@@ -392,7 +392,16 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function validActivityRow(t)"), "wallet: activity rows validated before rendering");
   ok(app.includes("indexer returned malformed activity data"), "wallet: non-list activity payload is malformed, never a fake empty history");
   const html = read("pages/web-wallet/index.html");
-  ok(html.includes("js/app.js?v=1.39.0"), "wallet: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.40.0"), "wallet: app.js cache key bumped for the boundary fix (1.39.0, superseded by the 1.40.0 lock-scrub bump)");
+  // Lock scrub (2026-10-10): lock() zeroed the in-memory key but left the
+  // revealed phrase words, Security-tab keys, address and send form rendered
+  // in the DOM behind the unlock screen; fillSecurity was { once: true },
+  // pinning the first wallet's keys for every later wallet in the page.
+  ok(app.includes("function scrubWalletDom()"), "wallet: scrubWalletDom() defined");
+  ok(app.includes("scrubWalletDom();\n  $('lock-btn').hidden = true;"), "wallet: lock() scrubs the DOM");
+  ok(app.includes("words.innerHTML = ''; words.hidden = true;"), "wallet: scrub removes the revealed phrase words");
+  ok(!app.includes("fillSecurity, { once: true }") && !app.includes("{ once: true });\n</script>"), "wallet: fillSecurity is not once-only");
+  ok(app.includes("addEventListener('click', fillSecurity);"), "wallet: security tab refills keys on every open");
 }
 
 // Batch 13 (2026-10-09 16:19): safesend (Tier 1) has no RPC/load boundary
