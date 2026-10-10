@@ -359,17 +359,87 @@ async function detectChain(addr){
  * api: live data normalized by the UI layer, or null when offline.
  * ============================================================ */
 function fmtBTC(sats){
-  var b = sats / 1e8;
+  var s = nonNegInt(sats);
+  if (s === null) return "—";
+  var b = s / 1e8;
   return (b >= 0.0001 ? b.toFixed(8).replace(/0+$/, "").replace(/\.$/, "") : b.toExponential(2)) + " BTC";
 }
 function fmtETH(weiStr){
+  var w = validPlancks(weiStr == null ? "0" : weiStr);
+  if (w === null) return "—";
   try {
-    var wei = BigInt(weiStr || "0");
+    var wei = BigInt(w);
     var whole = wei / BigInt("1000000000000000000");
     var frac = wei % BigInt("1000000000000000000");
     var fs = frac.toString().padStart(18, "0").replace(/0+$/, "");
     return whole.toString() + (fs ? "." + fs : "") + " ETH";
-  } catch (e){ return weiStr + " wei"; }
+  } catch (e){ return "—"; }
+}
+
+/* ============================================================
+ * API-payload boundary (fleet pattern, 2026-10-09): the BTC/ETH
+ * chain-data answers cross into verdict math unvalidated upstream —
+ * string counts string-concatenated ("3"+"2" = "32" spent outputs
+ * rendered as fact), fractional/negative counts silently flipped
+ * verdicts, and object/garbage wei or sats rendered as
+ * "[object Object]" / "NaN BTC" evidence. Sanitizers classify per
+ * field: core fields (counts, wei/sats totals — they anchor the
+ * verdict) reject the whole payload (caller reads it as offline /
+ * unknown), absent fields coerce to zero, flags coerce to strict
+ * booleans. A balance can never be negative on-chain, so a
+ * negative computed BTC balance (mempool double-count artifact)
+ * floors at 0 — the verdict rides on the counts, not the balance.
+ * ============================================================ */
+function validPlancks(v){
+  if (typeof v === "bigint") return v >= 0n ? v.toString() : null;
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
+  return null;
+}
+function nonNegInt(v){
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v)){
+    var n = Number(v);
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  return null;
+}
+function sanitizeBtcApi(api){
+  if (!api || typeof api !== "object" || Array.isArray(api)) return null;
+  var spent = api.spent_txo_count == null ? 0 : nonNegInt(api.spent_txo_count);
+  var funded = api.funded_txo_count == null ? 0 : nonNegInt(api.funded_txo_count);
+  var tx = api.tx_count == null ? 0 : nonNegInt(api.tx_count);
+  var bal = api.balance_sats == null ? 0 : nonNegInt(api.balance_sats);
+  if (spent === null || funded === null || tx === null || bal === null) return null;
+  return {
+    spent_txo_count: spent, funded_txo_count: funded, tx_count: tx,
+    balance_sats: bal,
+    p2pk_observed: api.p2pk_observed === true,
+    p2tr_funded: api.p2tr_funded === true,
+    sample: api.sample === true
+  };
+}
+function sanitizeEthApi(api){
+  if (!api || typeof api !== "object" || Array.isArray(api)) return null;
+  var nTx = api.n_tx == null ? null : nonNegInt(api.n_tx);
+  if (api.n_tx != null && nTx === null) return null;
+  var sent = api.total_sent_wei == null ? "0" : validPlancks(api.total_sent_wei);
+  var recv = api.total_received_wei == null ? "0" : validPlancks(api.total_received_wei);
+  var bal = api.balance_wei == null ? "0" : validPlancks(api.balance_wei);
+  if (sent === null || recv === null || bal === null) return null;
+  var out = {
+    n_tx: nTx, total_sent_wei: sent, total_received_wei: recv, balance_wei: bal,
+    sample: api.sample === true
+  };
+  if (typeof api.source === "string") out.source = api.source;
+  if (typeof api.fallback_note === "string") out.fallback_note = api.fallback_note;
+  if (api.is_contract === true) out.is_contract = true;
+  return out;
+}
+function malformedVerdict(chainLabel){
+  return { verdict: "unknown", title: "Chain data was malformed",
+    evidence: ["The " + chainLabel + " lookup returned values that are not valid chain data (fractional, negative, or non-numeric counts/amounts) — no exposure verdict can rest on them."],
+    recommendation: "Retry with a connection. A malformed answer is treated exactly like no answer: unknown, never guessed." };
 }
 
 function analyzeBTC(v, api){
@@ -379,6 +449,8 @@ function analyzeBTC(v, api){
       evidence: ["The address format is valid (" + v.format + "), but the mempool.space lookup failed or is offline — no exposure verdict without chain history."],
       recommendation: "Retry with a connection, or check the address on mempool.space manually: any spent output means the public key is on-chain." };
   }
+  api = sanitizeBtcApi(api);
+  if (!api) return malformedVerdict("Bitcoin");
   var bal = fmtBTC(api.balance_sats || 0);
   if (api.p2tr_funded){
     ev.push("Taproot (P2TR) output detected — the tweaked public key sits directly in the output script. Exposed since funding, no spend required.");
@@ -415,6 +487,8 @@ function analyzeETH(v, api){
       evidence: ["The address format is valid, but the chain-data lookup failed or is offline — no exposure verdict without history."],
       recommendation: "Retry with a connection. Rule of thumb: if this address has EVER sent a transaction, its public key is recoverable from the signature and it is exposed." };
   }
+  api = sanitizeEthApi(api);
+  if (!api) return malformedVerdict("Ethereum");
   var sent = false;
   try { sent = BigInt(api.total_sent_wei || "0") > 0; } catch (e){ sent = !!api.n_tx; }
   var bal = fmtETH(api.balance_wei || "0");
@@ -474,9 +548,14 @@ function summarize(entries){
   var counts = { exposed: 0, latent: 0, clean: 0, safe: 0, unknown: 0, invalid: 0 };
   var atRisk = 0, totalVal = 0;
   entries.forEach(function(e){
-    var k = counts.hasOwnProperty(e.analysis.verdict) ? e.analysis.verdict : "unknown";
+    if (!e || typeof e !== "object") return;
+    var verdict = e.analysis && e.analysis.verdict;
+    var k = counts.hasOwnProperty(verdict) ? verdict : "unknown";
     counts[k]++;
-    var usd = e.usd || 0;
+    // A USD figure anchors the score: only a finite, positive number
+    // counts — NaN/Infinity/negative prices read as no estimate, never
+    // as a negative total or a >100% / negative readiness score.
+    var usd = (typeof e.usd === "number" && Number.isFinite(e.usd) && e.usd > 0) ? e.usd : 0;
     totalVal += usd;
     if (k === "exposed" || k === "latent") atRisk += usd;
   });
@@ -529,7 +608,9 @@ var ExposureCore = {
   validateETH: validateETH, validateBTC: validateBTC, validateQTC: validateQTC,
   detectChain: detectChain, analyze: analyze, analyzeBTC: analyzeBTC,
   analyzeETH: analyzeETH, analyzeQTC: analyzeQTC, analyzeSubstrate: analyzeSubstrate,
-  summarize: summarize, fmtBTC: fmtBTC, fmtETH: fmtETH, SAMPLES: SAMPLES
+  summarize: summarize, fmtBTC: fmtBTC, fmtETH: fmtETH, SAMPLES: SAMPLES,
+  validPlancks: validPlancks, nonNegInt: nonNegInt,
+  sanitizeBtcApi: sanitizeBtcApi, sanitizeEthApi: sanitizeEthApi
 };
 
 if (typeof window !== "undefined") window.ExposureCore = ExposureCore;

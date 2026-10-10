@@ -36,13 +36,35 @@ async function fetchJSON(url, timeoutMs){
 async function fetchBTC(addr, validation){
   try {
     var info = await fetchJSON("https://mempool.space/api/address/" + encodeURIComponent(addr));
+    if (!info || typeof info !== "object" || Array.isArray(info))
+      return { offline: true, error: "malformed mempool.space answer" };
     var cs = info.chain_stats || {}, ms = info.mempool_stats || {};
+    if (typeof cs !== "object" || Array.isArray(cs) || typeof ms !== "object" || Array.isArray(ms))
+      return { offline: true, error: "malformed mempool.space stats" };
+    // Every stat crosses the boundary validated BEFORE any arithmetic:
+    // a string count must never string-concatenate ("3"+"2" = "32"), and
+    // a fractional/negative/object stat makes the whole answer
+    // malformed — read as offline (honest unknown), never as fact.
+    var stat = function(obj, key){
+      var val = obj[key];
+      if (val === undefined || val === null) return 0;
+      return C.nonNegInt(val);
+    };
+    var fields = ["spent_txo_count", "funded_txo_count", "tx_count", "funded_txo_sum", "spent_txo_sum"];
+    for (var fi = 0; fi < fields.length; fi++){
+      if (stat(cs, fields[fi]) === null || stat(ms, fields[fi]) === null)
+        return { offline: true, error: "malformed mempool.space stat: " + fields[fi] };
+    }
     var api = {
-      spent_txo_count: (cs.spent_txo_count || 0) + (ms.spent_txo_count || 0),
-      funded_txo_count: (cs.funded_txo_count || 0) + (ms.funded_txo_count || 0),
-      tx_count: (cs.tx_count || 0) + (ms.tx_count || 0),
-      balance_sats: ((cs.funded_txo_sum || 0) - (cs.spent_txo_sum || 0)) +
-                    ((ms.funded_txo_sum || 0) - (ms.spent_txo_sum || 0)),
+      spent_txo_count: stat(cs, "spent_txo_count") + stat(ms, "spent_txo_count"),
+      funded_txo_count: stat(cs, "funded_txo_count") + stat(ms, "funded_txo_count"),
+      tx_count: stat(cs, "tx_count") + stat(ms, "tx_count"),
+      // A balance cannot be negative on-chain; a negative here is a
+      // mempool double-count artifact — floor at 0 (verdict rides on
+      // the counts above, not on this figure).
+      balance_sats: Math.max(0,
+        (stat(cs, "funded_txo_sum") - stat(cs, "spent_txo_sum")) +
+        (stat(ms, "funded_txo_sum") - stat(ms, "spent_txo_sum"))),
       p2pk_observed: false, p2tr_funded: validation && validation.detail === "taproot-key-in-output"
     };
     // Scan the first page of history (25 txs) for P2PK / P2TR outputs paying this
@@ -52,9 +74,11 @@ async function fetchBTC(addr, validation){
       var txs = await fetchJSON("https://mempool.space/api/address/" + encodeURIComponent(addr) + "/txs");
       if (Array.isArray(txs)){
         for (var i = 0; i < txs.length; i++){
-          var vouts = txs[i].vout || [];
+          if (!txs[i] || typeof txs[i] !== "object") continue;
+          var vouts = Array.isArray(txs[i].vout) ? txs[i].vout : [];
           for (var j = 0; j < vouts.length; j++){
             var vo = vouts[j];
+            if (!vo || typeof vo !== "object") continue;
             if (vo.scriptpubkey_address !== addr) continue;
             var t = String(vo.scriptpubkey_type || "").toLowerCase();
             if (t === "p2pk") api.p2pk_observed = true;
@@ -72,27 +96,37 @@ async function fetchBTC(addr, validation){
 async function fetchETH(addr){
   try {
     var b = await fetchJSON("https://api.blockcypher.com/v1/eth/main/addrs/" + encodeURIComponent(addr));
-    var str = function(x){ return (x === undefined || x === null) ? "0" : String(x); };
-    return {
-      n_tx: b.n_tx || 0,
-      total_sent_wei: str(b.total_sent),
-      total_received_wei: str(b.total_received),
-      balance_wei: str(b.final_balance !== undefined ? b.final_balance : b.balance),
-      source: "blockcypher"
-    };
+    if (!b || typeof b !== "object" || Array.isArray(b)) throw new Error("malformed BlockCypher answer");
+    // Validate before normalizing: a garbage wei total or count must
+    // not be String()-coerced into the analysis ("[object Object] wei"
+    // was rendered as evidence pre-fix). Malformed primary data falls
+    // through to the Blockscout fallback like any other failure.
+    var clean = C.sanitizeEthApi({
+      n_tx: (b.n_tx === undefined || b.n_tx === null) ? 0 : b.n_tx,
+      total_sent_wei: b.total_sent,
+      total_received_wei: b.total_received,
+      balance_wei: b.final_balance !== undefined ? b.final_balance : b.balance
+    });
+    if (!clean) throw new Error("malformed BlockCypher payload");
+    clean.source = "blockcypher";
+    return clean;
   } catch (e1){
     try {
       var a = await fetchJSON("https://eth.blockscout.com/api/v2/addresses/" + encodeURIComponent(addr));
       var out = await fetchJSON("https://eth.blockscout.com/api/v2/addresses/" +
                                 encodeURIComponent(addr) + "/transactions?filter=from");
-      var sent = !!(out && Array.isArray(out.items) && out.items.length > 0);
+      if (!a || typeof a !== "object" || Array.isArray(a)) throw new Error("malformed Blockscout answer");
+      if (!out || typeof out !== "object" || !Array.isArray(out.items)) throw new Error("malformed Blockscout tx list");
+      var bal = (a.coin_balance === undefined || a.coin_balance === null) ? "0" : C.validPlancks(a.coin_balance);
+      if (bal === null) throw new Error("malformed Blockscout balance");
+      var sent = out.items.length > 0;
       return {
         n_tx: null,
         total_sent_wei: sent ? "1" : "0", // boolean signal only on the fallback path
         total_received_wei: "0",
-        balance_wei: String((a && a.coin_balance) || "0"),
+        balance_wei: bal,
         source: "blockscout",
-        is_contract: !!(a && a.is_contract),
+        is_contract: a.is_contract === true,
         fallback_note: "BlockCypher unreachable — Blockscout fallback: sent/not-sent signal only, no totals."
       };
     } catch (e2){ return { offline: true, error: String(e2 && e2.message || e2) }; }
@@ -104,7 +138,13 @@ async function fetchPrices(){
   if (priceCache) return priceCache;
   try {
     var p = await fetchJSON("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd", 12000);
-    priceCache = { btc: (p.bitcoin && p.bitcoin.usd) || 0, eth: (p.ethereum && p.ethereum.usd) || 0 };
+    // A price anchors USD-at-risk figures: only a finite, positive
+    // number counts — a string/object/negative price is no estimate.
+    var price = function(x){
+      var n = (x && typeof x.usd === "number") ? x.usd : NaN;
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    priceCache = { btc: price(p && p.bitcoin), eth: price(p && p.ethereum) };
   } catch (e){ priceCache = { btc: 0, eth: 0, offline: true }; }
   return priceCache;
 }

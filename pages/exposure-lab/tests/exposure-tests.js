@@ -243,6 +243,71 @@ async function ta(name, fn){
     assert.strictEqual(s.score, 50);
   });
 
+  /* --- API-payload boundary (2026-10-09) --- */
+  t("sanitizeBtcApi normalizes digit-string counts to numbers", function(){
+    var s = C.sanitizeBtcApi({ spent_txo_count: "3", funded_txo_count: "5", tx_count: "7", balance_sats: "250000" });
+    assert.strictEqual(s.spent_txo_count, 3); assert.strictEqual(s.balance_sats, 250000);
+  });
+  t("sanitizeBtcApi rejects fractional / negative / object core fields", function(){
+    assert.strictEqual(C.sanitizeBtcApi({ spent_txo_count: 1.5 }), null);
+    assert.strictEqual(C.sanitizeBtcApi({ spent_txo_count: -1 }), null);
+    assert.strictEqual(C.sanitizeBtcApi({ balance_sats: { evil: 1 } }), null);
+    assert.strictEqual(C.sanitizeBtcApi(null), null);
+    assert.strictEqual(C.sanitizeBtcApi([1, 2]), null);
+  });
+  t("BTC: string counts read numerically, never concatenated", function(){
+    var a = C.analyzeBTC({ chain: "btc", ok: true, format: "P2PKH (legacy)" },
+      { spent_txo_count: "3", funded_txo_count: "5", tx_count: "7", balance_sats: "250000" });
+    assert.strictEqual(a.verdict, "exposed");
+    assert.ok(/3 spent output\(s\) across 7/.test(a.evidence.join(" ")), a.evidence.join(" "));
+  });
+  t("BTC: fractional spent count => unknown, not a flipped verdict", function(){
+    var a = C.analyzeBTC({ chain: "btc", ok: true, format: "P2PKH (legacy)" },
+      { spent_txo_count: 1.5, funded_txo_count: 5, tx_count: 5, balance_sats: 100 });
+    assert.strictEqual(a.verdict, "unknown");
+    assert.ok(/malformed/i.test(a.title + a.evidence.join(" ")));
+  });
+  t("BTC: object balance => unknown, no [object Object] evidence", function(){
+    var a = C.analyzeBTC({ chain: "btc", ok: true, format: "P2PKH (legacy)" },
+      { spent_txo_count: 2, funded_txo_count: 5, tx_count: 5, balance_sats: { evil: 1 } });
+    assert.strictEqual(a.verdict, "unknown");
+    assert.ok(!/\[object Object\]|NaN/.test(a.evidence.join(" ")));
+  });
+  t("ETH: garbage wei total => unknown, never a guessed verdict", function(){
+    var a = C.analyzeETH({ chain: "eth", ok: true },
+      { n_tx: 3, total_sent_wei: { evil: 1 }, balance_wei: "100" });
+    assert.strictEqual(a.verdict, "unknown");
+    assert.ok(!/\[object Object\]/.test(a.evidence.join(" ")));
+  });
+  t("ETH: fractional wei balance => unknown", function(){
+    var a = C.analyzeETH({ chain: "eth", ok: true },
+      { n_tx: 0, total_sent_wei: "0", balance_wei: "1.5" });
+    assert.strictEqual(a.verdict, "unknown");
+  });
+  t("ETH: Blockscout-shaped api (n_tx null) still analyzes", function(){
+    var a = C.analyzeETH({ chain: "eth", ok: true },
+      { n_tx: null, total_sent_wei: "1", balance_wei: "500" });
+    assert.strictEqual(a.verdict, "exposed");
+  });
+  t("formatters refuse garbage instead of rendering it as fact", function(){
+    assert.strictEqual(C.fmtBTC("abc"), "—");
+    assert.strictEqual(C.fmtBTC(-5), "—");
+    assert.strictEqual(C.fmtETH({ evil: 1 }), "—");
+    assert.strictEqual(C.fmtETH("1.5"), "—");
+  });
+  t("summarize ignores NaN / Infinity / negative usd and junk entries", function(){
+    var s = C.summarize([
+      { analysis: { verdict: "exposed" }, usd: NaN },
+      { analysis: { verdict: "exposed" }, usd: Infinity },
+      { analysis: { verdict: "latent" }, usd: -50 },
+      null,
+      { analysis: { verdict: "safe" }, usd: 100 }
+    ]);
+    assert.strictEqual(s.totalUsd, 100);
+    assert.strictEqual(s.atRiskUsd, 0);
+    assert.strictEqual(s.score, 100);
+  });
+
   /* --- samples --- */
   await ta("every sample address validates on its chain", async function(){
     for (var i = 0; i < C.SAMPLES.length; i++){
