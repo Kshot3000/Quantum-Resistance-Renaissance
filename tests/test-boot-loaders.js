@@ -864,7 +864,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.2"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.3"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -897,7 +897,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.2"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.3"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -932,8 +932,46 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.1"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.2"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
+}
+
+// Batch 29 (2026-10-10 14:19): luck-lab (Tier 2) — the seventh Tier 2
+// boundary batch. loadData trusted both snapshots raw via Number():
+// a scientific-notation difficulty ("9.9e13") painted as 8.25 TH/s; an
+// est_hashrate contradicting the difficulty painted 1.00 kH/s (and was
+// never cross-checked against difficulty/12, the fetch construction);
+// a supply total contradicting its balances painted a 0.2400 QTC
+// reward; an over-cap total minted a negative reward; a fractional
+// height rounded into the badge ("head 201,294"); a garbage fetched_at
+// was echoed raw into the provenance note while the payload anchored;
+// a recent window with gapped heights and compressed timestamps
+// painted 78,545 blocks/day (span/(n-1) overcounts when heights skip);
+// a fractional balance summed into a near-max 0.4200 QTC reward; and
+// the live GraphQL head was compared unvalidated, so a fractional or
+// string head could promote/mark the snapshot. Pin: strict
+// intField/validPlancks/validHeight/validFetchedAt shapes, both exact
+// cross-checks, the 21M cap, parseable fetched_at provenance per
+// payload, the one-capture rule, a consecutive-window pace cleaner,
+// a validated live head, and the module hook that makes the boundary
+// unit-testable. Also pins the footer honesty line: the snapshots
+// refresh hourly — a hard-coded "(refreshed 2026-10-02)" date rotted
+// eight days stale on a live page.
+{
+  const app = read("pages/luck-lab/js/app.js");
+  ok(app.includes("function deriveSnapshotState(con, sup)"), "lucklab: deriveSnapshotState() defined (the snapshot boundary)");
+  ok(app.includes("function intField(v)"), "lucklab: intField() defined (integer shapes only)");
+  ok(app.includes("function validFetchedAt(v)"), "lucklab: validFetchedAt() defined (parseable dates only)");
+  ok(app.includes("BigInt(eh) !== BigInt(diff) / 12n) diff = null;"), "lucklab: difficulty cross-checked against est_hashrate x 12 exactly");
+  ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "lucklab: supply total cross-checked against its balances itemization");
+  ok(app.includes("BigInt(tp) <= 21000000n * 1000000000000n"), "lucklab: total issuance capped at 21M before it anchors a reward");
+  ok(app.includes("Math.abs(supHeight - consHeight) > 100"), "lucklab: cross-capture supply rejected (one-capture rule)");
+  ok(app.includes("function recentPaceMs(rec)"), "lucklab: recentPaceMs() defined (consecutive-window pace only)");
+  ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
+  ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
+  const html = read("pages/luck-lab/index.html");
+  ok(html.includes("app.js?v=1.47.1"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

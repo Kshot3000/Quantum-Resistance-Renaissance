@@ -4,23 +4,24 @@
  */
 (function () {
   "use strict";
-  var L = window.LuckCore;
+  var L = (typeof window !== "undefined" && window.LuckCore) ||
+          (typeof LuckCore !== "undefined" ? LuckCore : null);
   var $ = function (id) { return document.getElementById(id); };
 
   // Fallback bundle — ONE capture, never mixed dates: every field below comes
-  // from the 2026-10-10 18:28Z snapshot refresh (consensus @ block 201,293 +
-  // supply @ block 201,293, fetched 10 seconds apart). The previous bundle paired
+  // from the 2026-10-10 19:28Z snapshot refresh (consensus @ block 201,545 +
+  // supply @ block 201,548, fetched 10 seconds apart). The previous bundle paired
   // Oct 1 difficulty/head with an Oct 2 supply-derived reward, which silently
   // skewed every fallback-painted figure. Guarded by tests/luck-core.test.js
   // (cross-checked against energy-observatory's fallback bundle).
   var state = {
-    difficulty: 530756822880660,   // fallback: consensus snapshot 2026-10-10
-    netHs: 44229735240055,         // = difficulty / 12 s (indexer est. hashrate)
-    reward: 0.3039761,             // fallback: (21M − 5,801,195.6486 total supply) / 50M, same capture
-    blocksPerDay: 6074,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
-    avgBlockMs: 14224,
-    head: 201293,
-    fetchedAt: "2026-10-10T18:28:52.146Z",
+    difficulty: 534896378018334,   // fallback: consensus snapshot 2026-10-10
+    netHs: 44574698168194,         // = difficulty / 12 s (indexer est. hashrate)
+    reward: 0.3039732,             // fallback: (21M − 5,801,338.9152 total supply) / 50M, same capture
+    blocksPerDay: 6098,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
+    avgBlockMs: 14168,
+    head: 201545,
+    fetchedAt: "2026-10-10T19:28:15.609Z",
     source: "snapshot"
   };
 
@@ -58,46 +59,193 @@
     setTimeout(function () { ctl.abort(); }, ms);
     return ctl.signal;
   }
+  /* --- snapshot-boundary validation (fleet-standard strict shapes: the
+   * mining-studio / mining-calculator intField pattern, applied fleet-wide).
+   * The fetch scripts emit integer strings for plancks/difficulty/hashrate
+   * and integer numbers for heights/counts/timestamps — anything else
+   * (scientific notation, fractions, markup) is not a measurement and must
+   * not anchor a figure. Every helper is a total function: null, never a
+   * throw, so one malformed field cannot kill its neighbours' figures. */
+  function intField(v) {
+    if (typeof v === "string") {
+      if (!/^\d+$/.test(v.trim())) return null;
+      var n = Number(v.trim());
+      return isFinite(n) ? n : null;
+    }
+    if (typeof v === "number") return Number.isInteger(v) ? v : null;
+    return null;
+  }
+  function validPlancks(v) {
+    if (typeof v === "string") return /^\d+$/.test(v.trim()) ? v.trim() : null;
+    if (typeof v === "number" && Number.isInteger(v) && v >= 0) return String(v);
+    return null;
+  }
+  function validHeight(v) {
+    var h = intField(v);
+    return (h != null && h >= 1 && h <= 10000000) ? h : null;
+  }
+  function validFetchedAt(v) {
+    if (typeof v !== "string" || !v) return null;
+    return isFinite(Date.parse(v)) ? v : null;
+  }
+
+  /* Total supply in plancks from a supply snapshot: the first-class
+   * total_supply_plancks field when present (fetch-supply-data.mjs), else
+   * the balances aggregate (free + reserved + frozen) =
+   * Currency::total_issuance(). The fetch script DEFINES the total as
+   * that aggregate, so when both are present they must agree exactly: a
+   * total that contradicts its own itemization is tamper/truncation
+   * evidence and neither side is trusted (null). Never throws. */
+  function totalSupplyOf(sup) {
+    if (!sup) return null;
+    var total = validPlancks(sup.total_supply_plancks);
+    var b = sup.balances_plancks, sum = null;
+    if (b) {
+      var f = validPlancks(b.free), r = validPlancks(b.reserved), z = validPlancks(b.frozen);
+      if (f != null && r != null && z != null) sum = BigInt(f) + BigInt(r) + BigInt(z);
+    }
+    if (total != null && sum != null && BigInt(total) !== sum) return null;
+    if (total != null) return total;
+    return sum != null ? sum.toString() : null;
+  }
+
+  /* Observed pace from the consensus `recent` window [height, tsMs,
+   * difficulty]: span/(n-1) is only a measurement when the window is
+   * what the fetch script emits — at least 11 entries, CONSECUTIVE
+   * heights, strictly increasing integer timestamps. A window with a
+   * gap spans more blocks than it counts (a compressed, gapped window
+   * painted 78,545 blocks/day pre-fix); any poison drops the whole pace
+   * and the dated fallback stands. */
+  function recentPaceMs(rec) {
+    if (!Array.isArray(rec) || rec.length < 11) return null;
+    var prevH = null, prevTs = null, firstTs = null, lastTs = null;
+    for (var i = 0; i < rec.length; i++) {
+      var p = rec[i];
+      if (!Array.isArray(p)) return null;
+      var h = validHeight(p[0]);
+      var ts = (typeof p[1] === "number" && Number.isInteger(p[1]) && p[1] > 0) ? p[1] : null;
+      if (h == null || ts == null) return null;
+      if (prevH != null && h !== prevH + 1) return null;
+      if (prevTs != null && ts <= prevTs) return null;
+      if (firstTs == null) firstTs = ts;
+      prevH = h; prevTs = ts; lastTs = ts;
+    }
+    var avg = (lastTs - firstTs) / (rec.length - 1);
+    return (avg > 1000 && avg < 120000) ? avg : null;
+  }
+
+  /* Derive the page's chain state from the two snapshots. Every payload
+   * is validated at this boundary before it anchors a figure: strict
+   * integer shapes, the fetch scripts' own exact cross-checks
+   * (est_hashrate_hs == difficulty/12; total == free+reserved+frozen),
+   * the 21M cap on total issuance, a parseable fetched_at as provenance
+   * for anything called a snapshot figure, and the one-capture rule
+   * (payloads more than 100 blocks apart are different captures — never
+   * mixed). Fields that fail stay null and the caller keeps the dated
+   * FALLBACK for them; payloads fail independently, never together. */
+  function deriveSnapshotState(con, sup) {
+    var out = { difficulty: null, netHs: null, rewardQtc: null, head: null,
+                fetchedAt: null, avgBlockMs: null, blocksPerDay: null, snapshotOk: false };
+
+    // Consensus anchors as a unit — strict difficulty, a valid height
+    // (current.height and head are two reads of the same tip; a
+    // disagreement is not one capture), parseable provenance, and the
+    // exact difficulty cross-check when est_hashrate_hs is present.
+    var consAt = validFetchedAt(con && con.fetched_at);
+    var consHeight = null;
+    if (con && consAt && con.current) {
+      var diff = validPlancks(con.current.difficulty);
+      var hh = validHeight(con.current.height), hd = validHeight(con.head);
+      if (hh != null && hd != null && hh !== hd) hh = null;
+      consHeight = hh;
+      if (diff != null && con.current.est_hashrate_hs != null) {
+        var eh = validPlancks(con.current.est_hashrate_hs);
+        if (eh == null || BigInt(eh) !== BigInt(diff) / 12n) diff = null;
+      }
+      if (diff != null && BigInt(diff) > 0n && hh != null) {
+        out.difficulty = Number(diff);
+        out.netHs = Number(diff) / 12;
+        out.head = hh;
+        out.fetchedAt = consAt;
+        out.snapshotOk = true;
+        var avg = recentPaceMs(con.recent);
+        if (avg != null) { out.avgBlockMs = avg; out.blocksPerDay = 86400000 / avg; }
+      }
+    }
+
+    // Supply: the emission reward, from a dated, cross-checked,
+    // under-cap total in the same capture as the consensus payload.
+    // Total issuance for the emission formula is Currency::total_issuance()
+    // (incl. genesis — NOT mined rewards alone).
+    var supAt = validFetchedAt(sup && sup.fetched_at);
+    if (sup && supAt) {
+      var tp = totalSupplyOf(sup);
+      // Total issuance can never exceed the 21M cap; beyond it the
+      // emission formula would mint a negative reward out of a poison.
+      if (tp != null && BigInt(tp) <= 21000000n * 1000000000000n) {
+        var supHeight = validHeight(sup.block_height);
+        if (!(consHeight != null && supHeight != null && Math.abs(supHeight - consHeight) > 100)) {
+          out.rewardQtc = L.currentRewardQtc(Number(tp));
+          if (!out.fetchedAt) out.fetchedAt = supAt;
+        }
+      }
+    }
+    return out;
+  }
+
+  function fetchJson(url) {
+    // QA hook: qa-lucklab-boundary.mjs injects snapshot payloads via
+    // window.__qtcluck_mock because file:// fetch is blocked headless.
+    var mock = typeof window !== "undefined" ? window.__qtcluck_mock : null;
+    if (mock) {
+      for (var k in mock) {
+        if (url.indexOf(k) >= 0) return Promise.resolve(mock[k]);
+      }
+    }
+    return fetch(url, { signal: timeoutSignal(9000) }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  }
+
   function loadData() {
-    var liveHead = null;
-    return gql("{ s: chain_stats_by_pk(id: \"global\") { block_height } }", 6000)
-      .then(function (d) { liveHead = d && d.s && d.s.block_height; })
-      .catch(function () { liveHead = null; })
-      .then(function () {
-        return Promise.all([
-          fetch("../../data/consensus.json", { signal: timeoutSignal(9000) }).then(function (r) { return r.json(); }),
-          fetch("../../data/supply.json", { signal: timeoutSignal(9000) }).then(function (r) { return r.json(); })
-        ]);
-      })
-      .then(function (arr) {
-        var c = arr[0], s = arr[1];
-        state.difficulty = Number(c.current.difficulty);
-        state.netHs = Number(c.current.est_hashrate_hs) || state.difficulty / 12;
-        state.head = c.current.height;
-        state.fetchedAt = c.fetched_at;
-        // Total issuance for the emission formula (balances aggregate =
-        // Currency::total_issuance(), incl. genesis — NOT mined rewards alone).
-        var totalSupply = s.total_supply_plancks ? Number(s.total_supply_plancks)
-          : (Number(s.balances_plancks.free) + Number(s.balances_plancks.reserved) + Number(s.balances_plancks.frozen));
-        state.reward = L.currentRewardQtc(totalSupply);
-        // avg block time from the recent window
-        var rec = c.recent;
-        if (rec && rec.length > 10) {
-          var span = rec[rec.length - 1][1] - rec[0][1];
-          var avg = span / (rec.length - 1);
-          if (avg > 1000 && avg < 120000) {
-            state.avgBlockMs = avg;
-            state.blocksPerDay = 86400000 / avg;
+    var mock = typeof window !== "undefined" ? window.__qtcluck_mock : null;
+    var headP = (mock && "liveHead" in mock)
+      ? Promise.resolve(mock.liveHead)
+      : gql("{ s: chain_stats_by_pk(id: \"global\") { block_height } }", 6000)
+          .then(function (d) { return d && d.s && d.s.block_height; })
+          .catch(function () { return null; });
+    return headP.then(function (rawHead) {
+      // The live head is a measurement too: only a strict integer height
+      // may promote the snapshot to "live" or mark it stale.
+      var liveHead = validHeight(rawHead);
+      return Promise.all([
+        fetchJson("../../data/consensus.json").catch(function () { return null; }),
+        fetchJson("../../data/supply.json").catch(function () { return null; })
+      ]).then(function (arr) {
+        var d = deriveSnapshotState(arr[0], arr[1]);
+        if (d.snapshotOk) {
+          state.difficulty = d.difficulty;
+          state.netHs = d.netHs;
+          state.head = d.head;
+          if (d.avgBlockMs != null) {
+            state.avgBlockMs = d.avgBlockMs;
+            state.blocksPerDay = d.blocksPerDay;
+          }
+          state.source = "snapshot";
+        }
+        if (d.rewardQtc != null) state.reward = d.rewardQtc;
+        if (d.fetchedAt) state.fetchedAt = d.fetchedAt;
+        if (d.snapshotOk && liveHead != null) {
+          if (Math.abs(liveHead - state.head) <= 120) {
+            state.source = "live";
+            state.head = liveHead;
+          } else {
+            state.source = "snapshot-stale";
           }
         }
-        if (liveHead && Math.abs(liveHead - state.head) <= 120) {
-          state.source = "live";
-          state.head = liveHead;
-        } else if (liveHead) {
-          state.source = "snapshot-stale";
-        }
-      })
-      .catch(function () { state.source = "snapshot"; });
+      });
+    }).catch(function () { state.source = "snapshot"; });
   }
 
   /* --- canvas helpers ----------------------------------------------------- */
@@ -391,9 +539,18 @@
     window.addEventListener("resize", debounce(function () { drawSoloHist(); drawPoolHist(); }, 300));
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    bind();
-    renderAll(); // immediate paint on fallbacks
-    loadData().then(renderAll, renderAll);
-  });
+  if (typeof document !== "undefined") {
+    document.addEventListener("DOMContentLoaded", function () {
+      bind();
+      renderAll(); // immediate paint on fallbacks
+      loadData().then(renderAll, renderAll);
+    });
+  }
+
+  /* node test hook */
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = { deriveSnapshotState: deriveSnapshotState, totalSupplyOf: totalSupplyOf,
+                       recentPaceMs: recentPaceMs, intField: intField, validPlancks: validPlancks,
+                       validHeight: validHeight, validFetchedAt: validFetchedAt, FALLBACK: state };
+  }
 })();

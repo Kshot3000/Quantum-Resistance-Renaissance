@@ -126,5 +126,87 @@ t("percentile p=0 -> min", L.percentile([3, 1, 2].sort((a, b) => a - b), 0) === 
   approx("fallback: luck reward = emission(energy supply)", lRew, L.currentRewardQtc(Number(eSup)), 5e-8);
 }
 
+// --- snapshot boundary (app.js deriveSnapshotState): poisoned payloads must
+// not anchor a difficulty, a reward, or a pace — payloads fail independently.
+// RED evidence (real browser, pre-fix): sci difficulty painted 8.25 TH/s; an
+// est mismatch painted 1.00 kH/s; a contradictory total painted 0.2400 QTC;
+// an over-cap total painted a negative reward; a gapped/compressed recent
+// window painted 78,545 blocks/day; a fractional balance painted 0.4200 QTC.
+global.LuckCore = L;
+const A = require("../js/app.js");
+{
+  const mkRecent = (n, stepMs, h0, ts0) =>
+    Array.from({ length: n }, (_, i) => [h0 + i, ts0 + i * stepMs, "669104327575800"]);
+  const CONS = { fetched_at: "2026-10-02T15:00:29.848Z", head: 153406,
+    current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "55758693964650" },
+    recent: mkRecent(1500, 14000, 151907, 1756944000000) };
+  const SUP = { fetched_at: "2026-10-02T15:00:40.038Z", block_height: 153406,
+    total_supply_plancks: "5766179473775204913",
+    balances_plancks: { free: "5766179473775204813", reserved: "100", frozen: "0" } };
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+
+  const okD = A.deriveSnapshotState(clone(CONS), clone(SUP));
+  t("boundary: valid capture anchors", okD.snapshotOk === true && okD.difficulty === 669104327575800 && okD.head === 153406);
+  approx("boundary: netHs = difficulty / 12", okD.netHs, 669104327575800 / 12, 1);
+  approx("boundary: reward from cross-checked total", okD.rewardQtc, L.currentRewardQtc(5766179473775204913), 1e-12);
+  approx("boundary: pace from consecutive window", okD.avgBlockMs, 14000, 1e-9);
+  approx("boundary: blocksPerDay = 86400000 / avg", okD.blocksPerDay, 86400000 / 14000, 1e-6);
+
+  const sci = clone(CONS); sci.current.difficulty = "9.9e13"; sci.current.est_hashrate_hs = "8250000000000";
+  t("boundary: scientific-notation difficulty rejected", A.deriveSnapshotState(sci, clone(SUP)).snapshotOk === false);
+  const mis = clone(CONS); mis.current.est_hashrate_hs = "1000";
+  t("boundary: est contradicting difficulty rejected", A.deriveSnapshotState(mis, clone(SUP)).snapshotOk === false);
+  const noEst = clone(CONS); delete noEst.current.est_hashrate_hs;
+  t("boundary: est absent still anchors (netHs derived)", A.deriveSnapshotState(noEst, clone(SUP)).snapshotOk === true);
+  const fracH = clone(CONS); fracH.current.height = 153406.5; fracH.head = 153406.5;
+  t("boundary: fractional height rejected", A.deriveSnapshotState(fracH, clone(SUP)).snapshotOk === false);
+  const disH = clone(CONS); disH.head = 153407;
+  t("boundary: current.height vs head disagreement rejected", A.deriveSnapshotState(disH, clone(SUP)).snapshotOk === false);
+  const badDate = clone(CONS); badDate.fetched_at = '<b id="pwn">PWNED</b>';
+  t("boundary: garbage fetched_at rejected", A.deriveSnapshotState(badDate, clone(SUP)).snapshotOk === false);
+
+  const contra = clone(SUP); contra.total_supply_plancks = "9000000000000000000";
+  const dContra = A.deriveSnapshotState(clone(CONS), contra);
+  t("boundary: contradictory total -> no reward, consensus still anchors", dContra.rewardQtc === null && dContra.snapshotOk === true);
+  const fracB = clone(SUP); delete fracB.total_supply_plancks; fracB.balances_plancks.free = "1.5";
+  const dFrac = A.deriveSnapshotState(clone(CONS), fracB);
+  t("boundary: fractional balance -> no reward, no throw, neighbours anchor", dFrac.rewardQtc === null && dFrac.snapshotOk === true);
+  const balOnly = clone(SUP); delete balOnly.total_supply_plancks;
+  approx("boundary: balances-only supply anchors from the sum", A.deriveSnapshotState(clone(CONS), balOnly).rewardQtc, L.currentRewardQtc(5766179473775204913), 1e-12);
+  const over = clone(SUP); over.total_supply_plancks = "22000000000000000000";
+  over.balances_plancks = { free: "22000000000000000000", reserved: "0", frozen: "0" };
+  t("boundary: over-cap (22M) total -> no negative reward", A.deriveSnapshotState(clone(CONS), over).rewardQtc === null);
+  const mixed = clone(SUP); mixed.block_height = 100000; mixed.total_supply_plancks = "9000000000000000000";
+  mixed.balances_plancks = { free: "9000000000000000000", reserved: "0", frozen: "0" };
+  t("boundary: cross-capture supply -> no reward", A.deriveSnapshotState(clone(CONS), mixed).rewardQtc === null);
+  const undated = clone(SUP); delete undated.fetched_at;
+  t("boundary: undated supply -> no reward", A.deriveSnapshotState(clone(CONS), undated).rewardQtc === null);
+  t("totalSupplyOf: null payload -> null", A.totalSupplyOf(null) === null);
+  t("totalSupplyOf: contradiction -> null", A.totalSupplyOf(contra) === null);
+
+  const nullRec = clone(CONS); nullRec.recent[500] = null;
+  const dNullRec = A.deriveSnapshotState(nullRec, clone(SUP));
+  t("boundary: poisoned recent entry -> pace dropped, difficulty anchors", dNullRec.avgBlockMs === null && dNullRec.snapshotOk === true);
+  const gapRec = clone(CONS); gapRec.recent = mkRecent(11, 1100, 150000, 1756944000000).map((p, i) => [p[0] + i * 99, p[1], p[2]]);
+  t("boundary: gapped heights -> no pace (span would overcount blocks)", A.deriveSnapshotState(gapRec, clone(SUP)).avgBlockMs === null);
+  const strTs = clone(CONS); strTs.recent = mkRecent(11, 14000, 153396, 1756944000000).map((p) => [p[0], String(p[1]), p[2]]);
+  t("boundary: string timestamps -> no pace", A.deriveSnapshotState(strTs, clone(SUP)).avgBlockMs === null);
+  const few = clone(CONS); few.recent = mkRecent(10, 14000, 153397, 1756944000000);
+  t("boundary: <11-entry window -> no pace", A.deriveSnapshotState(few, clone(SUP)).avgBlockMs === null);
+  const fast = clone(CONS); fast.recent = mkRecent(11, 500, 153396, 1756944000000);
+  t("boundary: 500ms average -> no pace (outside the plausible band)", A.deriveSnapshotState(fast, clone(SUP)).avgBlockMs === null);
+
+  // The REAL current snapshots must pass their own boundary unchanged.
+  const fs2 = require("fs"), path2 = require("path");
+  const realC = JSON.parse(fs2.readFileSync(path2.join(__dirname, "../../../data/consensus.json"), "utf8"));
+  const realS = JSON.parse(fs2.readFileSync(path2.join(__dirname, "../../../data/supply.json"), "utf8"));
+  const dReal = A.deriveSnapshotState(realC, realS);
+  t("boundary: real snapshots anchor", dReal.snapshotOk === true && dReal.rewardQtc !== null && dReal.avgBlockMs !== null);
+  t("boundary: real difficulty/head unchanged", dReal.difficulty === Number(realC.current.difficulty) && dReal.head === realC.current.height);
+  approx("boundary: real reward unchanged", dReal.rewardQtc, L.currentRewardQtc(Number(realS.total_supply_plancks)), 1e-9);
+  const realAvg = (realC.recent[realC.recent.length - 1][1] - realC.recent[0][1]) / (realC.recent.length - 1);
+  approx("boundary: real pace unchanged", dReal.avgBlockMs, realAvg, 1e-9);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
