@@ -529,7 +529,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("hexToNum"), "notary: no unchecked parseInt header coercion remains");
   ok(!app.includes("parseInt($(\"nonceInput\")"), "notary: no parseInt nonce coercion remains");
   const html = read("pages/notary-desk/index.html");
-  ok(html.includes("js/app.js?v=1.51.0"), "notary: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.52.0"), "notary: app.js cache key bumped for the boundary fix");
   ok(html.includes("js/notary-codec.js?v=1.48.0"), "notary: notary-codec.js cache key bumped for the boundary fix");
 }
 
@@ -720,6 +720,35 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok((app.match(/voidVerify\(/g) || []).length >= 6, "extrinsic: voidVerify wired at definition + decode + hex-void + context-fetch + context-edit + Clear");
   const html = read("pages/extrinsic-lab/index.html");
   ok(html.includes("js/app.js?v=1.44.0"), "extrinsic: app.js cache key bumped for the clear-staleness fix");
+}
+
+// Batch 22 (2026-10-10 07:19): notary-desk (Tier 1) — the last Tier 1
+// staleness sweep. Neither rendered pin had ANY staleness path: the
+// Timestamp Studio build (lastBuild + rendered call/envelope/fee
+// ledger) is a pin on (mode, digest, algorithm, label, message, remark
+// variant, signature scheme, nonce, dropped file), yet editing any of
+// them left the old extrinsic standing — and Save anchor silently
+// persisted the OLD build while the form showed the new inputs. The
+// Verify verdict is a pin on (digest field, file pairing, vault
+// contents), yet digest edits, the verify drop's programmatic fill,
+// and every vault mutation (save / delete / clear / block annotation)
+// left it standing. Pin: voidBuild() / voidVerifyResult() exist, no-op
+// when nothing is live, and are wired into every determinant —
+// including both programmatic drop fills, which fire no events.
+{
+  const app = read("pages/notary-desk/js/app.js");
+  ok(app.includes("function voidBuild(what)"), "notary: voidBuild() defined (build staleness)");
+  ok(app.includes("Build cleared — "), "notary: build void replaces the output with a cleared note");
+  ok((app.match(/voidBuild\(/g) || []).length >= 10, "notary: voidBuild wired at definition + digest + algo + label + message + mode + variant + scheme + nonce + studio drop");
+  ok(app.includes("const changed = studio.mode !== btn.dataset.mode"), "notary: mode void scoped to an actual mode change");
+  ok(app.includes("const changed = nv !== studio.withEvent"), "notary: variant void scoped to an actual variant change");
+  ok(app.includes("function voidVerifyResult(what)"), "notary: voidVerifyResult() defined (verdict staleness)");
+  ok(app.includes("if (!verifyLive) return;"), "notary: verdict void only touches a live verdict");
+  ok(app.includes("Result cleared."), "notary: verdict void replaces the verdict with a cleared note");
+  ok(app.includes("verifyLive = true;"), "notary: a fresh verdict marks itself live for voiding");
+  ok((app.match(/voidVerifyResult\(/g) || []).length >= 7, "notary: voidVerifyResult wired at definition + digest edit + verify drop + save + delete + clear + block annotation");
+  const html = read("pages/notary-desk/index.html");
+  ok(html.includes("js/app.js?v=1.52.0"), "notary: app.js cache key bumped for the staleness fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

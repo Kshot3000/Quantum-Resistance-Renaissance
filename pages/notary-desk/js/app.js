@@ -81,11 +81,20 @@ async function hashFile(file, onProgress) {
 const studio = { mode: "document", withEvent: true, fileHash: null };
 
 segWire("modeSeg", (btn) => {
+  const changed = studio.mode !== btn.dataset.mode;
   studio.mode = btn.dataset.mode;
   $("docInputs").hidden = studio.mode !== "document";
   $("msgInputs").hidden = studio.mode !== "message";
+  /* voidBuild is defined below (hoisted); it no-ops until a build exists,
+   * and re-clicking the already-active segment is not a change. */
+  if (changed) voidBuild("the anchor mode changed after this build, so it no longer describes the current inputs.");
 });
-segWire("eventSeg", (btn) => { studio.withEvent = btn.dataset.ev === "1"; });
+segWire("eventSeg", (btn) => {
+  const nv = btn.dataset.ev === "1";
+  const changed = nv !== studio.withEvent;
+  studio.withEvent = nv;
+  if (changed) voidBuild("the remark variant changed after this build, so it no longer describes the current inputs.");
+});
 
 function wireDrop(dropId, inputId, onFile) {
   const drop = $(dropId), input = $(inputId);
@@ -120,6 +129,11 @@ wireDrop("drop", "fileInput", async (file) => {
     studio.fileHash = h;
     $("digestInput").value = h.sha256;
     $("algoSel").value = "1";
+    /* The fill above is programmatic (no input/change events fire), so
+     * the build void must be explicit: a build standing over the file
+     * this drop just replaced describes a document the form no longer
+     * shows, and Save would persist it under the new file's shadow. */
+    voidBuild("a new file was hashed after this build, so it no longer describes the current inputs.");
     drop.querySelector("strong").textContent = "✓ " + file.name;
     drop.querySelector(".hint").textContent =
       file.size.toLocaleString("en-US") + " bytes · SHA-256 " + h.sha256.slice(0, 16) + "… · BLAKE2b-256 " +
@@ -139,6 +153,7 @@ wireDrop("drop", "fileInput", async (file) => {
  * matches neither of the file's digests voids the file attribution, so the
  * build output never credits a pasted digest to the dropped file. */
 $("algoSel").addEventListener("change", () => {
+  voidBuild("the digest algorithm changed after this build, so it no longer describes the current inputs.");
   if (!studio.fileHash) return;
   const cur = $("digestInput").value.trim().toLowerCase();
   if (cur === studio.fileHash.sha256 || cur === studio.fileHash.blake2) {
@@ -147,6 +162,7 @@ $("algoSel").addEventListener("change", () => {
   }
 });
 $("digestInput").addEventListener("input", () => {
+  voidBuild("the digest changed after this build, so it no longer describes the current inputs.");
   if (!studio.fileHash) return;
   const cur = $("digestInput").value.trim().toLowerCase();
   if (cur === studio.fileHash.sha256) $("algoSel").value = "1";
@@ -154,7 +170,11 @@ $("digestInput").addEventListener("input", () => {
   else studio.fileHash = null;
 });
 
+$("labelInput").addEventListener("input", () => {
+  voidBuild("the label changed after this build, so it no longer describes the current inputs.");
+});
 $("msgInput").addEventListener("input", () => {
+  voidBuild("the message changed after this build, so it no longer describes the current inputs.");
   const n = new TextEncoder().encode($("msgInput").value).length;
   $("msgBytes").textContent = n.toLocaleString("en-US") + " / 4096 bytes";
   $("msgBytes").style.color = n > C.MAX_MESSAGE_BYTES ? "var(--red)" : "";
@@ -167,6 +187,39 @@ function anatomyRows(rows) {
 }
 
 let lastBuild = null;
+
+/* The built extrinsic is a pin on (mode, digest, algorithm, label,
+ * message, remark variant, signature scheme, nonce, dropped file):
+ * lastBuild + the rendered call/envelope/anatomy/fee ledger. Until now
+ * NOTHING voided it — editing any determinant after a build left the
+ * old extrinsic on screen, and Save anchor silently persisted the OLD
+ * build into the vault while the form showed the new inputs (the
+ * export-staleness class: the stale artifact leaves the page). Voiding
+ * nulls lastBuild — Save falls back to its no-build guard — and
+ * replaces the output with a cleared note naming what changed. Wired
+ * into every determinant mutation: the field/segment/select listeners,
+ * and EXPLICITLY at the studio drop, whose programmatic digest/algo
+ * fill fires no input/change events and would bypass an event-only
+ * void (the Extrinsic Lab Clear-button lesson). Segment voids are
+ * scoped to an actual change — re-clicking the active segment voids
+ * nothing. No-ops when no build exists. */
+function voidBuild(what) {
+  if (!lastBuild) return;
+  lastBuild = null;
+  $("stampOut").hidden = true;
+  const e = $("stampEmpty");
+  e.hidden = false;
+  e.textContent = "Build cleared — " + what + " Build again to get an extrinsic for the current inputs.";
+}
+/* Scheme and nonce live inside the output card, but they are build
+ * inputs all the same: the fee ledger and the saved feeQTC are computed
+ * from them at build time, so changing either strands a stale quote. */
+$("sigSel").addEventListener("change", () => {
+  voidBuild("the signature scheme changed after this build, so its fee quote no longer describes the current inputs.");
+});
+$("nonceInput").addEventListener("input", () => {
+  voidBuild("the nonce changed after this build, so its fee quote no longer describes the current inputs.");
+});
 
 $("buildBtn").addEventListener("click", () => {
   $("stampEmpty").hidden = true; $("stampOut").hidden = false;
@@ -277,11 +330,17 @@ $("saveVaultBtn").addEventListener("click", () => {
   const v = loadVault();
   v.unshift(lastBuild);
   saveVault(v); renderVault();
+  /* A saved anchor is a vault determinant of any Verify verdict: a
+   * MISS pronounced over the pre-save vault must not stand. */
+  voidVerifyResult("A new anchor was saved to the vault after that verdict, so it no longer applies.");
   $("saveVaultBtn").textContent = "✓ Saved to vault";
   setTimeout(() => { $("saveVaultBtn").textContent = "💾 Save anchor to my vault"; }, 1600);
 });
 $("vaultClear").addEventListener("click", () => {
-  if (confirm("Delete all saved anchors from this browser?")) { saveVault([]); renderVault(); }
+  if (confirm("Delete all saved anchors from this browser?")) {
+    saveVault([]); renderVault();
+    voidVerifyResult("The vault was cleared after that verdict, so it no longer applies.");
+  }
 });
 
 function renderVault() {
@@ -308,12 +367,18 @@ function renderVault() {
       vv[idx].block = /^\d+$/.test(t) ? t : null;
       if (t && !vv[idx].block) blk.value = "";
       saveVault(vv);
+      /* A HIT verdict quotes the anchor's recorded block, so editing
+       * the annotation strands the verdict's block claim. */
+      voidVerifyResult("A vault anchor's recorded block changed after that verdict, so it no longer applies.");
     });
     meta.appendChild(document.createTextNode("landed in block "));
     meta.appendChild(blk);
     const del = el("button", "btn tiny danger", "Delete");
     del.style.marginLeft = "8px";
-    del.addEventListener("click", () => { const vv = loadVault(); vv.splice(idx, 1); saveVault(vv); renderVault(); });
+    del.addEventListener("click", () => {
+      const vv = loadVault(); vv.splice(idx, 1); saveVault(vv); renderVault();
+      voidVerifyResult("An anchor was deleted from the vault after that verdict, so it no longer applies.");
+    });
     meta.appendChild(del);
     d.appendChild(meta);
     box.appendChild(d);
@@ -322,6 +387,26 @@ function renderVault() {
 function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 /* ---------------- Verify Desk ---------------- */
+/* A verdict is a pin on (digest field, dropped-file pairing, vault
+ * contents) — and until now nothing voided it either: editing the
+ * digest left a HIT pronouncing over the wrong digest, a verify drop
+ * refilled the field programmatically (no input event) under the old
+ * verdict, and saving / deleting / clearing a vault anchor — or
+ * editing an anchor's recorded block, which a HIT quotes — left the
+ * verdict standing over a vault that no longer matched it (a HIT for a
+ * deleted anchor; a MISS for one just saved). voidVerifyResult is
+ * wired into every one of those mutations (the vault ones live in the
+ * vault section above; this declaration is hoisted). It no-ops unless
+ * a verdict is actually live. */
+let verifyLive = false;
+function voidVerifyResult(what) {
+  if (!verifyLive) return;
+  verifyLive = false;
+  const box = $("vResult");
+  box.hidden = false;
+  box.className = "vresult miss";
+  box.innerHTML = "<strong>Result cleared.</strong> " + what + " Verify again for a verdict on the current digest and vault.";
+}
 /* Verify-by-file must try BOTH of the file's digests: a vault anchor built
  * as BLAKE2b-256 stores that digest, so filling only the SHA-256 into the
  * box (the old behaviour) reported a matching file as "not in your vault".
@@ -343,6 +428,9 @@ wireDrop("vDrop", "vFileInput", async (file) => {
     if (mySeq !== verifyHashSeq) return;
     verifyFileHash = h;
     $("vDigestInput").value = h.sha256;
+    /* Programmatic fill (no input event): void the verdict explicitly,
+     * or it keeps pronouncing over the previously entered digest. */
+    voidVerifyResult("A new file was dropped after that verdict, so it no longer applies.");
     drop.querySelector("strong").textContent = "✓ " + file.name + " — digest filled below";
   } catch {
     if (mySeq !== verifyHashSeq) return;
@@ -351,6 +439,7 @@ wireDrop("vDrop", "vFileInput", async (file) => {
   if (mySeq === verifyHashSeq) drop.querySelector(".drop-ico").textContent = "🔍";
 });
 $("vDigestInput").addEventListener("input", () => {
+  voidVerifyResult("The digest changed after that verdict, so it no longer applies.");
   if (!verifyFileHash) return;
   const cur = $("vDigestInput").value.trim().toLowerCase();
   if (cur !== verifyFileHash.sha256 && cur !== verifyFileHash.blake2) verifyFileHash = null;
@@ -359,6 +448,7 @@ $("vDigestInput").addEventListener("input", () => {
 $("vCheckBtn").addEventListener("click", () => {
   const d = $("vDigestInput").value.trim().toLowerCase();
   const box = $("vResult"); box.hidden = false;
+  verifyLive = true;
   if (!/^[0-9a-f]{64}$/.test(d)) {
     box.className = "vresult miss";
     box.innerHTML = "<strong>⚠ Not a digest</strong>Paste a 64-character hex digest, or drop the file above to hash it.";
