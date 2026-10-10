@@ -1,9 +1,9 @@
 {
   "ok": true,
   "source": "https://sqm.quantus.com/v1/graphql",
-  "fetched_at": "2026-10-10T01:23:44.890Z",
-  "block_height": 197034,
-  "accounts_total": 12955,
+  "fetched_at": "2026-10-10T02:21:54.387Z",
+  "block_height": 197261,
+  "accounts_total": 12982,
   "mint_sentinel_id": "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc",
   "genesis": {
     "count": 22,
@@ -122,15 +122,15 @@
     ]
   },
   "mined": {
-    "reward_events": 197034,
-    "total_plancks": "60662380000000000"
+    "reward_events": 197261,
+    "total_plancks": "60731950000000000"
   },
   "balances_plancks": {
-    "free": "5798514004548037469",
+    "free": "5798651691614761287",
     "reserved": "103500000000",
     "frozen": "0"
   },
-  "total_supply_plancks": "5798514108048037469",
+  "total_supply_plancks": "5798651795114761287",
   "vesting": {
     "schedules": 48,
     "total_plancks": "5669940000000000000",
@@ -140,9 +140,9 @@
   },
   "mint_sentinel": {
     "free_plancks": "0",
-    "out_count": 247915,
-    "out_total_plancks": "5798804151000000000",
-    "out_nongenesis_count": 247893,
-    "out_nongenesis_plancks": "128803850000000000"
+    "out_count": 248192,
+    "out_total_plancks": "5798942011000000000",
+    "out_nongenesis_count": 248170,
+    "out_nongenesis_plancks": "128941710000000000"
   }
 }

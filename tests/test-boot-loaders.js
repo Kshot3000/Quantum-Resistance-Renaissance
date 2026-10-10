@@ -550,5 +550,46 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/watch-core.js?v=1.31.0"), "watchtower: watch-core.js cache key bumped for the boundary fix");
 }
 
+// Batch 17 (2026-10-09 21:19): portfolio-desk (Tier 2) — its stored
+// vault and every snapshot/RPC payload crossed into BigInt math with no
+// validation: parseVaultJson threw on ONE null entry (loadVault's catch
+// then discarded the WHOLE vault), never deduped (a duplicate address
+// double-counted every portfolio total), fractional/negative planck
+// strings from the indexer or whales snapshot threw inside renderAll,
+// garbage heights rendered as chain fact, miner counts went NaN,
+// vesting schedule ids reached innerHTML unescaped, and id-less
+// transfers all collapsed into a single activity row. Pin: sanitizers
+// in desk-core.js gate the vault, balances, schedules, transfers, top
+// balances, and mined counts; the rollup re-validates its ctx; the app
+// SS58-gates the stored vault and validates live answers per-address.
+{
+  const core = read("pages/portfolio-desk/js/desk-core.js");
+  ok(core.includes("function sanitizeBalance(row)"), "portfolio: sanitizeBalance() defined in desk-core");
+  ok(core.includes("function sanitizeSchedule(s)"), "portfolio: sanitizeSchedule() defined in desk-core");
+  ok(core.includes("function sanitizeSchedules(rows)"), "portfolio: sanitizeSchedules() defined in desk-core");
+  ok(core.includes("function sanitizeTransfers(rows)"), "portfolio: sanitizeTransfers() defined in desk-core");
+  ok(core.includes("function sanitizeTopBalances(rows)"), "portfolio: sanitizeTopBalances() defined in desk-core");
+  ok(core.includes("function sanitizeMinedCounts(windowMiners, allTime)"), "portfolio: sanitizeMinedCounts() defined in desk-core");
+  ok(core.includes("function sanitizeVaultEntries(rows)"), "portfolio: sanitizeVaultEntries() defined in desk-core");
+  ok(core.includes("a duplicate silently double-counted every total"), "portfolio: duplicate vault entries are dropped, never double-counted");
+  ok(core.includes("sanitizeBalance(ctx.balances.get(entry.address))"), "portfolio: rollup re-validates balances from any ctx producer");
+  ok(core.includes("dedupe on the row's own facts"), "portfolio: id-less transfers dedupe on their own facts, never one shared key");
+  const app = read("pages/portfolio-desk/js/app.js");
+  ok(app.includes("v.addresses = v.addresses.filter(function (e) { return validateQuantusAddress(e.address).ok; });"), "portfolio: stored vault is SS58-gated at load");
+  ok(app.includes("indexer returned a malformed response"), "portfolio: a non-object indexer answer is rejected, never dereferenced");
+  ok(app.includes("QPORT.sanitizeBalance(row)"), "portfolio: live balance rows sanitized before they anchor the desk");
+  ok(app.includes("row.id === addr ? QPORT.sanitizeBalance(row) : null"), "portfolio: a single-address refresh must answer for the address asked");
+  ok(app.includes("Live refresh returned a malformed balance"), "portfolio: a malformed live balance reports honestly instead of anchoring");
+  ok(app.includes("c.snapBalances = QPORT.sanitizeTopBalances(whales.top);"), "portfolio: snapshot balances sanitized at load");
+  ok(app.includes("c.schedules = QPORT.sanitizeSchedules(vesting.schedules);"), "portfolio: vesting schedules sanitized at load");
+  ok(app.includes("indexTransfers(QPORT.sanitizeTransfers(flows.transfers))"), "portfolio: transfers sanitized before the activity index");
+  ok(app.includes("c.minedCounts = QPORT.sanitizeMinedCounts(miners.window_miners, miners.all_time);"), "portfolio: mined counts sanitized at load");
+  ok(app.includes("QPORT.parseHeight(bundle.liveData.status.block_height)"), "portfolio: the live head is parsed strictly, never presented raw");
+  ok(app.includes('esc(String(x.s.id))'), "portfolio: vesting schedule ids are escaped at render");
+  const html = read("pages/portfolio-desk/index.html");
+  ok(html.includes("js/app.js?v=1.35.0"), "portfolio: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/desk-core.js?v=1.32.0"), "portfolio: desk-core.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -75,6 +75,10 @@ function loadVault() {
     var raw = localStorage.getItem(QPORT.VAULT_KEY);
     if (!raw) return;
     var v = QPORT.parseVaultJson(raw);
+    // Stored addresses were SS58-validated when they entered the vault;
+    // one that no longer validates was never written by this desk —
+    // drop it rather than let it anchor balances or checkphrases.
+    v.addresses = v.addresses.filter(function (e) { return validateQuantusAddress(e.address).ok; });
     vault = v;
   } catch (e) { /* corrupted storage: start clean */ }
 }
@@ -123,7 +127,12 @@ function liveBalanceQuery(addresses) {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function (j) {
-      if (j.errors) throw new Error(j.errors[0].message);
+      if (!j || typeof j !== "object") throw new Error("indexer returned a malformed response");
+      if (j.errors) {
+        var first = Array.isArray(j.errors) && j.errors.length ? j.errors[0] : null;
+        throw new Error(first && first.message ? String(first.message) : "indexer returned errors");
+      }
+      if (!j.data || typeof j.data !== "object") throw new Error("indexer returned no data");
       return j.data;
     });
 }
@@ -136,8 +145,9 @@ function indexTransfers(transfers) {
     e[side].push(t);
   }
   (transfers || []).forEach(function (t) {
-    if (t.from_id) push(t.from_id, "out", t);
-    if (t.to_id) push(t.to_id, "in", t);
+    if (!t || typeof t !== "object") return;
+    if (typeof t.from_id === "string" && t.from_id) push(t.from_id, "out", t);
+    if (typeof t.to_id === "string" && t.to_id) push(t.to_id, "in", t);
   });
   byAddr.forEach(function (e) {
     e["in"].sort(function (a, b) { return b.block_height - a.block_height; });
@@ -158,16 +168,21 @@ function buildChain(bundle, addrs, nowMs) {
   // decode once here — idempotent, v1 object rows pass through untouched.
   if (bundle.flows && typeof QFlows !== "undefined" && QFlows.decode) bundle.flows = QFlows.decode(bundle.flows);
   c.fetchedAt = new Date().toISOString();
-  // Live per-address balances
+  // Live per-address balances — every node answer is validated before
+  // it anchors a balance or a chain head: a fractional/negative/garbage
+  // planck string used to reach rollup's BigInt() and throw inside
+  // renderAll, and a garbage block_height was presented as chain fact.
   if (bundle.liveData && bundle.liveData.status) {
     c.mode = "live";
     c.liveAt = new Date().toISOString();
-    c.height = bundle.liveData.status.block_height || null;
-    c.accountsTotal = bundle.liveData.status.total_accounts || null;
+    c.height = QPORT.parseHeight(bundle.liveData.status.block_height);
+    c.accountsTotal = QPORT.nonNegInt(bundle.liveData.status.total_accounts);
     Object.keys(bundle.liveData).forEach(function (k) {
       if (k === "status" || k === "__typename") return;
       var row = bundle.liveData[k];
-      if (row && row.id) c.liveBalances.set(row.id, { free: row.free, reserved: row.reserved, frozen: row.frozen });
+      if (!row || typeof row.id !== "string" || !row.id) return;
+      var bal = QPORT.sanitizeBalance(row);
+      if (bal) c.liveBalances.set(row.id, bal);
     });
   }
   // Snapshots (same-origin)
@@ -187,38 +202,21 @@ function buildChain(bundle, addrs, nowMs) {
     (bundle.flows && Array.isArray(bundle.flows.transfers) && bundle.flows.meta ? bundle.flows : null);
   var miners = pickSnap("miners", bundle.miners);
   if (live && live.data && live.data.status) {
-    if (c.height == null) c.height = live.data.status.block_height;
-    if (c.accountsTotal == null) c.accountsTotal = live.data.status.total_accounts;
+    if (c.height == null) c.height = QPORT.parseHeight(live.data.status.block_height);
+    if (c.accountsTotal == null) c.accountsTotal = QPORT.nonNegInt(live.data.status.total_accounts);
   }
   if (whales) {
-    (whales.top || []).forEach(function (a) {
-      c.snapBalances.set(a.address, { free: a.free_plancks, reserved: a.reserved_plancks, frozen: a.frozen_plancks });
-    });
+    c.snapBalances = QPORT.sanitizeTopBalances(whales.top);
     if (whales.supply_plancks) {
       var sp = whales.supply_plancks;
-      try { c.supplyPlancks = BigInt(typeof sp === "object" ? sp.free : sp); }
-      catch (e) { c.supplyPlancks = null; }
+      var spFree = QPORT.validPlancks(typeof sp === "object" ? sp.free : sp);
+      c.supplyPlancks = spFree === null ? null : BigInt(spFree);
     }
-    if (whales.block_height && c.height == null) c.height = whales.block_height;
+    if (c.height == null) c.height = QPORT.parseHeight(whales.block_height);
   }
-  if (vesting) {
-    (vesting.schedules || []).forEach(function (s) {
-      if (!s.beneficiary) return;
-      var arr = c.schedules.get(s.beneficiary);
-      if (!arr) { arr = []; c.schedules.set(s.beneficiary, arr); }
-      arr.push(s);
-    });
-  }
-  if (flows) c.byAddr = indexTransfers(flows.transfers);
-  if (miners) {
-    var wm = miners.window_miners || {};
-    Object.keys(wm).forEach(function (addr) {
-      c.minedCounts.set(addr, (c.minedCounts.get(addr) || 0) + Number(wm[addr] || 0));
-    });
-    (miners.all_time || []).forEach(function (m) {
-      if (m && m.address) c.minedCounts.set(m.address, (c.minedCounts.get(m.address) || 0) + Number(m.blocks || 0));
-    });
-  }
+  if (vesting) c.schedules = QPORT.sanitizeSchedules(vesting.schedules);
+  if (flows) c.byAddr = indexTransfers(QPORT.sanitizeTransfers(flows.transfers));
+  if (miners) c.minedCounts = QPORT.sanitizeMinedCounts(miners.window_miners, miners.all_time);
   return c;
 }
 
@@ -413,7 +411,7 @@ function renderVesting(pf) {
     var vestedPct = x.s.total > 0n ? Number((x.s.claimed + x.s.claimable) * 100n / x.s.total) : 0;
     return "<tr>" +
       '<td><div class="hname">' + esc(x.r.nick || QPORT.shortAddr(x.r.address)) + '</div><div class="haddr mono">' + esc(QPORT.shortAddr(x.r.address)) + "</div></td>" +
-      '<td>' + esc(String(x.s.cohort)) + ' <span class="muted small">#' + x.s.id + "</span></td>" +
+      '<td>' + esc(String(x.s.cohort)) + (x.s.id == null ? "" : ' <span class="muted small">#' + esc(String(x.s.id)) + "</span>") + "</td>" +
       '<td class="num">' + QPORT.formatQtc(x.s.total) + " QTC</td>" +
       '<td class="num"><div class="pbar"><div class="pfill" style="width:' + Math.min(100, vestedPct) + '%"></div></div><span class="small">' +
       vestedPct.toFixed(1) + "% vested · " + pct.toFixed(1) + "% claimed</span></td>" +
@@ -548,12 +546,17 @@ function refreshOne(addr) {
   toast("Refreshing " + QPORT.shortAddr(addr) + "…");
   liveBalanceQuery([addr]).then(function (d) {
     var row = d && d.a0;
-    if (row && row.id) {
-      chain.liveBalances.set(row.id, { free: row.free, reserved: row.reserved, frozen: row.frozen });
+    var bal = row && row.id === addr ? QPORT.sanitizeBalance(row) : null;
+    if (bal) {
+      chain.liveBalances.set(addr, bal);
       chain.mode = "live";
       chain.liveAt = new Date().toISOString();
       renderAll();
       toast("Refreshed — live balance loaded.", "ok");
+    } else if (row && row.id) {
+      // The indexer answered for this address but its balance fields
+      // were malformed — never let them anchor the desk.
+      toast("Live refresh returned a malformed balance — showing snapshot instead.", "err");
     } else {
       toast("No account row on-chain yet (zero/never-funded). Snapshot says: " +
         (chain.snapBalances.has(addr) ? QPORT.formatQtc(BigInt(chain.snapBalances.get(addr).free)) + " QTC" : "unknown") + ".", "err");

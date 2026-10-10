@@ -116,6 +116,134 @@ test("vault add/remove/duplicate/import round-trips", () => {
   assert.throws(() => P.parseVaultJson("{}"), /not a Portfolio Desk vault/);
 });
 
+test("validPlancks/nonNegInt accept only canonical non-negative integers", () => {
+  assert.equal(P.validPlancks("0"), "0");
+  assert.equal(P.validPlancks("007"), "7");
+  assert.equal(P.validPlancks(42), "42");
+  assert.equal(P.validPlancks(42n), "42");
+  for (const bad of ["12.5", "-5", "abc", "", null, undefined, 1.5, -1, NaN, {}, [], "0x10", "1e3"])
+    assert.equal(P.validPlancks(bad), null, "validPlancks(" + String(bad) + ")");
+  assert.equal(P.nonNegInt("197034"), 197034);
+  assert.equal(P.nonNegInt(0), 0);
+  for (const bad of ["1.5", "-1", "abc", null, 2.5, "99999999999999999999"])
+    assert.equal(P.nonNegInt(bad), null, "nonNegInt(" + String(bad) + ")");
+  assert.equal(P.parseHeight("42"), 42);
+  assert.equal(P.parseableTs("2026-09-30T00:00:00Z"), "2026-09-30T00:00:00Z");
+  assert.equal(P.parseableTs("not a date"), null);
+  assert.equal(P.parseableTs(null), null);
+});
+
+test("sanitizeBalance drops poisoned rows, defaults absent reserved/frozen to 0", () => {
+  assert.deepEqual(P.sanitizeBalance({ free: "100", reserved: "2", frozen: "0" }), { free: "100", reserved: "2", frozen: "0" });
+  assert.deepEqual(P.sanitizeBalance({ free: "100" }), { free: "100", reserved: "0", frozen: "0" });
+  for (const bad of [null, "x", [], { free: "12.5" }, { free: "-5" }, { free: "abc" }, { reserved: "0" }, { free: "1", reserved: "x" }, { free: {} }])
+    assert.equal(P.sanitizeBalance(bad), null);
+});
+
+test("sanitizeSchedule validates totals and the vesting window", () => {
+  const ok = P.sanitizeSchedule({ id: 3, cohort: "grant", total_plancks: "1000", claimed_plancks: "10", cliff_ms: "100", start_ms: "100", end_ms: "200" });
+  assert.equal(ok.total_plancks, "1000");
+  assert.equal(ok.id, 3);
+  const coerced = P.sanitizeSchedule({ id: "<b>9</b>", cohort: { x: 1 }, total_plancks: "5", cliff_ms: 0, start_ms: 0, end_ms: 1 });
+  assert.equal(coerced.id, null);            // markup-bearing id coerced away, never rendered raw
+  assert.equal(coerced.cohort, "—");
+  assert.equal(coerced.claimed_plancks, "0"); // absent claimed reads as 0
+  for (const bad of [null, [], { total_plancks: "1.5", cliff_ms: "0", start_ms: "0", end_ms: "1" },
+                     { total_plancks: "5", cliff_ms: "x", start_ms: "0", end_ms: "1" },
+                     { total_plancks: "5", cliff_ms: "0", start_ms: "9", end_ms: "1" },
+                     { total_plancks: "5", claimed_plancks: "-1", cliff_ms: "0", start_ms: "0", end_ms: "1" }])
+    assert.equal(P.sanitizeSchedule(bad), null);
+  const byBen = P.sanitizeSchedules([
+    { beneficiary: "qzA", total_plancks: "5", cliff_ms: "0", start_ms: "0", end_ms: "1" },
+    { beneficiary: "qzA", total_plancks: "bad", cliff_ms: "0", start_ms: "0", end_ms: "1" },
+    null,
+    { total_plancks: "5", cliff_ms: "0", start_ms: "0", end_ms: "1" },
+    { beneficiary: 42, total_plancks: "5", cliff_ms: "0", start_ms: "0", end_ms: "1" },
+  ]);
+  assert.equal(byBen.get("qzA").length, 1);
+  assert.equal(byBen.size, 1);
+});
+
+test("sanitizeTransfers drops unrenderable rows and coerces garbage timestamps to null", () => {
+  const rows = P.sanitizeTransfers([
+    { id: "t1", amount: "100", from_id: "qzA", to_id: "qzB", block_height: 5, timestamp: "2026-09-30T00:00:00Z" },
+    { id: "t2", amount: "12.5", from_id: "qzA", to_id: "qzB", block_height: 6, timestamp: null },
+    { id: "t3", amount: "1", from_id: "qzA", to_id: "qzB", block_height: "NaN", timestamp: null },
+    null,
+    { amount: "7", from_id: "qzA", to_id: "qzB", block_height: "9", timestamp: "garbage" },
+    { id: "t6", amount: "1", from_id: "qzA", block_height: 1, timestamp: null },
+  ]);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].amount, "100");
+  assert.equal(rows[1].id, null);              // id-less row survives with its own facts
+  assert.equal(rows[1].timestamp, null);       // garbage ts is unknown, not a fake "just now"
+  assert.equal(rows[1].block_height, 9);
+});
+
+test("sanitizeTopBalances and sanitizeMinedCounts reject garbage without NaN", () => {
+  const top = P.sanitizeTopBalances([
+    { address: "qzA", free_plancks: "100", reserved_plancks: "0", frozen_plancks: "0" },
+    { address: "qzB", free_plancks: "-5" },
+    null,
+    { free_plancks: "1" },
+  ]);
+  assert.equal(top.size, 1);
+  assert.equal(top.get("qzA").free, "100");
+  const mined = P.sanitizeMinedCounts({ qzA: 3, qzB: "abc", qzC: "4" }, [
+    { address: "qzA", blocks: 10 }, { address: "qzD", blocks: "x" }, null, { blocks: 1 },
+  ]);
+  assert.equal(mined.get("qzA"), 13);
+  assert.equal(mined.has("qzB"), false);
+  assert.equal(mined.get("qzC"), 4);
+  assert.equal(mined.has("qzD"), false);
+});
+
+test("parseVaultJson drops poison entries and duplicates instead of throwing or double-counting", () => {
+  const parsed = P.parseVaultJson(JSON.stringify({ version: 1, addresses: [
+    { address: "qzA", nick: "Cold", addedAt: 5 },
+    null,
+    { nick: "no address" },
+    { address: 42 },
+    { address: " qzA ", nick: "duplicate with spaces" },
+    { address: "qzB", nick: { evil: 1 }, addedAt: "garbage" },
+  ] }));
+  assert.equal(parsed.addresses.length, 2);
+  assert.equal(parsed.addresses[0].address, "qzA");
+  assert.equal(parsed.addresses[0].addedAt, 5);
+  assert.equal(parsed.addresses[1].nick, "");
+  assert.ok(parsed.addresses[1].addedAt > 0);
+  assert.throws(() => P.parseVaultJson("{}"), /not a Portfolio Desk vault/);
+  assert.throws(() => P.parseVaultJson('{"addresses":{}}'), /not a Portfolio Desk vault/);
+});
+
+test("rollupPortfolio survives poisoned ctx values (unknown, never a throw)", () => {
+  const vault = P.blankVault();
+  P.addToVault(vault, "qzA", "Cold");
+  const ctx = {
+    balances: new Map([["qzA", { free: "12.5", reserved: "0", frozen: "0" }]]),
+    schedules: new Map([["qzA", [{ id: 0, total_plancks: "bad", cliff_ms: "0", start_ms: "0", end_ms: "1" },
+                                  { id: 1, total_plancks: "2000000000000", claimed_plancks: "0", cliff_ms: "0", start_ms: "0", end_ms: "9999999999999" }]]]),
+    byAddr: new Map([["qzA", { in: "not-an-array", out: [], count: 0, lastTs: null }]]),
+    minedCounts: new Map([["qzA", "abc"]]),
+  };
+  const pf = P.rollupPortfolio(vault, ctx, Date.now());
+  assert.equal(pf.rows[0].balanceKnown, false);   // fractional balance is unknown, not fabricated
+  assert.equal(pf.rows[0].schedules.length, 1);  // only the valid schedule survives
+  assert.equal(pf.rows[0].minedBlocks, 0);        // garbage count is 0, never NaN
+  assert.equal(pf.totalMined, 0);
+});
+
+test("portfolioActivity keeps id-less rows and drops unrenderable ones", () => {
+  const byAddr = new Map();
+  const good = { amount: "100", from_id: "qzA", to_id: "qzB", block_height: 5, timestamp: null };
+  const good2 = { amount: "200", from_id: "qzA", to_id: "qzC", block_height: 6, timestamp: null };
+  const bad = { amount: "1.5", from_id: "qzA", to_id: "qzB", block_height: 7, timestamp: null };
+  byAddr.set("qzA", { in: [], out: [good, good2, bad, null], count: 4, lastTs: null });
+  const acts = P.portfolioActivity(byAddr, ["qzA"], 25);
+  assert.equal(acts.length, 2);   // pre-fix: all id-less rows collapsed to one, and the bad row reached BigInt()
+  assert.equal(acts[0].t.amount, "200");
+});
+
 test("csvExport produces a parseable holdings CSV", () => {
   const vault = P.blankVault();
   P.addToVault(vault, "qzA", "Cold");
