@@ -9,14 +9,14 @@ var E = EnergyCore;
 
 /* ---------- constants ---------- */
 var FALLBACK = {
-  difficulty: "536271527509978",
-  height: 201056,
+  difficulty: "530756822880660",
+  height: 201293,
   // total supply in plancks (free + reserved + frozen), balances aggregate @ block
-  // 201,056, fetched 2026-10-10 — the SAME capture as the difficulty above
-  // (@ block 201,056, fetched 2 seconds apart; never mix snapshot dates in one bundle).
+  // 201,293, fetched 2026-10-10 — the SAME capture as the difficulty above
+  // (@ block 201,293, fetched 10 seconds apart; never mix snapshot dates in one bundle).
   // This is total_issuance for the emission formula, NOT mined rewards alone
   // (genesis endowments count toward issuance).
-  totalSupplyPlancks: "5801046091114544012",
+  totalSupplyPlancks: "5801195648614986105",
   fetchedAt: null,
   txRate: null,
   txRateSub: null,
@@ -43,18 +43,149 @@ function setText(id, s) { var el = $(id); if (el) el.textContent = s; }
 
 /* ---------- data ---------- */
 
+/* ---- snapshot-boundary validation (fleet-standard strict shapes: the
+ * mining-studio / mining-calculator intField pattern, applied fleet-wide).
+ * The fetch scripts emit integer strings for plancks/difficulty/hashrate
+ * and integer numbers for heights/counts/timestamps — anything else
+ * (scientific notation, fractions, markup) is not a measurement and must
+ * not anchor a figure. Every helper is a total function: null, never a
+ * throw, so one malformed field cannot kill its neighbours' figures. */
+function intField(v) {
+  if (typeof v === "string") {
+    if (!/^\d+$/.test(v.trim())) return null;
+    var n = Number(v.trim());
+    return isFinite(n) ? n : null;
+  }
+  if (typeof v === "number") return Number.isInteger(v) ? v : null;
+  return null;
+}
+function validPlancks(v) {
+  if (typeof v === "string") return /^\d+$/.test(v.trim()) ? v.trim() : null;
+  if (typeof v === "number" && Number.isInteger(v) && v >= 0) return String(v);
+  return null;
+}
+function validHeight(v) {
+  var h = intField(v);
+  return (h != null && h >= 1 && h <= 10000000) ? h : null;
+}
+function validFetchedAt(v) {
+  if (typeof v !== "string" || !v) return null;
+  return isFinite(Date.parse(v)) ? v : null;
+}
+
 /* Total supply in plancks from a supply snapshot: the first-class
  * total_supply_plancks field when present (fetch-supply-data.mjs), else the
  * balances aggregate (free + reserved + frozen) = Currency::total_issuance().
- * Returns null when neither is available. */
+ * The fetch script DEFINES the total as that aggregate, so when both are
+ * present they must agree exactly: a total that contradicts its own
+ * itemization is tamper/truncation evidence and neither side is trusted
+ * (null). Null when neither is usable. Never throws on malformed balances. */
 function totalSupplyOf(sup) {
   if (!sup) return null;
-  if (sup.total_supply_plancks) return String(sup.total_supply_plancks);
-  var b = sup.balances_plancks;
-  if (b && b.free != null && b.reserved != null && b.frozen != null) {
-    return (BigInt(b.free) + BigInt(b.reserved) + BigInt(b.frozen)).toString();
+  var total = validPlancks(sup.total_supply_plancks);
+  var b = sup.balances_plancks, sum = null;
+  if (b) {
+    var f = validPlancks(b.free), r = validPlancks(b.reserved), z = validPlancks(b.frozen);
+    if (f != null && r != null && z != null) sum = BigInt(f) + BigInt(r) + BigInt(z);
   }
-  return null;
+  if (total != null && sum != null && BigInt(total) !== sum) return null;
+  if (total != null) return total;
+  return sum != null ? sum.toString() : null;
+}
+
+/* Trend points [height, tsMs, difficulty] for the history chart: drop
+ * poisoned points individually (a garbage timestamp otherwise buckets
+ * into a "NaN-aN-aN" day and a scientific-notation difficulty inflates
+ * that day's energy) instead of losing — or faking — the whole history. */
+function cleanTrend(trend) {
+  if (!Array.isArray(trend)) return [];
+  var out = [];
+  for (var i = 0; i < trend.length; i++) {
+    var p = trend[i];
+    if (!Array.isArray(p)) continue;
+    var h = validHeight(p[0]);
+    var ts = (typeof p[1] === "number" && Number.isInteger(p[1]) && p[1] > 0) ? p[1] : null;
+    var d = validPlancks(p[2]);
+    if (h == null || ts == null || d == null || BigInt(d) <= 0n) continue;
+    out.push([h, ts, d]);
+  }
+  return out;
+}
+
+/* Derive the page's chain state from the three snapshots. Every payload
+ * is validated at this boundary before it anchors a figure: strict
+ * integer shapes, the fetch scripts' own exact cross-checks
+ * (est_hashrate_hs == difficulty/12; total == free+reserved+frozen), the
+ * 21M cap on total issuance, a parseable fetched_at as provenance for
+ * anything called "live", and the one-capture rule (payloads more than
+ * 100 blocks apart are different captures — never mixed). Fields that
+ * fail validation stay null and the caller keeps the dated FALLBACK for
+ * them; payloads fail independently, never together. */
+function deriveSnapshotState(con, sup, liv) {
+  var out = { difficulty: null, height: null, netHs: null, rewardQtc: null,
+              fetchedAt: null, snapshotOk: false, txRate: null, txRateSub: null, trend: null };
+
+  // Consensus: difficulty anchors every energy figure on the page, so
+  // the payload anchors as a unit — strict difficulty, a valid height
+  // (current.height and head are two reads of the same tip; a
+  // disagreement is not one capture), parseable provenance, and the
+  // exact difficulty cross-check when est_hashrate_hs is present.
+  var consAt = validFetchedAt(con && con.fetched_at);
+  var consHeight = null;
+  if (con && consAt && con.current) {
+    var diff = validPlancks(con.current.difficulty);
+    var hh = validHeight(con.current.height), hd = validHeight(con.head);
+    if (hh != null && hd != null && hh !== hd) hh = null;
+    consHeight = hh;
+    if (diff != null && con.current.est_hashrate_hs != null) {
+      var eh = intField(con.current.est_hashrate_hs);
+      if (eh == null || BigInt(eh) !== BigInt(diff) / 12n) diff = null;
+    }
+    if (diff != null && BigInt(diff) > 0n && hh != null) {
+      out.difficulty = diff;
+      out.height = hh;
+      out.netHs = E.hashrateHs(diff);
+      out.fetchedAt = consAt;
+      out.snapshotOk = true;
+      out.trend = cleanTrend(con.trend);
+    }
+  }
+
+  // Supply: the emission reward, from a dated, cross-checked,
+  // under-cap total in the same capture as the consensus payload.
+  var supAt = validFetchedAt(sup && sup.fetched_at);
+  if (sup && supAt) {
+    var tp = totalSupplyOf(sup);
+    // Total issuance can never exceed the 21M cap; beyond it the
+    // emission formula would mint a negative reward out of a poison.
+    if (tp != null && BigInt(tp) <= 21000000n * 1000000000000n) {
+      var supHeight = validHeight(sup.block_height);
+      if (!(consHeight != null && supHeight != null && Math.abs(supHeight - consHeight) > 100)) {
+        out.rewardQtc = E.blockRewardQtc(tp);
+        if (!out.fetchedAt) out.fetchedAt = supAt;
+      }
+    }
+  }
+
+  // Live: the per-transfer rate, from the first daily row that is a
+  // measurement (strict integer counts, a real calendar date) in a
+  // dated payload — poisoned rows drop, never anchor a NaN rate.
+  var livAt = validFetchedAt(liv && liv.fetched_at);
+  if (liv && livAt && liv.data && Array.isArray(liv.data.daily)) {
+    for (var i = 0; i < liv.data.daily.length; i++) {
+      var row = liv.data.daily[i];
+      if (!row) continue;
+      var tx = intField(row.tx_count), bc = intField(row.blocks_count);
+      var date = (typeof row.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(row.date) &&
+                  isFinite(Date.parse(row.date))) ? row.date : null;
+      if (tx == null || tx < 0 || bc == null || bc <= 0 || date == null) continue;
+      out.txRate = tx / (bc * 12);
+      out.txRateSub = E.fmtNum(tx) + " transfers across " + E.fmtNum(bc) +
+        " blocks · " + date.slice(0, 10);
+      break;
+    }
+  }
+  return out;
 }
 
 /* Abort a fetch that never settles: a hung request must fall through to
@@ -91,30 +222,21 @@ function loadSnapshots() {
     var sup = res[1].status === "fulfilled" ? res[1].value : null;
     var liv = res[2].status === "fulfilled" ? res[2].value : null;
 
-    if (con && con.current && con.current.difficulty) {
-      state.difficulty = String(con.current.difficulty);
-      state.height = Number(con.current.height) || state.height;
-      state.netHs = E.hashrateHs(state.difficulty);
-      state.trend = Array.isArray(con.trend) ? con.trend : [];
-      state.fetchedAt = con.fetched_at || null;
+    var d = deriveSnapshotState(con, sup, liv);
+    if (d.snapshotOk) {
+      state.difficulty = d.difficulty;
+      state.height = d.height;
+      state.netHs = d.netHs;
+      state.trend = d.trend;
       state.snapshotOk = true;
     }
-    if (sup && totalSupplyOf(sup)) {
-      state.rewardQtc = E.blockRewardQtc(totalSupplyOf(sup));
-      if (!state.fetchedAt) state.fetchedAt = sup.fetched_at;
+    if (d.rewardQtc != null) state.rewardQtc = d.rewardQtc;
+    if (d.fetchedAt) state.fetchedAt = d.fetchedAt;
+    if (d.txRate != null) {
+      state.txRate = d.txRate;
+      state.txRateSub = d.txRateSub;
     }
-    if (liv && liv.data && Array.isArray(liv.data.daily) && liv.data.daily.length) {
-      var day = null;
-      for (var i = 0; i < liv.data.daily.length; i++) {
-        if (liv.data.daily[i] && liv.data.daily[i].tx_count != null) { day = liv.data.daily[i]; break; }
-      }
-      if (day && day.blocks_count > 0) {
-        state.txRate = day.tx_count / (day.blocks_count * 12);
-        state.txRateSub = E.fmtNum(day.tx_count) + " transfers across " + E.fmtNum(day.blocks_count) +
-          " blocks · " + String(day.date).slice(0, 10);
-      }
-    }
-    return { con: con, sup: sup, liv: liv };
+    return d;
   });
 }
 
@@ -133,7 +255,7 @@ function renderHero() {
     var age = Math.max(0, Math.round((Date.now() - new Date(state.fetchedAt).getTime()) / 3600000));
     pill.textContent = "snapshot " + age + "h old · block " + E.fmtNum(state.height);
     note.innerHTML = "Chain state from the builder's snapshots (<span class=\"mono\">data/consensus.json</span> + <span class=\"mono\">data/supply.json</span>, fetched <span class=\"mono\">" +
-      state.fetchedAt.replace("T", " ").slice(0, 19) + "Z</span>, block " + E.fmtNum(state.height) +
+      new Date(state.fetchedAt).toISOString().replace("T", " ").slice(0, 19) + "Z</span>, block " + E.fmtNum(state.height) +
       "). Implied network hashrate <span class=\"mono\">" + E.fmtHashrate(hs) + "</span>; current block reward <span class=\"mono\">" +
       state.rewardQtc.toFixed(4) + " QTC</span> (emission model, exact to the planck).";
   } else {
@@ -538,6 +660,15 @@ function boot() {
   renderRig();
   renderCarbon();
 }
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
-else boot();
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+}
+
+/* Node test hook */
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { deriveSnapshotState: deriveSnapshotState, totalSupplyOf: totalSupplyOf,
+                     cleanTrend: cleanTrend, intField: intField, validPlancks: validPlancks,
+                     validHeight: validHeight, validFetchedAt: validFetchedAt, FALLBACK: FALLBACK };
+}
 })();

@@ -201,7 +201,7 @@
         <h3>What is exact</h3>
         <ul>
           <li><code>H = D / 12</code>: expected hashes to win a block equal difficulty D (verified in the Consensus Lab against <code>pallet_qpow</code>), and the network targets one block per 12 s — so the implied hashrate is exact up to difficulty noise.</li>
-          <li>Efficiency arithmetic: <code>W = (H/s) / (H/J)</code>, annual energy = <code>MW × 8760 h</code>, per-block energy = <code>W × 12 s</code>. All in <code>energy-core.js</code>, 97/97 node tests green.</li>
+          <li>Efficiency arithmetic: <code>W = (H/s) / (H/J)</code>, annual energy = <code>MW × 8760 h</code>, per-block energy = <code>W × 12 s</code>. All in <code>energy-core.js</code>, covered by a node test suite; snapshot payloads are validated field-by-field before any of them anchors a figure on this page.</li>
           <li>Fleet efficiency is the hashrate-weighted harmonic mean — the only way the joules add up when cards differ.</li>
           <li>Reward math: <code>R = (21M − S) / 50M</code>, exact to the planck against the emission source (see Emission Lab).</li>
         </ul>
@@ -244,6 +244,6 @@
 </main>
 
 <script src="js/energy-core.js?v=1.49.1"></script>
-<script src="js/app.js?v=1.49.97"></script>
+<script src="js/app.js?v=1.50.1"></script>
 </body>
 </html>

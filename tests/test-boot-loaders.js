@@ -864,7 +864,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.1"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.2"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -897,7 +897,43 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.1"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.2"), "pooldesk: app.js cache key bumped for the boundary fix");
+}
+
+// Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
+// Tier 2 boundary batch. loadSnapshots trusted all three snapshots raw:
+// String() accepted a scientific-notation difficulty ("9.9e13" painted
+// as 8.25 TH/s live) and the payload's own est_hashrate was never
+// cross-checked against it (fetch construction: est = difficulty/12
+// exactly); a fractional height rendered as a live block; a supply
+// total was never cross-checked against its balances itemization (a
+// 9,000,000 QTC total anchored a 0.240000 QTC reward) and an over-cap
+// total minted a NEGATIVE reward (-439.58 QTC); a fractional balance
+// threw inside BigInt() and killed the live payload's tx rate too
+// (inverted failure domain); a supply payload from a different, stale
+// capture mixed into the live reward math; poisoned trend points
+// bucketed into a "NaN-aN-aN" history day; a poisoned first daily row
+// NaN'd the whole per-transfer desk; and a garbage fetched_at anchored
+// the snapshot AND reached the provenance note's innerHTML as markup.
+// Pin: strict intField/validPlancks/validHeight/validFetchedAt shapes,
+// both exact cross-checks, the 21M cap on total issuance, parseable
+// fetched_at provenance per payload, per-point trend cleaning, per-row
+// daily validation, the one-capture rule, and a re-serialized
+// (toISOString) provenance date — never the raw payload string.
+{
+  const app = read("pages/energy-observatory/js/app.js");
+  ok(app.includes("function deriveSnapshotState(con, sup, liv)"), "energy: deriveSnapshotState() defined (the snapshot boundary)");
+  ok(app.includes("function intField(v)"), "energy: intField() defined (integer shapes only)");
+  ok(app.includes("function validFetchedAt(v)"), "energy: validFetchedAt() defined (parseable dates only)");
+  ok(app.includes("BigInt(eh) !== BigInt(diff) / 12n) diff = null;"), "energy: difficulty cross-checked against est_hashrate x 12 exactly");
+  ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "energy: supply total cross-checked against its balances itemization");
+  ok(app.includes("BigInt(tp) <= 21000000n * 1000000000000n"), "energy: total issuance capped at 21M before it anchors a reward");
+  ok(app.includes("Math.abs(supHeight - consHeight) > 100"), "energy: cross-capture supply rejected (one-capture rule)");
+  ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
+  ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
+  const html = read("pages/energy-observatory/index.html");
+  ok(html.includes("app.js?v=1.50.1"), "energy: app.js cache key bumped for the boundary fix");
+  ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

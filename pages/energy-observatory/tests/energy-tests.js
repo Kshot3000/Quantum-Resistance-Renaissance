@@ -184,5 +184,85 @@ t("us home 10,791 kWh/yr", E.EXTERNAL.us_home_kwh_2022.value === 10791);
     Math.abs(E.blockRewardQtc(sup) - lRew) <= 5e-8, E.blockRewardQtc(sup) + " vs " + lRew);
 }
 
+/* --- snapshot boundary (deriveSnapshotState) ---
+ * app.js is a plain browser script; its Node hook exports the boundary
+ * once EnergyCore is on the global (the browser gets it from the
+ * energy-core.js <script> tag). */
+{
+  global.EnergyCore = E;
+  const app = require("../js/app.js");
+  const D = app.deriveSnapshotState;
+  const CONS = { fetched_at: "2026-10-02T15:00:29.848Z", head: 153406,
+    current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "55758693964650" },
+    trend: [[153000, 1756944000000, "669104327575800"], [153406, 1757030400000, "669104327575800"]] };
+  const SUP = { fetched_at: "2026-10-02T15:00:40.038Z", block_height: 153406,
+    total_supply_plancks: "5766179473775204913",
+    balances_plancks: { free: "5766179473775204813", reserved: "100", frozen: "0" } };
+  const LIV = { fetched_at: "2026-10-02T15:00:11.401Z",
+    data: { daily: [{ date: "2026-10-02T00:00:00+00:00", blocks_count: 6000, tx_count: 12000 }] } };
+  const cp = (o) => JSON.parse(JSON.stringify(o));
+
+  const okD = D(CONS, SUP, LIV);
+  t("boundary: valid capture anchors difficulty+height", okD.snapshotOk && okD.difficulty === "669104327575800" && okD.height === 153406);
+  t("boundary: valid capture hashrate = difficulty/12", approx(okD.netHs, 669104327575800 / 12, 1e-12));
+  t("boundary: valid capture reward from total", approx(okD.rewardQtc, E.blockRewardQtc("5766179473775204913"), 1e-12));
+  t("boundary: valid capture tx rate", approx(okD.txRate, 12000 / (6000 * 12), 1e-12));
+  t("boundary: valid capture trend survives whole", okD.trend.length === 2);
+
+  const sci = cp(CONS); sci.current.difficulty = "9.9e13"; sci.current.est_hashrate_hs = "8250000000000";
+  t("boundary: scientific-notation difficulty rejected", D(sci, SUP, LIV).snapshotOk === false);
+  const mis = cp(CONS); mis.current.est_hashrate_hs = "1000";
+  t("boundary: est_hashrate contradicting difficulty rejected", D(mis, SUP, LIV).snapshotOk === false);
+  const frac = cp(CONS); frac.current.height = 153406.5; frac.head = 153406.5;
+  t("boundary: fractional height rejected", D(frac, SUP, LIV).snapshotOk === false);
+  const dis = cp(CONS); dis.head = 153407;
+  t("boundary: head/current.height disagreement rejected", D(dis, SUP, LIV).snapshotOk === false);
+  const und = cp(CONS); und.fetched_at = '<b id="pwn">PWNED</b>';
+  t("boundary: garbage fetched_at rejected (payload is undated)", D(und, SUP, LIV).snapshotOk === false);
+
+  const contra = cp(SUP); contra.total_supply_plancks = "9000000000000000000";
+  t("boundary: total contradicting balances itemization rejected", D(CONS, contra, LIV).rewardQtc === null);
+  const throwS = cp(SUP); delete throwS.total_supply_plancks; throwS.balances_plancks.free = "1.5";
+  const throwD = D(CONS, throwS, LIV);
+  t("boundary: fractional balance never throws; reward null, neighbours anchor",
+    throwD.rewardQtc === null && throwD.snapshotOk === true && throwD.txRate > 0);
+  const over = cp(SUP); over.total_supply_plancks = "22000000000000000000000";
+  over.balances_plancks = { free: "22000000000000000000000", reserved: "0", frozen: "0" };
+  t("boundary: over-cap total issuance rejected", D(CONS, over, LIV).rewardQtc === null);
+  const mixed = cp(SUP); mixed.block_height = 100000;
+  mixed.total_supply_plancks = "9000000000000000000";
+  mixed.balances_plancks = { free: "9000000000000000000", reserved: "0", frozen: "0" };
+  t("boundary: cross-capture supply rejected (one-capture rule)", D(CONS, mixed, LIV).rewardQtc === null);
+  t("boundary: supply alone anchors reward (layered fallback)", D(null, SUP, null).rewardQtc > 0);
+
+  const tr = cp(CONS);
+  tr.trend = [[153406, "not-a-date", "669104327575800"], [153300, 1757030400000, "9.9e13"],
+              [153000, 1756944000000, "669104327575800"]];
+  t("boundary: poisoned trend points drop individually", D(tr, SUP, LIV).trend.length === 1);
+
+  const ld = cp(LIV);
+  ld.data.daily = [{ date: "2026-10-02T00:00:00+00:00", blocks_count: 6000, tx_count: "abc" },
+                   { date: "2026-10-01T00:00:00+00:00", blocks_count: 6000, tx_count: 12000 }];
+  t("boundary: poisoned daily row skipped, next valid row anchors", approx(D(CONS, SUP, ld).txRate, 12000 / 72000, 1e-12));
+  const neg = cp(LIV); neg.data.daily[0].tx_count = -5;
+  t("boundary: negative tx_count rejected", D(CONS, SUP, neg).txRate === null);
+  const zb = cp(LIV); zb.data.daily[0].blocks_count = 0;
+  t("boundary: zero blocks_count rejected", D(CONS, SUP, zb).txRate === null);
+  const bd = cp(LIV); bd.data.daily[0].date = "not-a-date";
+  t("boundary: garbage daily date rejected", D(CONS, SUP, bd).txRate === null);
+  const ul = cp(LIV); delete ul.fetched_at;
+  t("boundary: undated live payload rejected", D(CONS, SUP, ul).txRate === null);
+
+  // The REAL current snapshots must pass their own boundary unchanged.
+  const fs2 = require("fs"), path2 = require("path");
+  const root = path2.join(__dirname, "..", "..", "..");
+  const rCon = JSON.parse(fs2.readFileSync(path2.join(root, "data/consensus.json"), "utf8"));
+  const rSup = JSON.parse(fs2.readFileSync(path2.join(root, "data/supply.json"), "utf8"));
+  const rLiv = JSON.parse(fs2.readFileSync(path2.join(root, "data/live.json"), "utf8"));
+  const rD = D(rCon, rSup, rLiv);
+  t("boundary: real snapshots anchor (difficulty+reward+rate)", rD.snapshotOk && rD.rewardQtc > 0 && rD.txRate > 0);
+  t("boundary: real trend survives whole", rD.trend.length === rCon.trend.length, rD.trend.length + " vs " + rCon.trend.length);
+}
+
 console.log(pass + "/" + (pass + fail) + " tests green");
 process.exit(fail ? 1 : 0);
