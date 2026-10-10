@@ -125,6 +125,76 @@ t("ss58Encode32 prefix-189 shape",
 t("ss58Encode32 deterministic", codec.ss58Encode32(upDec.key, b2b512) === qAddr);
 t("ss58Encode32 rejects bad key", codec.ss58Encode32([1, 2, 3], b2b512) === null);
 
+/* --- fees: nonce must never wrap --- */
+t("signed length rejects a wrapping nonce (2^32)",
+  codec.signedLengthEstimate(100, "mldsa65", 4294967296).ok === false);
+t("signed length rejects a fractional nonce",
+  codec.signedLengthEstimate(100, "mldsa65", 2.5).ok === false);
+t("signed length rejects a nonce past the compact-encodable range (2^30, would throw)",
+  codec.signedLengthEstimate(100, "mldsa65", 1073741824).ok === false);
+t("signed length accepts the max compact-encodable nonce (2^30 - 1)",
+  codec.signedLengthEstimate(100, "mldsa65", 1073741823).ok === true);
+
+/* --- RPC-boundary validators --- */
+t("parseBlockNumber hex", codec.parseBlockNumber("0x2f") === 47);
+t("parseBlockNumber decimal string", codec.parseBlockNumber("47") === 47);
+t("parseBlockNumber integer", codec.parseBlockNumber(47) === 47);
+t("parseBlockNumber rejects garbage", codec.parseBlockNumber("garbage!!") === null);
+t("parseBlockNumber rejects bad hex", codec.parseBlockNumber("0xZZ") === null);
+t("parseBlockNumber rejects float", codec.parseBlockNumber(1.5) === null);
+t("parseBlockNumber rejects negative", codec.parseBlockNumber(-3) === null);
+t("parseBlockNumber rejects object", codec.parseBlockNumber({}) === null);
+t("isHash32 accepts a real hash", codec.isHash32("0x" + "ab".repeat(32)) === true);
+t("isHash32 rejects short hex", codec.isHash32("0x1234") === false);
+t("isHash32 rejects non-string", codec.isHash32({}) === false);
+t("validSubscriptionId accepts string id", codec.validSubscriptionId("sub-1") === true);
+t("validSubscriptionId rejects empty/object",
+  codec.validSubscriptionId("") === false && codec.validSubscriptionId({}) === false);
+
+/* --- vault sanitizer --- */
+const goodDigest = codec.bytesToHex(sha256(codec.utf8ToBytes("abc")));
+const goodEnv = codec.buildEnvelope(1, sha256(codec.utf8ToBytes("abc")), "Deed");
+const goodCall = codec.buildRemarkCall(goodEnv.bytes, true);
+const GOOD = { id: "n1", created: "2026-10-01T12:00:00.000Z", mode: "document",
+  algo: "SHA-256", digestHex: goodDigest, label: "Deed", envelopeHex: goodEnv.hex,
+  callHex: goodCall.callHex, withEvent: true, feeQTC: "0.0005354", block: "123" };
+const GOOD_MSG2 = { id: "n2", created: "2026-10-02T12:00:00.000Z", mode: "message",
+  algo: null, digestHex: null, label: null, envelopeHex: null,
+  callHex: codec.buildRemarkCall(codec.utf8ToBytes("hi"), false).callHex,
+  withEvent: false, feeQTC: "0.0005", block: null };
+t("sanitizeVault keeps valid doc + message anchors verbatim",
+  (() => { const v = codec.sanitizeVault([GOOD, GOOD_MSG2]);
+    return v.length === 2 && v[0].digestHex === goodDigest && v[0].block === "123" &&
+      v[1].mode === "message"; })());
+t("sanitizeVault rejects a non-array payload",
+  Array.isArray(codec.sanitizeVault({})) && codec.sanitizeVault("junk").length === 0 &&
+  codec.sanitizeVault(null).length === 0);
+t("sanitizeVault drops null / primitive entries",
+  codec.sanitizeVault([null, "x", 42, GOOD]).length === 1);
+t("sanitizeVault drops a bad digest", codec.sanitizeVault([{ ...GOOD, digestHex: "zz" }]).length === 0);
+t("sanitizeVault drops a garbage envelope (never hashed into a verify fingerprint)",
+  codec.sanitizeVault([{ ...GOOD, envelopeHex: "zzzz" }]).length === 0);
+t("sanitizeVault drops an envelope whose digest mismatches the stored digest",
+  codec.sanitizeVault([{ ...GOOD, envelopeHex: codec.buildEnvelope(1, new Array(32).fill(9), "Deed").hex }]).length === 0);
+t("sanitizeVault drops a markup-bearing fee",
+  codec.sanitizeVault([{ ...GOOD, feeQTC: "<img src=x>" }]).length === 0);
+t("sanitizeVault drops a missing/garbage callHex",
+  codec.sanitizeVault([{ ...GOOD, callHex: undefined }]).length === 0 &&
+  codec.sanitizeVault([{ ...GOOD, callHex: "zzzz" }]).length === 0);
+t("sanitizeVault drops a call whose index contradicts withEvent",
+  codec.sanitizeVault([{ ...GOOD, withEvent: false }]).length === 0);
+t("sanitizeVault drops an unparseable created date",
+  codec.sanitizeVault([{ ...GOOD, created: "garbage" }]).length === 0);
+t("sanitizeVault drops a non-string label",
+  codec.sanitizeVault([{ ...GOOD, label: { evil: 1 } }]).length === 0);
+t("sanitizeVault drops an unknown mode",
+  codec.sanitizeVault([{ ...GOOD, mode: "carrier-pigeon" }]).length === 0);
+t("sanitizeVault drops a message anchor carrying a digest",
+  codec.sanitizeVault([{ ...GOOD_MSG2, digestHex: goodDigest }]).length === 0);
+t("sanitizeVault coerces a non-numeric block annotation to null, anchor survives",
+  (() => { const v = codec.sanitizeVault([{ ...GOOD, block: "<b>9</b>" }]);
+    return v.length === 1 && v[0].block === null; })());
+
 /* --- storage key --- */
 const evKey = codec.systemEventsKey((b) => twox.twox128bytes(b));
 t("System.Events key shape",

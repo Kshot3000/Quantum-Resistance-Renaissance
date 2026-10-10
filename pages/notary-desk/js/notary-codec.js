@@ -191,6 +191,15 @@
     var scheme = SIG_SCHEMES[schemeKey || "mldsa65"];
     if (!scheme) return { ok: false, error: "unknown signature scheme" };
     nonce = (nonce === undefined || nonce === null) ? 0 : nonce;
+    // compactU32() wraps via >>>0, so an out-of-u32 nonce would silently
+    // encode as a DIFFERENT nonce and the fee/length quote would describe
+    // an extrinsic the user did not ask for; and at >= 2^30 compactU32
+    // throws outright (its big-integer mode is unimplemented). Reject
+    // both cases cleanly instead of wrapping or throwing.
+    if (!Number.isSafeInteger(callLen) || callLen < 0)
+      return { ok: false, error: "call length must be a non-negative integer" };
+    if (!Number.isSafeInteger(nonce) || nonce < 0 || nonce > 1073741823)
+      return { ok: false, error: "nonce must be a u32 integer the compact encoder can represent (0..1073741823)" };
     var nonceBytes = compactU32(nonce);
     var bodyLen = 1 + (1 + 32) + (1 + scheme.sig + scheme.pub) + 2 + nonceBytes.length + 1 + callLen;
     var lenPrefix = bodyLen < 64 ? 1 : bodyLen < 16384 ? 2 : 4;
@@ -264,6 +273,99 @@
     return out;
   }
 
+  /* ---------------- Untrusted-boundary validators ----------------
+   * The node (Remark Board) and localStorage (anchor vault) are both
+   * untrusted boundaries: every answer/entry is validated here BEFORE it
+   * anchors a board row, a scan verdict, a live claim, or a verify
+   * result. A malformed value is dropped or an honest error — never a
+   * coerced figure: no parseInt NaN heights rendered as "#NaN", no
+   * garbage envelope hashed into a fake "expected event hash", no
+   * markup-bearing fee string reaching the vault's innerHTML.
+   */
+  // A block height arrives as a 0x-hex string (JSON-RPC headers), a
+  // decimal string, or a JSON integer — anything else is not a height.
+  function parseBlockNumber(v) {
+    if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
+    if (typeof v === "string") {
+      if (/^\d+$/.test(v)) { var n = Number(v); return Number.isSafeInteger(n) ? n : null; }
+      if (/^0x[0-9a-fA-F]+$/.test(v)) { var h = parseInt(v, 16); return Number.isSafeInteger(h) ? h : null; }
+    }
+    return null;
+  }
+  // A 32-byte hash is exactly 0x + 64 hex digits.
+  function isHash32(s) {
+    return typeof s === "string" && /^0x[0-9a-fA-F]{64}$/.test(s);
+  }
+  // A subscription id is a non-empty string or a non-negative integer.
+  function validSubscriptionId(v) {
+    return (typeof v === "string" && v.length > 0 && v.length <= 128) ||
+           (typeof v === "number" && Number.isSafeInteger(v) && v >= 0);
+  }
+
+  /* Sanitize a parsed localStorage vault: returns a NEW array holding
+   * only anchors whose every rendered/verified field checks out, with
+   * fields normalized (lowercase hex, block annotation coerced to a
+   * digit string or null). Classification per field:
+   *  - core (drop the anchor): mode, created (must parse), feeQTC (a
+   *    plain non-negative decimal — it reaches innerHTML), callHex
+   *    (even hex encoding a System remark/remark_with_event call whose
+   *    index matches withEvent), label (string or null);
+   *  - document anchors additionally: digestHex (64 hex), algo (a known
+   *    ALGOS name), envelopeHex (must parse back to an envelope whose
+   *    digest, algo AND label all match the stored fields — a garbage
+   *    envelope must never be hashed into a verify "expected hash");
+   *  - message anchors: digest/algo/envelope must all be null;
+   *  - absent-but-recoverable: a block annotation that is not a plain
+   *    block number coerces to null (the anchor itself is still real).
+   */
+  function sanitizeVault(raw) {
+    if (!Array.isArray(raw)) return [];
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var a = raw[i];
+      if (!a || typeof a !== "object" || Array.isArray(a)) continue;
+      if (a.mode !== "document" && a.mode !== "message") continue;
+      if (typeof a.created !== "string" || !isFinite(Date.parse(a.created))) continue;
+      if (typeof a.feeQTC !== "string" || !/^\d+(\.\d+)?$/.test(a.feeQTC)) continue;
+      if (typeof a.withEvent !== "boolean") continue;
+      if (a.label !== null && a.label !== undefined && typeof a.label !== "string") continue;
+      if (typeof a.callHex !== "string" || !/^[0-9a-fA-F]+$/.test(a.callHex) ||
+          a.callHex.length % 2 !== 0) continue;
+      var callBytes = hexToBytes(a.callHex);
+      if (!callBytes || callBytes.length < 4) continue;
+      if (callBytes[0] !== PALLET_SYSTEM ||
+          (callBytes[1] !== CALL_REMARK && callBytes[1] !== CALL_REMARK_WITH_EVENT)) continue;
+      if ((callBytes[1] === CALL_REMARK_WITH_EVENT) !== a.withEvent) continue;
+      var digestHex = null, algo = null, envelopeHex = null;
+      if (a.mode === "document") {
+        if (typeof a.digestHex !== "string" || !/^[0-9a-fA-F]{64}$/.test(a.digestHex)) continue;
+        digestHex = a.digestHex.toLowerCase();
+        if (a.algo !== ALGOS[1] && a.algo !== ALGOS[2]) continue;
+        algo = a.algo;
+        if (typeof a.envelopeHex !== "string") continue;
+        var envBytes = hexToBytes(a.envelopeHex);
+        if (!envBytes) continue;
+        var parsed = parseRemark(envBytes);
+        if (parsed.kind !== "envelope") continue;
+        if (parsed.digestHex !== digestHex || parsed.algo !== algo) continue;
+        if (parsed.label !== (a.label || "")) continue;
+        envelopeHex = a.envelopeHex.toLowerCase();
+      } else {
+        if (a.digestHex !== null || a.algo !== null || a.envelopeHex !== null) continue;
+      }
+      var block = null;
+      if (typeof a.block === "string" && /^\d+$/.test(a.block)) block = a.block;
+      out.push({
+        id: (typeof a.id === "string" && a.id) ? a.id : "n-sanitized-" + out.length,
+        created: a.created, mode: a.mode, algo: algo, digestHex: digestHex,
+        label: (typeof a.label === "string" && a.label) ? a.label : null,
+        envelopeHex: envelopeHex, callHex: a.callHex.toLowerCase(),
+        withEvent: a.withEvent, feeQTC: a.feeQTC, block: block
+      });
+    }
+    return out;
+  }
+
   /* ---------------- SS58 (prefix 189) ----------------
    * Needs a 64-byte-output BLAKE2b hasher injected: blake2b512(bytes) -> 64-byte array.
    * (Substrate's ss58hash uses Blake2b::new(64); digest length is part of the
@@ -321,6 +423,8 @@
     buildRemarkCall: buildRemarkCall,
     signedLengthEstimate: signedLengthEstimate, formatQTC: formatQTC,
     decodeSystemEvents: decodeSystemEvents,
+    parseBlockNumber: parseBlockNumber, isHash32: isHash32,
+    validSubscriptionId: validSubscriptionId, sanitizeVault: sanitizeVault,
     ss58Encode32: ss58Encode32, systemEventsKey: systemEventsKey
   };
 }));

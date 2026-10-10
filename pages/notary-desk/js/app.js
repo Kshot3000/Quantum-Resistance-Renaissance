@@ -170,6 +170,10 @@ let lastBuild = null;
 
 $("buildBtn").addEventListener("click", () => {
   $("stampEmpty").hidden = true; $("stampOut").hidden = false;
+  /* A failed build must never leave a previous build saveable: clear the
+   * pending anchor up front, so Save can only ever persist the build the
+   * user is actually looking at. */
+  lastBuild = null;
   let remarkBytes, digestHex, algoId, label, envelopeHex = null, parsed = null;
 
   if (studio.mode === "document") {
@@ -196,8 +200,21 @@ $("buildBtn").addEventListener("click", () => {
 
   const call = C.buildRemarkCall(remarkBytes, studio.withEvent);
   const sigScheme = $("sigSel").value;
-  const nonce = Math.max(0, parseInt($("nonceInput").value || "0", 10) || 0);
+  /* The nonce is parsed STRICTLY: parseInt silently truncated "2.5" to 2
+   * (a fee quote for a nonce the user never typed) and the codec's
+   * compact encoder wrapped a nonce past the u32 range back to small
+   * values. Anything but a plain u32 digit string is a build error. */
+  const nonceRaw = $("nonceInput").value.trim();
+  let nonce = 0;
+  if (nonceRaw !== "") {
+    if (!/^\d+$/.test(nonceRaw) || Number(nonceRaw) > 1073741823) {
+      $("oDigest").textContent = "⚠ Nonce must be a whole number between 0 and 1073741823 (the largest nonce the compact encoder can represent) — fix it and build again.";
+      return;
+    }
+    nonce = Number(nonceRaw);
+  }
   const est = C.signedLengthEstimate(call.callLen, sigScheme, nonce);
+  if (!est.ok) { $("oDigest").textContent = "⚠ " + (est.error || "could not estimate the signed length"); return; }
   const callFee = BigInt(call.callLen) * C.LENGTH_FEE_PER_BYTE;
 
   lastBuild = {
@@ -244,7 +261,15 @@ $("buildBtn").addEventListener("click", () => {
 
 /* ---------------- vault ---------------- */
 const VKEY = "qnot_vault_v1";
-function loadVault() { try { return JSON.parse(localStorage.getItem(VKEY) || "[]"); } catch { return []; } }
+/* localStorage is an untrusted boundary: a hand-edited, corrupted, or
+ * older-format vault must never brick this desk or mint a verify result.
+ * Every load routes through the codec's sanitizeVault — valid anchors
+ * survive verbatim, poisoned entries drop, and renderers/verify only
+ * ever see fields that have already checked out. */
+function loadVault() {
+  try { return C.sanitizeVault(JSON.parse(localStorage.getItem(VKEY) || "[]")); }
+  catch { return []; }
+}
 function saveVault(v) { localStorage.setItem(VKEY, JSON.stringify(v)); }
 
 $("saveVaultBtn").addEventListener("click", () => {
@@ -268,14 +293,21 @@ function renderVault() {
     const head = el("div", "vh",
       `<strong>${a.mode === "document" ? "📄" : "💬"} ${a.label ? escapeHtml(a.label) : (a.mode === "document" ? "Document anchor" : "Message anchor")}</strong><time>${new Date(a.created).toLocaleString()}</time>`);
     d.appendChild(head);
-    if (a.digestHex) d.appendChild(el("code", "", a.algo + ": " + a.digestHex));
-    d.appendChild(el("code", "", "call: 0x" + a.callHex.slice(0, 60) + "…"));
+    if (a.digestHex) { const c1 = el("code"); c1.textContent = a.algo + ": " + a.digestHex; d.appendChild(c1); }
+    const c2 = el("code"); c2.textContent = "call: 0x" + a.callHex.slice(0, 60) + "…"; d.appendChild(c2);
     const meta = el("div", "vmeta");
-    meta.innerHTML = `${a.withEvent ? "📯 remark_with_event" : "📝 remark"} · fee ≈ ${a.feeQTC} QTC · `;
+    meta.innerHTML = `${a.withEvent ? "📯 remark_with_event" : "📝 remark"} · fee ≈ ${escapeHtml(a.feeQTC)} QTC · `;
     const blk = el("input", "blk"); blk.placeholder = "block #"; blk.value = a.block || "";
     blk.title = "Fill in the block number once your extrinsic lands";
     blk.addEventListener("change", () => {
-      const vv = loadVault(); vv[idx].block = blk.value.trim() || null; saveVault(vv);
+      /* A block annotation is a plain block number or nothing — free
+       * text stored here would be re-rendered as the anchor's landing
+       * block, a chain fact the user never proved. */
+      const t = blk.value.trim();
+      const vv = loadVault(); if (!vv[idx]) return;
+      vv[idx].block = /^\d+$/.test(t) ? t : null;
+      if (t && !vv[idx].block) blk.value = "";
+      saveVault(vv);
     });
     meta.appendChild(document.createTextNode("landed in block "));
     meta.appendChild(blk);
@@ -287,7 +319,7 @@ function renderVault() {
     box.appendChild(d);
   });
 }
-function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 /* ---------------- Verify Desk ---------------- */
 /* Verify-by-file must try BOTH of the file's digests: a vault anchor built
@@ -335,7 +367,12 @@ $("vCheckBtn").addEventListener("click", () => {
   const candidates = verifyFileHash ? [d, verifyFileHash.sha256, verifyFileHash.blake2] : [d];
   const hit = loadVault().find((a) => candidates.includes(a.digestHex));
   if (hit) {
-    const fp = hit.envelopeHex ? C.bytesToHex(b2b256(C.hexToBytes(hit.envelopeHex))) : null;
+    /* The envelope reached the vault only by parsing back to this very
+     * digest/algo/label at load (sanitizeVault); still, never hash a
+     * null decode — a failed decode is no fingerprint, not the hash of
+     * the empty input presented as one. */
+    let fp = null;
+    if (hit.envelopeHex) { const eb = C.hexToBytes(hit.envelopeHex); if (eb) fp = C.bytesToHex(b2b256(eb)); }
     box.className = "vresult hit";
     box.innerHTML = "<strong>✓ Anchored in your vault</strong>" +
       `<div>${hit.label ? "“" + escapeHtml(hit.label) + "” · " : ""}${hit.algo} · built ${new Date(hit.created).toLocaleString()}</div>` +
@@ -374,7 +411,9 @@ function rpc(method, params) {
     if (!board.ws || board.ws.readyState !== 1) return reject(new Error("not connected"));
     const id = ++board.id;
     board.pending.set(id, { resolve, reject });
-    board.ws.send(JSON.stringify({ jsonrpc: "2.0", id, method, params: params || [] }));
+    try {
+      board.ws.send(JSON.stringify({ jsonrpc: "2.0", id, method, params: params || [] }));
+    } catch (e) { board.pending.delete(id); return reject(e); }
     setTimeout(() => {
       if (board.pending.has(id)) { board.pending.delete(id); reject(new Error("rpc timeout: " + method)); }
     }, 15000);
@@ -384,7 +423,6 @@ function setStatus(mode, text) {
   $("connDot").className = "dot" + (mode ? " " + mode : "");
   $("connStatus").textContent = text;
 }
-function hexToNum(h) { return parseInt(h, 16); }
 
 // Parse one signed/unsigned extrinsic; return {pallet, call, payload} for
 // System.remark-shaped calls, else null. Defensive: any anomaly -> null.
@@ -420,10 +458,12 @@ function spotRemarkCall(extHex) {
 function renderRemarked(blockNum, senderHex, eventHash, payloadInfo, seenAt) {
   const key = blockNum + ":" + eventHash;
   if (board.seen.has(key)) return;
+  const senderBytes = C.hexToBytes(senderHex);
+  const sender = senderBytes ? C.ss58Encode32(senderBytes, b2b512) : null;
+  if (!sender) return; // an unencodable sender is not a board row
   board.seen.add(key);
   const empty = document.querySelector("#boardList .empty");
   if (empty) empty.remove();
-  const sender = C.ss58Encode32(C.hexToBytes(senderHex), b2b512);
   const item = el("div", "bitem" + (payloadInfo && payloadInfo.parsed.kind === "raw" ? " raw" : ""));
   let body = "";
   if (payloadInfo) {
@@ -450,22 +490,42 @@ function renderRemarked(blockNum, senderHex, eventHash, payloadInfo, seenAt) {
   while (list.children.length > 120) list.lastChild.remove();
 }
 
+/* The node is an untrusted boundary: every answer is validated BEFORE
+ * it anchors a board row or a scan verdict. A malformed block hash,
+ * block, header number, events blob, or extrinsics list is an honest
+ * error (the scan reports it; the live watch drops that one block) —
+ * never a "#NaN" row, never a silently-swallowed blob behind a
+ * "scan complete" claim, and never a fake empty block. A null storage
+ * answer is legitimate (no System.Events value at that hash). */
 async function processBlock(blockHash) {
+  if (!C.isHash32(blockHash)) throw new Error("node returned a malformed block hash");
   const [blockRes, evRes] = await Promise.all([
     rpc("chain_getBlock", [blockHash]),
     rpc("state_getStorage", [EVENTS_KEY, blockHash])
   ]);
-  const blockNum = hexToNum(blockRes.block.header.number);
-  if (!evRes) return;
+  if (!blockRes || typeof blockRes !== "object" || !blockRes.block ||
+      typeof blockRes.block !== "object" || !blockRes.block.header ||
+      typeof blockRes.block.header !== "object")
+    throw new Error("node returned a malformed block");
+  const blockNum = C.parseBlockNumber(blockRes.block.header.number);
+  if (blockNum === null) throw new Error("node returned a malformed block number");
+  if (evRes === null || evRes === undefined) return;
+  if (typeof evRes !== "string" || !/^0x(?:[0-9a-fA-F]{2})+$/.test(evRes))
+    throw new Error("node returned malformed System.Events data");
   const evBytes = C.hexToBytes(evRes);
+  if (!evBytes) throw new Error("node returned malformed System.Events data");
   const dec = C.decodeSystemEvents(evBytes);
-  if (!dec.ok || !dec.records.length) return;
-  const exts = blockRes.block.extrinsics || [];
+  if (!dec.ok) throw new Error("node returned malformed System.Events data (" + (dec.error || "decode failed") + ")");
+  if (!dec.records.length) return;
+  if (!Array.isArray(blockRes.block.extrinsics))
+    throw new Error("node returned a malformed block (extrinsics is not a list)");
+  const exts = blockRes.block.extrinsics;
   const seenAt = new Date().toLocaleTimeString();
   for (const r of dec.records) {
     if (r.skipped) continue;
     let payloadInfo = null;
     for (const ex of exts) {
+      if (typeof ex !== "string") continue;
       const spot = spotRemarkCall(ex);
       if (!spot) continue;
       const h = C.bytesToHex(b2b256(spot.payload));
@@ -495,22 +555,40 @@ $("connBtn").addEventListener("click", () => {
     $("connBtn").textContent = "Disconnect";
     $("backBtn").disabled = false;
     setStatus("live", "Live — watching new heads. Remarks appear as their blocks arrive.");
-    const subId = await rpc("chain_subscribeNewHeads", []);
-    board.headSub = subId;
+    try {
+      const subId = await rpc("chain_subscribeNewHeads", []);
+      if (!C.validSubscriptionId(subId))
+        throw new Error("node returned a malformed subscription id");
+      board.headSub = subId;
+    } catch (e) {
+      /* A rejected/malformed subscription must not leave the "Live —
+       * watching" claim standing: nothing is being watched. Reset via
+       * fail(), then replace its generic text with the specific cause. */
+      try { ws.close(); } catch { /* already closed */ }
+      fail();
+      setStatus("", "Connected, but the new-heads subscription failed (" + e.message + ") — not watching new heads.");
+    }
   };
   ws.onmessage = async (ev) => {
     let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+    /* A raw "null" / array / scalar frame is junk, not a response: the
+     * old handler dereferenced msg.id and threw on every such frame. */
+    if (!msg || typeof msg !== "object" || Array.isArray(msg)) return;
     if (msg.id && board.pending.has(msg.id)) {
       const p = board.pending.get(msg.id); board.pending.delete(msg.id);
-      if (msg.error) p.reject(new Error(msg.error.message || "rpc error"));
+      if (msg.error) p.reject(new Error((msg.error && msg.error.message) || "rpc error"));
       else p.resolve(msg.result);
       return;
     }
     if (msg.method === "chain_newHead" && msg.params && msg.params.result) {
       const h = msg.params.result;
+      if (!h || typeof h !== "object") return;
+      const hn = C.parseBlockNumber(h.number);
+      if (hn === null) return; // a garbage head number anchors nothing
       try {
         // the subscription yields a header (no hash): resolve it to a block hash
-        const hash = await rpc("chain_getBlockHash", [hexToNum(h.number)]);
+        const hash = await rpc("chain_getBlockHash", [hn]);
+        if (!C.isHash32(hash)) return;
         await processBlock(hash);
       } catch (e) { /* one bad block never kills the watch */ }
     }
@@ -546,7 +624,8 @@ $("backBtn").addEventListener("click", async () => {
   try {
     const head = await rpc("chain_getHeader", []);
     if (!isCurrent()) return;
-    const headNum = hexToNum(head.number);
+    const headNum = (head && typeof head === "object") ? C.parseBlockNumber(head.number) : null;
+    if (headNum === null) throw new Error("node returned a malformed head");
     const N = 720, from = Math.max(1, headNum - N + 1);
     let found = 0;
     for (let n = headNum; n >= from; n--) {

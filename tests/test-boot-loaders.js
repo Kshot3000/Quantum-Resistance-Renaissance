@@ -471,5 +471,45 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/app.js?v=1.43.0"), "airgap: app.js cache key bumped for the boundary fix");
 }
 
+// Batch 15 (2026-10-09 19:19): notary-desk (Tier 1) — the last Tier 1 app
+// whose boundaries were unhardened. Its localStorage vault JSON.parsed
+// blindly: a null entry threw inside renderVault and bricked the vault,
+// a markup-bearing feeQTC reached innerHTML, and a garbage envelopeHex
+// was hashed (blake2 of the empty decode) into a verify "expected event
+// hash" presented as a real fingerprint. Its Remark Board parseInt'd
+// node answers unchecked: a garbage head claimed "scan complete — NaN
+// blocks", a truncated System.Events blob was silently swallowed behind
+// the same claim, a raw "null" frame threw on msg.id, and a rejected
+// new-heads subscription left an unhandled rejection under a false
+// "Live — watching" status. The build nonce parseInt-truncated "2.5"
+// and the codec's compact encoder wrapped nonces past u32. Pin:
+// sanitizeVault + RPC validators live in notary-codec.js and gate every
+// load, verify, board row, scan verdict, and live claim.
+{
+  const codec = read("pages/notary-desk/js/notary-codec.js");
+  ok(codec.includes("function sanitizeVault(raw)"), "notary: sanitizeVault() defined in codec");
+  ok(codec.includes("function parseBlockNumber(v)"), "notary: parseBlockNumber() defined in codec");
+  ok(codec.includes("function isHash32(s)"), "notary: isHash32() defined in codec");
+  ok(codec.includes("function validSubscriptionId(v)"), "notary: validSubscriptionId() defined in codec");
+  ok(codec.includes("parsed.digestHex !== digestHex"), "notary: envelope must parse back to the stored digest");
+  ok(codec.includes("nonce must be a u32 integer"), "notary: signedLengthEstimate rejects a wrapping nonce");
+  const app = read("pages/notary-desk/js/app.js");
+  ok(app.includes("C.sanitizeVault(JSON.parse"), "notary: loadVault routes through sanitizeVault");
+  ok(app.includes("node returned a malformed head"), "notary: scan rejects a malformed head instead of claiming NaN blocks");
+  ok(app.includes("node returned a malformed block hash"), "notary: processBlock requires a 32-byte block hash");
+  ok(app.includes("node returned malformed System.Events data"), "notary: malformed/truncated events are an error, never silently swallowed");
+  ok(app.includes("extrinsics is not a list"), "notary: a non-list extrinsics field is malformed, never a fake empty block");
+  ok(app.includes("Array.isArray(msg)) return"), "notary: board ignores non-object socket frames");
+  ok(app.includes("new-heads subscription failed"), "notary: a failed subscription drops the Live claim honestly");
+  ok(app.includes("node returned a malformed subscription id"), "notary: subscription id validated before it anchors the watch");
+  ok(app.includes("lastBuild = null;"), "notary: a build attempt clears the previous build so a failed build is never saveable");
+  ok(app.includes("/^\\d+$/.test(nonceRaw)"), "notary: the build nonce is parsed strictly (no parseInt truncation)");
+  ok(!app.includes("hexToNum"), "notary: no unchecked parseInt header coercion remains");
+  ok(!app.includes("parseInt($(\"nonceInput\")"), "notary: no parseInt nonce coercion remains");
+  const html = read("pages/notary-desk/index.html");
+  ok(html.includes("js/app.js?v=1.51.0"), "notary: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/notary-codec.js?v=1.48.0"), "notary: notary-codec.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
