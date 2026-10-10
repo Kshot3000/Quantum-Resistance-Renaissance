@@ -53,12 +53,52 @@ function blankState() {
     ruleSeq: 1,
   };
 }
+/* Stored state is a boundary, not a trusted input: a hand-edited backup,
+ * an older build, or a corrupted write must never brick the tower (a null
+ * alert entry threw inside renderAll; a garbage baseline balance made
+ * every scan throw). Valid entries survive verbatim; poison is dropped
+ * or coerced per field by the sanitizers. */
+function sanitizeWatchlist(rows) {
+  if (!Array.isArray(rows)) return [];
+  var out = [], seen = {};
+  rows.forEach(function (x) {
+    if (!x || typeof x !== "object") return;
+    var v = validateQuantusAddress(x.address);
+    if (!v.ok || seen[v.address]) return;
+    seen[v.address] = true;
+    var phrase = null;
+    if (Array.isArray(x.checkphrase) && x.checkphrase.length &&
+        x.checkphrase.every(function (w) { return typeof w === "string" && w; })) {
+      phrase = x.checkphrase.slice();
+    }
+    out.push({
+      address: v.address,
+      nick: typeof x.nick === "string" ? x.nick : "",
+      note: typeof x.note === "string" ? x.note : "",
+      addedAt: QWATCH.parseableTs(x.addedAt),
+      checkphrase: phrase, // null -> re-derived at init
+    });
+  });
+  return out;
+}
 var state = blankState();
 try {
   var raw = localStorage.getItem(LS_KEY);
   if (raw) {
     var parsed = JSON.parse(raw);
-    Object.keys(blankState()).forEach(function (k) { if (parsed[k] !== undefined) state[k] = parsed[k]; });
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      state.watchlist = sanitizeWatchlist(parsed.watchlist);
+      state.rules = Array.isArray(parsed.rules) ? parsed.rules : [];
+      state.baselines = QWATCH.sanitizeBaselines(parsed.baselines);
+      state.alerts = QWATCH.sanitizeAlerts(parsed.alerts);
+      if (parsed.settings && typeof parsed.settings === "object" && !Array.isArray(parsed.settings)) {
+        state.settings.pollMinutes = [0, 5, 15, 60].indexOf(parsed.settings.pollMinutes) !== -1
+          ? parsed.settings.pollMinutes : 0;
+        state.settings.notify = parsed.settings.notify === true;
+      }
+      state.lastScan = QWATCH.parseableTs(parsed.lastScan);
+      state.ruleSeq = Number.isInteger(parsed.ruleSeq) && parsed.ruleSeq > 0 ? parsed.ruleSeq : 1;
+    }
   }
 } catch (e) { /* corrupted storage: start clean */ }
 function save() {
@@ -197,28 +237,45 @@ function buildScanContext(bundle) {
   // flows.json is stored columnar (format v2, assets/flows-decode.js);
   // decode once here — idempotent, v1 object rows pass through untouched.
   if (bundle.flows && typeof QFlows !== "undefined" && QFlows.decode) bundle.flows = QFlows.decode(bundle.flows);
-  var live = bundle.mode === "live" ? bundle.live : bundle.live;
-  var src = bundle.mode === "live" ? bundle.live : bundle.live; // bundle.live is snapshot in snapshot mode
-  var blocks = (src && src.data && src.data.blocks) || [];
+  var src = bundle.live; // live response in live mode, live.json snapshot otherwise
+  // Every payload validates before it anchors anything: only blocks with
+  // a real height + timestamp may be the head, only well-formed transfer
+  // rows reach the rule engine / pulse, and governance counts are null
+  // (unknown) when their payload is missing or malformed — never a
+  // fabricated 0, which used to reset the chain baselines and fire
+  // false "new referendum" alerts on the next good scan.
+  var blocks = QWATCH.sanitizeBlocks(src && src.data && src.data.blocks);
   var head = blocks[0] || null;
-  var transfers = (bundle.flows && bundle.flows.transfers) || [];
-  var govData = (bundle.gov && bundle.gov.data) || {};
-  var referenda = (govData.referenda || []).length;
-  var upgrades = (govData.upgrades || []).length;
+  var transfers = QWATCH.sanitizeTransfers(bundle.flows && bundle.flows.transfers);
+  var gov = QWATCH.sanitizeGovernance(bundle.gov && bundle.gov.data);
   var balances = QWATCH.buildBalanceMap((bundle.whales && bundle.whales.top) || []);
+  var fm = bundle.flows && bundle.flows.meta;
+  var flowsMeta = null;
+  if (fm && typeof fm === "object" && !Array.isArray(fm)) {
+    var wb = QWATCH.parseHeight(fm.window_blocks);
+    if (wb !== null) {
+      flowsMeta = {
+        window_blocks: wb,
+        dust_threshold_qtc: (typeof fm.dust_threshold_qtc === "string" || typeof fm.dust_threshold_qtc === "number")
+          ? String(fm.dust_threshold_qtc) : "?",
+      };
+    }
+  }
+  var fetchedAt = src ? QWATCH.parseableTs(src.fetched_at) : null;
   return {
     bundle: bundle,
     balances: balances,
     byAddr: QWATCH.indexTransfers(transfers),
     transfers: transfers,
-    referenda: referenda,
-    upgrades: upgrades,
-    upgradesList: govData.upgrades || [],
+    referenda: gov ? gov.referenda : null,
+    upgrades: gov ? gov.upgrades : null,
+    upgradesList: gov ? gov.upgradesList : [],
     headHeight: head ? head.height : null,
-    headTsMs: head && head.timestamp ? new Date(head.timestamp).getTime() : NaN,
-    snapshotCapturedAt: (bundle.mode === "snapshot" && src && src.fetched_at) || null,
-    flowsMeta: (bundle.flows && bundle.flows.meta) || null,
-    govFetchedAt: (bundle.gov && bundle.gov.fetched_at) || null,
+    headTsMs: head ? new Date(head.timestamp).getTime() : NaN,
+    fetchedAt: fetchedAt,
+    snapshotCapturedAt: bundle.mode === "snapshot" ? fetchedAt : null,
+    flowsMeta: flowsMeta,
+    govFetchedAt: bundle.gov ? QWATCH.parseableTs(bundle.gov.fetched_at) : null,
   };
 }
 
@@ -291,8 +348,7 @@ function renderFacts() {
     lb.hidden = false; sb.hidden = true;
   } else {
     lb.hidden = true; sb.hidden = false;
-    var snap = chainData && chainData.bundle.live;
-    var when = snap && snap.fetched_at;
+    var when = chainData && chainData.fetchedAt;
     sb.textContent = when
       ? "◌ snapshot · block " + (chainData.headHeight != null ? "#" + chainData.headHeight.toLocaleString("en-US") : "?") +
         " · captured " + QWATCH.formatAge(Date.now() - new Date(when).getTime()) + " ago"
@@ -314,7 +370,7 @@ function renderDash() {
     var age = isNaN(chainData.headTsMs) ? "—" : QWATCH.formatAge(Date.now() - chainData.headTsMs);
     cards.push({ k: "Chain head", v: chainData.headHeight != null ? "#" + chainData.headHeight.toLocaleString("en-US") : "—",
                  sub: "newest block " + age + " old", tone: "" });
-    cards.push({ k: "Referenda", v: String(chainData.referenda), sub: "on-chain parliament", tone: "" });
+    cards.push({ k: "Referenda", v: chainData.referenda != null ? String(chainData.referenda) : "—", sub: chainData.referenda != null ? "on-chain parliament" : "governance data unavailable", tone: "" });
     cards.push({ k: "Transfers in window", v: chainData.transfers.length.toLocaleString("en-US"), sub: "15,000-block snapshot window", tone: "cool" });
   } else {
     cards.push({ k: "Chain head", v: "—", sub: "run a scan to light the tower", tone: "" });
@@ -475,13 +531,15 @@ function renderDataKv() {
   var kv = $("data-kv");
   if (!chainData) { kv.innerHTML = "<dt>Status</dt><dd>Run a scan to load chain data.</dd>"; return; }
   var b = chainData.bundle;
-  var snap = b.live; // snapshot payload in snapshot mode; live response in live mode
+  var govCounts = (chainData.referenda != null && chainData.upgrades != null)
+    ? chainData.referenda + " referenda · " + chainData.upgrades + " upgrades"
+    : "counts unknown — governance data unavailable";
   var rows = [
     ["Mode", b.mode === "live" ? "LIVE — public Subsquid indexer (sqm.quantus.com)" : "SNAPSHOT — committed same-origin data (indexer unreachable from this browser)"],
-    ["Snapshot captured", (snap && snap.fetched_at) ? new Date(snap.fetched_at).toLocaleString() + " (" + QWATCH.formatAge(Date.now() - new Date(snap.fetched_at).getTime()) + " ago)" : "—"],
+    ["Snapshot captured", chainData.fetchedAt ? new Date(chainData.fetchedAt).toLocaleString() + " (" + QWATCH.formatAge(Date.now() - new Date(chainData.fetchedAt).getTime()) + " ago)" : "—"],
     ["Chain head in data", chainData.headHeight != null ? "#" + chainData.headHeight.toLocaleString("en-US") : "—"],
     ["Transfer window", chainData.flowsMeta ? chainData.flowsMeta.window_blocks.toLocaleString("en-US") + " blocks · " + chainData.transfers.length.toLocaleString("en-US") + " transfers ≥ " + chainData.flowsMeta.dust_threshold_qtc + " QTC" : chainData.transfers.length + " transfers"],
-    ["Governance snapshot", chainData.govFetchedAt ? new Date(chainData.govFetchedAt).toLocaleString() + " · " + chainData.referenda + " referenda · " + chainData.upgrades + " upgrades" : chainData.referenda + " referenda · " + chainData.upgrades + " upgrades"],
+    ["Governance snapshot", chainData.govFetchedAt ? new Date(chainData.govFetchedAt).toLocaleString() + " · " + govCounts : govCounts],
     ["Balance coverage", "top-200 rich-list snapshot (" + chainData.balances.size + " addresses)"],
     ["Last scan", state.lastScan ? new Date(state.lastScan).toLocaleString() : "never"],
   ];

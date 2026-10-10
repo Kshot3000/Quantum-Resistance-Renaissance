@@ -62,6 +62,7 @@ function indexTransfers(transfers) {
     e[side].push(t);
   }
   (transfers || []).forEach(function (t) {
+    if (!t || typeof t !== "object") return;
     if (t.from_id) push(t.from_id, "out", t);
     if (t.to_id) push(t.to_id, "in", t);
   });
@@ -84,14 +85,184 @@ function addressActivity(byAddr, address) {
 }
 
 function buildBalanceMap(whalesTop) {
-  // whales.json "top" rows -> Map address -> free plancks (BigInt)
+  // whales.json "top" rows -> Map address -> free plancks (BigInt).
+  // A row anchors balance rules, so it must be a string address with a
+  // non-negative integer planck count — a negative "balance" (BigInt
+  // accepts "-5") would fire balance_below on fiction.
   var m = new Map();
   (whalesTop || []).forEach(function (row) {
-    if (row && row.address && row.free_plancks != null) {
-      try { m.set(row.address, BigInt(String(row.free_plancks))); } catch (e) { /* skip */ }
-    }
+    if (!row || typeof row.address !== "string" || !row.address) return;
+    var v = validPlancks(row.free_plancks);
+    if (v !== null) m.set(row.address, v);
   });
   return m;
+}
+
+/* ---------- boundary validation (load + scan) ----------
+ * Every payload the tower did not create itself — the localStorage state
+ * and the chain payloads (indexer answer / committed snapshots) — is
+ * validated here before it can anchor a render, a balance, or a rule
+ * baseline. Classification per field: core (drop the row / the count is
+ * unknown), poison (drop the row), absent-but-recoverable (coerce to a
+ * safe neutral and let the next scan re-derive it). */
+
+function parseHeight(v) {
+  // Positive integer block height: number (integer) or pure-digit string.
+  if (typeof v === "number") return Number.isInteger(v) && v > 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) {
+    var n = Number(v);
+    return Number.isSafeInteger(n) && n > 0 ? n : null;
+  }
+  return null;
+}
+
+function nonNegInt(v) {
+  if (typeof v === "number") return Number.isInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) {
+    var n = Number(v);
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  return null;
+}
+
+function validPlancks(v) {
+  // Non-negative integer plancks as BigInt, or null. Strings must be pure
+  // digits (BigInt alone accepts "-5" and throws on "12.5"/"1e3").
+  if (typeof v === "bigint") return v >= 0n ? v : null;
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) return BigInt(v);
+  return null;
+}
+
+function parseableTs(v) {
+  return typeof v === "string" && isFinite(Date.parse(v)) ? v : null;
+}
+
+var HASH32_RE = /^0x[0-9a-fA-F]{64}$/;
+
+function sanitizeBlocks(rows) {
+  // Only blocks whose height AND timestamp both validate may anchor the
+  // head / stall math; hash and reward are kept only when well-formed.
+  if (!Array.isArray(rows)) return [];
+  var out = [];
+  rows.forEach(function (b) {
+    if (!b || typeof b !== "object") return;
+    var h = parseHeight(b.height);
+    var ts = parseableTs(b.timestamp);
+    if (h === null || ts === null) return;
+    var reward = validPlancks(b.reward);
+    out.push({
+      height: h, timestamp: ts,
+      hash: typeof b.hash === "string" && HASH32_RE.test(b.hash) ? b.hash : null,
+      reward: reward !== null ? reward.toString() : null,
+    });
+  });
+  return out;
+}
+
+function sanitizeTransfers(rows) {
+  // A transfer row anchors rule evaluation and the pulse table: id,
+  // from/to, a non-negative integer amount, and an integer block height
+  // are core — a row missing any of them is dropped, never repaired into
+  // a plausible-looking transfer. A garbage timestamp is recoverable
+  // (sorting and ages use block height), so it coerces to null.
+  if (!Array.isArray(rows)) return [];
+  var out = [];
+  rows.forEach(function (t) {
+    if (!t || typeof t !== "object") return;
+    if (typeof t.id !== "string" || !t.id) return;
+    if (typeof t.from_id !== "string" || !t.from_id) return;
+    if (typeof t.to_id !== "string" || !t.to_id) return;
+    var amt = validPlancks(t.amount);
+    if (amt === null) return;
+    var h = parseHeight(t.block_height);
+    if (h === null) return;
+    out.push({
+      id: t.id, amount: amt.toString(), from_id: t.from_id, to_id: t.to_id,
+      block_height: h, timestamp: parseableTs(t.timestamp),
+      extrinsic_id: typeof t.extrinsic_id === "string" ? t.extrinsic_id : null,
+    });
+  });
+  return out;
+}
+
+function sanitizeGovernance(data) {
+  // Returns { referenda, upgrades, upgradesList } or null when the
+  // payload's counts cannot be known. A FAILED governance load must read
+  // as UNKNOWN — counting it as 0 resets the chain baselines, and the
+  // next good scan then fires false "new referendum" alerts.
+  if (!data || typeof data !== "object") return null;
+  if (!Array.isArray(data.referenda) || !Array.isArray(data.upgrades)) return null;
+  var refs = data.referenda.filter(function (r) { return !!r && typeof r === "object"; }).length;
+  var ups = [];
+  data.upgrades.forEach(function (u) {
+    if (!u || typeof u !== "object") return;
+    ups.push({ spec_version: nonNegInt(u.spec_version) });
+  });
+  return { referenda: refs, upgrades: ups.length, upgradesList: ups };
+}
+
+function sanitizeIdList(v) {
+  if (!Array.isArray(v)) return [];
+  var out = [];
+  v.forEach(function (id) {
+    if (typeof id === "string" && id && out.indexOf(id) === -1) out.push(id);
+  });
+  return out.length > MAX_SEEN_IDS ? out.slice(out.length - MAX_SEEN_IDS) : out;
+}
+
+function sanitizeBaselines(raw) {
+  var out = { addresses: {}, chain: blankChainBaseline() };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  if (raw.addresses && typeof raw.addresses === "object" && !Array.isArray(raw.addresses)) {
+    Object.keys(raw.addresses).forEach(function (addr) {
+      var b = raw.addresses[addr];
+      if (!b || typeof b !== "object") return;
+      // A poisoned balance coerces to null (unknown): the next scan
+      // re-baselines instead of throwing BigInt() on every scan forever.
+      var bal = b.balance == null ? null : validPlancks(b.balance);
+      out.addresses[addr] = {
+        balance: bal !== null ? bal.toString() : null,
+        seenIn: sanitizeIdList(b.seenIn),
+        seenOut: sanitizeIdList(b.seenOut),
+      };
+    });
+  }
+  if (raw.chain && typeof raw.chain === "object" && !Array.isArray(raw.chain)) {
+    out.chain = {
+      referenda: raw.chain.referenda == null ? null : nonNegInt(raw.chain.referenda),
+      upgrades: raw.chain.upgrades == null ? null : nonNegInt(raw.chain.upgrades),
+      stallFiredHead: raw.chain.stallFiredHead == null ? null : parseHeight(raw.chain.stallFiredHead),
+      seenWhale: sanitizeIdList(raw.chain.seenWhale),
+    };
+  }
+  return out;
+}
+
+function sanitizeAlerts(raw) {
+  // Stored alerts are rendered and counted: an entry survives only with
+  // a string id and a parseable timestamp (its age is displayed). A bad
+  // severity is recoverable (coerce to info) and a non-string address is
+  // an annotation (coerce to null) — neither may brick the feed.
+  if (!Array.isArray(raw)) return [];
+  var out = [];
+  raw.forEach(function (a) {
+    if (!a || typeof a !== "object") return;
+    if (typeof a.id !== "string" || !a.id) return;
+    if (typeof a.title !== "string" || typeof a.detail !== "string") return;
+    var ts = parseableTs(a.ts);
+    if (ts === null) return;
+    out.push({
+      id: a.id,
+      ruleId: typeof a.ruleId === "string" ? a.ruleId : null,
+      address: typeof a.address === "string" ? a.address : null,
+      severity: ["info", "warn", "crit"].indexOf(a.severity) !== -1 ? a.severity : "info",
+      title: a.title, detail: a.detail, ts: ts,
+      read: a.read === true,
+      synthetic: a.synthetic === true ? true : undefined,
+    });
+  });
+  return out;
 }
 
 /* ---------- rules ---------- */
@@ -144,10 +315,10 @@ function blankAddressBaseline() {
   return { balance: null, seenIn: [], seenOut: [] };
 }
 function ensureBaselines(baselines) {
-  baselines = baselines || {};
-  if (!baselines.addresses) baselines.addresses = {};
-  if (!baselines.chain) baselines.chain = blankChainBaseline();
-  return baselines;
+  // Baselines are persisted state: sanitize on every evaluation so a
+  // poisoned stored baseline can never throw inside a rule (BigInt on a
+  // garbage balance wedged every scan) or masquerade as chain fact.
+  return sanitizeBaselines(baselines);
 }
 
 function pushSeen(arr, id) {
@@ -294,6 +465,10 @@ function evalChainRule(rule, chain, ctx) {
       break;
     }
     case "new_referendum": {
+      // An unknown count (governance payload failed/malformed) must
+      // neither fire nor RESET the baseline — assigning it would make
+      // the next good scan compare against null/0 and fire falsely.
+      if (nonNegInt(ctx.referenda) === null) break;
       if (chain.referenda != null && ctx.referenda > chain.referenda) {
         mk("New governance referendum",
            "Referendum count rose " + chain.referenda + " → " + ctx.referenda + ". Check the Governance Tracker for details.",
@@ -303,6 +478,7 @@ function evalChainRule(rule, chain, ctx) {
       break;
     }
     case "new_upgrade": {
+      if (nonNegInt(ctx.upgrades) === null) break;
       if (chain.upgrades != null && ctx.upgrades > chain.upgrades) {
         var latest = (ctx.upgradesList || []).slice(-1)[0];
         mk("Runtime upgrade detected",
@@ -431,6 +607,15 @@ var api = {
   defaultThreshold: defaultThreshold,
   ruleLabel: ruleLabel,
   ensureBaselines: ensureBaselines,
+  parseHeight: parseHeight,
+  nonNegInt: nonNegInt,
+  validPlancks: validPlancks,
+  parseableTs: parseableTs,
+  sanitizeBlocks: sanitizeBlocks,
+  sanitizeTransfers: sanitizeTransfers,
+  sanitizeGovernance: sanitizeGovernance,
+  sanitizeBaselines: sanitizeBaselines,
+  sanitizeAlerts: sanitizeAlerts,
   advanceAddressBaseline: advanceAddressBaseline,
   blankChainBaseline: blankChainBaseline,
   blankAddressBaseline: blankAddressBaseline,

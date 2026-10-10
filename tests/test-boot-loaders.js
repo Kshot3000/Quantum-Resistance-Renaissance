@@ -511,5 +511,44 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/notary-codec.js?v=1.48.0"), "notary: notary-codec.js cache key bumped for the boundary fix");
 }
 
+// Batch 16 (2026-10-09 20:19): watchtower (Tier 2) — its persisted state
+// was copied into `state` with NO validation except rules: a null alert
+// entry threw inside renderAll and killed init, a numeric alert address
+// threw on .indexOf, a poisoned baseline balance ("abc") made
+// evaluateRules throw BigInt() on EVERY scan, and a garbage lastScan
+// rendered as a fake "just now". buildScanContext trusted every payload
+// the same way: a garbage head height was presented as chain fact,
+// poisoned transfer rows reached the rule engine, and a FAILED
+// governance fetch computed referenda/upgrades as 0 — resetting the
+// chain baselines so the next good scan fired FALSE "new referendum /
+// upgrade" alerts. Pin: sanitizers in watch-core.js gate stored state,
+// blocks, transfers, governance, baselines, and balances; unknown
+// governance counts never fire and never reset a baseline.
+{
+  const core = read("pages/watchtower/js/watch-core.js");
+  ok(core.includes("function sanitizeBlocks(rows)"), "watchtower: sanitizeBlocks() defined in watch-core");
+  ok(core.includes("function sanitizeTransfers(rows)"), "watchtower: sanitizeTransfers() defined in watch-core");
+  ok(core.includes("function sanitizeGovernance(data)"), "watchtower: sanitizeGovernance() defined in watch-core");
+  ok(core.includes("function sanitizeBaselines(raw)"), "watchtower: sanitizeBaselines() defined in watch-core");
+  ok(core.includes("function sanitizeAlerts(raw)"), "watchtower: sanitizeAlerts() defined in watch-core");
+  ok(core.includes("counting it as 0 resets the chain baselines"), "watchtower: failed governance load reads unknown, never 0");
+  ok(core.includes("if (nonNegInt(ctx.referenda) === null) break;"), "watchtower: unknown referendum count neither fires nor resets the baseline");
+  ok(core.includes("if (nonNegInt(ctx.upgrades) === null) break;"), "watchtower: unknown upgrade count neither fires nor resets the baseline");
+  ok(core.includes("return sanitizeBaselines(baselines);"), "watchtower: ensureBaselines sanitizes on every evaluation");
+  const app = read("pages/watchtower/js/app.js");
+  ok(app.includes("function sanitizeWatchlist(rows)"), "watchtower: sanitizeWatchlist() defined in app");
+  ok(app.includes("state.baselines = QWATCH.sanitizeBaselines(parsed.baselines);"), "watchtower: stored baselines sanitized at load");
+  ok(app.includes("state.alerts = QWATCH.sanitizeAlerts(parsed.alerts);"), "watchtower: stored alerts sanitized at load");
+  ok(app.includes("state.lastScan = QWATCH.parseableTs(parsed.lastScan);"), "watchtower: stored lastScan must parse or is dropped");
+  ok(app.includes("QWATCH.sanitizeBlocks(src && src.data && src.data.blocks)"), "watchtower: scan head comes only from validated blocks");
+  ok(app.includes("QWATCH.sanitizeTransfers(bundle.flows && bundle.flows.transfers)"), "watchtower: transfers sanitized before the rule engine");
+  ok(app.includes("QWATCH.sanitizeGovernance(bundle.gov && bundle.gov.data)"), "watchtower: governance counts sanitized before baselining");
+  ok(!app.includes("(govData.referenda || []).length"), "watchtower: no raw governance length counting remains");
+  ok(!app.includes("Object.keys(blankState())"), "watchtower: no blind stored-state copy remains");
+  const html = read("pages/watchtower/index.html");
+  ok(html.includes("js/app.js?v=1.34.0"), "watchtower: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/watch-core.js?v=1.31.0"), "watchtower: watch-core.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

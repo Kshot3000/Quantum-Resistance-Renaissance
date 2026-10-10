@@ -222,6 +222,129 @@ test("runSelfTest produces synthetic alerts for each enabled rule", () => {
   assert.ok(!types.has("r6"));
 });
 
+test("sanitizeBlocks keeps only height+timestamp-valid blocks", () => {
+  const out = W.sanitizeBlocks([
+    { height: 100, timestamp: "2026-01-01T00:00:00Z", hash: "0x" + "ab".repeat(32), reward: "300000000000" },
+    { height: "garbage", timestamp: "2026-01-01T00:00:00Z" },
+    { height: 12.5, timestamp: "2026-01-01T00:00:00Z" },
+    { height: -4, timestamp: "2026-01-01T00:00:00Z" },
+    { height: 99, timestamp: "not-a-date" },
+    null,
+    { height: "98", timestamp: "2026-01-01T00:00:00Z", hash: "0xzz", reward: "-5" },
+  ]);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].height, 100);
+  assert.equal(out[0].reward, "300000000000");
+  assert.equal(out[1].height, 98); // digit-string height normalized
+  assert.equal(out[1].hash, null); // malformed hash coerced, block survives
+  assert.equal(out[1].reward, null);
+  assert.deepEqual(W.sanitizeBlocks("nope"), []);
+  assert.deepEqual(W.sanitizeBlocks(undefined), []);
+});
+
+test("sanitizeTransfers drops poisoned rows, keeps valid ones verbatim", () => {
+  const out = W.sanitizeTransfers([
+    { id: "T1", amount: "2000", from_id: "A", to_id: "B", block_height: 10, timestamp: "2026-01-01T00:00:00Z" },
+    { id: "T2", amount: "12.5", from_id: "A", to_id: "B", block_height: 10 },
+    { id: "T3", amount: "-5", from_id: "A", to_id: "B", block_height: 10 },
+    { amount: "100", from_id: "A", to_id: "B", block_height: 10 },
+    null,
+    { id: "T4", amount: "100", from_id: "A", to_id: "B", block_height: "x" },
+    { id: "T5", amount: 4000, from_id: "A", to_id: "B", block_height: 9, timestamp: "garbage" },
+  ]);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].id, "T1");
+  assert.equal(out[1].id, "T5");
+  assert.equal(out[1].amount, "4000"); // safe-integer number normalized to string
+  assert.equal(out[1].timestamp, null); // garbage ts is recoverable, row survives
+  assert.deepEqual(W.sanitizeTransfers({}), []);
+});
+
+test("sanitizeGovernance: malformed counts are unknown (null), never 0", () => {
+  const g = W.sanitizeGovernance({ referenda: [{}, {}], upgrades: [{ spec_version: 42 }, { spec_version: "x" }, "junk"] });
+  assert.equal(g.referenda, 2);
+  assert.equal(g.upgrades, 2); // the "junk" string row is not an upgrade
+  assert.equal(g.upgradesList[0].spec_version, 42);
+  assert.equal(W.sanitizeGovernance({ referenda: "oops", upgrades: [] }), null);
+  assert.equal(W.sanitizeGovernance({}), null); // failed load: counts unknown
+  assert.equal(W.sanitizeGovernance(null), null);
+});
+
+test("sanitizeBaselines coerces poison instead of wedging every scan", () => {
+  const b = W.sanitizeBaselines({
+    addresses: { A: { balance: "abc", seenIn: "nope", seenOut: [123, "TX1", "TX1"] }, B: null, C: { balance: "500", seenIn: [], seenOut: [] } },
+    chain: { referenda: "oops", upgrades: -3, stallFiredHead: "x", seenWhale: 42 },
+  });
+  assert.equal(b.addresses.A.balance, null); // re-baselines next scan, never throws
+  assert.deepEqual(b.addresses.A.seenIn, []);
+  assert.deepEqual(b.addresses.A.seenOut, ["TX1"]);
+  assert.equal(b.addresses.B, undefined);
+  assert.equal(b.addresses.C.balance, "500");
+  assert.deepEqual(b.chain, { referenda: null, upgrades: null, stallFiredHead: null, seenWhale: [] });
+  assert.deepEqual(W.sanitizeBaselines("junk").chain, { referenda: null, upgrades: null, stallFiredHead: null, seenWhale: [] });
+});
+
+test("sanitizeAlerts drops brick-rows, coerces annotation fields", () => {
+  const out = W.sanitizeAlerts([
+    { id: "a1", ruleId: "r", address: "A", severity: "warn", title: "T", detail: "D", ts: "2026-01-01T00:00:00Z", read: false },
+    null,
+    { id: "a2", title: "T", detail: "D", ts: "garbage" },
+    { id: "a3", title: "T", detail: "D", ts: "2026-01-01T00:00:00Z", address: 12345, severity: "catastrophic" },
+    { title: "no id", detail: "D", ts: "2026-01-01T00:00:00Z" },
+  ]);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].id, "a1");
+  assert.equal(out[1].address, null);
+  assert.equal(out[1].severity, "info");
+  assert.deepEqual(W.sanitizeAlerts("junk"), []);
+});
+
+test("buildBalanceMap rejects negative and non-string-address rows", () => {
+  const m = W.buildBalanceMap([
+    { address: "A", free_plancks: "500" },
+    { address: "B", free_plancks: "-5" },
+    { address: 42, free_plancks: "500" },
+    { address: "C", free_plancks: "12.5" },
+  ]);
+  assert.equal(m.get("A"), 500n);
+  assert.equal(m.has("B"), false);
+  assert.equal(m.has("C"), false);
+  assert.equal(m.size, 1);
+});
+
+test("unknown governance counts neither fire nor reset the baseline", () => {
+  const { now, data } = fixtureData(); // referenda 3, upgrades 2
+  const rules = [
+    { id: "g1", type: "new_referendum", enabled: true },
+    { id: "g2", type: "new_upgrade", enabled: true },
+  ];
+  let out = W.evaluateRules(rules, {}, data, now);
+  assert.equal(out.baselines.chain.referenda, 3);
+  // a scan whose governance payload failed: counts unknown (null)
+  const unknown = fixtureData({ referenda: null, upgrades: null }).data;
+  out = W.evaluateRules(rules, out.baselines, unknown, now);
+  assert.equal(out.alerts.length, 0);
+  assert.equal(out.baselines.chain.referenda, 3); // NOT reset to null/0
+  assert.equal(out.baselines.chain.upgrades, 2);
+  // the next good scan still detects the increase exactly once
+  const grown = fixtureData({ referenda: 4, upgrades: 2 }).data;
+  out = W.evaluateRules(rules, out.baselines, grown, now);
+  assert.equal(out.alerts.length, 1);
+  assert.ok(out.alerts[0].title.includes("referendum"));
+});
+
+test("evaluateRules survives poisoned stored baselines", () => {
+  const { now, data } = fixtureData();
+  const rule = { id: "r1", type: "balance_below", address: ADDR, threshold: "1000", enabled: true };
+  const poison = {
+    addresses: { [ADDR]: { balance: "abc", seenIn: 5, seenOut: "x" } },
+    chain: { referenda: "oops", upgrades: [], stallFiredHead: {}, seenWhale: 9 },
+  };
+  const out = W.evaluateRules([rule], poison, data, now);
+  assert.ok(Array.isArray(out.alerts)); // no BigInt throw; balance re-baselines
+  assert.equal(out.baselines.addresses[ADDR].balance, (100n * P).toString());
+});
+
 test("ruleLabel renders human descriptions", () => {
   assert.equal(W.ruleLabel({ type: "whale_ge", threshold: "50000" }), "Whale transfer ≥ 50000 QTC");
   assert.equal(W.ruleLabel({ type: "balance_change", changeMode: "pct", threshold: "10" }), "Balance moves by 10%");
