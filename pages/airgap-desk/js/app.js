@@ -540,6 +540,23 @@ function renderColdTicket() {
   $('cold-ticket-out').hidden = false;
 }
 
+/* Void a signed package when an input that determined it changes after
+ * signing. The chunks in step 3 are the product of ONE ticket, destination,
+ * amount, nonce and scheme: leaving them standing (Copy/Download armed)
+ * beside edited fields would present the OLD extrinsic as the transfer now
+ * on screen — the cold-side mirror of the hot side's voidVerification. */
+function voidSignedPackage(what) {
+  if (!cold.extrinsicHex && !cold.chunks.length) return;
+  cold.extrinsicHex = '';
+  cold.chunks = [];
+  $('pkg-hex').value = '';
+  $('stepper-mount').innerHTML = '<p class="muted">Nothing signed yet — the previous signed package was voided because '
+    + what + ' after signing. Review and sign again for what is on screen now.</p>';
+  $('btn-pkg-copy').disabled = true;
+  $('btn-pkg-download').disabled = true;
+  $('cold-wipe-note').hidden = true;
+}
+
 function importTicketString(s) {
   err('cold-ticket-err');
   try {
@@ -549,6 +566,9 @@ function importTicketString(s) {
     // genesis): importing a new ticket voids it, so a signature can never be
     // produced under a review whose "From" names a different ticket.
     if (cold.reviewed) { cold.reviewed = null; $('cold-review').hidden = true; }
+    // A package signed under the previous ticket is not this ticket's
+    // package either — void the export, not just the review.
+    voidSignedPackage('a new chain ticket was imported');
     renderColdTicket();
   } catch (e) { err('cold-ticket-err', e.message); }
 }
@@ -632,6 +652,7 @@ let cpSeq = 0; // token: only the latest checkphrase compute may render
 $('cold-dest').addEventListener('input', () => {
   err('cold-dest-err');
   $('cp-box').hidden = true; cold.cpWords = null; cold.reviewed = null;
+  voidSignedPackage('the destination was edited');
   clearTimeout(cpTimer);
   const seq = ++cpSeq; // any edit voids a compute already in flight
   const v = $('cold-dest').value.trim();
@@ -659,6 +680,20 @@ $('cold-dest').addEventListener('input', () => {
     }
   }, 450);
 });
+
+/* The remaining determinants of a signed package get the same voiding
+ * discipline as the destination: editing amount or nonce, or switching the
+ * scheme, after signing voids the export in step 3. (Programmatic value
+ * writes — the ticket import's nonce prefill — fire no input/change event,
+ * so they never void spuriously; the import voids explicitly instead.) */
+for (const [id, what] of [
+  ['cold-amount', 'the amount was edited'],
+  ['cold-nonce', 'the nonce was edited'],
+  ['cold-scheme', 'the signing scheme was changed'],
+]) {
+  $(id).addEventListener('input', () => voidSignedPackage(what));
+  $(id).addEventListener('change', () => voidSignedPackage(what));
+}
 
 function readColdKey(scheme) {
   const m = document.querySelector('[data-ck].active').dataset.ck;
@@ -706,8 +741,10 @@ $('btn-cold-review').addEventListener('click', () => {
       ['Signature wire', `${wireLen.toLocaleString()} bytes (fixed for the scheme)`],
       ['Checkphrase', '✓ read back correctly'],
     ]);
-    // pin exactly what was reviewed — signing re-validates against this
-    cold.reviewed = { dest, amount: $('cold-amount').value.trim(), nonce: nonceRaw };
+    // pin exactly what was reviewed — signing re-validates against this,
+    // scheme included: the review displayed one scheme and wire length, and
+    // signing must never silently produce the other scheme's signature.
+    cold.reviewed = { dest, amount: $('cold-amount').value.trim(), nonce: nonceRaw, scheme };
     $('cold-review').hidden = false;
     $('cold-review').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) { err('cold-build-err', e.message); }
@@ -719,18 +756,22 @@ $('btn-cold-sign').addEventListener('click', async () => {
   let kp = null;
   try {
     const scheme = Number($('cold-scheme').value);
+    const dest = $('cold-dest').value.trim();
+    // sign EXACTLY what was reviewed: re-validate the live fields against the
+    // reviewed snapshot BEFORE deriving any key — a dest/amount/nonce/scheme
+    // edited (or pasted over) after review must never be signed on the
+    // strength of the old checkphrase, and a scheme switch must be named as
+    // what it is, not surface later as a confusing "wrong key".
+    if (!cold.reviewed) throw new Error('review the transfer first — signing is pinned to the reviewed destination, amount, nonce and scheme');
+    if (dest !== cold.reviewed.dest || $('cold-amount').value.trim() !== cold.reviewed.amount || $('cold-nonce').value.trim() !== cold.reviewed.nonce)
+      throw new Error('destination, amount or nonce changed since review — review again before signing');
+    if (scheme !== cold.reviewed.scheme)
+      throw new Error(`scheme changed since review — reviewed ML-DSA-${cold.reviewed.scheme}, now ML-DSA-${scheme}. Review again before signing`);
     ({ kp } = readColdKey(scheme));
     // the key MUST match the ticket's sender — otherwise the signature is useless
     if (kp.address !== cold.ticket.addr) {
       throw new Error('this key derives to ' + shortAddr(kp.address) + ' — but the ticket is for ' + shortAddr(cold.ticket.addr) + '. Wrong key, refusing to sign.');
     }
-    const dest = $('cold-dest').value.trim();
-    // sign EXACTLY what was reviewed: re-validate the live fields against the
-    // reviewed snapshot — a dest/amount/nonce edited (or pasted over) after
-    // review must never be signed on the strength of the old checkphrase.
-    if (!cold.reviewed) throw new Error('review the transfer first — signing is pinned to the reviewed destination, amount and nonce');
-    if (dest !== cold.reviewed.dest || $('cold-amount').value.trim() !== cold.reviewed.amount || $('cold-nonce').value.trim() !== cold.reviewed.nonce)
-      throw new Error('destination, amount or nonce changed since review — review again before signing');
     const { prefix: destPrefix, accountId: destAccountId } = ss58Decode(dest);
     if (destPrefix !== 189) throw new Error('destination has wrong network prefix');
     const amount = qtcToPlancks($('cold-amount').value);

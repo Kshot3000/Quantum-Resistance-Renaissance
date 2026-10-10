@@ -476,8 +476,14 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("BigInt(f.baseFee)"), "airgap: no raw BigInt() fee coercion remains in app.js");
   ok(app.includes("$('fee-quote').hidden = true;"), "airgap: a quote attempt hides the previous quote until a fresh one lands");
   ok(app.includes("$('broadcast-result').hidden = true;"), "airgap: a broadcast attempt hides the previous result until a fresh one lands");
+  ok(app.includes("function voidSignedPackage(what)"), "airgap: signed-package voiding present (cold export staleness)");
+  ok(app.includes("voidSignedPackage('a new chain ticket was imported')"), "airgap: importing a new ticket voids the signed package");
+  ok(app.includes("voidSignedPackage('the destination was edited')"), "airgap: editing the destination voids the signed package");
+  ok(app.includes("['cold-scheme', 'the signing scheme was changed']"), "airgap: amount/nonce/scheme edits void the signed package");
+  ok(app.includes("scheme changed since review"), "airgap: sign refuses a scheme switched after review, named as such");
+  ok(app.includes("nonce: nonceRaw, scheme }"), "airgap: the review pins the scheme alongside dest/amount/nonce");
   const html = read("pages/airgap-desk/index.html");
-  ok(html.includes("js/app.js?v=1.43.0"), "airgap: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.44.0"), "airgap: app.js cache key bumped for the sign-staleness fix (1.43.0, superseded by the 1.44.0 cold-void bump)");
 }
 
 // Batch 15 (2026-10-09 19:19): notary-desk (Tier 1) — the last Tier 1 app
