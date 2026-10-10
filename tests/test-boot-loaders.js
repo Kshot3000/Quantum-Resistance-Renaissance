@@ -808,5 +808,36 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.31.0"), "supply2: app.js cache key bumped for the boundary fix");
 }
 
+// Batch 25 (2026-10-10 10:19): mining-observatory (Tier 2) — the third
+// Tier 2 boundary batch. It trusted data/miners.json raw: a coinbase
+// address was interpolated unescaped into title=/data-copy=/href
+// attributes in the leaderboard's innerHTML (quote breakout = live
+// markup injection, an <img> demonstrably materialized), the window
+// denominator was never cross-checked against the miner counts it
+// divides (a truncated map silently rescaled every share, Nakamoto
+// coefficient and HHI), negative counts produced negative shares, a
+// duplicate all-time row split one miner's share in two, an all-time
+// count above the chain height rendered a >100% share, a garbage
+// fetched_at rendered "NaNd ago" as fresh — while a STRING
+// observed_block_time_s threw on .toFixed and one poisoned bucket
+// (miners: null) threw inside the timeline draw, each dashing figures
+// the rest of the snapshot had proven. Pin: sanitizeMiners() rejects a
+// malformed core payload wholesale before DATA is assigned, the block
+// time degrades to null (the fetch script itself emits null), and
+// buckets are cleaned drop-and-continue.
+{
+  const app = read("pages/mining-observatory/app.js");
+  ok(app.includes("function sanitizeMiners(d)"), "minobs: sanitizeMiners() defined");
+  ok(app.includes("var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;"), "minobs: coinbase addresses must be prefix-189 SS58 shape");
+  ok(app.includes("DATA = sanitizeMiners(data);"), "minobs: DATA assigned only from the sanitized snapshot");
+  ok(app.includes("window_miners counts do not sum to window.block_count"), "minobs: window counts cross-checked against the denominator they divide");
+  ok(app.includes("window.end_height != chain_height"), "minobs: window must end at the claimed chain height");
+  ok(app.includes("all_time duplicate address"), "minobs: duplicate all-time rows rejected (no split shares)");
+  ok(app.includes("function cleanBuckets(buckets)"), "minobs: cleanBuckets() defined for the auxiliary timeline");
+  ok(app.includes("wout.observed_block_time_s = cleanBlockTime(w.observed_block_time_s);"), "minobs: block time degraded to null, never .toFixed on a string");
+  const html = read("pages/mining-observatory/index.html");
+  ok(html.includes("app.js?v=1.17.0"), "minobs: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

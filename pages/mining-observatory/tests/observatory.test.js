@@ -121,5 +121,125 @@ t("timeAgo formats durations", function(){
   assert.strictEqual(m.timeAgo(new Date(now - 3 * 3600 * 1000).toISOString()), "3h ago");
 });
 
+// 12. sanitizeMiners: a well-formed payload passes and is normalized
+var VA = function(c){ return "qz" + c.repeat(47); }; // valid SS58-189 shape
+function goodPayload(){
+  return {
+    ok: true,
+    source: "https://sqm.quantus.com/v1/graphql",
+    fetched_at: new Date().toISOString(),
+    chain_height: 2000,
+    window: { start_height: 1001, end_height: 2000, block_count: 1000, observed_block_time_s: 10 },
+    window_miners: {},
+    buckets: [
+      { start: 1001, end: 1500, blocks: 500, miners: {} },
+      { start: 1501, end: 2000, blocks: 500, miners: {} },
+    ],
+    all_time: [
+      { address: VA("a"), blocks: 1200 }, { address: VA("b"), blocks: 500 }, { address: VA("c"), blocks: 200 },
+    ],
+  };
+}
+function fillGood(p){
+  p.window_miners[VA("a")] = 600; p.window_miners[VA("b")] = 250; p.window_miners[VA("c")] = 150;
+  p.buckets[0].miners[VA("a")] = 300; p.buckets[0].miners[VA("b")] = 200;
+  p.buckets[1].miners[VA("a")] = 300; p.buckets[1].miners[VA("b")] = 50; p.buckets[1].miners[VA("c")] = 150;
+  return p;
+}
+function expectBad(name, mut){
+  t(name, function(){
+    var p = fillGood(goodPayload());
+    mut(p);
+    assert.throws(function(){ m.sanitizeMiners(p); }, /malformed miners snapshot/);
+  });
+}
+
+t("sanitizeMiners accepts a well-formed payload", function(){
+  var out = m.sanitizeMiners(fillGood(goodPayload()));
+  assert.strictEqual(out.chain_height, 2000);
+  assert.strictEqual(out.window.observed_block_time_s, 10);
+  assert.strictEqual(out.buckets.length, 2);
+});
+
+expectBad("sanitizeMiners rejects a markup-carrying window address", function(p){
+  p.window_miners = {}; p.window_miners['qz"><img src=x>'] = 600;
+  p.window_miners[VA("b")] = 250; p.window_miners[VA("c")] = 150;
+});
+expectBad("sanitizeMiners rejects window counts that do not sum to block_count", function(p){
+  p.window_miners[VA("c")] = 100;
+});
+expectBad("sanitizeMiners rejects a negative miner count", function(p){
+  p.window_miners[VA("a")] = 900; p.window_miners[VA("c")] = -150;
+});
+expectBad("sanitizeMiners rejects a fractional miner count", function(p){
+  p.window_miners[VA("a")] = 600.5; p.window_miners[VA("c")] = 149.5;
+});
+expectBad("sanitizeMiners rejects a string miner count", function(p){
+  p.window_miners[VA("a")] = "600";
+});
+expectBad("sanitizeMiners rejects a garbage fetched_at", function(p){
+  p.fetched_at = "not-a-date";
+});
+expectBad("sanitizeMiners rejects window end != chain_height", function(p){
+  p.window.end_height = 1999; p.window.start_height = 1000;
+});
+expectBad("sanitizeMiners rejects a window range that disagrees with block_count", function(p){
+  p.window.start_height = 1002;
+});
+expectBad("sanitizeMiners rejects a duplicate all-time address", function(p){
+  p.all_time.push({ address: VA("a"), blocks: 10 });
+});
+expectBad("sanitizeMiners rejects an all-time count above chain height", function(p){
+  p.all_time[0].blocks = 5000;
+});
+expectBad("sanitizeMiners rejects all-time counts summing past chain height", function(p){
+  p.all_time[1].blocks = 900;
+});
+expectBad("sanitizeMiners rejects an empty window_miners", function(p){
+  p.window_miners = {};
+});
+expectBad("sanitizeMiners rejects a zero chain_height", function(p){
+  p.chain_height = 0;
+});
+
+// 13. Auxiliary degradation: block time and buckets never kill the core
+t("sanitizeMiners degrades a string block time to null, keeps figures", function(){
+  var p = fillGood(goodPayload());
+  p.window.observed_block_time_s = "10.0";
+  var out = m.sanitizeMiners(p);
+  assert.strictEqual(out.window.observed_block_time_s, null);
+  assert.strictEqual(out.chain_height, 2000);
+});
+t("sanitizeMiners keeps a null block time null (fetch script emits null)", function(){
+  var p = fillGood(goodPayload());
+  p.window.observed_block_time_s = null;
+  assert.strictEqual(m.sanitizeMiners(p).window.observed_block_time_s, null);
+});
+t("sanitizeMiners drops a poisoned bucket, keeps the clean one", function(){
+  var p = fillGood(goodPayload());
+  p.buckets[0].miners = null;
+  var out = m.sanitizeMiners(p);
+  assert.strictEqual(out.buckets.length, 1);
+  assert.strictEqual(out.buckets[0].start, 1501);
+});
+t("cleanBuckets drops a bucket whose miners do not sum to its blocks", function(){
+  var b = { start: 1, end: 500, blocks: 500, miners: {} };
+  b.miners[VA("a")] = 499;
+  assert.deepStrictEqual(m.cleanBuckets([b]), []);
+});
+t("cleanBuckets tolerates a non-array buckets field", function(){
+  assert.deepStrictEqual(m.cleanBuckets(undefined), []);
+  assert.deepStrictEqual(m.cleanBuckets("junk"), []);
+});
+
+// 14. Real snapshot passes its own boundary
+t("real snapshot passes sanitizeMiners unchanged in shape", function(){
+  var data = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "data", "miners.json"), "utf8"));
+  var out = m.sanitizeMiners(data);
+  assert.strictEqual(out.chain_height, data.chain_height);
+  assert.strictEqual(out.buckets.length, data.buckets.length);
+  assert.ok(out.window.observed_block_time_s > 5 && out.window.observed_block_time_s < 60);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

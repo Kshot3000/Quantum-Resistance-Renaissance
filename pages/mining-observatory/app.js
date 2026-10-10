@@ -105,6 +105,106 @@ function loadData(){
   });
 }
 
+/* ---------------- snapshot boundary ----------------
+ * The snapshot is server-generated, but every figure on this station is a
+ * decentralization VERDICT (Nakamoto coefficient, HHI band, top share),
+ * so a malformed payload must never anchor one. Core data is rejected
+ * wholesale (throw -> showError, no figures): a coinbase address is
+ * interpolated into title=/data-copy=/href attributes in the leaderboard
+ * (anything but a canonical SS58-189 address is an attribute breakout),
+ * the window denominator is cross-checked against the miner counts it
+ * divides (a truncated map silently rescales every share), and the
+ * window must be exactly the last block_count blocks ending at the
+ * claimed chain height. Auxiliary data degrades instead: the fetch
+ * script itself emits observed_block_time_s: null when it cannot
+ * measure one, so an unusable block time becomes null ("—"), and
+ * buckets (timeline only) are cleaned drop-and-continue. */
+var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
+
+function posInt(v, max){
+  return (typeof v === "number" && Number.isSafeInteger(v) && v >= 1 && v <= max) ? v : null;
+}
+
+function cleanBlockTime(v){
+  if (v === null || v === undefined) return null;
+  return (typeof v === "number" && isFinite(v) && v > 0 && v <= 3600) ? v : null;
+}
+
+function cleanBucket(b){
+  if (!b || typeof b !== "object" || Array.isArray(b)) return null;
+  var start = posInt(b.start, 10000000), end = posInt(b.end, 10000000);
+  var blocks = posInt(b.blocks, 100000);
+  if (start === null || end === null || blocks === null || end < start) return null;
+  if (blocks > end - start + 1) return null;
+  if (!b.miners || typeof b.miners !== "object" || Array.isArray(b.miners)) return null;
+  var keys = Object.keys(b.miners);
+  if (!keys.length) return null;
+  var sum = 0;
+  for (var i = 0; i < keys.length; i++){
+    if (!ADDR_RE.test(keys[i])) return null;
+    var n = posInt(b.miners[keys[i]], blocks);
+    if (n === null) return null;
+    sum += n;
+  }
+  if (sum !== blocks) return null;
+  return b;
+}
+
+function cleanBuckets(buckets){
+  if (!Array.isArray(buckets)) return [];
+  var out = [];
+  buckets.forEach(function(b){ var c = cleanBucket(b); if (c) out.push(c); });
+  return out;
+}
+
+function sanitizeMiners(d){
+  function bad(field){ throw new Error("malformed miners snapshot: " + field); }
+  if (!d || typeof d !== "object" || Array.isArray(d)) bad("payload is not an object");
+  if (typeof d.fetched_at !== "string" || !isFinite(Date.parse(d.fetched_at))) bad("fetched_at");
+  var height = posInt(d.chain_height, 10000000);
+  if (height === null) bad("chain_height");
+  var w = d.window;
+  if (!w || typeof w !== "object" || Array.isArray(w)) bad("window");
+  var wStart = posInt(w.start_height, 10000000), wEnd = posInt(w.end_height, 10000000);
+  var wCount = posInt(w.block_count, 10000000);
+  if (wStart === null || wEnd === null || wCount === null) bad("window heights");
+  if (wEnd !== height) bad("window.end_height != chain_height");
+  if (wStart !== wEnd - wCount + 1) bad("window range != block_count");
+  var wm = d.window_miners;
+  if (!wm || typeof wm !== "object" || Array.isArray(wm)) bad("window_miners");
+  var wkeys = Object.keys(wm);
+  if (!wkeys.length) bad("window_miners empty");
+  var wsum = 0;
+  wkeys.forEach(function(a){
+    if (!ADDR_RE.test(a)) bad("window_miners address");
+    var n = posInt(wm[a], wCount);
+    if (n === null) bad("window_miners count");
+    wsum += n;
+  });
+  if (wsum !== wCount) bad("window_miners counts do not sum to window.block_count");
+  var at = d.all_time;
+  if (!Array.isArray(at) || !at.length) bad("all_time");
+  var seen = {}, asum = 0;
+  at.forEach(function(r){
+    if (!r || typeof r !== "object") bad("all_time row");
+    if (!ADDR_RE.test(r.address || "")) bad("all_time address");
+    if (seen[r.address]) bad("all_time duplicate address");
+    seen[r.address] = 1;
+    var n = posInt(r.blocks, height);
+    if (n === null) bad("all_time count");
+    asum += n;
+  });
+  if (asum > height) bad("all_time counts exceed chain_height");
+  var out = {};
+  Object.keys(d).forEach(function(k){ out[k] = d[k]; });
+  var wout = {};
+  Object.keys(w).forEach(function(k){ wout[k] = w[k]; });
+  wout.observed_block_time_s = cleanBlockTime(w.observed_block_time_s);
+  out.window = wout;
+  out.buckets = cleanBuckets(d.buckets);
+  return out;
+}
+
 function buildViews(data){
   var wrows = sortedShares(data.window_miners, data.window.block_count);
   var arows = sortedShares(data.all_time, data.chain_height);
@@ -471,7 +571,7 @@ function init(){
 
   loadData().then(function(data){
     if (!data || !data.ok) throw new Error("snapshot payload missing or not ok");
-    DATA = data;
+    DATA = sanitizeMiners(data);
     VIEWS = buildViews(data);
     snapshotLine();
     render("window");
@@ -493,6 +593,8 @@ if (typeof module !== "undefined" && module.exports){
     hhiBand: hhiBand,
     cumulative: cumulative,
     bucketStats: bucketStats,
+    sanitizeMiners: sanitizeMiners,
+    cleanBuckets: cleanBuckets,
     fmtAddr: fmtAddr,
     timeAgo: timeAgo,
   };
