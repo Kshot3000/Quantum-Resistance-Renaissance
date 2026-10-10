@@ -280,7 +280,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("balance key changed${at}"), "console: storage watch renders the block as a hash");
   ok(app.includes("if (html) feedLog(key, html, n)"), "console: malformed head notifications produce no feed row");
   const html = read("pages/chain-console/index.html");
-  ok(html.includes("js/app.js?v=1.43.0"), "console: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.44.0"), "console: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 15. Mempool Desk: validate RPC answers at the node boundary ----
@@ -677,6 +677,32 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes('$("addrCheck").innerHTML = "";'), "ledger: wipe voids a pending address confirm");
   const html = read("pages/ledger-desk/index.html");
   ok(html.includes("app.js?v=1.5.0"), "ledger: app.js cache key bumped for the report-staleness fix");
+}
+
+// Batch 20 (2026-10-10 05:19): chain-console (Tier 1) — the gated broadcast
+// review had NO staleness path at all. The review is a pin on (extrinsic
+// hex, connection): pendingBroadcast + the rendered size/head/tail. Editing
+// #rf-extrinsic after reviewing left the old review confirmable (confirm
+// broadcast the OLD hex while the form showed the new one); selecting a
+// different recipe silently nulled pendingBroadcast but left the review UI
+// alive (confirm then broadcast [null]); disconnect/reconnect left the
+// review live against a connection it was never reviewed on. Pin:
+// voidPendingBroadcast() exists and is wired into every determinant change,
+// renderResult / the node-identity write clear an orphaned review silently,
+// and uncommitted endpoint typing does NOT void (no endpoint listener).
+{
+  const app = read("pages/chain-console/js/app.js");
+  ok(app.includes("function voidPendingBroadcast(what)"), "console: voidPendingBroadcast() defined (broadcast-review staleness)");
+  ok(app.includes("if (pendingBroadcast === null) return;"), "console: voiding only touches a pending review");
+  ok(app.includes("Broadcast review cleared"), "console: void replaces the review with a cleared note");
+  ok(app.includes("voidPendingBroadcast('the recipe inputs')"), "console: recipe-input edits void the review");
+  ok(app.includes("voidPendingBroadcast('the selected recipe')"), "console: recipe switch voids the review");
+  ok(app.includes("voidPendingBroadcast('the connection');"), "console: disconnect voids the review");
+  ok(app.includes("voidPendingBroadcast('the connection was lost')"), "console: socket loss voids the review");
+  ok((app.match(/pendingBroadcast = null;/g) || []).length >= 5, "console: renderResult + node-identity writes clear an orphaned review");
+  ok(!app.includes("$('endpoint').addEventListener('input'"), "console: uncommitted endpoint typing does not void the review");
+  const html = read("pages/chain-console/index.html");
+  ok(html.includes("js/app.js?v=1.44.0"), "console: app.js cache key bumped for the broadcast-staleness fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

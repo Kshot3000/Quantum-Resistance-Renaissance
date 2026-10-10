@@ -188,6 +188,7 @@ async function connect(url) {
     if (s === 'closed' || s === 'error') {
       if (connectedUrl) {
         connectedUrl = null;
+        voidPendingBroadcast('the connection was lost');
         // The socket is gone: any handshake/call still in flight on it is
         // superseded, and this teardown owns the busy indicator it leaves.
         connGen++; handshakeSeq++; callSeq++;
@@ -221,6 +222,9 @@ function disconnect(silent = true) {
   // starts (below), the handshake, and any result-pane call: their
   // continuations must not register, render, or report for a dead
   // connection, and this path owns the busy indicator they leave behind.
+  // A pending broadcast review was made against THIS connection: void it,
+  // so it cannot be confirmed against a different node after a reconnect.
+  voidPendingBroadcast('the connection');
   connGen++;
   handshakeSeq++;
   callSeq++;
@@ -320,6 +324,10 @@ function setBusy(b, label) {
 }
 
 function renderResult({ method, params, result, ms, ok, error, summarizeKey, ctx }) {
+  // Any rendered result supersedes a pending broadcast review (its UI is
+  // being overwritten): clear the captured hex silently so no orphaned
+  // review state survives without its confirm screen.
+  pendingBroadcast = null;
   const el = $('result');
   const req = JSON.stringify({ jsonrpc: '2.0', id: '…', method, params }, null, 2);
   let summaryHtml = '';
@@ -448,7 +456,7 @@ function renderRecipes(cat = 'all') {
 
 function selectRecipe(id) {
   selectedRecipe = getRecipe(id);
-  pendingBroadcast = null;
+  voidPendingBroadcast('the selected recipe');
   document.querySelectorAll('.recipe-card').forEach((c) => c.classList.toggle('sel', c.dataset.recipe === id));
   const r = selectedRecipe;
   const form = $('recipe-form');
@@ -478,6 +486,12 @@ function selectRecipe(id) {
     </div>
     <div id="rf-err" class="note warn" hidden></div>`;
   $('rf-run').addEventListener('click', () => runSelectedRecipe());
+  // Any edit to the recipe inputs after a broadcast review voids it: the
+  // review pinned the values at review time, so a form that no longer
+  // matches the review must not be confirmable against it. (Programmatic
+  // writes fire no input events, so building a key or running the recipe
+  // never self-voids.)
+  form.querySelectorAll('input, textarea').forEach((el) => el.addEventListener('input', () => voidPendingBroadcast('the recipe inputs')));
   const kb = $('kb-toggle');
   if (kb) kb.addEventListener('click', () => { $('kb').hidden = !$('kb').hidden; });
   const kbb = $('kb-build');
@@ -534,6 +548,7 @@ async function runSelectedRecipe() {
         || typeof type !== 'string' || !Array.isArray(roles) || roles.some((x) => typeof x !== 'string')) {
         throw new Error('the node returned a malformed identity (system_chain / system_name / system_version / system_chainType / system_nodeRoles had unexpected types)');
       }
+      pendingBroadcast = null; // this write supersedes any pending review, like renderResult
       const el = $('result');
       el.innerHTML = `<div class="res-head"><span class="res-method mono">node identity</span>
         <span class="res-meta"><b class="green">ok</b> · ${formatMs(ms)}</span></div>
@@ -558,6 +573,28 @@ async function runSelectedRecipe() {
     ctx.address = p.address;
   }
   await runCall({ method: r.method, params: b.params, label: r.title, summarizeKey: r.summarize, ctx });
+}
+
+/* The broadcast review is a pin on (extrinsic hex, connection): its size /
+ * head / tail describe the hex captured at review time, on the connection
+ * live at review time, and its confirm button broadcasts exactly that hex.
+ * If a determinant changes after the review — the recipe inputs are edited,
+ * a different recipe is selected, or the connection drops / is replaced —
+ * the review no longer describes what would be sent, so it is voided: the
+ * captured hex is dropped and, while the review screen is still the one in
+ * the result pane, it is replaced with a cleared note naming what changed.
+ * Scoped like the fleet's other determinant-voiding fixes: uncommitted
+ * typing that changes no determinant (e.g. editing the endpoint field
+ * without connecting) does NOT void — only committed changes do. */
+function voidPendingBroadcast(what) {
+  if (pendingBroadcast === null) return;
+  pendingBroadcast = null;
+  if ($('bc-go')) {
+    $('result').innerHTML = `
+      <div class="res-head"><span class="res-method mono">author_submitExtrinsic</span><span class="res-meta"><b class="amber">review cleared</b></span></div>
+      <div class="note warn">Broadcast review cleared — ${esc(what)} changed after the review, so the extrinsic that was reviewed is no longer the one that would be sent. Review the current values again before broadcasting.</div>
+      ${resultPlaceholder()}`;
+  }
 }
 
 /* gated broadcast: review → confirm */
