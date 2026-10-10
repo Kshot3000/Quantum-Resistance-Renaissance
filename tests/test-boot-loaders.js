@@ -751,5 +751,29 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/app.js?v=1.52.0"), "notary: app.js cache key bumped for the staleness fix");
 }
 
+// Batch 23 (2026-10-10 08:19): network-dashboard (Tier 2) — the first
+// Tier 2 boundary batch. It trusted every indexer/snapshot field raw:
+// fmtQTC passed non-digit reward strings straight into the blocks
+// table's innerHTML (a poisoned reward became live markup), block
+// hash/timestamp were interpolated into data-* attributes (quote
+// breakout = injection), a string block_height rendered "—" while the
+// poisoned blocks still painted, negative accounts rendered as fact,
+// and a poisoned daily tx_count rendered "NaN tx/s". Pin:
+// sanitizeData() exists, is consulted in refresh() before any render,
+// and a malformed payload throws into the failure path (last good
+// telemetry kept); fmtQTC/fmtInt reject non-numeric input outright.
+{
+  const app = read("pages/network-dashboard/app.js");
+  ok(app.includes("function sanitizeData(data)"), "netdash: sanitizeData() defined");
+  ok(app.includes("function validHash(v)"), "netdash: validHash() defined (0x + 64 hex)");
+  ok(app.includes("function validPlancks(v)"), "netdash: validPlancks() defined");
+  ok(app.includes("function nonNegInt(v)"), "netdash: nonNegInt() defined");
+  ok(app.includes("var data = sanitizeData(result.data);"), "netdash: refresh() sanitizes before rendering");
+  ok(app.includes('if (!data) throw new Error("malformed chain data");'), "netdash: malformed payload routes to the failure path");
+  ok(app.includes('if (valid === null) return "—";'), "netdash: fmtQTC rejects non-planck input instead of passing it through");
+  const html = read("pages/network-dashboard/index.html");
+  ok(html.includes("app.js?v=1.9.0"), "netdash: app.js cache key bumped for the boundary fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

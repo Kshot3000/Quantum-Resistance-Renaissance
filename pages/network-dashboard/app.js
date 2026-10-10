@@ -21,15 +21,88 @@ var CHAIN = {
 
 /* ---------------- pure helpers (Node-testable) ---------------- */
 
+/* Indexer/snapshot boundary (fleet pattern, Batch 23): every field that
+ * crosses from the indexer or the snapshot file is validated BEFORE it
+ * anchors a stat, a block row, or a chart point. Core status fields
+ * reject the whole payload (the caller reads it exactly like a failed
+ * fetch — last good telemetry stays, the pill reports the failure);
+ * individual block/daily rows that are malformed are dropped, never
+ * rendered. The format helpers below are hardened the same way as
+ * defense in depth, so a raw value can never reach innerHTML. */
+function nonNegInt(v){
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v)){
+    var n = Number(v);
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  return null;
+}
+
+function validPlancks(v){
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
+  return null;
+}
+
+/* A block hash is an H256: 0x + exactly 64 hex digits (verified against
+ * live data/live.json). The hex-only charset is what makes the hash
+ * safe to interpolate into the row's data-hash attribute. */
+function validHash(v){
+  return typeof v === "string" && /^0x[0-9a-fA-F]{64}$/.test(v) ? v : null;
+}
+
+function sanitizeData(data){
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  var st = data.status;
+  if (!st || typeof st !== "object" || Array.isArray(st)) return null;
+  var height = nonNegInt(st.block_height);
+  var accounts = nonNegInt(st.total_accounts);
+  var imm = nonNegInt(st.total_immediate_transfers);
+  var sched = nonNegInt(st.total_scheduled_transfers);
+  if (height === null || accounts === null || imm === null || sched === null) return null;
+  if (!Array.isArray(data.blocks)) return null;
+  var blocks = [];
+  data.blocks.forEach(function(b){
+    if (!b || typeof b !== "object" || Array.isArray(b)) return;
+    var h = nonNegInt(b.height);
+    var hash = validHash(b.hash);
+    var reward = validPlancks(b.reward);
+    if (h === null || hash === null || reward === null) return;
+    if (typeof b.timestamp !== "string" || !isFinite(Date.parse(b.timestamp))) return;
+    blocks.push({ height: h, hash: hash, timestamp: b.timestamp, reward: reward });
+  });
+  var dailyRaw = data.daily === undefined ? [] : data.daily;
+  if (!Array.isArray(dailyRaw)) return null;
+  var daily = [];
+  dailyRaw.forEach(function(d){
+    if (!d || typeof d !== "object" || Array.isArray(d)) return;
+    var bc = nonNegInt(d.blocks_count);
+    var tc = nonNegInt(d.tx_count);
+    var aa = nonNegInt(d.active_accounts);
+    if (bc === null || tc === null || aa === null) return;
+    if (typeof d.date !== "string" || !isFinite(Date.parse(d.date))) return;
+    daily.push({ date: d.date, blocks_count: bc, tx_count: tc, active_accounts: aa });
+  });
+  return {
+    status: { block_height: height, total_accounts: accounts,
+      total_immediate_transfers: imm, total_scheduled_transfers: sched },
+    blocks: blocks, daily: daily
+  };
+}
+
 function fmtInt(n){
-  if (n === null || n === undefined || isNaN(n)) return "—";
+  if (typeof n !== "number" || !isFinite(n) || n < 0) return "—";
   return Math.floor(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-/* planck string -> QTC string, trimmed to 4 decimals max */
+/* planck string -> QTC string, trimmed to 4 decimals max.
+ * Anything that is not a digit string is not a reward: "—", never a
+ * pass-through (pre-fix, non-digit characters rode straight into the
+ * blocks table's innerHTML). */
 function fmtQTC(planckStr){
-  if (planckStr === null || planckStr === undefined) return "—";
-  var neg = false, s = String(planckStr);
+  var valid = validPlancks(planckStr);
+  if (valid === null) return "—";
+  var neg = false, s = valid;
   if (s.charAt(0) === "-"){ neg = true; s = s.slice(1); }
   s = s.replace(/^0+/, "") || "0";
   var pad = s.length <= 12 ? ("000000000000" + s).slice(-12) : s.slice(-12);
@@ -58,8 +131,8 @@ function ageFmt(atMs, nowMs){
 }
 
 function tps24h(txCount24h){
-  if (!txCount24h || txCount24h < 0) return 0;
-  return txCount24h / 86400;
+  var n = nonNegInt(txCount24h);
+  return n === null ? 0 : n / 86400;
 }
 
 /* mean gap in seconds between consecutive block timestamps (newest first) */
@@ -74,23 +147,29 @@ function avgBlockGap(tsMs){
 }
 
 function supplyEst(blocks){
-  var remaining = (CHAIN.MAX_SUPPLY - CHAIN.GENESIS_MINT) * Math.exp(-Math.max(0, blocks) / CHAIN.EMISSION_DIVISOR);
+  var n = nonNegInt(blocks);
+  if (n === null) return NaN;
+  var remaining = (CHAIN.MAX_SUPPLY - CHAIN.GENESIS_MINT) * Math.exp(-n / CHAIN.EMISSION_DIVISOR);
   return CHAIN.MAX_SUPPLY - remaining;
 }
 
 function blockRewardEst(blocks){
-  var remaining = (CHAIN.MAX_SUPPLY - CHAIN.GENESIS_MINT) * Math.exp(-Math.max(0, blocks) / CHAIN.EMISSION_DIVISOR);
+  var n = nonNegInt(blocks);
+  if (n === null) return NaN;
+  var remaining = (CHAIN.MAX_SUPPLY - CHAIN.GENESIS_MINT) * Math.exp(-n / CHAIN.EMISSION_DIVISOR);
   return remaining / CHAIN.EMISSION_DIVISOR;
 }
 
 function shortHash(h){
-  if (!h || h.length < 18) return h || "—";
+  if (typeof h !== "string" || h.length < 18) return "—";
   return h.slice(0, 10) + "…" + h.slice(-8);
 }
 
 var API = { fmtInt: fmtInt, fmtQTC: fmtQTC, fmtRewardQTC: fmtRewardQTC, ageFmt: ageFmt,
   tps24h: tps24h, avgBlockGap: avgBlockGap, supplyEst: supplyEst,
-  blockRewardEst: blockRewardEst, shortHash: shortHash, CHAIN: CHAIN };
+  blockRewardEst: blockRewardEst, shortHash: shortHash, CHAIN: CHAIN,
+  nonNegInt: nonNegInt, validPlancks: validPlancks, validHash: validHash,
+  sanitizeData: sanitizeData };
 if (typeof module !== "undefined" && module.exports) module.exports = API;
 
 /* ---------------- fetch layer ---------------- */
@@ -218,7 +297,8 @@ function renderStats(data){
 
   var sup = supplyEst(st.block_height || 0);
   els.stSupply.innerHTML = fmtInt(sup) + '<span class="unit">QTC</span>';
-  els.stSupplyFoot.textContent = "est. · block reward ≈ " + blockRewardEst(st.block_height || 0).toFixed(3) + " QTC";
+  var rewardEst = blockRewardEst(st.block_height || 0);
+  els.stSupplyFoot.textContent = "est. · block reward ≈ " + (isFinite(rewardEst) ? rewardEst.toFixed(3) : "—") + " QTC";
 
   els.chartNote.textContent = "Daily aggregates from the indexer's daily_chain_stats table. TPS counts only user transactions.";
   chartData = daily;
@@ -368,7 +448,12 @@ function refresh(){
     /* A superseded poll renders nothing: its slow snapshot (or its failure)
      * must not paint over a newer poll's fresher telemetry. */
     if (mySeq !== refreshSeq) return;
-    var data = result.data;
+    /* Boundary: no field renders until the whole payload validates.
+     * A malformed answer is thrown into the catch below and read
+     * exactly like a failed fetch — last good telemetry stays on
+     * screen, the pill reports the failure, nothing is fabricated. */
+    var data = sanitizeData(result.data);
+    if (!data) throw new Error("malformed chain data");
     var h = incomingHeight(data);
     if (result.mode === "snapshot" && h !== null && displayedHeight !== null && h < displayedHeight){
       /* The snapshot file is refreshed only periodically, so a current poll
