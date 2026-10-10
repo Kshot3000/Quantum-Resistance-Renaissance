@@ -36,9 +36,14 @@ function ok(cond, label) {
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
 // ---- 1. Consensus Lab: validate before assigning S ----
+// (2026-10-10 Batch 33: validSnapshot moved to consensus-core.js, where the
+// node unit tests can import it, and was strengthened from shapes to
+// relations — see Batch 33 below. The validate-before-assign wiring stays.)
 {
   const src = read("pages/consensus-lab/app.js");
-  ok(src.includes("function validSnapshot(j)"), "consensus: validSnapshot() defined");
+  const core = read("pages/consensus-lab/consensus-core.js");
+  ok(core.includes("export function validSnapshot(j"), "consensus: validSnapshot() defined in consensus-core.js");
+  ok(src.includes("validSnapshot, "), "consensus: app.js imports the boundary from the core");
   const callIdx = src.indexOf("if (!validSnapshot(j)) throw");
   ok(callIdx !== -1, "consensus: loadSnapshot rejects a malformed snapshot");
   const assignIdx = src.indexOf("S = j;", callIdx);
@@ -46,7 +51,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!src.includes("S = await r.json()"), "consensus: no assign-before-validate loader remains");
   // the validator must cover the fields the renderers dereference
   for (const f of ["block_times_ms", "est_hashrate_hs", "net_change_pct", "blocks_indexed", "trend", "recent"])
-    ok(src.slice(src.indexOf("function validSnapshot"), src.indexOf("async function loadSnapshot")).includes(f),
+    ok(core.slice(core.indexOf("export function validSnapshot")).includes(f),
       "consensus: validator covers " + f);
 }
 
@@ -864,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.6"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.7"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -897,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.6"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.7"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -932,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.5"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.6"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -970,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.4"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.5"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1073,6 +1078,34 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(src.includes("liveHeightFromSnapshot: liveHeightFromSnapshot"), "tokenomics2: Node module hook exports the boundary");
   const html = read("pages/tokenomics/index.html");
   ok(html.includes("app.js?v=1.10.0"), "tokenomics2: app.js cache key bumped for the boundary fix");
+}
+
+// ---- 33. Consensus Lab round 2 (2026-10-10 18:19): the validator checked
+// shapes only — head 9,007,199,254,740,991 finite, any parseable
+// fetched_at, stats that need not summarize their own window. Round 2
+// checks the RELATIONS the generator guarantees (see
+// scripts/fetch-consensus-data.mjs): head == current.height, hashrate ==
+// difficulty/12, hex == difficulty, net_change recomputes exactly, the
+// block-time stats equal the recomputed stats of last[], blocks_indexed +
+// missing == head, trend/recent tails == current, trend[0] == genesis.
+{
+  const core = read("pages/consensus-lab/consensus-core.js");
+  ok(core.includes("export function validBlockHeight(v)"), "consensus2: validBlockHeight() defined (fleet 1..10,000,000 shape)");
+  ok(core.includes("j.ok !== true"), "consensus2: snapshot must carry ok:true");
+  ok(core.includes("fetchedMs > nowMs + 3600000"), "consensus2: a future fetched_at fails the snapshot");
+  ok(core.includes("fetchedMs < GENESIS_FLOOR_MS"), "consensus2: a pre-genesis fetched_at fails the snapshot");
+  ok(core.includes("j.blocks_indexed + j.missing_heights !== head"), "consensus2: indexed + missing must equal the head");
+  ok(core.includes("validBlockHeight(cur.height) !== head"), "consensus2: current.height must agree with head");
+  ok(core.includes('cur.difficulty_hex !== "0x" + D.toString(16)'), "consensus2: difficulty_hex must restate difficulty");
+  ok(core.includes("digitBig(cur.est_hashrate_hs) !== D / 12n"), "consensus2: hashrate must equal difficulty / 12 exactly");
+  ok(core.includes("d.net_change_pct !== Number(((D - INITIAL_DIFF) * 10000n) / INITIAL_DIFF) / 100"), "consensus2: net_change_pct must recompute exactly");
+  ok(core.includes("bt.avg_ms !== Math.round(mean)"), "consensus2: avg_ms must be the window's own mean");
+  ok(core.includes("bt.sample !== last.length"), "consensus2: sample must count the window it summarizes");
+  ok(core.includes("bt.longest_gap_ms < bt.max_ms"), "consensus2: the all-time gap cannot be below the window max");
+  ok(core.includes('j.trend[0][2] !== INITIAL_DIFF.toString()'), "consensus2: trend must start at the genesis point");
+  ok(core.includes("trendTail[2] !== cur.difficulty || recentTail[2] !== cur.difficulty"), "consensus2: trend/recent tails must land on current");
+  const html = read("pages/consensus-lab/index.html");
+  ok(html.includes("app.js?v=1.38.0"), "consensus2: app.js cache key bumped for the boundary fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

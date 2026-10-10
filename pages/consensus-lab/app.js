@@ -1,7 +1,7 @@
 /* QTC Consensus Lab — app.js */
 import {
   calculateDifficulty, hashrateFromDifficulty, fmtHashrate, fmtDiff, fmtMs, pctChange,
-  retargetZone, TARGET_MS, MIN_DIFF, MAX_DIFF, INITIAL_DIFF, MAX_REORG_DEPTH,
+  retargetZone, validSnapshot, TARGET_MS, MIN_DIFF, MAX_DIFF, INITIAL_DIFF, MAX_REORG_DEPTH,
 } from "./consensus-core.js";
 
 const $ = (id) => document.getElementById(id);
@@ -19,32 +19,15 @@ function timeoutSignal(ms) {
   setTimeout(function () { ctl.abort(); }, ms);
   return ctl.signal;
 }
-/* A snapshot is only trusted after its shape is validated: every field the
- * renderers dereference must be present and parseable. The previous loader
- * assigned the parsed JSON to S before touching it, so a malformed payload
- * threw inside the try (the pill correctly said "unavailable") but left S
- * poisoned — hero() then threw on BigInt(undefined) and the whole boot died,
- * constants fallback included. Validate first, assign only on success. */
-function validSnapshot(j) {
-  try {
-    if (!j || typeof j !== "object") return false;
-    if (!Number.isFinite(j.head) || !Number.isFinite(Date.parse(j.fetched_at))) return false;
-    if (!j.current) return false;
-    BigInt(j.current.difficulty); BigInt(j.current.est_hashrate_hs);
-    const bt = j.block_times_ms;
-    if (!bt) return false;
-    for (const k of ["avg_ms", "median_ms", "p90_ms", "max_ms", "longest_gap_ms", "longest_gap_height", "sample"])
-      if (!Number.isFinite(bt[k])) return false;
-    if (!Array.isArray(bt.last) || !bt.last.length) return false;
-    const d = j.difficulty;
-    if (!d) return false;
-    BigInt(d.max); BigInt(d.min);
-    if (!Number.isFinite(d.max_height) || !Number.isFinite(d.min_height) || !Number.isFinite(d.net_change_pct)) return false;
-    if (!Number.isFinite(j.blocks_indexed) || !Number.isFinite(j.missing_heights)) return false;
-    if (!Array.isArray(j.trend) || !j.trend.length || !Array.isArray(j.recent) || !j.recent.length) return false;
-    return true;
-  } catch { return false; }
-}
+/* A snapshot is only trusted after validSnapshot (consensus-core.js) has
+ * validated it — shapes AND the relations between fields (head ==
+ * current.height, hashrate == difficulty/12, block-time stats == the stats
+ * of the window they summarize, trend/recent tails == current). The
+ * previous loader assigned the parsed JSON to S before touching it, so a
+ * malformed payload threw inside the try (the pill correctly said
+ * "unavailable") but left S poisoned — hero() then threw on
+ * BigInt(undefined) and the whole boot died, constants fallback included.
+ * Validate first, assign only on success. */
 async function loadSnapshot() {
   try {
     const r = await fetch(SNAP, { cache: "no-store", signal: timeoutSignal(9000) });

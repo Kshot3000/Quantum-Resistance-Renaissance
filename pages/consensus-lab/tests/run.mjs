@@ -6,9 +6,10 @@
  */
 import {
   calculateDifficulty, recomputeChain, hashrateFromDifficulty,
-  fmtDiff, fmtHashrate, retargetZone,
+  fmtDiff, fmtHashrate, retargetZone, validSnapshot, validBlockHeight,
   TARGET_MS, MIN_DIFF, MAX_DIFF, INITIAL_DIFF,
 } from "../consensus-core.js";
+import { readFileSync } from "node:fs";
 
 let pass = 0, fail = 0;
 function eq(name, got, want) {
@@ -90,6 +91,55 @@ eq("zone <10s", retargetZone(5000).cls, "up");
 eq("zone 10-20s", retargetZone(15000).cls, "flat");
 eq("zone 25s", retargetZone(25000).cls, "down");
 eq("zone floored", retargetZone(10).cls, "up");
+
+// --- snapshot boundary (round 2): shapes AND relations. The real snapshot
+// must pass its own boundary unchanged; every relational poison must fail.
+{
+  const real = JSON.parse(readFileSync(new URL("../../../data/consensus.json", import.meta.url), "utf8"));
+  const now = Date.parse(real.fetched_at) + 60000; // pin "now" just after capture
+  ok("real snapshot passes its own boundary", validSnapshot(real, now) === true);
+  const poison = (name, fn) => {
+    const s = JSON.parse(JSON.stringify(real));
+    fn(s);
+    ok("poison rejected: " + name, validSnapshot(s, now) === false);
+  };
+  poison("ok false", (s) => { s.ok = false; });
+  poison("head absurd", (s) => { s.head = 9007199254740991; s.current.height = 9007199254740991; });
+  poison("head fractional", (s) => { s.head += 0.5; s.current.height += 0.5; });
+  poison("head boolean", (s) => { s.head = true; });
+  poison("current.height disagrees", (s) => { s.current.height = s.head + 1; });
+  poison("hashrate off by one", (s) => { s.current.est_hashrate_hs = (BigInt(s.current.est_hashrate_hs) + 1n).toString(); });
+  poison("difficulty_hex bogus", (s) => { s.current.difficulty_hex = "0xdeadbeef"; });
+  poison("net_change wrong", (s) => { s.difficulty.net_change_pct = 1.5; });
+  poison("avg tampered", (s) => { s.block_times_ms.avg_ms += 5000; });
+  poison("median tampered", (s) => { s.block_times_ms.median_ms += 1; });
+  poison("p90 tampered", (s) => { s.block_times_ms.p90_ms += 1; });
+  poison("max tampered", (s) => { s.block_times_ms.max_ms += 9999; });
+  poison("sample miscounts window", (s) => { s.block_times_ms.sample = 1234; });
+  poison("window entry negative", (s) => { s.block_times_ms.last[7] = -5; });
+  poison("blocks_indexed short", (s) => { s.blocks_indexed = s.head - 5; });
+  poison("missing invented", (s) => { s.missing_heights = 3; });
+  poison("fetched_at 2999", (s) => { s.fetched_at = "2999-01-01T00:00:00.000Z"; });
+  poison("fetched_at pre-genesis", (s) => { s.fetched_at = "2020-01-01T00:00:00.000Z"; });
+  poison("trend tail difficulty", (s) => { s.trend[s.trend.length - 1][2] = "999999999999999"; });
+  poison("recent tail difficulty", (s) => { s.recent[s.recent.length - 1][2] = "999999999999999"; });
+  poison("recent tail height", (s) => { s.recent[s.recent.length - 1][0] = s.head - 1; });
+  poison("trend head not genesis difficulty", (s) => { s.trend[0][2] = "131072"; });
+  poison("trend heights not ascending", (s) => { s.trend[10][0] = s.trend[9][0]; });
+  poison("longest gap below window max", (s) => { s.block_times_ms.longest_gap_ms = s.block_times_ms.max_ms - 1; });
+  poison("longest gap height 0 with a gap", (s) => { s.block_times_ms.longest_gap_height = 0; });
+  poison("min above current", (s) => { s.difficulty.min = (BigInt(s.current.difficulty) + 1n).toString(); });
+  poison("max below current", (s) => { s.difficulty.max = (BigInt(s.current.difficulty) - 1n).toString(); });
+  poison("genesis_ts disagrees with trend[0]", (s) => { s.genesis_ts += 60000; });
+  // validBlockHeight fleet shape
+  eq("height number", validBlockHeight(202254), 202254);
+  eq("height digit string", validBlockHeight("202254"), 202254);
+  eq("height boolean rejects", validBlockHeight(true), null);
+  eq("height fractional rejects", validBlockHeight(1.5), null);
+  eq("height scientific rejects", validBlockHeight("2.02e5"), null);
+  eq("height absurd rejects", validBlockHeight(9007199254740991), null);
+  eq("height zero rejects", validBlockHeight(0), null);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
