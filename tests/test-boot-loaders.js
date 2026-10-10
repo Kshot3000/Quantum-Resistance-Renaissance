@@ -155,9 +155,9 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(src.includes("e.rank = idx + 1"), "whale: ranks rebuilt from validated survivors");
   ok(src.includes("MAX_SUPPLY_PLANCKS"), "whale: supply sanity-bounded by the 21M cap");
   ok(src.includes("BigInt(vClaimed) > BigInt(vTotal)"), "whale: vesting claimed > total fails the snapshot");
-  ok(src.includes("function cleanMove(raw, maxHeight)"), "whale: moves validated against the snapshot height");
+  ok(src.includes("function cleanMove(raw, maxHeight, fetchedMs, isRecent)"), "whale: moves validated against the snapshot height and capture time");
   const html = read("pages/whale-watch/index.html");
-  ok(html.includes("app.js?v=1.20.0"), "whale: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.21.0"), "whale: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 10. Governance Tracker: validate the whole snapshot at the load boundary ----
@@ -864,7 +864,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.4"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.5"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -897,7 +897,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.4"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.5"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -932,7 +932,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.3"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.4"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -970,7 +970,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.2"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.3"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1009,6 +1009,40 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.30.0"), "vesting2: app.js cache key bumped for the boundary fix");
   ok(html.includes('id="st-claimed-sub"'), "vesting2: claimed sub has the id the app writes");
   ok(!html.includes("96% locked"), "vesting2: hero no longer pins a drifting locked percentage");
+}
+
+// Batch 31 (2026-10-10 16:19): whale-watch round 2 (Tier 2) — the
+// 2026-10-09 boundary validated shapes per field, but the desk still
+// broke on RELATIONS between fields: bracket counts/sums were never
+// reconciled with accounts_total / supply.free and a bracket average
+// could sit outside its own band; locked could be split across a
+// non-pool row (each row still satisfied liquid == free - locked) or
+// fall short of vesting total - claimed; the whale bracket could
+// disagree with the top list; a top row could outweigh the whole
+// supply (top-10 share painted 1099.13%); block_height was any safe
+// integer (badge painted block 9,007,199,254,740,991); fetched_at
+// could be in the far future (staleness warning defeated); moves
+// could postdate their snapshot and "recent" moves owed neither the
+// >= 10 QTC nor the 7-day contract; genesis rows could sit at any
+// block from any origin; a malformed reserved silently became "0".
+// Pin: partition + band + pool-identity + whale cross-checks fail the
+// snapshot honestly; time/genesis/reserved poison drops its row.
+{
+  const src = read("pages/whale-watch/app.js");
+  ok(src.includes("bracketCountSum !== accounts || bracketSumTotal !== BigInt(sFree)"), "whale2: brackets must partition accounts and free supply exactly");
+  ok(src.includes("BRACKET_BOUNDS"), "whale2: per-bracket average band bounds defined");
+  ok(src.includes("lockedSum !== BigInt(vTotal) - BigInt(vClaimed)"), "whale2: summed top locked must equal unclaimed vesting to the planck");
+  ok(src.includes("if (lockers > 1) return null;"), "whale2: at most one top entry may carry locked");
+  ok(src.includes("inTopWhales.length !== whaleBracket.count"), "whale2: whale bracket count must agree with the top list");
+  ok(src.includes("if (topFreeSum > BigInt(sFree)) return null;"), "whale2: the top list cannot outweigh the supply");
+  ok(src.includes("function validBlockHeight(v)"), "whale2: validBlockHeight() defined (fleet 1..10,000,000 shape)");
+  ok(src.includes("fetchedMs > Date.now() + 3600000"), "whale2: a future fetched_at fails the snapshot");
+  ok(src.includes("RECENT_MIN_PLANCKS"), "whale2: recent moves owe the >= 10 QTC contract");
+  ok(src.includes("if (bh !== 1) return;"), "whale2: genesis allocations must sit at block 1");
+  ok(src.includes("poolEntry.address !== genesis[0].to"), "whale2: the pool must be the block-1 allocation recipient");
+  ok(src.includes('raw.reserved_plancks == null ? "0" : decStr(raw.reserved_plancks)'), "whale2: present-but-malformed reserved drops its row, never silently zeroed");
+  const html = read("pages/whale-watch/index.html");
+  ok(html.includes("app.js?v=1.21.0"), "whale2: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

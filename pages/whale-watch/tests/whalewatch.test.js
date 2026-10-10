@@ -145,5 +145,114 @@ t("timeAgo buckets", function(){
   assert.strictEqual(m.timeAgo(new Date(now - 3 * 3600000).toISOString()), "3h ago");
 });
 
+// --- validateSnapshot round 2: relational (cross-field) boundary ---
+// Fixture is the real snapshot: it must pass its own boundary unchanged,
+// and every relational poison below must fail or drop, never paint.
+var fs = require("fs");
+var REAL = JSON.parse(fs.readFileSync(__dirname + "/../../../data/whales.json", "utf8"));
+function snap(mut){ var s = JSON.parse(JSON.stringify(REAL)); if (mut) mut(s); return s; }
+var PL = 1000000000000n;
+t("validateSnapshot passes the real snapshot unchanged", function(){
+  var v = m.validateSnapshot(snap());
+  assert.ok(v !== null, "real snapshot must validate");
+  assert.strictEqual(v.top.length, REAL.top.length);
+  assert.strictEqual(v.brackets.length, 6);
+  assert.strictEqual(v.genesis_allocation.length, REAL.genesis_allocation.length);
+  assert.strictEqual(v.whale_moves_alltime.length, REAL.whale_moves_alltime.length);
+  assert.strictEqual(v.whale_moves_recent.length, REAL.whale_moves_recent.length);
+});
+t("bracket counts must sum to accounts_total", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){ s.brackets[5].count += 1; })), null);
+});
+t("bracket sums must sum to supply.free exactly", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    s.brackets[0].sum_plancks = (BigInt(s.brackets[0].sum_plancks) - PL).toString();
+  })), null);
+});
+t("a missing bracket key fails the snapshot (partition must be complete)", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){ s.brackets.pop(); })), null);
+});
+t("bracket average outside its own band fails (sums preserved)", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    var y = 97n * 900n * PL;
+    s.brackets[1].sum_plancks = (BigInt(s.brackets[1].sum_plancks) + y).toString();
+    s.brackets[0].sum_plancks = (BigInt(s.brackets[0].sum_plancks) - y).toString();
+  })), null);
+});
+t("vesting total larger than the supply fails", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    // keep claimed <= total and locked <= supply, but total > supply
+    s.vesting.total_plancks = (BigInt(s.supply_plancks.free) + BigInt(s.supply_plancks.reserved) + PL).toString();
+    s.vesting.claimed_plancks = s.vesting.total_plancks;
+    s.top[0].locked_plancks = "0";
+    s.top[0].liquid_plancks = s.top[0].free_plancks;
+  })), null);
+});
+t("locked split across a non-pool row fails (pool identity)", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    var amt = 100000n * PL;
+    s.top[0].locked_plancks = (BigInt(s.top[0].locked_plancks) - amt).toString();
+    s.top[0].liquid_plancks = (BigInt(s.top[0].liquid_plancks) + amt).toString();
+    s.top[1].locked_plancks = amt.toString();
+    s.top[1].liquid_plancks = (BigInt(s.top[1].free_plancks) - amt).toString();
+  })), null);
+});
+t("pool locked short of vesting total - claimed fails", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    s.top[0].locked_plancks = (BigInt(s.top[0].locked_plancks) - PL).toString();
+    s.top[0].liquid_plancks = (BigInt(s.top[0].liquid_plancks) + PL).toString();
+  })), null);
+});
+t("whale bracket count disagreeing with the top list fails", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    s.brackets[0].count -= 1;
+    s.brackets[5].count += 1; // keep the partition sum intact
+  })), null);
+});
+t("top list outweighing the supply fails", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    var extra = BigInt(s.supply_plancks.free) * 10n;
+    s.top[1].free_plancks = (BigInt(s.top[1].free_plancks) + extra).toString();
+    s.top[1].liquid_plancks = s.top[1].free_plancks;
+  })), null);
+});
+t("absurd block height fails; validBlockHeight shapes hold", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){ s.block_height = 9007199254740991; })), null);
+  assert.strictEqual(m.validBlockHeight(202000), 202000);
+  assert.strictEqual(m.validBlockHeight(0), null);
+  assert.strictEqual(m.validBlockHeight(10000001), null);
+  assert.strictEqual(m.validBlockHeight(1.5), null);
+});
+t("future fetched_at fails (staleness can never be defeated)", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){ s.fetched_at = "2999-01-01T00:00:00.000Z"; })), null);
+});
+t("genesis rows off block 1 or from a second origin drop individually", function(){
+  var v = m.validateSnapshot(snap(function(s){
+    s.genesis_allocation[1].block_height = 500;
+    s.genesis_allocation[2].from = s.genesis_allocation[2].to; // also from == to
+  }));
+  assert.ok(v !== null);
+  assert.strictEqual(v.genesis_allocation.length, 1);
+});
+t("a move postdating its snapshot drops; recent owes >= 10 QTC / 7 days", function(){
+  var v = m.validateSnapshot(snap(function(s){
+    s.whale_moves_alltime[0].timestamp = "2999-01-01T00:00:00.000Z";
+    s.whale_moves_recent[0].amount = (5n * PL).toString();
+    s.whale_moves_recent[0].timestamp = new Date(Date.parse(s.fetched_at) - 30 * 86400000).toISOString();
+  }));
+  assert.ok(v !== null);
+  assert.strictEqual(v.whale_moves_alltime.length, REAL.whale_moves_alltime.length - 1);
+  assert.strictEqual(v.whale_moves_recent.length, REAL.whale_moves_recent.length - 1);
+});
+t("present-but-malformed reserved drops the top row", function(){
+  // a non-whale row (index 50): its absence breaks no aggregate identity
+  var v = m.validateSnapshot(snap(function(s){ s.top[50].reserved_plancks = "oops"; }));
+  assert.ok(v !== null);
+  assert.strictEqual(v.top.length, REAL.top.length - 1);
+});
+t("dropping a whale row by poison fails honestly (bracket cannot reconcile)", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){ s.top[3].reserved_plancks = "oops"; })), null);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

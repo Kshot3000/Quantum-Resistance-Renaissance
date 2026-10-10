@@ -341,7 +341,21 @@ function timeoutSignal(ms) {
  * genesis) drop invalid entries individually, top is re-sorted by free
  * balance and re-ranked from the survivors, and every renderer downstream
  * can rely on pure-digit plancks, valid prefix-189 addresses, liquid ==
- * free - locked, claimed <= vesting total, and a parseable fetched_at. */
+ * free - locked, claimed <= vesting total, and a parseable fetched_at.
+ * Round 2 (2026-10-10): per-field shapes were not a boundary — the desk
+ * still broke on RELATIONS between fields. Now also enforced: brackets
+ * partition the accounts (six canonical keys, counts sum to
+ * accounts_total, sums sum to supply.free, each bracket's average inside
+ * its own band); the vesting-pool identity (one locker at most, flagged
+ * as the pool, its locked == vesting total - claimed to the planck, and
+ * the pool is the block-1 allocation recipient); the whale bracket
+ * agrees with the top list in count and summed free; the top list cannot
+ * outweigh the supply; block_height is a plausible chain height;
+ * fetched_at is a real capture time (not pre-genesis, not future); moves
+ * cannot postdate their snapshot and "recent" moves owe the tab's
+ * >= 10 QTC / 7-day contract; genesis rows sit at block 1 from a single
+ * mint origin; a present-but-malformed reserved/frozen drops its row
+ * instead of silently becoming "0". */
 function decStr(v){
   if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) return BigInt(v).toString();
   if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return String(v);
@@ -364,12 +378,17 @@ function cleanTopEntry(raw, seen){
   if (free === null || locked === null || liquid === null) return null;
   if (BigInt(locked) > BigInt(free)) return null;
   if (BigInt(liquid) !== BigInt(free) - BigInt(locked)) return null; // the circ view assumes this identity
+  // reserved/frozen: absent defaults to "0", but a PRESENT malformed value
+  // drops the row (round 2) — silently zeroing it hid snapshot corruption.
+  var res = raw.reserved_plancks == null ? "0" : decStr(raw.reserved_plancks);
+  var fro = raw.frozen_plancks == null ? "0" : decStr(raw.frozen_plancks);
+  if (res === null || fro === null) return null;
   seen[raw.address] = true;
   var bm = nonNegInt(raw.blocks_mined);
   return {
     rank: 0, address: raw.address, free_plancks: free,
-    reserved_plancks: decStr(raw.reserved_plancks) || "0",
-    frozen_plancks: decStr(raw.frozen_plancks) || "0",
+    reserved_plancks: res,
+    frozen_plancks: fro,
     locked_plancks: locked, liquid_plancks: liquid,
     is_vesting_pool: raw.is_vesting_pool === true,
     is_genesis_recipient: raw.is_genesis_recipient === true,
@@ -379,7 +398,10 @@ function cleanTopEntry(raw, seen){
     blocks_mined: bm // null when malformed — tagList/lookup render it as absent, never NaN
   };
 }
-function cleanMove(raw, maxHeight){
+var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain genesis was 2026-09-09
+var RECENT_MIN_PLANCKS = 10000000000000n; // 10 QTC — the recent tab's printed contract
+var RECENT_WINDOW_MS = 7 * 86400000;
+function cleanMove(raw, maxHeight, fetchedMs, isRecent){
   if (!raw || typeof raw !== "object") return null;
   var amount = decStr(raw.amount);
   if (amount === null || BigInt(amount) <= 0n) return null;
@@ -391,13 +413,34 @@ function cleanMove(raw, maxHeight){
   var bh = nonNegInt(raw.block_height);
   if (bh === null || bh < 1 || bh > maxHeight) return null; // a move "from the future" is not this snapshot's data
   if (typeof raw.timestamp !== "string" || !isFinite(Date.parse(raw.timestamp))) return null;
+  var tsMs = Date.parse(raw.timestamp);
+  // Round 2: a move cannot postdate the snapshot that contains it, nor
+  // predate the chain; the "recent" feed additionally owes its printed
+  // contract — >= 10 QTC within the last 7 days of the snapshot.
+  if (tsMs > fetchedMs + 300000 || tsMs < GENESIS_FLOOR_MS) return null;
+  if (isRecent && (BigInt(amount) < RECENT_MIN_PLANCKS || tsMs < fetchedMs - RECENT_WINDOW_MS - 3600000)) return null;
   return { amount: amount, fee: fee, from_id: from, to_id: raw.to_id, block_height: bh, timestamp: raw.timestamp };
+}
+var BRACKET_BOUNDS = { // planck band [lo, hi) per bracket, from fetch-whale-data.mjs
+  whale: [1000000000000000n, null], shark: [100000000000000n, 1000000000000000n],
+  dolphin: [10000000000000n, 100000000000000n], fish: [1000000000000n, 10000000000000n],
+  shrimp: [100000000000n, 1000000000000n], dust: [0n, 100000000000n]
+};
+var WHALE_LO_PLANCKS = 1000000000000000n; // 1,000 QTC
+function validBlockHeight(v){ // fleet shape (vesting round 2): plausible chain heights only
+  var n = nonNegInt(v);
+  return (n !== null && n >= 1 && n <= 10000000) ? n : null;
 }
 function validateSnapshot(raw){
   if (!raw || typeof raw !== "object" || raw.ok !== true) return null;
   if (typeof raw.fetched_at !== "string" || !isFinite(Date.parse(raw.fetched_at))) return null;
-  var height = nonNegInt(raw.block_height);
-  if (height === null || height < 1) return null;
+  var fetchedMs = Date.parse(raw.fetched_at);
+  // Round 2: provenance must be a real capture time — not before the chain
+  // existed, not in the future (a future fetched_at defeats the staleness
+  // warning and the recent-move window alike).
+  if (fetchedMs < GENESIS_FLOOR_MS || fetchedMs > Date.now() + 3600000) return null;
+  var height = validBlockHeight(raw.block_height);
+  if (height === null) return null;
   var accounts = nonNegInt(raw.accounts_total), transfers = nonNegInt(raw.transfers_total);
   if (accounts === null || transfers === null) return null;
   if (!raw.supply_plancks || typeof raw.supply_plancks !== "object") return null;
@@ -410,23 +453,33 @@ function validateSnapshot(raw){
   if (vSched === null || vTotal === null || vClaimed === null) return null;
   if (BigInt(vClaimed) > BigInt(vTotal)) return null;
   if (BigInt(vTotal) - BigInt(vClaimed) > supplyTotal) return null; // locked cannot exceed the supply it sits in
+  if (BigInt(vTotal) > supplyTotal) return null; // round 2: locked + claimed both sit inside the supply
   // Brackets are aggregates this page cannot rebuild (they cover all
   // accounts, not just the top 200) — any malformed bracket fails the
   // snapshot honestly rather than displaying a partial distribution.
-  if (!Array.isArray(raw.brackets) || !raw.brackets.length) return null;
-  var seenKeys = {}, brackets = [], hasWhale = false;
+  // Round 2: brackets are a PARTITION of the indexed accounts, so the six
+  // canonical keys must all be present, counts must sum to accounts_total,
+  // sums must sum to supply.free exactly (brackets are computed on free),
+  // and each bracket's average must sit inside its own [lo, hi) band.
+  if (!Array.isArray(raw.brackets) || raw.brackets.length !== 6) return null;
+  var seenKeys = {}, brackets = [], bracketCountSum = 0, bracketSumTotal = 0n;
   for (var i = 0; i < raw.brackets.length; i++){
     var b = raw.brackets[i];
     if (!b || typeof b !== "object" || !BRACKET_KEYS[b.key] || seenKeys[b.key]) return null;
     if (typeof b.label !== "string" || !b.label) return null;
     var bCount = nonNegInt(b.count), bSum = decStr(b.sum_plancks);
     if (bCount === null || bSum === null) return null;
+    var band = BRACKET_BOUNDS[b.key], bSumB = BigInt(bSum);
+    if (bSumB < BigInt(bCount) * band[0]) return null;
+    if (band[1] !== null && bSumB >= BigInt(bCount) * band[1]) return null;
     seenKeys[b.key] = true;
-    if (b.key === "whale") hasWhale = true;
+    bracketCountSum += bCount;
+    bracketSumTotal += bSumB;
     brackets.push({ key: b.key, label: b.label, count: bCount, sum_plancks: bSum });
   }
-  if (!hasWhale) return null;
+  if (bracketCountSum !== accounts || bracketSumTotal !== BigInt(sFree)) return null;
   if (!Array.isArray(raw.top)) return null;
+  if (raw.top.length > 200 || raw.top.length > accounts) return null; // the fetcher caps the list at TOP_N = 200
   var seenAddr = {}, top = [];
   raw.top.forEach(function(r){ var e = cleanTopEntry(r, seenAddr); if (e) top.push(e); });
   if (!top.length) return null;
@@ -435,23 +488,58 @@ function validateSnapshot(raw){
     return x < y ? 1 : x > y ? -1 : 0;
   });
   top.forEach(function(e, idx){ e.rank = idx + 1; }); // rank is derived — rebuild it from the survivors
+  // Round 2 cross-checks between the cleaned top list and the aggregates:
+  var topFreeSum = 0n, lockedSum = 0n, lockers = 0, poolEntry = null;
+  top.forEach(function(e){
+    topFreeSum += BigInt(e.free_plancks);
+    lockedSum += BigInt(e.locked_plancks);
+    if (BigInt(e.locked_plancks) > 0n) lockers++;
+    if (e.is_vesting_pool) poolEntry = e;
+  });
+  if (topFreeSum > BigInt(sFree)) return null; // the part cannot exceed the whole
+  // The pool identity the circ view is built on (fetch-whale-data.mjs):
+  // exactly the pool account carries locked, and its locked equals the
+  // unclaimed vesting balance to the planck. A split or short locker made
+  // every circulating figure quietly wrong while each row looked valid.
+  if (lockedSum !== BigInt(vTotal) - BigInt(vClaimed)) return null;
+  if (lockers > 1) return null;
+  if (lockers === 1 && !top.some(function(e){ return BigInt(e.locked_plancks) > 0n && e.is_vesting_pool; })) return null;
+  // The whale bracket must agree with the top list wherever the list can
+  // see every whale: count and summed free of the >= 1,000 QTC entries.
+  var whaleBracket = brackets.filter(function(x){ return x.key === "whale"; })[0];
+  if (whaleBracket.count <= top.length){
+    var inTopWhales = top.filter(function(e){ return BigInt(e.free_plancks) >= WHALE_LO_PLANCKS; });
+    var inTopWhaleSum = 0n;
+    inTopWhales.forEach(function(e){ inTopWhaleSum += BigInt(e.free_plancks); });
+    if (inTopWhales.length !== whaleBracket.count || inTopWhaleSum !== BigInt(whaleBracket.sum_plancks)) return null;
+  }
   if (!Array.isArray(raw.whale_moves_alltime) || !Array.isArray(raw.whale_moves_recent)) return null;
-  function cleanMoves(list){
+  function cleanMoves(list, isRecent){
     var out = [];
-    list.forEach(function(m){ var c = cleanMove(m, height); if (c) out.push(c); });
+    list.forEach(function(m){ var c = cleanMove(m, height, fetchedMs, isRecent); if (c) out.push(c); });
     return out;
   }
   var genesis = [];
   if (Array.isArray(raw.genesis_allocation)){
+    var mintFrom = null;
     raw.genesis_allocation.forEach(function(g){
       if (!g || typeof g !== "object") return;
       var amt = decStr(g.amount_plancks), bh = nonNegInt(g.block_height);
-      if (amt === null || BigInt(amt) <= 0n || bh === null || bh < 1) return;
+      if (amt === null || BigInt(amt) <= 0n || BigInt(amt) > supplyTotal) return;
+      if (bh !== 1) return; // round 2: genesis allocations live at block 1, by definition
       if (!(g.from === "0".repeat(48) || validAddr(g.from)) || !validAddr(g.to)) return; // genesis origin may be the mint sentinel
+      if (g.from === g.to) return;
+      if (mintFrom === null) mintFrom = g.from;
+      if (g.from !== mintFrom) return; // one mint origin for the whole allocation list
       if (typeof g.timestamp !== "string" || !isFinite(Date.parse(g.timestamp))) return;
+      var gts = Date.parse(g.timestamp);
+      if (gts > fetchedMs + 300000 || gts < GENESIS_FLOOR_MS) return;
       genesis.push({ amount_plancks: amt, from: g.from, to: g.to, block_height: bh, timestamp: g.timestamp });
     });
   }
+  // Round 2: the pool account IS the block-1 allocation recipient — if the
+  // snapshot names both, they must name the same account.
+  if (poolEntry && genesis.length && poolEntry.address !== genesis[0].to) return null;
   return {
     ok: true, source: typeof raw.source === "string" ? raw.source : "",
     fetched_at: raw.fetched_at, block_height: height,
@@ -460,8 +548,8 @@ function validateSnapshot(raw){
     mined_plancks: decStr(raw.mined_plancks) || "0",
     vesting: { schedules: vSched, total_plancks: vTotal, claimed_plancks: vClaimed },
     genesis_allocation: genesis, brackets: brackets, top: top,
-    whale_moves_alltime: cleanMoves(raw.whale_moves_alltime),
-    whale_moves_recent: cleanMoves(raw.whale_moves_recent),
+    whale_moves_alltime: cleanMoves(raw.whale_moves_alltime, false),
+    whale_moves_recent: cleanMoves(raw.whale_moves_recent, true),
     params: raw.params && typeof raw.params === "object" ? raw.params : {}
   };
 }
@@ -817,7 +905,7 @@ if (typeof module !== "undefined" && module.exports){
     lockedPlancks: lockedPlancks, circPlancks: circPlancks, giniEstimate: giniEstimate,
     bracketLoQTC: bracketLoQTC, bracketHiQTC: bracketHiQTC, tagList: tagList,
     validateAddress: validateAddress, ss58Decode: ss58Decode, ss58Encode: ss58Encode,
-    validateSnapshot: validateSnapshot,
+    validateSnapshot: validateSnapshot, validBlockHeight: validBlockHeight,
     QUANTUS_PREFIX: QUANTUS_PREFIX, PLANCKS_PER_QTC: PLANCKS_PER_QTC
   };
 }
