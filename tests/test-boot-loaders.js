@@ -436,9 +436,16 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("act ? +act.dataset.blocks : DEFAULT_DELAY_BLOCKS"), "safesend: Schedule falls back instead of dereferencing a missing preset");
   ok(!app.includes('parseInt($("customBlocks")'), "safesend: no parseInt coercion of the custom delay remains");
   ok(!app.includes('parseFloat($("simAmt")'), "safesend: no parseFloat coercion of the amount remains");
+  ok(app.includes("function voidActiveSim()"), "safesend: live-sim voiding present (sim staleness)");
+  ok(app.includes("if (!simTimer) return;"), "safesend: voiding only touches a live run — a completed run is history");
+  ok(app.includes('$("simAddr").addEventListener("input", voidActiveSim);'), "safesend: recipient edits void the live run");
+  ok(app.includes('$("simAmt").addEventListener("input", voidActiveSim);'), "safesend: amount edits void the live run");
+  ok(app.includes('$("customBlocks").addEventListener("input", voidActiveSim);'), "safesend: custom-delay edits void the live run");
+  ok(app.includes('p.addEventListener("click", voidActiveSim);'), "safesend: preset clicks void the live run");
+  ok(app.includes("the running simulation was for the previous recipient, amount and delay"), "safesend: the void explains itself");
   const html = read("pages/safesend/index.html");
   ok(html.includes("js/ss58.js?v=1.0.0"), "safesend: ss58.js loaded with its cache key");
-  ok(html.includes("js/app.js?v=1.3.0"), "safesend: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.4.0"), "safesend: app.js cache key bumped for the boundary fix (1.3.0, superseded by the 1.4.0 sim-staleness bump)");
 }
 
 // Batch 14 (2026-10-09 17:19): airgap-desk (Tier 1) hot side trusted

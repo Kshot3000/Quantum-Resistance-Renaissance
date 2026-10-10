@@ -340,6 +340,28 @@ function clearSim() {
   if (doneLbl) doneLbl.textContent = "Final";
 }
 
+/* A live simulation is a rendered output bound to (recipient, amount,
+ * delay): the countdown, the timeline and the Cancel refund all describe
+ * the values captured at Schedule. Editing any determinant mid-run must
+ * void the run — otherwise the panel keeps "executing" the old transfer
+ * while the form, and the "Your chosen delay" explainer, describe a
+ * different one, and Cancel would return an amount the form no longer
+ * shows. A completed run is history, not a live output: its timer is
+ * already stopped, so edits after execution/cancel leave it standing. */
+function voidActiveSim() {
+  if (!simTimer) return;
+  clearSim();
+  var err = $("simErr");
+  err.textContent = "Transfer inputs changed — the running simulation was for the previous recipient, amount and delay, so it has been reset. Schedule again with the values now in the form.";
+  err.hidden = false;
+}
+$("simAddr").addEventListener("input", voidActiveSim);
+$("simAmt").addEventListener("input", voidActiveSim);
+$("customBlocks").addEventListener("input", voidActiveSim);
+document.querySelectorAll(".preset").forEach(function (p) {
+  p.addEventListener("click", voidActiveSim);
+});
+
 $("resetBtn").addEventListener("click", clearSim);
 
 $("scheduleBtn").addEventListener("click", function () {
