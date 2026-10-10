@@ -125,8 +125,8 @@ t("fallback bundle is one consistent capture", function(){
   var F = m.FALLBACK;
   assert.strictEqual(F.netHs, Math.floor(Number(F.difficulty) / 12), "netHs = difficulty / 12s");
   approx(Number(F.totalSupplyPlancks) / 1e12, F.supplyQtc, 0.001); // supplyQtc stored rounded to 4dp
-  approx(m.blockReward(F.supplyQtc), 0.3039854, 1e-7);
-  assert.strictEqual(F.height, 200517);
+  approx(m.blockReward(F.supplyQtc), 0.3039832, 1e-7);
+  assert.strictEqual(F.height, 200775);
   assert.ok(F.fetchedAt.indexOf("2026-10-10") === 0, "fallback is dated 2026-10-10");
   // The old bug, pinned: the pre-v1.9.0 static default was 10 GH/s.
   assert.ok(F.netHs > 1e12, "fallback network rate is TH/s-scale, not the old 10 GH/s example");
@@ -143,25 +143,90 @@ t("estimate uses observed pace when given", function(){
   approx(paced.qtcPerDay, paced.blocksPerDay * 0.3, 1e-9);
 });
 
-// 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.0208 QTC/day
+// 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.0209 QTC/day
 // (band re-derived each fallback sync: share × observed pace × reward at the
-// @200,517 capture = 0.0208; it drifts down as the network grows)
+// @200,775 capture = 0.0209; it drifts down as the network grows)
 t("default rig estimate is honest at fallback defaults", function(){
   var e = estimate({ userHs: 500e6, netHs: m.FALLBACK.netHs, watts: 450, kwhPrice: 0.12,
                      qtcPrice: 0, reward: m.blockReward(m.FALLBACK.supplyQtc),
                      blocksPerDay: 86400000 / m.FALLBACK.avgBlockMs });
-  assert.ok(e.qtcPerDay > 0.016 && e.qtcPerDay < 0.027, "expected ~0.0208 QTC/day, got " + e.qtcPerDay);
+  assert.ok(e.qtcPerDay > 0.016 && e.qtcPerDay < 0.027, "expected ~0.0209 QTC/day, got " + e.qtcPerDay);
 });
 
 // 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
-t("index.html carries the fallback defaults and v1.9.91 key", function(){
+t("index.html carries the fallback defaults and v1.10.0 key", function(){
   var fs = require("fs"), path = require("path");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="43.638"') >= 0, "in-net defaults to the fallback TH/s figure");
+  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="43.870"') >= 0, "in-net defaults to the fallback TH/s figure");
   assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
   assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
-  assert.ok(html.indexOf("app.js?v=1.9.91") >= 0, "app.js cache key bumped to 1.9.91");
+  assert.ok(html.indexOf("app.js?v=1.10.0") >= 0, "app.js cache key bumped to 1.10.0");
+  assert.ok(html.indexOf("falls back to the dated Oct 2, 2026 capture") < 0, "honesty bullet no longer pins the fallback to the stale Oct 2 capture");
   assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
+});
+
+// 16. Snapshot scalars: only the fetch scripts' shapes are accepted
+t("derive rejects non-integer snapshot scalars", function(){
+  var cons = { fetched_at: "2026-10-02T15:00:29.848Z", head: 153406,
+    current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "55758693964650" },
+    block_times_ms: { avg_ms: 11764, sample: 3000 } };
+  var sup = { fetched_at: "2026-10-02T15:00:40.038Z", block_height: 153406, total_supply_plancks: "5766179473775204913" };
+  var sci = JSON.parse(JSON.stringify(cons)); sci.current.est_hashrate_hs = "9.9e13";
+  assert.strictEqual(m.deriveNetworkDefaults(sci, sup).netHs, null);
+  var frac = JSON.parse(JSON.stringify(cons)); frac.current.est_hashrate_hs = "55758693964650.5";
+  assert.strictEqual(m.deriveNetworkDefaults(frac, sup).netHs, null);
+  var fh = JSON.parse(JSON.stringify(cons)); fh.current.height = 153406.9; fh.head = 153406.9;
+  var dh = m.deriveNetworkDefaults(fh, sup);
+  assert.strictEqual(dh.height, 153406); // provenance falls back to the supply height
+  var gd = JSON.parse(JSON.stringify(cons)); gd.fetched_at = '<b id="pwn">PWNED</b>';
+  assert.strictEqual(m.deriveNetworkDefaults(gd, sup).fetchedAt, "2026-10-02T15:00:40.038Z");
+  var fp = JSON.parse(JSON.stringify(cons)); fp.block_times_ms.avg_ms = 1001.5;
+  assert.strictEqual(m.deriveNetworkDefaults(fp, sup).blocksPerDay, null);
+  var ts = JSON.parse(JSON.stringify(cons)); ts.block_times_ms.sample = 3;
+  assert.strictEqual(m.deriveNetworkDefaults(ts, sup).blocksPerDay, null);
+});
+
+// 17. Exact cross-check: est_hashrate_hs == difficulty / 12 (fetch construction)
+t("derive rejects a hashrate that contradicts its difficulty", function(){
+  var cons = { current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "1000" } };
+  assert.strictEqual(m.deriveNetworkDefaults(cons, null).netHs, null);
+  var ok = { current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "55758693964650" } };
+  assert.strictEqual(m.deriveNetworkDefaults(ok, null).netHs, 55758693964650);
+});
+
+// 18. Supply total must agree with its own balances itemization
+t("totalSupplyOf rejects a total that contradicts its balances", function(){
+  var bad = { total_supply_plancks: "9000000000000000000",
+    balances_plancks: { free: "5766179473775204813", reserved: "100", frozen: "0" } };
+  assert.strictEqual(m.totalSupplyOf(bad), null);
+  var good = { total_supply_plancks: "5766179473775204913",
+    balances_plancks: { free: "5766179473775204813", reserved: "100", frozen: "0" } };
+  assert.strictEqual(m.totalSupplyOf(good), "5766179473775204913");
+  var fracBal = { balances_plancks: { free: "5766179473775204913.5", reserved: "0", frozen: "0" } };
+  assert.strictEqual(m.totalSupplyOf(fracBal), null);
+});
+
+// 19. One-capture rule: supply tens of thousands of blocks stale is not mixed in
+t("derive rejects a supply payload from a different capture", function(){
+  var cons = { fetched_at: "2026-10-02T15:00:29.848Z", head: 153406,
+    current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "55758693964650" },
+    block_times_ms: { avg_ms: 11764, sample: 3000 } };
+  var stale = { block_height: 100000, total_supply_plancks: "5766179473775204913" };
+  assert.strictEqual(m.deriveNetworkDefaults(cons, stale).supplyQtc, null);
+  var near = { block_height: 153407, total_supply_plancks: "5766179473775204913" };
+  approx(m.deriveNetworkDefaults(cons, near).supplyQtc, 5766179.4738, 0.001);
+});
+
+// 20. The REAL current snapshots pass their own boundary unchanged
+t("real data/*.json snapshots pass derive unchanged", function(){
+  var fs = require("fs"), path = require("path");
+  var cons = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "data", "consensus.json"), "utf8"));
+  var sup = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "data", "supply.json"), "utf8"));
+  var d = m.deriveNetworkDefaults(cons, sup);
+  assert.strictEqual(d.netHs, Number(cons.current.est_hashrate_hs));
+  approx(d.supplyQtc, Number(sup.total_supply_plancks) / 1e12, 0.001);
+  assert.strictEqual(d.height, cons.head);
+  approx(d.blocksPerDay, 86400000 / cons.block_times_ms.avg_ms, 0.01);
 });
 
 console.log(passed + " tests passed");

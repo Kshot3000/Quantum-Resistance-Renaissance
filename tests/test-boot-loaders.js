@@ -839,5 +839,34 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.17.0"), "minobs: app.js cache key bumped for the boundary fix");
 }
 
+// Batch 26 (2026-10-10 11:19): mining-calculator (Tier 2) — the fourth
+// Tier 2 boundary batch. deriveNetworkDefaults trusted the consensus +
+// supply snapshots raw: Number() accepted a scientific-notation
+// hashrate ("9.9e13" painted as ≈99 TH/s live) and fractional scalars,
+// a hashrate was never cross-checked against the difficulty it is
+// derived from (fetch construction: est = difficulty / 12 exactly),
+// a fractional height rendered as "block 153,406.9" and a garbage
+// fetched_at as "unknown time" while the payload still counted as a
+// live snapshot, a fractional avg_ms overstated blocks/day ~14x, a
+// supply total was never cross-checked against its own balances
+// itemization (fetch construction: total == free+reserved+frozen), and
+// a supply payload from a different, stale capture was mixed into the
+// live reward math. The honesty bullet also pinned the fallback to the
+// long-superseded Oct 2 capture. Pin: strict intField/validPlancks/
+// validHeight/validFetchedAt shapes, both exact cross-checks, the
+// >=100 sample gate on observed pace, and the one-capture height rule.
+{
+  const app = read("pages/mining-calculator/app.js");
+  ok(app.includes("function intField(v)"), "miningcalc: intField() defined (integer shapes only)");
+  ok(app.includes("function validFetchedAt(v)"), "miningcalc: validFetchedAt() defined (parseable dates only)");
+  ok(app.includes("BigInt(hs) !== BigInt(diff) / 12n) hs = null;"), "miningcalc: hashrate cross-checked against difficulty / 12 exactly");
+  ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "miningcalc: supply total cross-checked against its balances itemization");
+  ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
+  ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
+  const html = read("pages/mining-calculator/index.html");
+  ok(html.includes("app.js?v=1.10.0"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

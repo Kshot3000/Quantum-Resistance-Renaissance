@@ -30,17 +30,17 @@ CHAIN.BLOCKS_PER_DAY = 86400 / CHAIN.BLOCK_TIME_S; // 7200
 /* Dated static FALLBACK bundle — replaced at load by deriveNetworkDefaults()
  * from the hourly data/*.json snapshots. Kept honest and dated for the
  * no-fetch path (file://, offline). Every figure comes from ONE capture
- * (2026-10-10 15:26Z): consensus difficulty @200,517 and total issuance
- * @200,518, fetched 11 seconds apart — never mix snapshot dates in one bundle.
+ * (2026-10-10 16:25Z): consensus difficulty @200,775 and total issuance
+ * @200,776, fetched 10 seconds apart — never mix snapshot dates in one bundle.
  * Guarded by tests/calc.test.js (fallback-integrity suite). */
 var FALLBACK = {
-  difficulty: "523652248953769",        // data/consensus.json @200,517
-  netHs: 43637687412814,                // = floor(difficulty / 12 s)
-  totalSupplyPlancks: "5800729724996769537", // data/supply.json @200,518
-  supplyQtc: 5800729.7250,              // total issuance incl. genesis
-  avgBlockMs: 14462,                    // consensus block_times_ms (3,000-block sample)
-  height: 200517,
-  fetchedAt: "2026-10-10T15:26:37.898Z"
+  difficulty: "526439042872746",        // data/consensus.json @200,775
+  netHs: 43869920239395,                // = floor(difficulty / 12 s)
+  totalSupplyPlancks: "5800841129787439938", // data/supply.json @200,776
+  supplyQtc: 5800841.1298,              // total issuance incl. genesis
+  avgBlockMs: 14341,                    // consensus block_times_ms (3,000-block sample)
+  height: 200775,
+  fetchedAt: "2026-10-10T16:25:49.265Z"
 };
 
 /* Pure: block reward from total issuance (the emission formula's S —
@@ -51,22 +51,57 @@ function blockReward(supplyQtc){
   return Math.max(0, (CHAIN.MAX_SUPPLY - supplyQtc) / CHAIN.EMISSION_DIVISOR);
 }
 
+/* Snapshot scalar validation (v1.10.0): the fetch scripts emit plancks
+ * and hashrate as integer strings, heights and avg_ms as integers, and
+ * fetched_at as an ISO timestamp — accept only that shape. Number()
+ * alone accepts fractional ("…650.5") and scientific ("9.9e13") strings
+ * for fields that are never fractional on chain, String() coerced a
+ * garbage fetched_at into the provenance line as "unknown time" while
+ * the payload still counted as a live snapshot, and a fractional height
+ * rendered as "block 153,406.9". Invalid fields come back null and the
+ * caller keeps the dated FALLBACK for that field (mining-studio's
+ * intField pattern, applied fleet-wide). */
+function intField(v){
+  if (typeof v === "string") {
+    if (!/^\d+$/.test(v.trim())) return null;
+    var n = Number(v.trim());
+    return isFinite(n) ? n : null;
+  }
+  if (typeof v === "number") return Number.isInteger(v) ? v : null;
+  return null;
+}
+function validPlancks(v){
+  if (typeof v === "string") return /^\d+$/.test(v.trim()) ? v.trim() : null;
+  if (typeof v === "number" && Number.isInteger(v) && v >= 0) return String(v);
+  return null;
+}
+function validHeight(v){
+  var h = intField(v);
+  return (h != null && h >= 1 && h <= 10000000) ? h : null;
+}
+function validFetchedAt(v){
+  if (typeof v !== "string" || !v) return null;
+  return isFinite(Date.parse(v)) ? v : null;
+}
+
 /* Pure: total supply in plancks from a supply snapshot — the first-class
  * total_supply_plancks field when present, else the balances aggregate
- * (free + reserved + frozen) = Currency::total_issuance(). Null when
- * neither is usable. */
+ * (free + reserved + frozen) = Currency::total_issuance(). The fetch
+ * script DEFINES the total as that aggregate, so when both are present
+ * they must agree exactly: a total that contradicts its own itemization
+ * is tamper/truncation evidence and neither side is trusted (null).
+ * Null when neither is usable. */
 function totalSupplyOf(sup){
   if (!sup) return null;
-  if (sup.total_supply_plancks != null && sup.total_supply_plancks !== "") {
-    var p = String(sup.total_supply_plancks);
-    if (/^\d+$/.test(p)) return p;
+  var total = validPlancks(sup.total_supply_plancks);
+  var b = sup.balances_plancks, sum = null;
+  if (b) {
+    var f = validPlancks(b.free), r = validPlancks(b.reserved), z = validPlancks(b.frozen);
+    if (f != null && r != null && z != null) sum = BigInt(f) + BigInt(r) + BigInt(z);
   }
-  var b = sup.balances_plancks;
-  if (b && b.free != null && b.reserved != null && b.frozen != null) {
-    try { return (BigInt(b.free) + BigInt(b.reserved) + BigInt(b.frozen)).toString(); }
-    catch (e) { return null; }
-  }
-  return null;
+  if (total != null && sum != null && BigInt(total) !== sum) return null;
+  if (total != null) return total;
+  return sum != null ? sum.toString() : null;
 }
 
 /* Pure: derive the calculator's network defaults from the builder's
@@ -80,15 +115,25 @@ function totalSupplyOf(sup){
 function deriveNetworkDefaults(consensus, supply){
   var out = { netHs: null, supplyQtc: null, blocksPerDay: null, avgBlockMs: null, height: null, fetchedAt: null };
   if (consensus && consensus.current) {
-    var hs = Number(consensus.current.est_hashrate_hs);
-    if (isFinite(hs) && hs > 0) out.netHs = hs;
-    var h = Number(consensus.current.height || consensus.head);
-    if (isFinite(h) && h > 0) out.height = h;
-    if (consensus.fetched_at) out.fetchedAt = String(consensus.fetched_at);
+    var hs = intField(consensus.current.est_hashrate_hs);
+    var diff = validPlancks(consensus.current.difficulty);
+    /* Exact cross-check: the fetch script computes est_hashrate_hs as
+     * difficulty / 12 (BigInt division) — a hashrate that disagrees with
+     * its own difficulty is a poisoned payload, not a measurement. */
+    if (hs != null && diff != null && BigInt(hs) !== BigInt(diff) / 12n) hs = null;
+    if (hs != null && hs > 0) out.netHs = hs;
+    var hh = validHeight(consensus.current.height), hd = validHeight(consensus.head);
+    if (hh != null && hd != null && hh !== hd) out.height = null;
+    else out.height = hh != null ? hh : hd;
+    out.fetchedAt = validFetchedAt(consensus.fetched_at);
   }
   if (consensus && consensus.block_times_ms) {
-    var avg = Number(consensus.block_times_ms.avg_ms);
-    if (isFinite(avg) && avg > 1000 && avg < 120000) {
+    var avg = intField(consensus.block_times_ms.avg_ms);
+    var sample = intField(consensus.block_times_ms.sample);
+    /* Observed pace is a mean over the fetch script's block sample —
+     * require the sample that construction guarantees (>= 100 of its
+     * up-to-3,000 blocks) before a pace anchors blocks/day. */
+    if (avg != null && avg > 1000 && avg < 120000 && sample != null && sample >= 100) {
       out.avgBlockMs = avg;
       out.blocksPerDay = 86400000 / avg;
     }
@@ -97,8 +142,17 @@ function deriveNetworkDefaults(consensus, supply){
   if (plancks != null) {
     var qtc = Number(plancks) / 1e12;
     if (isFinite(qtc) && qtc >= CHAIN.GENESIS_MINT && qtc <= CHAIN.MAX_SUPPLY) out.supplyQtc = qtc;
-    if (!out.fetchedAt && supply.fetched_at) out.fetchedAt = String(supply.fetched_at);
-    if (!out.height && supply.block_height) out.height = Number(supply.block_height) || null;
+    var sHeight = supply ? validHeight(supply.block_height) : null;
+    /* One-capture rule: the two snapshots are fetched seconds apart
+     * (the sync script asserts a 0–10 block gap); a supply payload tens
+     * of thousands of blocks from the consensus height is a different,
+     * stale capture — never mix it into this one's reward math. */
+    if (out.supplyQtc != null && out.height != null && sHeight != null &&
+        Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;
+    if (out.supplyQtc != null) {
+      if (!out.fetchedAt) out.fetchedAt = validFetchedAt(supply.fetched_at);
+      if (out.height == null) out.height = sHeight;
+    }
   }
   return out;
 }
@@ -400,6 +454,7 @@ if (typeof module !== "undefined" && module.exports){
   module.exports = { CHAIN: CHAIN, FALLBACK: FALLBACK, chainState: chainState, estimate: estimate,
                      blockReward: blockReward, totalSupplyOf: totalSupplyOf,
                      deriveNetworkDefaults: deriveNetworkDefaults,
+                     intField: intField, validPlancks: validPlancks, validHeight: validHeight, validFetchedAt: validFetchedAt,
                      fmtNum: fmtNum, fmtQTC: fmtQTC, fmtMoney: fmtMoney, fmtDuration: fmtDuration, fmtUtc: fmtUtc };
 }
 })();
