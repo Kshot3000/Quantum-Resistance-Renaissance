@@ -864,8 +864,40 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.0"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.1"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
+}
+
+// Batch 27 (2026-10-10 12:19): pool-desk (Tier 2) — the fifth Tier 2
+// boundary batch. deriveNetworkDefaults trusted all three snapshots raw:
+// Number() accepted a scientific-notation hashrate ("9.9e13" painted as
+// ≈99 TH/s live) and a hashrate was never cross-checked against the
+// difficulty it derives from (fetch construction: est = difficulty/12
+// exactly); a 100ms avg_ms over a 3-block sample painted 864,000
+// blocks/day; a supply total was never cross-checked against its own
+// balances itemization (a 9,000,000 QTC total anchored a 0.240000 QTC
+// reward); a fractional balance threw inside BigInt() and killed ALL
+// live defaults (inverted failure domain); a supply payload from a
+// different, stale capture mixed into the live reward math; poisoned
+// live-block rewards averaged to NaN; and a garbage fetched_at rendered
+// "unknown time" while the payload still counted as a live snapshot.
+// Pin: strict intField/validPlancks/validHeight/validFetchedAt shapes,
+// both exact cross-checks, the 21M cap on total issuance, parseable
+// fetched_at provenance per payload, the >=100 sample gate on observed
+// pace, per-row reward validation on the block-avg path, and the
+// one-capture height rule for both the supply and live payloads.
+{
+  const app = read("pages/pool-desk/js/app.js");
+  ok(app.includes("function intField(v)"), "pooldesk: intField() defined (integer shapes only)");
+  ok(app.includes("function validFetchedAt(v)"), "pooldesk: validFetchedAt() defined (parseable dates only)");
+  ok(app.includes("BigInt(h) !== BigInt(diff) / 12n) h = null;"), "pooldesk: hashrate cross-checked against difficulty / 12 exactly");
+  ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "pooldesk: supply total cross-checked against its balances itemization");
+  ok(app.includes("BigInt(MAX_SUPPLY_QTC) * 1000000000000n"), "pooldesk: total issuance capped at 21M before it anchors a reward");
+  ok(app.includes("sample != null && sample >= 100"), "pooldesk: observed pace requires the fetch sample (>= 100 blocks)");
+  ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
+  ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
+  const html = read("pages/pool-desk/index.html");
+  ok(html.includes("app.js?v=1.47.1"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

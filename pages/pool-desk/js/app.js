@@ -20,14 +20,14 @@ const NETWORK_DEFAULTS = {
   // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
   // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
   // and dated for the no-fetch path (file://, offline). All four figures come from
-  // ONE capture (2026-10-10 16:25Z): consensus difficulty @200,775 and total
-  // issuance @200,776, 10 seconds apart — never mix snapshot dates in one bundle
+  // ONE capture (2026-10-10 17:28Z): consensus difficulty @201,056 and total
+  // issuance @201,056, 2 seconds apart — never mix snapshot dates in one bundle
   // (the Sept-30 bundle survived to Oct 2 at half the real hashrate and skewed
   // every fallback-path earnings figure ~2x; guarded in tests).
-  blockRewardQTC: 0.3039832, // emission formula: (21M − 5,800,841.1298 total issuance) / 50M, data/supply.json @200776, 2026-10-10
-  blockRewardLabel: "0.3040 QTC · emission formula @ height 200776, 2026-10-10",
-  netHashHS: 43869920239395, // difficulty 526439042872746 / 12s, data/consensus.json @200775, 2026-10-10
-  netHashLabel: "≈43.87 TH/s · from difficulty 526439042872746 @ height 200775, 2026-10-10",
+  blockRewardQTC: 0.3039791, // emission formula: (21M − 5,801,046.0911 total issuance) / 50M, data/supply.json @201056, 2026-10-10
+  blockRewardLabel: "0.3040 QTC · emission formula @ height 201056, 2026-10-10",
+  netHashHS: 44689293959164, // difficulty 536271527509978 / 12s, data/consensus.json @201056, 2026-10-10
+  netHashLabel: "≈44.69 TH/s · from difficulty 536271527509978 @ height 201056, 2026-10-10",
 };
 
 const SOURCES = [
@@ -202,17 +202,52 @@ function blockRewardQtc(totalSupplyPlancks) {
   return (MAX_SUPPLY_QTC - Number(totalSupplyPlancks) / PLANCK) / EMISSION_DENOM;
 }
 
+/* ---- snapshot-boundary validation (fleet-standard strict shapes: the
+ * mining-studio / mining-calculator intField pattern, applied fleet-wide).
+ * The fetch scripts emit integer strings for plancks/difficulty/hashrate
+ * and integer numbers for heights/ms — anything else (scientific notation,
+ * fractions, markup) is not a measurement and must not anchor a figure. */
+function intField(v) {
+  if (typeof v === "string") {
+    if (!/^\d+$/.test(v.trim())) return null;
+    var n = Number(v.trim());
+    return isFinite(n) ? n : null;
+  }
+  if (typeof v === "number") return Number.isInteger(v) ? v : null;
+  return null;
+}
+function validPlancks(v) {
+  if (typeof v === "string") return /^\d+$/.test(v.trim()) ? v.trim() : null;
+  if (typeof v === "number" && Number.isInteger(v) && v >= 0) return String(v);
+  return null;
+}
+function validHeight(v) {
+  var h = intField(v);
+  return (h != null && h >= 1 && h <= 10000000) ? h : null;
+}
+function validFetchedAt(v) {
+  if (typeof v !== "string" || !v) return null;
+  return isFinite(Date.parse(v)) ? v : null;
+}
+
 /** Total supply in plancks from a supply snapshot: the first-class
  * total_supply_plancks field when present, else the balances aggregate
- * (free + reserved + frozen) = Currency::total_issuance(). Null when neither. */
+ * (free + reserved + frozen) = Currency::total_issuance(). The fetch
+ * script DEFINES the total as that aggregate, so when both are present
+ * they must agree exactly: a total that contradicts its own itemization
+ * is tamper/truncation evidence and neither side is trusted (null).
+ * Null when neither is usable. Never throws on malformed balances. */
 function totalSupplyOf(sup) {
   if (!sup) return null;
-  if (sup.total_supply_plancks) return String(sup.total_supply_plancks);
-  var b = sup.balances_plancks;
-  if (b && b.free != null && b.reserved != null && b.frozen != null) {
-    return (BigInt(b.free) + BigInt(b.reserved) + BigInt(b.frozen)).toString();
+  var total = validPlancks(sup.total_supply_plancks);
+  var b = sup.balances_plancks, sum = null;
+  if (b) {
+    var f = validPlancks(b.free), r = validPlancks(b.reserved), z = validPlancks(b.frozen);
+    if (f != null && r != null && z != null) sum = BigInt(f) + BigInt(r) + BigInt(z);
   }
-  return null;
+  if (total != null && sum != null && BigInt(total) !== sum) return null;
+  if (total != null) return total;
+  return sum != null ? sum.toString() : null;
 }
 
 /** Observed blocks/day from a snapshot's average block time in ms.
@@ -232,11 +267,18 @@ function formatUtc(iso) {
 }
 
 /** Derive the comparator's network defaults from hourly chain snapshots.
- * Layered fallbacks keep the page honest when a snapshot field is missing:
- * reward falls back to the average of recent mainnet block rewards, then to the
- * dated static default; hashrate falls back to the dated static default;
- * pace falls back to the 7200 protocol target. Returns null when no snapshot
- * object is usable at all (caller keeps the static defaults). */
+ * Every payload is validated at this boundary before it anchors a figure:
+ * strict integer shapes, the fetch scripts' own exact cross-checks
+ * (est_hashrate_hs == difficulty/12; total == free+reserved+frozen), a
+ * parseable fetched_at as provenance for anything called "live", the
+ * >=100-sample gate on observed pace, and the one-capture rule (payloads
+ * more than 100 blocks apart are different captures — never mixed).
+ * Layered fallbacks keep the page honest when a snapshot field is missing
+ * or rejected: reward falls back to the average of recent mainnet block
+ * rewards, then to the dated static default; hashrate falls back to the
+ * dated static default; pace falls back to the 7200 protocol target.
+ * Returns null when no snapshot object is usable at all (caller keeps
+ * the static defaults). */
 function deriveNetworkDefaults(snap) {
   if (!snap || typeof snap !== "object") return null;
   var live = snap.live, consensus = snap.consensus, supply = snap.supply;
@@ -244,53 +286,99 @@ function deriveNetworkDefaults(snap) {
 
   var out = { snapshotTime: null, rewardLabel: null, netHashLabel: null, paceLabel: null };
 
+  // Consensus provenance + height: current.height and head are two reads
+  // of the same tip — a disagreement means the payload is not one capture.
+  var consAt = validFetchedAt(consensus && consensus.fetched_at);
+  var consHeight = null;
+  if (consensus && consensus.current) {
+    var hh = validHeight(consensus.current.height), hd = validHeight(consensus.head);
+    consHeight = (hh != null && hd != null && hh !== hd) ? null : (hh != null ? hh : hd);
+  }
+
   // --- block reward: emission formula first (exact to the planck)
-  var supplyPlancks = totalSupplyOf(supply);
-  if (supplyPlancks) {
+  var supplyPlancks = null;
+  var supAt = validFetchedAt(supply && supply.fetched_at);
+  if (supAt) { // an undated supply payload cannot anchor a "live" reward
+    var tp = totalSupplyOf(supply);
+    // Total issuance can never exceed the 21M cap; beyond it the emission
+    // formula would mint a negative reward out of a poisoned total.
+    if (tp != null && BigInt(tp) <= BigInt(MAX_SUPPLY_QTC) * 1000000000000n) supplyPlancks = tp;
+    // One-capture rule: the snapshots are fetched seconds apart (the sync
+    // script asserts a 0–10 block gap); a supply payload far from the
+    // consensus height is a different, stale capture — never mix it in.
+    var supHeight = validHeight(supply && supply.block_height);
+    if (supplyPlancks != null && consHeight != null && supHeight != null &&
+        Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;
+  }
+  if (supplyPlancks != null) {
     out.rewardQtc = blockRewardQtc(supplyPlancks);
-    var when = (supply && supply.fetched_at) || (live && live.fetched_at) || null;
-    out.snapshotTime = when;
-    out.rewardLabel = out.rewardQtc.toFixed(4) + " QTC · emission formula, snapshot " + formatUtc(when);
+    out.snapshotTime = supAt;
+    out.rewardLabel = out.rewardQtc.toFixed(4) + " QTC · emission formula, snapshot " + formatUtc(supAt);
   } else {
-    // fallback: average of recent mainnet block rewards (planck-exact ints)
+    // Fallback: average of recent mainnet block rewards — each reward a
+    // strict plancks integer inside the emission formula's possible range
+    // (0, (21M − 0)/50M = 0.42 QTC]; poisoned rows drop, never average in.
     var rewards = [];
-    try {
-      (live.data.blocks || []).forEach(function (b) {
-        if (b && b.reward != null) rewards.push(Number(b.reward) / PLANCK);
+    var liveAt = validFetchedAt(live && live.fetched_at);
+    if (liveAt) {
+      var blocks = (live.data && live.data.blocks) || [];
+      var newest = blocks.length ? validHeight(blocks[0] && blocks[0].height) : null;
+      var mixedLive = newest != null && consHeight != null && Math.abs(newest - consHeight) > 100;
+      if (!mixedLive) blocks.forEach(function (b) {
+        var rp = validPlancks(b && b.reward);
+        if (rp != null) {
+          var q = Number(rp) / PLANCK;
+          if (q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM) rewards.push(q);
+        }
       });
-    } catch (e) { /* keep empty */ }
+    }
     if (rewards.length) {
       out.rewardQtc = rewards.reduce(function (a, b) { return a + b; }, 0) / rewards.length;
-      out.snapshotTime = live.fetched_at || null;
+      out.snapshotTime = liveAt;
       out.rewardLabel = out.rewardQtc.toFixed(4) + " QTC · avg of last " + rewards.length +
-        " mainnet blocks, snapshot " + formatUtc(out.snapshotTime);
+        " mainnet blocks, snapshot " + formatUtc(liveAt);
     } else {
       out.rewardQtc = NETWORK_DEFAULTS.blockRewardQTC;
       out.rewardLabel = NETWORK_DEFAULTS.blockRewardLabel;
     }
   }
 
-  // --- network hashrate: recomputed difficulty / 12s target
-  var estHs = consensus && consensus.current && consensus.current.est_hashrate_hs;
-  if (estHs != null && Number(estHs) > 0) {
-    out.netHashHs = Number(estHs);
-    var cwhen = consensus.fetched_at || out.snapshotTime;
+  // --- network hashrate: recomputed difficulty / 12s target.
+  // Exact cross-check: the fetch script computes est_hashrate_hs as
+  // difficulty / 12 (BigInt division) — a hashrate that disagrees with
+  // its own difficulty is a poisoned payload, not a measurement.
+  var hs = null;
+  if (consAt && consensus && consensus.current) {
+    var h = intField(consensus.current.est_hashrate_hs);
+    var diff = validPlancks(consensus.current.difficulty);
+    if (h != null && diff != null && BigInt(h) !== BigInt(diff) / 12n) h = null;
+    if (h != null && h > 0) hs = h;
+  }
+  if (hs != null) {
+    out.netHashHs = hs;
     out.netHashLabel = "≈" + (out.netHashHs / 1e12).toFixed(2) +
-      " TH/s · difficulty ÷ 12 s target, snapshot " + formatUtc(cwhen);
-    if (!out.snapshotTime) out.snapshotTime = consensus.fetched_at || null;
+      " TH/s · difficulty ÷ 12 s target, snapshot " + formatUtc(consAt);
+    if (!out.snapshotTime) out.snapshotTime = consAt;
   } else {
     out.netHashHs = NETWORK_DEFAULTS.netHashHS;
     out.netHashLabel = NETWORK_DEFAULTS.netHashLabel;
   }
 
-  // --- daily pace: observed block times beat the 12s target on honesty
-  var avgMs = consensus && consensus.block_times_ms && consensus.block_times_ms.avg_ms;
-  var sample = consensus && consensus.block_times_ms && consensus.block_times_ms.sample;
-  out.blocksPerDay = paceBlocksPerDay(Number(avgMs));
-  out.paceLabel = "≈" + Math.round(out.blocksPerDay).toLocaleString("en-US") +
-    " blocks/day · " + (avgMs > 0
-      ? "observed pace, last " + (sample || "—") + " blocks (target 7,200)"
-      : "protocol target");
+  // --- daily pace: observed block times beat the 12s target on honesty,
+  // but only on the sample the fetch construction guarantees: it emits a
+  // Math.round mean over up to 3,000 blocks — require an integer avg in a
+  // sane band and >= 100 sampled blocks before a pace anchors blocks/day.
+  var avgMs = consensus && consensus.block_times_ms ? intField(consensus.block_times_ms.avg_ms) : null;
+  var sample = consensus && consensus.block_times_ms ? intField(consensus.block_times_ms.sample) : null;
+  if (avgMs != null && avgMs > 1000 && avgMs < 120000 && sample != null && sample >= 100) {
+    out.blocksPerDay = paceBlocksPerDay(avgMs);
+    out.paceLabel = "≈" + Math.round(out.blocksPerDay).toLocaleString("en-US") +
+      " blocks/day · observed pace, last " + sample + " blocks (target 7,200)";
+  } else {
+    out.blocksPerDay = BLOCKS_PER_DAY;
+    out.paceLabel = "≈" + Math.round(BLOCKS_PER_DAY).toLocaleString("en-US") +
+      " blocks/day · protocol target";
+  }
 
   return out;
 }
@@ -613,5 +701,6 @@ if (typeof module !== "undefined" && module.exports) {
     toHS, fmtQTC, fmtDays, validateAddress, validateWorker, authToken, buildCommand,
     poolById, minerOptions,
     blockRewardQtc, totalSupplyOf, paceBlocksPerDay, deriveNetworkDefaults, formatUtc,
+    intField, validPlancks, validHeight, validFetchedAt,
   };
 }

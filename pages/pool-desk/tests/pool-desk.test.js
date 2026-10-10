@@ -201,6 +201,95 @@ approx("grossPerDay default 7200", P.grossPerDay(1e12, 2e12, 0.3), 0.5 * 7200 * 
 const s2 = P.soloStats(1e12, 2e12, 6465);
 approx("soloStats honors pace param", s2.blocksPerDay, 0.5 * 6465, 1e-9);
 
+// --- snapshot-boundary hardening (2026-10-10): strict shapes, the fetch
+// scripts' exact cross-checks, provenance, sample gate, one-capture rule.
+// Pre-fix every poison below anchored as fact (and a fractional balance
+// threw inside BigInt(), killing ALL live defaults for the page).
+eq("intField accepts integer string", P.intField("14341"), 14341);
+eq("intField rejects scientific notation", P.intField("9.9e13"), null);
+eq("intField rejects fraction", P.intField(1001.5), null);
+eq("validPlancks rejects fraction string", P.validPlancks("1.5"), null);
+eq("validHeight rejects fraction", P.validHeight(153406.9), null);
+eq("validFetchedAt rejects markup garbage", P.validFetchedAt('<b id="pwn">x</b>'), null);
+t("validFetchedAt accepts ISO", P.validFetchedAt("2026-10-02T15:00:29.848Z") !== null);
+
+const bnd = (c, s, l) => P.deriveNetworkDefaults({ consensus: c, supply: s, live: l });
+const bCons = () => JSON.parse(JSON.stringify(fixture.consensus));
+const bSup = () => ({ fetched_at: "2026-10-02T06:00:30.000Z", block_height: 150644, total_supply_plancks: "5763112233946770492" });
+const bLive = () => JSON.parse(JSON.stringify(fixture.live));
+
+// scientific-notation hashrate: the indexer emits integer strings only
+{ const c = bCons(); c.current.difficulty = "669104327575800"; c.current.height = 150644; c.head = 150644; c.current.est_hashrate_hs = "9.9e13";
+  eq("sci-notation hashrate rejected -> static fallback", bnd(c, bSup(), bLive()).netHashHs, P.NETWORK_DEFAULTS.netHashHS); }
+// hashrate contradicting its own difficulty (est == difficulty/12 exactly)
+{ const c = bCons(); c.current.difficulty = "669104327575800"; c.current.height = 150644; c.head = 150644; c.current.est_hashrate_hs = "1000";
+  eq("difficulty-contradicting hashrate rejected", bnd(c, bSup(), bLive()).netHashHs, P.NETWORK_DEFAULTS.netHashHS); }
+// matching difficulty/est pair accepted exactly
+{ const c = bCons(); c.current.difficulty = "669104327575800"; c.current.height = 150644; c.head = 150644; c.current.est_hashrate_hs = "55758693964650";
+  eq("difficulty-consistent hashrate accepted", bnd(c, bSup(), bLive()).netHashHs, 55758693964650); }
+// garbage consensus fetched_at: payload has no provenance -> static hashrate
+{ const c = bCons(); c.current.difficulty = "669104327575800"; c.current.est_hashrate_hs = "55758693964650"; c.fetched_at = "not-a-date";
+  eq("undated consensus -> static hashrate", bnd(c, bSup(), bLive()).netHashHs, P.NETWORK_DEFAULTS.netHashHS); }
+
+// supply total contradicting its balances itemization: neither side trusted
+eq("contradicted total -> totalSupplyOf null",
+  P.totalSupplyOf({ total_supply_plancks: "9000000000000000000", balances_plancks: { free: "100", reserved: "5", frozen: "7" } }), null);
+{ const s = bSup(); s.total_supply_plancks = "9000000000000000000";
+  s.balances_plancks = { free: "5763112233946770492", reserved: "0", frozen: "0" };
+  approx("contradicted supply -> reward falls to block avg", bnd(bCons(), s, bLive()).rewardQtc, 0.305, 1e-9); }
+// fractional balance must not throw (pre-fix BigInt("1.5") killed the page's defaults)
+{ const s = bSup(); delete s.total_supply_plancks; s.balances_plancks = { free: "1.5", reserved: "0", frozen: "0" };
+  let threw = false, dd = null;
+  try { dd = bnd(bCons(), s, bLive()); } catch (e) { threw = true; }
+  t("fractional balance does not throw", !threw);
+  approx("fractional balance -> reward falls to block avg", dd && dd.rewardQtc, 0.305, 1e-9); }
+// consistent balances aggregate still works
+eq("consistent balances aggregate accepted",
+  P.totalSupplyOf({ total_supply_plancks: "112", balances_plancks: { free: "100", reserved: "5", frozen: "7" } }), "112");
+// over-cap total (negative emission reward) rejected even when self-consistent
+{ const s = bSup(); s.total_supply_plancks = "22000000000000000000";
+  s.balances_plancks = { free: "22000000000000000000", reserved: "0", frozen: "0" };
+  approx("over-cap supply -> reward falls to block avg", bnd(bCons(), s, bLive()).rewardQtc, 0.305, 1e-9); }
+// one-capture rule: supply 50k blocks from the consensus height is another capture
+{ const c = bCons(); c.current.height = 150644; c.head = 150644;
+  const s = bSup(); s.block_height = 100000; s.total_supply_plancks = "9000000000000000000";
+  s.balances_plancks = { free: "9000000000000000000", reserved: "0", frozen: "0" };
+  approx("cross-capture supply rejected -> block avg", bnd(c, s, bLive()).rewardQtc, 0.305, 1e-9); }
+// undated supply cannot anchor a live reward
+{ const s = bSup(); s.fetched_at = "garbage";
+  approx("undated supply -> reward falls to block avg", bnd(bCons(), s, bLive()).rewardQtc, 0.305, 1e-9); }
+
+// pace gates: fractional avg, tiny avg, and small sample all fall to target
+{ const c = bCons(); c.block_times_ms.avg_ms = 1001.5;
+  eq("fractional avg_ms -> 7200 target pace", bnd(c, bSup(), bLive()).blocksPerDay, 7200); }
+{ const c = bCons(); c.block_times_ms.avg_ms = 100;
+  eq("100ms avg_ms -> 7200 target pace", bnd(c, bSup(), bLive()).blocksPerDay, 7200); }
+{ const c = bCons(); c.block_times_ms.sample = 3;
+  const dd = bnd(c, bSup(), bLive());
+  eq("sample <100 -> 7200 target pace", dd.blocksPerDay, 7200);
+  t("target pace label says protocol target", /protocol target/.test(dd.paceLabel)); }
+
+// block-avg path: poisoned rewards drop individually; all-poisoned -> static
+{ const l = bLive(); l.data.blocks = [{ height: 150644, reward: "999999999999999999" }, { height: 150643, reward: "abc" }, { height: 150642, reward: "300000000000" }];
+  approx("poisoned block rewards dropped, clean row averages", bnd(bCons(), {}, l).rewardQtc, 0.3, 1e-12); }
+{ const l = bLive(); l.data.blocks = [{ height: 150644, reward: "-5" }];
+  eq("all-poisoned block rewards -> static reward", bnd(bCons(), {}, l).rewardQtc, P.NETWORK_DEFAULTS.blockRewardQTC); }
+
+// the REAL current snapshots pass their own boundary unchanged
+(function () {
+  try {
+    const fs = require("fs"), path = require("path");
+    const root = path.join(__dirname, "..", "..", "..");
+    const cons = JSON.parse(fs.readFileSync(path.join(root, "data", "consensus.json"), "utf8"));
+    const sup = JSON.parse(fs.readFileSync(path.join(root, "data", "supply.json"), "utf8"));
+    const live = JSON.parse(fs.readFileSync(path.join(root, "data", "live.json"), "utf8"));
+    const dd = P.deriveNetworkDefaults({ live, consensus: cons, supply: sup });
+    eq("real snapshots: hashrate passes boundary", dd.netHashHs, Number(cons.current.est_hashrate_hs));
+    approx("real snapshots: reward passes boundary", dd.rewardQtc, P.blockRewardQtc(P.totalSupplyOf(sup)), 1e-12);
+    approx("real snapshots: pace passes boundary", dd.blocksPerDay, 86400000 / cons.block_times_ms.avg_ms, 1e-6);
+  } catch (e) { /* standalone copy: no repo data/ */ }
+})();
+
 // --- fallback bundle integrity (regression guard, added 2026-10-02)
 // The Sept-30 fallback bundle survived two days of difficulty growth: at half
 // the real hashrate it overstated every fallback-path earnings figure ~2x.
