@@ -350,7 +350,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("parseInt(block.block.header.number, 16)"), "extrinsic: no unchecked header parseInt remains in the scanner");
   ok(!app.includes("block.block.extrinsics || []"), "extrinsic: no silent non-list-to-empty extrinsics coercion remains");
   const html = read("pages/extrinsic-lab/index.html");
-  ok(html.includes("js/app.js?v=1.43.0"), "extrinsic: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.44.0"), "extrinsic: app.js cache key bumped (1.44.0 clear-staleness, supersedes the 1.43.0 boundary fix)");
   ok(html.includes("js/rpc-validate.js?v=1.0.0"), "extrinsic: rpc-validate.js cache key present");
 }
 
@@ -703,6 +703,23 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("$('endpoint').addEventListener('input'"), "console: uncommitted endpoint typing does not void the review");
   const html = read("pages/chain-console/index.html");
   ok(html.includes("js/app.js?v=1.44.0"), "console: app.js cache key bumped for the broadcast-staleness fix");
+}
+
+// Batch 21 (2026-10-10 06:19): extrinsic-lab (Tier 1) — the Decode tab's
+// Clear button was the one determinant change with no staleness path:
+// it writes hex-input.value programmatically (no input event, so the
+// hex-divergence voidDecode never runs), nulls state.last/lastHex and
+// hides the autopsy — but never voided the Verify tab, so a VALID
+// verdict earned by the cleared extrinsic stayed rendered, pronouncing
+// over an extrinsic that no longer exists anywhere in the app. Pin:
+// Clear calls voidVerify with an explanation (voidVerify itself no-ops
+// when no verdict is shown, so Clear paints no spurious verify error).
+{
+  const app = read("pages/extrinsic-lab/js/app.js");
+  ok(app.includes("voidVerify('The decoded extrinsic was cleared"), "extrinsic: Clear voids a shown verdict with an explanation");
+  ok((app.match(/voidVerify\(/g) || []).length >= 6, "extrinsic: voidVerify wired at definition + decode + hex-void + context-fetch + context-edit + Clear");
+  const html = read("pages/extrinsic-lab/index.html");
+  ok(html.includes("js/app.js?v=1.44.0"), "extrinsic: app.js cache key bumped for the clear-staleness fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

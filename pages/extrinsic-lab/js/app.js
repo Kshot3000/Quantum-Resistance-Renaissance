@@ -293,6 +293,12 @@
   $('clear-btn').addEventListener('click', function () {
     $('hex-input').value = ''; $('decode-error').hidden = true; $('decode-result').hidden = true;
     state.last = null; state.lastHex = '';
+    /* Clear is a programmatic determinant change: setting .value fires
+     * no input event, so the hex-divergence void never runs — and a
+     * verdict is a rendered artifact, not just state. Nulling the pin
+     * alone left the Verify tab pronouncing VALID over an extrinsic
+     * that no longer exists anywhere in the app. Void it explicitly. */
+    voidVerify('The decoded extrinsic was cleared, so the verdict no longer applies. Decode an extrinsic and verify again.');
   });
   $('hex-input').addEventListener('keydown', function (ev) {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') doDecode();
