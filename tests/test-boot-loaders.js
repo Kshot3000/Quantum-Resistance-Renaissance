@@ -645,5 +645,39 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.33.0"), "flowtracer: app.js cache key bumped for the boundary fix");
 }
 
+// Batch 19 (2026-10-10 04:19): ledger-desk (Tier 1, money-touching) —
+// its boundaries were hardened in Batches-era passes (sanitizeState,
+// scanSeq, snapshot validation, address-confirm pin), but the tax-year
+// REPORT had no staleness path at all: lastReport + the rendered cards
+// are a pin on (events, prices, method, tax year), yet adding/deleting/
+// importing an event, adding detected events, adding/removing a price,
+// switching FIFO/LIFO/HIFO, or editing the year field left the old
+// report standing — and Export report CSV/JSON silently exported the
+// stale figures. Wipe vault was worse: it reset only the stored state,
+// leaving the built report (exports resurrecting wiped figures), the
+// scan candidates, and a pending checkphrase confirm fully alive. Pin:
+// voidReport() exists and is wired into every determinant mutation,
+// voidDetections() clears candidates when the vault changes, and wipe
+// clears every rendered derivative.
+{
+  const app = read("pages/ledger-desk/app.js");
+  ok(app.includes("function voidReport(what)"), "ledger: voidReport() defined (report staleness)");
+  ok(app.includes("if (!lastReport) return;"), "ledger: voiding only touches a built report");
+  ok(app.includes('voidReport("an event was added")'), "ledger: event add voids the report");
+  ok(app.includes('voidReport("an event was deleted")'), "ledger: event delete voids the report");
+  ok(app.includes('voidReport("events were imported")'), "ledger: CSV import voids the report");
+  ok(app.includes('voidReport("detected events were added to the ledger")'), "ledger: adding detections voids the report");
+  ok((app.match(/voidReport\("the price table changed"\)/g) || []).length >= 2, "ledger: price add AND remove void the report");
+  ok(app.includes('voidReport("the cost-basis method changed")'), "ledger: method switch voids the report");
+  ok(app.includes('voidReport("the tax year changed")'), "ledger: tax-year edit voids the report");
+  ok(app.includes("Number($(\"repYear\").value) !== lastReport.year"), "ledger: year void is scoped to a different year");
+  ok(app.includes("function voidDetections(msg)"), "ledger: voidDetections() defined (candidate staleness)");
+  ok(app.includes("the scan candidates were computed for the previous vault"), "ledger: address removal voids the candidates");
+  ok(app.includes('voidReport("the vault was wiped")'), "ledger: wipe voids the report");
+  ok(app.includes('$("addrCheck").innerHTML = "";'), "ledger: wipe voids a pending address confirm");
+  const html = read("pages/ledger-desk/index.html");
+  ok(html.includes("app.js?v=1.5.0"), "ledger: app.js cache key bumped for the report-staleness fix");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

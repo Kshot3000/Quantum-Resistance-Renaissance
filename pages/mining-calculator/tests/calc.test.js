@@ -125,8 +125,8 @@ t("fallback bundle is one consistent capture", function(){
   var F = m.FALLBACK;
   assert.strictEqual(F.netHs, Math.floor(Number(F.difficulty) / 12), "netHs = difficulty / 12s");
   approx(Number(F.totalSupplyPlancks) / 1e12, F.supplyQtc, 0.001); // supplyQtc stored rounded to 4dp
-  approx(m.blockReward(F.supplyQtc), 0.3040096, 1e-7);
-  assert.strictEqual(F.height, 198722);
+  approx(m.blockReward(F.supplyQtc), 0.3040062, 1e-7);
+  assert.strictEqual(F.height, 199000);
   assert.ok(F.fetchedAt.indexOf("2026-10-10") === 0, "fallback is dated 2026-10-10");
   // The old bug, pinned: the pre-v1.9.0 static default was 10 GH/s.
   assert.ok(F.netHs > 1e12, "fallback network rate is TH/s-scale, not the old 10 GH/s example");
@@ -143,24 +143,24 @@ t("estimate uses observed pace when given", function(){
   approx(paced.qtcPerDay, paced.blocksPerDay * 0.3, 1e-9);
 });
 
-// 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.0212 QTC/day
+// 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.0209 QTC/day
 // (band re-derived each fallback sync: share × observed pace × reward at the
-// @198,722 capture = 0.0212; it drifts down as the network grows)
+// @199,000 capture = 0.0209; it drifts down as the network grows)
 t("default rig estimate is honest at fallback defaults", function(){
   var e = estimate({ userHs: 500e6, netHs: m.FALLBACK.netHs, watts: 450, kwhPrice: 0.12,
                      qtcPrice: 0, reward: m.blockReward(m.FALLBACK.supplyQtc),
                      blocksPerDay: 86400000 / m.FALLBACK.avgBlockMs });
-  assert.ok(e.qtcPerDay > 0.016 && e.qtcPerDay < 0.027, "expected ~0.0212 QTC/day, got " + e.qtcPerDay);
+  assert.ok(e.qtcPerDay > 0.016 && e.qtcPerDay < 0.027, "expected ~0.0209 QTC/day, got " + e.qtcPerDay);
 });
 
 // 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
-t("index.html carries the fallback defaults and v1.9.84 key", function(){
+t("index.html carries the fallback defaults and v1.9.85 key", function(){
   var fs = require("fs"), path = require("path");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="42.250"') >= 0, "in-net defaults to the fallback TH/s figure");
+  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="43.102"') >= 0, "in-net defaults to the fallback TH/s figure");
   assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
   assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
-  assert.ok(html.indexOf("app.js?v=1.9.84") >= 0, "app.js cache key bumped to 1.9.84");
+  assert.ok(html.indexOf("app.js?v=1.9.85") >= 0, "app.js cache key bumped to 1.9.85");
   assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
 });
 

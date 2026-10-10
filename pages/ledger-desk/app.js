@@ -75,6 +75,12 @@ function renderVault() {
   box.querySelectorAll("[data-rm]").forEach(function (b) {
     b.addEventListener("click", function () {
       state.addresses.splice(Number(b.getAttribute("data-rm")), 1);
+      /* The candidate list was computed for the previous vault: leaving
+       * it live would let "Add selected" write events for an address the
+       * user just removed from the vault. (Filtering to the surviving
+       * addresses instead would re-render every checkbox checked,
+       * resurrecting candidates the user had unchecked.) */
+      voidDetections("Vault changed \u2014 the scan candidates were computed for the previous vault, so they have been cleared. Scan again for the current vault.");
       save(); renderVault(); renderEventForm(); renderHero();
     });
   });
@@ -153,6 +159,16 @@ function handleAddrSubmit(ev) {
 
 /* ---------------- auto-detect ---------------- */
 var detections = [];
+/* Scan candidates are a pin on the vault (and the ledger's refs) at scan
+ * time. When the vault changes underneath them they are voided as a
+ * whole — see the renderVault remove handler and wipeVault. */
+function voidDetections(msg) {
+  if (!detections.length) return;
+  detections = [];
+  $("detectList").innerHTML = "";
+  $("detectActions").hidden = true;
+  $("scanStatus").textContent = msg;
+}
 function tsForHeight(h, anchorH, anchorMs, blockS) {
   return Math.round(anchorMs - (anchorH - h) * blockS * 1000);
 }
@@ -374,6 +390,7 @@ function addSelectedDetections() {
   $("detectList").innerHTML = "";
   $("detectActions").hidden = true;
   $("scanStatus").textContent = added ? added + " events added to the ledger." : "Nothing selected.";
+  if (added) voidReport("detected events were added to the ledger");
   save(); renderAll();
 }
 
@@ -407,6 +424,7 @@ function renderEvents() {
   tb.querySelectorAll("[data-del]").forEach(function (b) {
     b.addEventListener("click", function () {
       state.events = state.events.filter(function (e) { return e.id !== b.getAttribute("data-del"); });
+      voidReport("an event was deleted");
       save(); renderAll();
     });
   });
@@ -432,6 +450,7 @@ function handleEventSubmit(ev) {
     source: "manual", ref: "", internal: $("evInternal").checked, flags: [] });
   $("evQty").value = ""; $("evPrice").value = ""; $("evNote").value = "";
   $("evInternal").checked = false;
+  voidReport("an event was added");
   save(); renderAll();
 }
 function download(name, text, mime) {
@@ -470,6 +489,7 @@ function importEventsCsv(file) {
         added++;
       } catch (e) { bad++; }
     }
+    if (added) voidReport("events were imported");
     save(); renderAll();
     alert("Imported " + added + " events" + (bad ? " (" + bad + " rows skipped)" : "") + ".");
   };
@@ -488,6 +508,7 @@ function renderPrices() {
     b.addEventListener("click", function () {
       var p = ps[Number(b.getAttribute("data-px"))];
       state.prices = state.prices.filter(function (x) { return x !== p; });
+      voidReport("the price table changed");
       save(); renderPrices(); renderAll();
     });
   });
@@ -501,6 +522,7 @@ function handlePriceSubmit(ev) {
   state.prices = state.prices.filter(function (p) { return p.day !== day; });
   state.prices.push({ day: day, micro: micro });
   $("pxValue").value = "";
+  voidReport("the price table changed");
   save(); renderPrices(); renderAll();
 }
 
@@ -530,6 +552,20 @@ function renderLots() {
 
 /* ---------------- tax-year report ---------------- */
 var lastReport = null;
+/* A built report is a pin on (events, prices, method, tax year) — the
+ * figures an accountant would file from. Every mutation of those
+ * determinants voids it: the rendered cards are replaced by an honest
+ * cleared note and lastReport is nulled, so Export CSV/JSON fall back to
+ * their "Build the report first" guard instead of silently exporting
+ * figures the current ledger no longer produces. Unsubmitted form
+ * typing is NOT a determinant — only committed changes void. */
+function voidReport(what) {
+  if (!lastReport) return;
+  lastReport = null;
+  $("reportOut").innerHTML = '<div class="empty">Report cleared \u2014 the ledger changed (' +
+    esc(what) + "), so the figures that were here described the previous ledger. " +
+    "Build the report again to see current figures.</div>";
+}
 function buildReport() {
   var year = Number($("repYear").value) || 2026;
   lastReport = L.taxYearReport(state.events, state.method, priceLookup, year);
@@ -640,6 +676,17 @@ function wipeVault() {
   if (!confirm("Delete the entire local vault (addresses, events, prices)? This cannot be undone.")) return;
   state = { addresses: [], events: [], prices: [], method: "FIFO" };
   try { localStorage.removeItem(LS_KEY); } catch (e) {}
+  /* A wipe must clear every rendered derivative too, not just the stored
+   * state: the built report (whose exports would resurrect the wiped
+   * figures), the scan candidates, and a pending checkphrase confirm
+   * (whose button would re-add the wiped vault's next address). */
+  addrPin = null;
+  $("addrCheck").innerHTML = "";
+  detections = [];
+  $("detectList").innerHTML = "";
+  $("detectActions").hidden = true;
+  $("scanStatus").textContent = "";
+  voidReport("the vault was wiped");
   renderAll();
 }
 
@@ -676,7 +723,17 @@ function init() {
   document.querySelectorAll('input[name="method"]').forEach(function (r) {
     r.addEventListener("change", function () {
       state.method = document.querySelector('input[name="method"]:checked').value;
+      voidReport("the cost-basis method changed");
       save(); renderLots(); renderHero(); renderEvents();
+    });
+  });
+  /* The tax year is a report determinant with no other handler: editing
+   * the field must void a report built for a different year. */
+  ["input", "change"].forEach(function (evt) {
+    $("repYear").addEventListener(evt, function () {
+      if (lastReport && Number($("repYear").value) !== lastReport.year) {
+        voidReport("the tax year changed");
+      }
     });
   });
   $("btnReport").addEventListener("click", buildReport);
