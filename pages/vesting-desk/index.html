@@ -88,7 +88,7 @@
     <div class="hero-inner">
       <div class="kicker"><span class="dot"></span>GENESIS VESTING &middot; 48 SCHEDULES &middot; ON-CHAIN MATH</div>
       <h1>QTC Vesting Desk</h1>
-      <p class="lede">The unlock calendar for Quantus's locked genesis supply. Every schedule below is a real row from the chain's Subsquid indexer — <strong>5,669,940 QTC</strong> of the 27% TGE mint, still <strong>96% locked</strong> behind a one-year cliff. The unlock math is the pallet's own formula, recomputed to the planck, in your browser.</p>
+      <p class="lede">The unlock calendar for Quantus's locked genesis supply. Every schedule below is a real row from the chain's Subsquid indexer — <strong>5,669,940 QTC</strong> of the 27% TGE mint. The grants sit behind a one-year cliff and then vest linearly; the unlock math is the pallet's own formula, recomputed to the planck, in your browser.</p>
       <div class="hero-badges">
         <span class="badge" id="snap-badge">loading snapshot&hellip;</span>
         <span class="badge live" id="live-badge" hidden>live indexer</span>
@@ -100,7 +100,7 @@
     <h2><span class="sec-ico">&#9201;</span> Right now</h2>
     <div class="stat-grid">
       <div class="stat"><div class="stat-label">Vested so far</div><div class="stat-value" id="st-vested">&mdash;</div><div class="stat-sub" id="st-vested-sub"></div></div>
-      <div class="stat"><div class="stat-label">Claimed on-chain</div><div class="stat-value" id="st-claimed">&mdash;</div><div class="stat-sub">only the liquidity schedule has moved</div></div>
+      <div class="stat"><div class="stat-label">Claimed on-chain</div><div class="stat-value" id="st-claimed">&mdash;</div><div class="stat-sub" id="st-claimed-sub">only the liquidity schedule has moved</div></div>
       <div class="stat warn"><div class="stat-label">Claimable now (est.)</div><div class="stat-value" id="st-unclaimed">&mdash;</div><div class="stat-sub">25-QTC aligned &middot; permissionless claim, anyone can ping</div></div>
       <div class="stat"><div class="stat-label">Still locked</div><div class="stat-value" id="st-locked">&mdash;</div><div class="stat-sub">behind the 2027-09-09 cliff</div></div>
     </div>
@@ -219,6 +219,6 @@
   </div>
 </footer>
 
-<script defer src="app.js?v=1.29.0"></script>
+<script defer src="app.js?v=1.30.0"></script>
 </body>
 </html>

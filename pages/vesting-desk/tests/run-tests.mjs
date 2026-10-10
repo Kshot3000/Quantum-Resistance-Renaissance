@@ -175,4 +175,53 @@ t("vesting.json: 48 schedules, cohort math reconciles", () => {
   }
 });
 
+/* --- load boundary round 2 (app.js, 2026-10-10): cliff/cohort/cap/height ---
+ * The browser boundary QA (qa-vesting-boundary2) demonstrated each class
+ * RED through the real page; these pin the validator functions directly. */
+const VApp = require(join(__dirname, "..", "app.js"));
+const REAL_V = JSON.parse(readFileSync(join(__dirname, "..", "..", "..", "data", "vesting.json"), "utf8"));
+const freshSeen = () => new Set();
+const baseRow = () => ({ ...REAL_V.schedules[0] }); // a real grant schedule
+
+t("boundary: every real snapshot schedule passes validSchedule (48/48)", () => {
+  const seen = freshSeen();
+  for (const s of REAL_V.schedules) assert.ok(VApp.validSchedule(s, seen), "schedule " + s.id);
+  assert.equal(seen.size, 48);
+});
+t("boundary: cliff before start is rejected (negative-vested poison)", () => {
+  const r = baseRow();
+  r.cliff_ms = String(BigInt(r.start_ms) - 1n);
+  assert.equal(VApp.validSchedule(r, freshSeen()), null);
+});
+t("boundary: cliff == start and cliff inside the window are accepted", () => {
+  assert.ok(VApp.validSchedule(baseRow(), freshSeen()));
+  const r = baseRow();
+  r.cliff_ms = String(BigInt(r.start_ms) + 1000n);
+  assert.ok(VApp.validSchedule(r, freshSeen()));
+});
+t("boundary: (start,end) outside the genesis cohorts is rejected", () => {
+  const r = baseRow();
+  r.cliff_ms = String(BigInt(r.cliff_ms) + 1000n);
+  r.start_ms = String(BigInt(r.start_ms) + 1000n);
+  r.end_ms = String(BigInt(r.end_ms) + 1000n);
+  assert.equal(VApp.validSchedule(r, freshSeen()), null);
+});
+t("boundary: a total above the whole genesis mint is rejected", () => {
+  const r = baseRow();
+  r.total_plancks = (VC.GENESIS_MINT_QTC * Q + 1n).toString();
+  assert.equal(VApp.validSchedule(r, freshSeen()), null);
+  const okRow = baseRow();
+  okRow.total_plancks = (VC.GENESIS_MINT_QTC * Q).toString();
+  assert.ok(VApp.validSchedule(okRow, freshSeen()));
+});
+t("boundary: validBlockHeight is the fleet 1..10,000,000 shape", () => {
+  assert.equal(VApp.validBlockHeight(REAL_V.block_height), REAL_V.block_height);
+  assert.equal(VApp.validBlockHeight(String(REAL_V.block_height)), REAL_V.block_height);
+  assert.equal(VApp.validBlockHeight("9".repeat(40)), null);
+  assert.equal(VApp.validBlockHeight(0), null);
+  assert.equal(VApp.validBlockHeight(10000001), null);
+  assert.equal(VApp.validBlockHeight("1.5"), null);
+  assert.equal(VApp.validBlockHeight(null), null);
+});
+
 console.log(`\nvesting-core: ${pass} tests green`);

@@ -1,7 +1,7 @@
 /* QTC Vesting Desk — app logic. All money math via VestingCore (BigInt plancks). */
 (function () {
   "use strict";
-  const VC = window.VestingCore;
+  const VC = typeof window !== "undefined" ? window.VestingCore : require("./js/vesting-core.js");
   const $ = (id) => document.getElementById(id);
   const Q = VC.PLANCKS_PER_QTC;
   const LIVE_QUERY = `query { schedules: vesting_schedule(limit: 64, order_by: {id: asc}) { id beneficiary total claimed cliff start end last_claim_at block_height } }`;
@@ -29,7 +29,11 @@
    * literally as "Invalid Date". Now: invalid schedules are DROPPED,
    * by_cohort is REBUILT from the survivors on both paths, fetched_at is
    * derived from fetched_at_ms when unparseable, and the desk fails
-   * honestly (boot's "data unavailable") only when nothing valid remains. */
+   * honestly (boot's "data unavailable") only when nothing valid remains.
+   * Round 2 (2026-10-10): cliff < start (negative vested), unknown-cohort
+   * schedules, over-genesis-mint totals, unbounded block_height, and a
+   * parseable-but-disagreeing fetched_at are also rejected/derived at
+   * this same boundary — see validSchedule / validBlockHeight / loadData. */
   const ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
   const MS_MIN = 946684800000, MS_MAX = 4102444800000; // 2000-01-01 .. 2100-01-01
   function decStr(v) {
@@ -47,6 +51,17 @@
     const n = Number(s);
     return n >= MS_MIN && n <= MS_MAX ? s : null;
   }
+  /* Fleet-standard block height (the validHeight shape used across the
+   * fleet): a strict integer in 1..10,000,000. decStr alone accepts a
+   * digit string of any length — a 40-digit "height" became Number() 1e40
+   * and painted in the badge as the snapshot block. Anything outside the
+   * range is not a height this chain will ever have: omit it (null). */
+  function validBlockHeight(v) {
+    const s = decStr(v);
+    if (s === null) return null;
+    const n = Number(s);
+    return Number.isSafeInteger(n) && n >= 1 && n <= 10000000 ? n : null;
+  }
   function validSchedule(raw, seenIds) {
     if (!raw || typeof raw !== "object") return null;
     const idStr = decStr(raw.id);
@@ -58,9 +73,22 @@
     const claimed = decStr(raw.claimed_plancks);
     if (total === null || claimed === null) return null;
     if (BigInt(total) <= 0n || BigInt(claimed) > BigInt(total)) return null;
+    /* No single genesis schedule can exceed the whole 27% genesis mint:
+     * an over-mint total (a poisoned row claimed 10,000,000 QTC) anchored
+     * the hero/locked figures instead of being dropped. */
+    if (BigInt(total) > VC.GENESIS_MINT_QTC * Q) return null;
     const cliff = msStr(raw.cliff_ms), start = msStr(raw.start_ms), end = msStr(raw.end_ms);
     if (cliff === null || start === null || end === null) return null;
     if (!(BigInt(start) < BigInt(end)) || BigInt(cliff) > BigInt(end)) return null;
+    /* vestedAmount measures elapsed from START, gated by cliff: a cliff
+     * before start makes (now - start) negative for cliff <= now < start,
+     * and the desk painted a NEGATIVE vested total (-42,262 QTC in QA).
+     * Genesis has cliff == start on every row; require cliff >= start. */
+    if (BigInt(cliff) < BigInt(start)) return null;
+    /* This desk is the genesis set: a (start, end) pair outside the three
+     * genesis cohorts counted into hero/chart totals and the table, but
+     * no cohort card or filter could ever show it ("unknown"). Drop it. */
+    if (VC.cohortOf(start, end) === "unknown") return null;
     // A malformed last-claim stamp is cosmetic, not money-critical:
     // sanitize it to null instead of dropping an otherwise valid schedule.
     const last = raw.last_claim_at_ms == null ? null : msStr(raw.last_claim_at_ms);
@@ -131,13 +159,16 @@
       if (fetchedMs === null) throw new Error("snapshot fetched_at_ms invalid");
       const schedules = validateSchedules(raw.schedules);
       if (!schedules.length) throw new Error("snapshot: no valid schedules");
-      const fetchedAt = (typeof raw.fetched_at === "string" && isFinite(Date.parse(raw.fetched_at)))
-        ? raw.fetched_at : new Date(Number(fetchedMs)).toISOString();
-      const bh = decStr(raw.block_height);
+      /* Provenance is ALWAYS re-derived from fetched_at_ms — the value
+       * the vesting math anchors on. The raw fetched_at string used to be
+       * echoed into the badge whenever it merely parsed: a payload dated
+       * 1999 painted "snapshot · Fri, 01 Jan 1999" over figures computed
+       * at the real capture time. */
+      const fetchedAt = new Date(Number(fetchedMs)).toISOString();
       DATA = {
         ok: true, source: raw.source || "snapshot", fetched_at: fetchedAt,
         fetched_at_ms: fetchedMs,
-        block_height: bh === null ? null : Number(bh),
+        block_height: validBlockHeight(raw.block_height),
         schedules, by_cohort: buildByCohort(schedules), live: false,
       };
     }
@@ -173,6 +204,15 @@
     $("st-vested").textContent = VC.fmtQTC0(vested) + " QTC";
     $("st-vested-sub").textContent = pct(vested, total) + " of the 5,669,940 QTC vesting pool";
     $("st-claimed").textContent = VC.fmtQTC(claimed) + " QTC";
+    // Which schedules have moved is data, not prose: the old static sub
+    // ("only the liquidity schedule has moved") rots the day another
+    // schedule claims. Derive it from the loaded rows.
+    const movers = DATA.schedules.filter((s) => BigInt(s.claimed_plancks) > 0n);
+    $("st-claimed-sub").textContent =
+      movers.length === 0 ? "no claims yet" :
+      movers.length === 1 && movers[0].cohort === "liquidity" ? "only the liquidity schedule has moved" :
+      movers.length === 1 ? "only one schedule has claimed so far" :
+      movers.length + " schedules have claimed so far";
     $("st-unclaimed").textContent = VC.fmtQTC(claimable) + " QTC";
     $("st-locked").textContent = VC.fmtQTC0(total - vested) + " QTC";
     // tooltip-grade honesty: unclaimed includes sub-25-QTC remainders the chain won't pay yet
@@ -223,6 +263,7 @@
             BigInt(s.cliff_ms), BigInt(s.start_ms), BigInt(s.end_ms), now));
       }
       const total = BigInt(b.total_plancks);
+      const claimed = BigInt(b.claimed_plancks);
       const meta = COHORT_META[key];
       const card = document.createElement("div");
       card.className = "cohort";
@@ -235,14 +276,35 @@
         '<div class="prow"><span>' + pct(vested, total) + ' vested</span><span>' + VC.fmtQTC0(vested) + ' / ' + VC.fmtQTC0(total) + '</span></div>' +
         '<div class="prow"><span>claimed</span><span>' + VC.fmtQTC(BigInt(b.claimed_plancks)) + ' QTC</span></div>' +
         '<div class="prow"><span>claimable now (est.)</span><span>' + VC.fmtQTC(claimable) + ' QTC</span></div>' +
-        '<div class="note">' + cohortNote(key) + "</div>";
+        '<div class="note">' + cohortNote(key, rows, vested, claimed, total) + "</div>";
       grid.appendChild(card);
     }
   }
-  function cohortNote(key) {
+  /* Cohort notes are COMPUTED from the loaded rows at data time. The old
+   * hard-coded figures (an intents vested figure and a liquidity claimed
+   * figure, both from the Sep-30 snapshot) were still being presented as
+   * current on Oct 10, when intents had 3,617.983 vested and liquidity
+   * was fully claimed. Any figure in a note must be derived. */
+  function cohortNote(key, rows, vested, claimed, total) {
     if (key === "grant") return "1-year lockup from TGE (Sep 9, 2026), then linear vesting over 3 years. cliff == start, so there is no cliff-day lump — the first QTC accrues on Sep 9, 2027 itself.";
-    if (key === "intents") return "The NEAR Intents grant vests from TGE over 365 days. At snapshot time ~2,441 QTC had vested and the beneficiary had claimed nothing yet.";
-    return "Treasury market-making allocation, fully vested since Sep 25, 2026. 171,475 of 210,000 QTC claimed at snapshot time — 38,525 QTC vested but unclaimed. On-chain curiosity: this schedule's beneficiary address also holds grant schedule #47 (502,438 QTC) — the treasury wears two hats.";
+    if (key === "intents") {
+      return "The NEAR Intents grant vests from TGE over 365 days. At data time " +
+        VC.fmtQTC(vested) + " QTC had vested and " +
+        (claimed === 0n ? "the beneficiary had claimed nothing yet." : VC.fmtQTC(claimed) + " QTC had been claimed.");
+    }
+    let note = "Treasury market-making allocation, fully vested since Sep 25, 2026. " +
+      VC.fmtQTC(claimed) + " of " + VC.fmtQTC0(total) + " QTC claimed at data time — " +
+      VC.fmtQTC(total - claimed) + " QTC vested but unclaimed.";
+    // The two-hats curiosity, derived: any OTHER schedule sharing this
+    // cohort's beneficiary address (the treasury's grant schedule today).
+    const ben = rows[0].beneficiary;
+    const other = DATA.schedules.find((s) => s.beneficiary === ben && s.cohort !== key);
+    if (other) {
+      note += " On-chain curiosity: this schedule's beneficiary address also holds " +
+        other.cohort + " schedule #" + other.id + " (" + VC.fmtQTC0(BigInt(other.total_plancks)) +
+        " QTC) — the treasury wears two hats.";
+    }
+    return note;
   }
 
   /* ---------------- chart ---------------- */
@@ -581,6 +643,14 @@
     window.__vestingDeskReady = true;
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
-  else boot();
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+    else boot();
+  }
+  /* Node hook (fleet miningcalc pattern): the load boundary is unit-
+   * testable without a browser — pages/vesting-desk/tests/run-tests.mjs
+   * requires this file and drives validSchedule/validBlockHeight. */
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = { validSchedule, validateSchedules, validBlockHeight };
+  }
 })();

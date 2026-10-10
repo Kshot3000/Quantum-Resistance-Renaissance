@@ -135,7 +135,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!src.includes("function normalizeLive"), "vesting: unvalidated normalizeLive is gone");
   ok(src.includes("snapshot: no valid schedules"), "vesting: all-invalid payload fails honestly instead of rendering poison");
   const html = read("pages/vesting-desk/index.html");
-  ok(html.includes("app.js?v=1.29.0"), "vesting: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.30.0"), "vesting: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 9. Whale Watch: validate the whole snapshot at the load boundary ----
@@ -864,7 +864,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.3"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.4"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -897,7 +897,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.3"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.4"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -932,7 +932,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.2"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.3"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -970,8 +970,45 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.1"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.2"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
+}
+
+// Batch 30 (2026-10-10 15:19): vesting-desk round 2 (Tier 2) — the
+// 2026-10-09 boundary validated shapes per schedule, but five classes
+// still anchored: cliff < start (vestedAmount measures elapsed from
+// start, so the hero painted NEGATIVE vested, -42,262 QTC, and locked
+// exceeded the pool); a (start,end) outside the three genesis cohorts
+// counted into hero/chart/table but no cohort card or filter could
+// show it; a single total above the whole 5,670,000 QTC genesis mint
+// anchored (locked painted 10,005,451,072 QTC); block_height was any
+// digit string (a 40-digit height painted as block 1e40); and a
+// parseable-but-disagreeing fetched_at (1999) was echoed as provenance
+// while the math anchored on fetched_at_ms. Plus stale hard-coded
+// cohort notes (intents "~2,441 vested" vs actual 3,617.983; liquidity
+// "171,475 claimed" vs actual fully claimed 210,000). Pin: cliff >=
+// start, known-cohort-only, genesis-mint cap, fleet validBlockHeight,
+// fetched_at always re-derived from fetched_at_ms, cohort notes and
+// the claimed sub computed from the loaded rows, and the Node module
+// hook that makes the boundary unit-testable.
+{
+  const src = read("pages/vesting-desk/app.js");
+  ok(src.includes("if (BigInt(cliff) < BigInt(start)) return null;"), "vesting2: cliff before start is rejected (no negative vested)");
+  ok(src.includes('VC.cohortOf(start, end) === "unknown"'), "vesting2: schedules outside the genesis cohorts are rejected");
+  ok(src.includes("BigInt(total) > VC.GENESIS_MINT_QTC * Q"), "vesting2: a schedule total above the genesis mint is rejected");
+  ok(src.includes("function validBlockHeight(v)"), "vesting2: validBlockHeight() defined (fleet 1..10,000,000 shape)");
+  ok(src.includes("block_height: validBlockHeight(raw.block_height)"), "vesting2: snapshot block_height goes through validBlockHeight");
+  ok(src.includes("const fetchedAt = new Date(Number(fetchedMs)).toISOString();"), "vesting2: fetched_at always re-derived from fetched_at_ms");
+  ok(!src.includes("isFinite(Date.parse(raw.fetched_at))"), "vesting2: raw fetched_at string is never echoed as provenance");
+  ok(src.includes("function cohortNote(key, rows, vested, claimed, total)"), "vesting2: cohort notes computed from the loaded rows");
+  ok(!src.includes("2,441 QTC had vested"), "vesting2: stale hard-coded intents vested figure is gone");
+  ok(!src.includes("171,475 of 210,000"), "vesting2: stale hard-coded liquidity claimed figure is gone");
+  ok(src.includes('$("st-claimed-sub")'), "vesting2: claimed sub derived from which schedules actually claimed");
+  ok(src.includes("module.exports = { validSchedule, validateSchedules, validBlockHeight };"), "vesting2: Node module hook exports the boundary");
+  const html = read("pages/vesting-desk/index.html");
+  ok(html.includes("app.js?v=1.30.0"), "vesting2: app.js cache key bumped for the boundary fix");
+  ok(html.includes('id="st-claimed-sub"'), "vesting2: claimed sub has the id the app writes");
+  ok(!html.includes("96% locked"), "vesting2: hero no longer pins a drifting locked percentage");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
