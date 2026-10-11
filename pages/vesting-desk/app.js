@@ -33,7 +33,14 @@
    * Round 2 (2026-10-10): cliff < start (negative vested), unknown-cohort
    * schedules, over-genesis-mint totals, unbounded block_height, and a
    * parseable-but-disagreeing fetched_at are also rejected/derived at
-   * this same boundary — see validSchedule / validBlockHeight / loadData. */
+   * this same boundary — see validSchedule / validBlockHeight / loadData.
+   * Round 3 (2026-10-11): fetched_at_ms must be a REAL capture time
+   * (fleet bounds: genesis floor 2026-09-01, now+1h ceiling) — it is
+   * the vesting-math "now" anchor, so the generic msStr 2000..2100
+   * shape let a 2020 stamp compute vesting at a pre-genesis instant
+   * and a 2099 stamp vest the whole pool. The bound lives ONLY in
+   * validFetchedAtMs: msStr stays 2000..2100 because schedule
+   * cliff/start/end legitimately reach 2030. */
   const ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
   const MS_MIN = 946684800000, MS_MAX = 4102444800000; // 2000-01-01 .. 2100-01-01
   function decStr(v) {
@@ -50,6 +57,19 @@
     if (s === null) return null;
     const n = Number(s);
     return n >= MS_MIN && n <= MS_MAX ? s : null;
+  }
+  const GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain exists from Sept 2026 (fleet bound)
+  /* fetched_at_ms ONLY: a capture time must be a real one — inside the
+   * chain's lifetime (genesis floor 2026-09-01) and not in the future
+   * (now+1h, the fleet 1h clock-skew tolerance). Deliberately NOT folded
+   * into msStr above: cliff/start/end share msStr and the grant cohort's
+   * end (2030) is legitimately years past any capture time. */
+  function validFetchedAtMs(v, nowMs) {
+    const s = msStr(v);
+    if (s === null) return null;
+    const n = Number(s);
+    const now = typeof nowMs === "number" && isFinite(nowMs) ? nowMs : Date.now();
+    return n >= GENESIS_FLOOR_MS && n <= now + 3600000 ? s : null;
   }
   /* Fleet-standard block height (the validHeight shape used across the
    * fleet): a strict integer in 1..10,000,000. decStr alone accepts a
@@ -155,7 +175,7 @@
       if (!res.ok) throw new Error("snapshot fetch failed: " + res.status);
       const raw = await res.json();
       if (!raw || !Array.isArray(raw.schedules)) throw new Error("snapshot malformed");
-      const fetchedMs = msStr(raw.fetched_at_ms);
+      const fetchedMs = validFetchedAtMs(raw.fetched_at_ms);
       if (fetchedMs === null) throw new Error("snapshot fetched_at_ms invalid");
       const schedules = validateSchedules(raw.schedules);
       if (!schedules.length) throw new Error("snapshot: no valid schedules");
@@ -651,6 +671,6 @@
    * testable without a browser — pages/vesting-desk/tests/run-tests.mjs
    * requires this file and drives validSchedule/validBlockHeight. */
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { validSchedule, validateSchedules, validBlockHeight };
+    module.exports = { validSchedule, validateSchedules, validBlockHeight, validFetchedAtMs };
   }
 })();

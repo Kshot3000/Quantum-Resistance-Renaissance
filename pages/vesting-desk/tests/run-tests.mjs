@@ -214,6 +214,28 @@ t("boundary: a total above the whole genesis mint is rejected", () => {
   okRow.total_plancks = (VC.GENESIS_MINT_QTC * Q).toString();
   assert.ok(VApp.validSchedule(okRow, freshSeen()));
 });
+/* --- capture-time bounds round 3 (app.js, 2026-10-11): fetched_at_ms is
+ * the vesting-math "now" anchor, so it must be a REAL capture time
+ * (fleet bounds: genesis floor 2026-09-01, now+1h ceiling). The generic
+ * msStr 2000..2100 shape let a 2020 stamp compute vesting pre-genesis
+ * and a 2099 stamp vest the whole pool. The bound lives only in
+ * validFetchedAtMs — schedule cliff/start/end keep msStr (grant end
+ * legitimately reaches 2030, proven by the 48/48 control above). */
+t("boundary: validFetchedAtMs enforces the fleet capture-time bounds", () => {
+  const NOW = Date.parse("2026-10-11T18:00:00.000Z");
+  const ms = (iso) => String(Date.parse(iso));
+  assert.equal(VApp.validFetchedAtMs(REAL_V.fetched_at_ms, NOW), REAL_V.fetched_at_ms);
+  assert.equal(VApp.validFetchedAtMs(ms("2026-09-01T00:00:00.000Z"), NOW), ms("2026-09-01T00:00:00.000Z"));
+  assert.equal(VApp.validFetchedAtMs(ms("2026-08-31T23:59:59.000Z"), NOW), null);
+  assert.equal(VApp.validFetchedAtMs(ms("2020-01-01T00:00:00.000Z"), NOW), null);
+  assert.equal(VApp.validFetchedAtMs(String(NOW + 30 * 60 * 1000), NOW), String(NOW + 30 * 60 * 1000));
+  assert.equal(VApp.validFetchedAtMs(String(NOW + 2 * 3600 * 1000), NOW), null);
+  assert.equal(VApp.validFetchedAtMs(ms("2099-01-01T00:00:00.000Z"), NOW), null);
+  assert.equal(VApp.validFetchedAtMs("4102444800000", NOW), null);
+  assert.equal(VApp.validFetchedAtMs("oops", NOW), null);
+  assert.equal(VApp.validFetchedAtMs("1.5", NOW), null);
+  assert.equal(VApp.validFetchedAtMs(null, NOW), null);
+});
 t("boundary: validBlockHeight is the fleet 1..10,000,000 shape", () => {
   assert.equal(VApp.validBlockHeight(REAL_V.block_height), REAL_V.block_height);
   assert.equal(VApp.validBlockHeight(String(REAL_V.block_height)), REAL_V.block_height);

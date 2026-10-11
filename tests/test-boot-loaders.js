@@ -140,7 +140,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!src.includes("function normalizeLive"), "vesting: unvalidated normalizeLive is gone");
   ok(src.includes("snapshot: no valid schedules"), "vesting: all-invalid payload fails honestly instead of rendering poison");
   const html = read("pages/vesting-desk/index.html");
-  ok(html.includes("app.js?v=1.30.0"), "vesting: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.31.0"), "vesting: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 9. Whale Watch: validate the whole snapshot at the load boundary ----
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.11.2"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.11.3"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.48.2"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.3"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.51.2"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.51.3"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.48.2"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.3"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1009,9 +1009,9 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!src.includes("2,441 QTC had vested"), "vesting2: stale hard-coded intents vested figure is gone");
   ok(!src.includes("171,475 of 210,000"), "vesting2: stale hard-coded liquidity claimed figure is gone");
   ok(src.includes('$("st-claimed-sub")'), "vesting2: claimed sub derived from which schedules actually claimed");
-  ok(src.includes("module.exports = { validSchedule, validateSchedules, validBlockHeight };"), "vesting2: Node module hook exports the boundary");
+  ok(src.includes("module.exports = { validSchedule, validateSchedules, validBlockHeight, validFetchedAtMs };"), "vesting2: Node module hook exports the boundary");
   const html = read("pages/vesting-desk/index.html");
-  ok(html.includes("app.js?v=1.30.0"), "vesting2: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.31.0"), "vesting2: app.js cache key bumped for the boundary fix");
   ok(html.includes('id="st-claimed-sub"'), "vesting2: claimed sub has the id the app writes");
   ok(!html.includes("96% locked"), "vesting2: hero no longer pins a drifting locked percentage");
 }
@@ -1618,19 +1618,19 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const mc = read("pages/mining-calculator/app.js");
   ok(mc.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: miningcalc rejects a pre-genesis capture time");
   ok(mc.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: miningcalc rejects a future capture time");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.2"), "fetchedat: miningcalc cache key bumped");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.3"), "fetchedat: miningcalc cache key bumped");
   const pd = read("pages/pool-desk/js/app.js");
   ok(pd.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: pooldesk rejects a pre-genesis capture time");
   ok(pd.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: pooldesk rejects a future capture time");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.2"), "fetchedat: pooldesk cache key bumped");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.3"), "fetchedat: pooldesk cache key bumped");
   const en = read("pages/energy-observatory/js/app.js");
   ok(en.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: energy rejects a pre-genesis capture time");
   ok(en.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: energy rejects a future capture time");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.2"), "fetchedat: energy cache key bumped");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.3"), "fetchedat: energy cache key bumped");
   const lk = read("pages/luck-lab/js/app.js");
   ok(lk.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: lucklab rejects a pre-genesis capture time");
   ok(lk.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: lucklab rejects a future capture time");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.2"), "fetchedat: lucklab cache key bumped");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.3"), "fetchedat: lucklab cache key bumped");
 }
 
 // Batch 50 (2026-10-11 12:19): fleet capture-time alignment, round 2 —
@@ -1658,6 +1658,28 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const nd = read("pages/node-desk/node-core.js");
   ok(nd.includes("if (t < GENESIS_FLOOR_MS || t > now + 3600000) return null;"), "capturetime: nodedesk rejects a non-capture fetched_at (pre-genesis or future)");
   ok(read("pages/node-desk/index.html").includes("app.js?v=1.41.0"), "capturetime: nodedesk cache key bumped");
+}
+
+// Batch 51 (2026-10-11 13:19): vesting-desk capture-time bounds — the
+// last snapshot consumer the Batch 49/50 fleet grep flagged. Its
+// fetched_at_ms went through msStr, the generic 2000..2100 timestamp
+// shape shared with schedule cliff/start/end, so a 2020 stamp computed
+// vesting at a pre-genesis instant (the desk's vested/claimable figures
+// anchor on fetched_at_ms as "now") and a 2099 stamp vested the whole
+// pool instantly, both cited as snapshot provenance. RED first (probe
+// qa-vesting-capturetime: 15 failures, controls passing). Pin: the
+// fleet bounds (genesis floor 2026-09-01, now+1h ceiling) live ONLY in
+// validFetchedAtMs at the fetched_at_ms call site — msStr itself is
+// untouched because the grant cohort's end legitimately reaches 2030 —
+// plus the new cache key and Node exports.
+{
+  const src = read("pages/vesting-desk/app.js");
+  ok(src.includes("function validFetchedAtMs(v, nowMs)"), "vesting3: validFetchedAtMs() defined for the capture time");
+  ok(src.includes("return n >= GENESIS_FLOOR_MS && n <= now + 3600000 ? s : null;"), "vesting3: fetched_at_ms carries the fleet capture-time bounds");
+  ok(src.includes("const fetchedMs = validFetchedAtMs(raw.fetched_at_ms);"), "vesting3: snapshot fetched_at_ms goes through validFetchedAtMs");
+  ok(!src.includes("const fetchedMs = msStr(raw.fetched_at_ms);"), "vesting3: no msStr-only fetched_at_ms load remains");
+  ok(src.includes("return n >= MS_MIN && n <= MS_MAX ? s : null;"), "vesting3: msStr itself stays 2000..2100 for schedule cliff/start/end");
+  ok(read("pages/vesting-desk/index.html").includes("app.js?v=1.31.0"), "vesting3: app.js cache key bumped for the capture-time fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
