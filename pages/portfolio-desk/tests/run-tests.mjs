@@ -55,8 +55,8 @@ test("rollupPortfolio aggregates balances, vesting, activity", () => {
     ]),
     schedules: new Map([
       [addrA, [{ id: 0, beneficiary: addrA, cohort: "grant",
-                 total_plancks: "20000000000000", claimed_plancks: "0",
-                 cliff_ms: "0", start_ms: "0", end_ms: String(Date.now() * 2) }]],
+                 total_plancks: "200000000000000", claimed_plancks: "0",
+                 cliff_ms: "1788912000000", start_ms: "1788912000000", end_ms: "1820448000000" }]],
     ]),
     byAddr: new Map([
       [addrA, { in: [{ id: "t1" }], out: [], count: 1, lastTs: "2026-09-30T00:00:00Z" }],
@@ -141,37 +141,42 @@ test("sanitizeBalance drops poisoned rows, defaults absent reserved/frozen to 0"
 });
 
 test("sanitizeSchedule validates totals and the vesting window", () => {
-  const ok = P.sanitizeSchedule({ id: 3, cohort: "grant", total_plancks: "1000", claimed_plancks: "10", cliff_ms: "100", start_ms: "100", end_ms: "200" });
+  // Fixture windows use real chain-era millisecond instants (the round-2
+  // relations require cliff/start/end inside the 2000..2100 shape).
+  const W = { cliff_ms: "1820479917807", start_ms: "1820479917807", end_ms: "1915087917807" };
+  const ok = P.sanitizeSchedule(Object.assign({}, W, { id: 3, cohort: "grant", total_plancks: "1000", claimed_plancks: "10" }));
   assert.equal(ok.total_plancks, "1000");
   assert.equal(ok.id, 3);
-  const coerced = P.sanitizeSchedule({ id: "<b>9</b>", cohort: { x: 1 }, total_plancks: "5", cliff_ms: 0, start_ms: 0, end_ms: 1 });
+  const coerced = P.sanitizeSchedule(Object.assign({}, W, { id: "<b>9</b>", cohort: { x: 1 }, total_plancks: "5" }));
   assert.equal(coerced.id, null);            // markup-bearing id coerced away, never rendered raw
   assert.equal(coerced.cohort, "—");
   assert.equal(coerced.claimed_plancks, "0"); // absent claimed reads as 0
-  for (const bad of [null, [], { total_plancks: "1.5", cliff_ms: "0", start_ms: "0", end_ms: "1" },
-                     { total_plancks: "5", cliff_ms: "x", start_ms: "0", end_ms: "1" },
-                     { total_plancks: "5", cliff_ms: "0", start_ms: "9", end_ms: "1" },
-                     { total_plancks: "5", claimed_plancks: "-1", cliff_ms: "0", start_ms: "0", end_ms: "1" }])
+  for (const bad of [null, [], Object.assign({}, W, { total_plancks: "1.5" }),
+                     Object.assign({}, W, { total_plancks: "5", cliff_ms: "x" }),
+                     { total_plancks: "5", cliff_ms: "1820479917807", start_ms: "1915087917807", end_ms: "1820479917807" },
+                     Object.assign({}, W, { total_plancks: "5", claimed_plancks: "-1" })])
     assert.equal(P.sanitizeSchedule(bad), null);
+  const BEN = "qzo9ddk2km1qqAmXNiwo55vs5LNTU851mSQc8ufBwkQygHRBv";
   const byBen = P.sanitizeSchedules([
-    { beneficiary: "qzA", total_plancks: "5", cliff_ms: "0", start_ms: "0", end_ms: "1" },
-    { beneficiary: "qzA", total_plancks: "bad", cliff_ms: "0", start_ms: "0", end_ms: "1" },
+    Object.assign({}, W, { beneficiary: BEN, total_plancks: "5" }),
+    Object.assign({}, W, { beneficiary: BEN, total_plancks: "bad" }),
     null,
-    { total_plancks: "5", cliff_ms: "0", start_ms: "0", end_ms: "1" },
-    { beneficiary: 42, total_plancks: "5", cliff_ms: "0", start_ms: "0", end_ms: "1" },
+    Object.assign({}, W, { total_plancks: "5" }),
+    Object.assign({}, W, { beneficiary: 42, total_plancks: "5" }),
   ]);
-  assert.equal(byBen.get("qzA").length, 1);
+  assert.equal(byBen.get(BEN).length, 1);
   assert.equal(byBen.size, 1);
 });
 
 test("sanitizeTransfers drops unrenderable rows and coerces garbage timestamps to null", () => {
+  const FA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7", FB = "qzo9ddk2km1qqAmXNiwo55vs5LNTU851mSQc8ufBwkQygHRBv";
   const rows = P.sanitizeTransfers([
-    { id: "t1", amount: "100", from_id: "qzA", to_id: "qzB", block_height: 5, timestamp: "2026-09-30T00:00:00Z" },
-    { id: "t2", amount: "12.5", from_id: "qzA", to_id: "qzB", block_height: 6, timestamp: null },
-    { id: "t3", amount: "1", from_id: "qzA", to_id: "qzB", block_height: "NaN", timestamp: null },
+    { id: "t1", amount: "100", from_id: FA, to_id: FB, block_height: 5, timestamp: "2026-09-30T00:00:00Z" },
+    { id: "t2", amount: "12.5", from_id: FA, to_id: FB, block_height: 6, timestamp: null },
+    { id: "t3", amount: "1", from_id: FA, to_id: FB, block_height: "NaN", timestamp: null },
     null,
-    { amount: "7", from_id: "qzA", to_id: "qzB", block_height: "9", timestamp: "garbage" },
-    { id: "t6", amount: "1", from_id: "qzA", block_height: 1, timestamp: null },
+    { amount: "7", from_id: FA, to_id: FB, block_height: "9", timestamp: "garbage" },
+    { id: "t6", amount: "1", from_id: FA, block_height: 1, timestamp: null },
   ]);
   assert.equal(rows.length, 2);
   assert.equal(rows[0].amount, "100");
@@ -181,21 +186,26 @@ test("sanitizeTransfers drops unrenderable rows and coerces garbage timestamps t
 });
 
 test("sanitizeTopBalances and sanitizeMinedCounts reject garbage without NaN", () => {
+  const MA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7",
+        MB = "qzo9ddk2km1qqAmXNiwo55vs5LNTU851mSQc8ufBwkQygHRBv",
+        MC = "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk",
+        MD = "qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv";
   const top = P.sanitizeTopBalances([
-    { address: "qzA", free_plancks: "100", reserved_plancks: "0", frozen_plancks: "0" },
-    { address: "qzB", free_plancks: "-5" },
+    { address: MA, free_plancks: "100", reserved_plancks: "0", frozen_plancks: "0" },
+    { address: MB, free_plancks: "-5" },
     null,
     { free_plancks: "1" },
   ]);
   assert.equal(top.size, 1);
-  assert.equal(top.get("qzA").free, "100");
-  const mined = P.sanitizeMinedCounts({ qzA: 3, qzB: "abc", qzC: "4" }, [
-    { address: "qzA", blocks: 10 }, { address: "qzD", blocks: "x" }, null, { blocks: 1 },
+  assert.equal(top.get(MA).free, "100");
+  const mined = P.sanitizeMinedCounts({ [MA]: 3, [MB]: "abc", [MC]: "4" }, [
+    { address: MA, blocks: 10 }, { address: MD, blocks: "x" }, null, { blocks: 1 },
   ]);
-  assert.equal(mined.get("qzA"), 13);
-  assert.equal(mined.has("qzB"), false);
-  assert.equal(mined.get("qzC"), 4);
-  assert.equal(mined.has("qzD"), false);
+  // Round 2: all_time already includes the window — MA is 10, never 3+10.
+  assert.equal(mined.get(MA), 10);
+  assert.equal(mined.has(MB), false);
+  assert.equal(mined.get(MC), 4);
+  assert.equal(mined.has(MD), false);
 });
 
 test("parseVaultJson drops poison entries and duplicates instead of throwing or double-counting", () => {
@@ -221,8 +231,8 @@ test("rollupPortfolio survives poisoned ctx values (unknown, never a throw)", ()
   P.addToVault(vault, "qzA", "Cold");
   const ctx = {
     balances: new Map([["qzA", { free: "12.5", reserved: "0", frozen: "0" }]]),
-    schedules: new Map([["qzA", [{ id: 0, total_plancks: "bad", cliff_ms: "0", start_ms: "0", end_ms: "1" },
-                                  { id: 1, total_plancks: "2000000000000", claimed_plancks: "0", cliff_ms: "0", start_ms: "0", end_ms: "9999999999999" }]]]),
+    schedules: new Map([["qzA", [{ id: 0, total_plancks: "bad", cliff_ms: "1820479917807", start_ms: "1820479917807", end_ms: "1915087917807" },
+                                  { id: 1, total_plancks: "2000000000000", claimed_plancks: "0", cliff_ms: "1820479917807", start_ms: "1820479917807", end_ms: "4102444799999" }]]]),
     byAddr: new Map([["qzA", { in: "not-an-array", out: [], count: 0, lastTs: null }]]),
     minedCounts: new Map([["qzA", "abc"]]),
   };
@@ -242,6 +252,42 @@ test("portfolioActivity keeps id-less rows and drops unrenderable ones", () => {
   const acts = P.portfolioActivity(byAddr, ["qzA"], 25);
   assert.equal(acts.length, 2);   // pre-fix: all id-less rows collapsed to one, and the bad row reached BigInt()
   assert.equal(acts[0].t.amount, "200");
+});
+
+test("round 2 relations: mined counts never double-count the window", () => {
+  const MA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7",
+        MB = "qzo9ddk2km1qqAmXNiwo55vs5LNTU851mSQc8ufBwkQygHRBv";
+  // Live-verified at head 207,818: the top miner's window count (10,532)
+  // is already inside its all_time count (83,778); the desk painted 94,310.
+  const m = P.sanitizeMinedCounts({ [MA]: 10532, [MB]: 7 }, [{ address: MA, blocks: 83778 }]);
+  assert.equal(m.get(MA), 83778);
+  assert.equal(m.get(MB), 7); // absent from all_time: window floor stands
+  const dup = P.sanitizeMinedCounts({}, [{ address: MA, blocks: 100 }, { address: MA, blocks: 100 }]);
+  assert.equal(dup.get(MA), 100); // a restated cumulative fact counts once
+});
+
+test("round 2 relations: caps, shapes, heights, timestamps, duplicate ids", () => {
+  const FA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7", FB = "qzo9ddk2km1qqAmXNiwo55vs5LNTU851mSQc8ufBwkQygHRBv";
+  const CAP = "21000000000000000000";
+  const row = (patch) => Object.assign({ id: "t1", amount: "1000000000000", from_id: FA, to_id: FB,
+                                         block_height: 200000, timestamp: "2026-10-11T00:00:00.000Z" }, patch);
+  assert.equal(P.sanitizeTransfers([row({})]).length, 1);
+  assert.equal(P.sanitizeTransfers([row({ amount: "0" })]).length, 0);
+  assert.equal(P.sanitizeTransfers([row({ amount: "22000000000000000000" })]).length, 0);
+  assert.equal(P.sanitizeTransfers([row({ block_height: 0 })]).length, 0);
+  assert.equal(P.sanitizeTransfers([row({ block_height: 99999999999 })]).length, 0);
+  assert.equal(P.sanitizeTransfers([row({ from_id: "not-an-address" })]).length, 0);
+  assert.equal(P.sanitizeTransfers([row({ timestamp: "2020-01-01T00:00:00.000Z" })]).length, 0);
+  assert.equal(P.sanitizeTransfers([row({ timestamp: "2999-01-01T00:00:00.000Z" })]).length, 0);
+  assert.equal(P.sanitizeTransfers([row({}), row({})]).length, 1);
+  assert.equal(P.sanitizeBalance({ free: "22000000000000000000" }), null);
+  assert.equal(P.sanitizeBalance({ free: "20000000000000000000", reserved: "2000000000000000000" }), null);
+  assert.ok(P.sanitizeBalance({ free: CAP }) !== null);
+  const W = { cliff_ms: "1820479917807", start_ms: "1820479917807", end_ms: "1915087917807" };
+  assert.equal(P.sanitizeSchedule(Object.assign({}, W, { total_plancks: "22000000000000000000", claimed_plancks: "0" })), null);
+  assert.equal(P.sanitizeSchedule(Object.assign({}, W, { total_plancks: "1000", claimed_plancks: "1001" })), null);
+  assert.equal(P.sanitizeSchedule(Object.assign({}, W, { total_plancks: "1000", claimed_plancks: "0", cliff_ms: "1915087917808" })), null);
+  assert.equal(P.sanitizeSchedule(Object.assign({}, W, { total_plancks: "1000", claimed_plancks: "0", end_ms: "1" })), null);
 });
 
 test("csvExport produces a parseable holdings CSV", () => {

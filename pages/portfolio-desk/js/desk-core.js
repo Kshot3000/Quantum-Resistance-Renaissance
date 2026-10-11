@@ -14,6 +14,18 @@ var MAX_SUPPLY_PLANCKS = MAX_SUPPLY_QTC * PLANCK_PER_QTC;
 var VAULT_KEY = "qtc-portfolio-desk-vault-v1";
 var MAX_ADDRESSES = 200;
 
+/* Fleet boundary bounds (round 2, 2026-10-11): the same relations the
+ * Flow Tracer / Ledger Desk cores enforce — verified against live data
+ * at head 207,818 before being written down here. Quantus launched
+ * 2026-09-09; no chain fact predates the 2026-09-01 genesis floor, no
+ * block height exceeds the fleet's 10,000,000 sanity ceiling, and no
+ * account or transfer can exceed the 21M supply cap. */
+var MAX_CHAIN_HEIGHT = 10000000;
+var GENESIS_FLOOR_MS = Date.UTC(2026, 8, 1); // 2026-09-01T00:00:00Z
+var SS58_189_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // strict shape: qz + 47 base58
+var SCHED_MS_MIN = 946684800000;   // 2000-01-01 (vesting desk msStr shape)
+var SCHED_MS_MAX = 4102444800000;  // 2100-01-01
+
 /* ---------- planck <-> QTC ---------- */
 
 function parseQtcToPlancks(str) {
@@ -58,6 +70,16 @@ function formatQtc(plancks, decimals) {
  *   absent-but-recoverable — a missing reserved/frozen/claimed reads
  *           as "0", a garbage transfer timestamp coerces to null, a
  *           non-string cohort/id is coerced, never thrown on.
+ *
+ * Round 2 (2026-10-11) validates RELATIONS between fields, not just
+ * their shapes — every relation below was verified against live data
+ * first: mined counts take all_time over the window (the window is
+ * already inside all_time; summing double-counted), a balance's
+ * components sum to at most the 21M cap, a schedule's claimed never
+ * exceeds its total and its cliff never follows its end, and transfer
+ * rows carry a positive in-cap amount between strict SS58-189
+ * endpoints at a height of 1..10,000,000 with no duplicated id and no
+ * present-but-impossible timestamp.
  */
 
 function validPlancks(v) {
@@ -91,6 +113,10 @@ function sanitizeBalance(row) {
   var reserved = row.reserved == null ? "0" : validPlancks(row.reserved);
   var frozen = row.frozen == null ? "0" : validPlancks(row.frozen);
   if (reserved === null || frozen === null) return null;
+  // Relation: one account can never hold more than the whole supply —
+  // neither in a single component nor summed (verified: every live
+  // top-200 row sums under the cap).
+  if (BigInt(free) + BigInt(reserved) + BigInt(frozen) > MAX_SUPPLY_PLANCKS) return null;
   return { free: free, reserved: reserved, frozen: frozen };
 }
 
@@ -100,8 +126,20 @@ function sanitizeSchedule(s) {
   if (total === null) return null; // core field
   var claimed = s.claimed_plancks == null ? "0" : validPlancks(s.claimed_plancks);
   if (claimed === null) return null;
+  // Relations (verified on all 48 live schedules): the grant cannot
+  // exceed the supply cap, and claimed can never exceed the grant.
+  if (BigInt(total) > MAX_SUPPLY_PLANCKS) return null;
+  if (BigInt(claimed) > BigInt(total)) return null;
   var cliff = nonNegInt(s.cliff_ms), start = nonNegInt(s.start_ms), end = nonNegInt(s.end_ms);
   if (cliff === null || start === null || end === null || end < start) return null;
+  // The window fields are millisecond instants, not bare counts: the
+  // vesting desk's 2000..2100 shape applies (an end_ms of 1 is 1970 —
+  // it would vest the whole grant instantly at any real "now"), and a
+  // cliff after the end is a window that can never exist on-chain.
+  if (cliff < SCHED_MS_MIN || cliff > SCHED_MS_MAX ||
+      start < SCHED_MS_MIN || start > SCHED_MS_MAX ||
+      end < SCHED_MS_MIN || end > SCHED_MS_MAX) return null;
+  if (cliff > end) return null;
   return {
     id: nonNegInt(s.id),
     cohort: typeof s.cohort === "string" && s.cohort ? s.cohort : "—",
@@ -115,7 +153,7 @@ function sanitizeSchedules(rows) {
   if (!Array.isArray(rows)) return byBeneficiary;
   rows.forEach(function (s) {
     if (!s || typeof s !== "object") return;
-    if (typeof s.beneficiary !== "string" || !s.beneficiary) return;
+    if (typeof s.beneficiary !== "string" || !SS58_189_RE.test(s.beneficiary)) return;
     var clean = sanitizeSchedule(s);
     if (!clean) return;
     var arr = byBeneficiary.get(s.beneficiary);
@@ -128,17 +166,41 @@ function sanitizeSchedules(rows) {
 function sanitizeTransfers(rows) {
   if (!Array.isArray(rows)) return [];
   var out = [];
+  var seenIds = {};
+  var nowCeil = Date.now() + 3600000; // capture-time ceiling, fleet standard
   rows.forEach(function (t) {
     if (!t || typeof t !== "object" || Array.isArray(t)) return;
     var amount = validPlancks(t.amount);
     var height = parseHeight(t.block_height);
     if (amount === null || height === null) return; // core fields
-    if (typeof t.from_id !== "string" || !t.from_id) return;
-    if (typeof t.to_id !== "string" || !t.to_id) return;
+    // Relations, not just shapes: a transfer moves a positive amount no
+    // larger than the whole supply, between two strict SS58-189
+    // endpoints, at a real chain height (1..10,000,000).
+    if (BigInt(amount) <= 0n || BigInt(amount) > MAX_SUPPLY_PLANCKS) return;
+    if (height < 1 || height > MAX_CHAIN_HEIGHT) return;
+    if (typeof t.from_id !== "string" || !SS58_189_RE.test(t.from_id)) return;
+    if (typeof t.to_id !== "string" || !SS58_189_RE.test(t.to_id)) return;
+    // A PRESENT-but-impossible timestamp (pre-genesis, or past the
+    // capture ceiling) poisons the row — the desk must not present it
+    // as chain fact. An UNPARSEABLE one still coerces to null (ages and
+    // ordering run on block height), per the round-1 classification.
+    var ts = parseableTs(t.timestamp);
+    if (ts !== null) {
+      var ms = Date.parse(ts);
+      if (!(ms >= GENESIS_FLOOR_MS && ms <= nowCeil)) return;
+    }
+    var id = (typeof t.id === "string" && t.id) || (typeof t.id === "number" && Number.isFinite(t.id)) ? String(t.id) : null;
+    // Dedupe AFTER validation (a poisoned first copy must not suppress
+    // a good one): a duplicated transfer id double-indexed into the
+    // per-address in/out counts the rollup reports.
+    if (id !== null) {
+      if (seenIds[id]) return;
+      seenIds[id] = 1;
+    }
     out.push({
-      id: (typeof t.id === "string" && t.id) || (typeof t.id === "number" && Number.isFinite(t.id)) ? String(t.id) : null,
+      id: id,
       amount: amount, from_id: t.from_id, to_id: t.to_id,
-      block_height: height, timestamp: parseableTs(t.timestamp),
+      block_height: height, timestamp: ts,
     });
   });
   return out;
@@ -149,7 +211,7 @@ function sanitizeTopBalances(rows) {
   if (!Array.isArray(rows)) return byAddr;
   rows.forEach(function (a) {
     if (!a || typeof a !== "object") return;
-    if (typeof a.address !== "string" || !a.address) return;
+    if (typeof a.address !== "string" || !SS58_189_RE.test(a.address)) return;
     var bal = sanitizeBalance({ free: a.free_plancks, reserved: a.reserved_plancks, frozen: a.frozen_plancks });
     if (bal) byAddr.set(a.address, bal);
   });
@@ -157,17 +219,36 @@ function sanitizeTopBalances(rows) {
 }
 
 function sanitizeMinedCounts(windowMiners, allTime) {
+  // miners.json carries TWO views of the same fact: window_miners is
+  // complete for the last 15,000 blocks, all_time is cumulative since
+  // genesis for the top-100 miners — and all_time already INCLUDES the
+  // window blocks for every address present in both (verified at head
+  // 207,818: 35/35 shared addresses have all_time >= window). Adding
+  // the two maps — what this function used to do — double-counted the
+  // window: the top miner painted 94,310 blocks mined against a true
+  // all-time 83,778. The honest count is all_time where the address is
+  // listed there, else the window count (a floor: it mined at least
+  // that many). A duplicated all_time row restates the same cumulative
+  // fact, so it is counted once, never summed.
   var counts = new Map();
-  function add(addr, n) {
-    if (typeof addr !== "string" || !addr) return;
-    var v = nonNegInt(n);
-    if (v === null) return; // a garbage count is unknown, never NaN blocks mined
-    counts.set(addr, (counts.get(addr) || 0) + v);
-  }
   if (windowMiners && typeof windowMiners === "object" && !Array.isArray(windowMiners))
-    Object.keys(windowMiners).forEach(function (addr) { add(addr, windowMiners[addr]); });
-  if (Array.isArray(allTime))
-    allTime.forEach(function (m) { if (m && typeof m === "object") add(m.address, m.blocks); });
+    Object.keys(windowMiners).forEach(function (addr) {
+      if (!SS58_189_RE.test(addr)) return;
+      var v = nonNegInt(windowMiners[addr]);
+      if (v !== null) counts.set(addr, v);
+    });
+  if (Array.isArray(allTime)) {
+    var seenAllTime = {};
+    allTime.forEach(function (m) {
+      if (!m || typeof m !== "object") return;
+      if (typeof m.address !== "string" || !SS58_189_RE.test(m.address)) return;
+      if (seenAllTime[m.address]) return;
+      var v = nonNegInt(m.blocks);
+      if (v === null) return; // a garbage count is unknown, never NaN blocks mined
+      seenAllTime[m.address] = 1;
+      counts.set(m.address, v);
+    });
+  }
   return counts;
 }
 
