@@ -47,7 +47,14 @@ function nonNegInt(v) {
   return null;
 }
 
-function parseHeight(v) { return nonNegInt(v); }
+var MAX_SUPPLY_PLANCKS = 21000000n * PLANCKS_PER_QTC; // 21M QTC hard cap
+var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain genesis was 2026-09-09
+var MAX_CHAIN_HEIGHT = 10000000; // fleet bound (validBlockHeight elsewhere)
+
+function parseHeight(v) { // fleet chain height: indexer transfers live at 1..10,000,000
+  var n = nonNegInt(v);
+  return (n !== null && n >= 1 && n <= MAX_CHAIN_HEIGHT) ? n : null;
+}
 
 function parseableTs(v) {
   if (typeof v === "string" && v && Number.isFinite(Date.parse(v))) return v;
@@ -55,23 +62,45 @@ function parseableTs(v) {
   return null;
 }
 
+/* Round 2 (2026-10-11): a present timestamp must sit inside the chain's
+ * lifetime — a 2020 stamp predates genesis and a 2999 stamp defeats every
+ * freshness notion; both are poison, not recoverable formatting. (A
+ * MISSING timestamp stays recoverable: genesis rows carry none.)
+ * Heights and amounts get the same treatment below: a transfer's height
+ * is a fleet chain height (1..10,000,000), its amount a positive planck
+ * count no larger than the 21M supply cap — 0-planck rows are not
+ * transfers, and a 100M QTC row cannot exist on this chain. */
+function chainLifetimeTs(v) {
+  var ts = parseableTs(v);
+  if (ts === null) return null;
+  var ms = Date.parse(ts);
+  if (ms < GENESIS_FLOOR_MS || ms > Date.now() + 3600000) return null;
+  return ts;
+}
+
 function sanitizeTransfer(r, i) {
   if (!r || typeof r !== "object" || Array.isArray(r)) return null;
   var amount = validPlancks(r.amount);
-  if (amount === null) return null; // core field
+  if (amount === null || BigInt(amount) <= 0n || BigInt(amount) > MAX_SUPPLY_PLANCKS) return null; // core field
   var height = parseHeight(r.block_height);
   if (height === null) return null; // core field
   if (typeof r.from_id !== "string" || !r.from_id) return null;
   if (typeof r.to_id !== "string" || !r.to_id) return null;
   var fee = r.fee == null ? "0" : validPlancks(r.fee);
   if (fee === null) fee = "0"; // recoverable: anchors nothing in this app
+  var ts = null;
+  if (r.timestamp != null && parseableTs(r.timestamp) !== null) {
+    ts = chainLifetimeTs(r.timestamp);
+    if (ts === null) return null; // a parseable-but-impossible timestamp is poison (round 2);
+    // an UNPARSEABLE one still coerces to null (round 1: it anchors no total)
+  }
   var id = null;
   if (typeof r.id === "string" && r.id) id = r.id;
   else if (typeof r.id === "number" && Number.isFinite(r.id)) id = String(r.id);
   if (!id) id = "row-" + i + ":" + r.from_id + ">" + r.to_id + "@" + height + ":" + amount;
   return {
     id: id, amount: amount, from_id: r.from_id, to_id: r.to_id,
-    block_height: height, timestamp: parseableTs(r.timestamp),
+    block_height: height, timestamp: ts,
     fee: fee, extrinsic_id: typeof r.extrinsic_id === "string" && r.extrinsic_id ? r.extrinsic_id : null,
   };
 }
@@ -97,9 +126,78 @@ function sanitizeSnapshotMeta(m) {
   if (!m || typeof m !== "object" || Array.isArray(m)) return null;
   var from = parseHeight(m.window_from), head = parseHeight(m.chain_height);
   if (from === null || head === null || from > head) return null;
-  var captured = parseableTs(m.captured_at);
+  var captured = chainLifetimeTs(m.captured_at); // round 2: a real capture time, not any parseable date
   if (captured === null) return null;
-  return { window_from: from, chain_height: head, captured_at: captured };
+  var out = { window_from: from, chain_height: head, captured_at: captured };
+  // Round 2: the meta's redundant fields must restate the core fields
+  // when present — window_blocks IS head - from by construction, and the
+  // row counts are checked against the payload by the loader.
+  if (m.window_blocks != null) {
+    var wb = nonNegInt(m.window_blocks);
+    if (wb === null || wb !== head - from) return null;
+    out.window_blocks = wb;
+  }
+  if (m.transfers != null) {
+    var tc = nonNegInt(m.transfers);
+    if (tc === null) return null;
+    out.transfers = tc;
+  }
+  if (m.genesis_rows != null) {
+    var gr = nonNegInt(m.genesis_rows);
+    if (gr === null) return null;
+    out.genesis_rows = gr;
+  }
+  if (m.dust_threshold_planck != null) {
+    var dt = validPlancks(m.dust_threshold_planck);
+    if (dt === null || BigInt(dt) <= 0n) return null;
+    out.dust_threshold_planck = dt;
+  }
+  return out;
+}
+
+var SS58_189_SHAPE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // strict shape (fleet standard; checksum lives in ss58.js)
+
+/* Snapshot-row relations (round 2, 2026-10-11) — verified against the
+ * live snapshot first (head 207,263: every one of 1,146 addresses matches
+ * the strict SS58-189 shape, heights run 1..207,256 <= chain_height,
+ * in-window rows are all >= the 1 QTC dust floor exactly, timestamps run
+ * genesis..captured_at, meta.transfers restates the row count, and the
+ * block-1 rows are exactly the 22 genesis transfers). The generic
+ * sanitizer checks each row against itself; this layer checks rows
+ * against the SNAPSHOT they claim to belong to:
+ *   - both endpoints must be SS58-189-shaped (the graph's nodes are
+ *     presented as chain addresses; "qzABC" is not one);
+ *   - no row may sit above the snapshot's own chain_height, nor carry
+ *     a timestamp after its capture time (5 min indexer slack);
+ *   - rows inside the window owe the window's dust floor — the fetch
+ *     query filters amount >= threshold, so a sub-floor in-window row
+ *     is not window data;
+ *   - a synthetic genesis-* row whose facts duplicate an indexer row is
+ *     the SAME transfer twice: the fetch merge namespaced the genesis
+ *     ids, so id-dedupe missed that the top-600 query already carried
+ *     the 5,669,940 QTC vesting transfer — the live snapshot painted it
+ *     twice (double totals, and the "largest organic move" quick pick
+ *     pointed at the genesis duplicate). The indexer row (real
+ *     timestamp) wins; the synthetic copy drops. */
+function sanitizeSnapshotTransfers(rows, meta) {
+  if (!meta) return [];
+  var clean = sanitizeTransfers(rows);
+  var capturedMs = Date.parse(meta.captured_at);
+  var dust = meta.dust_threshold_planck != null ? BigInt(meta.dust_threshold_planck) : PLANCKS_PER_QTC;
+  var genesisFacts = new Set();
+  clean.forEach(function (r) {
+    if (r.block_height === 1 && !r.id.startsWith("genesis-"))
+      genesisFacts.add(r.from_id + ">" + r.to_id + "@1:" + r.amount);
+  });
+  return clean.filter(function (r) {
+    if (!SS58_189_SHAPE.test(r.from_id) || !SS58_189_SHAPE.test(r.to_id)) return false;
+    if (r.block_height > meta.chain_height) return false;
+    if (r.timestamp !== null && Date.parse(r.timestamp) > capturedMs + 300000) return false;
+    if (r.block_height >= meta.window_from && BigInt(r.amount) < dust) return false;
+    if (r.block_height === 1 && r.id.startsWith("genesis-") &&
+        genesisFacts.has(r.from_id + ">" + r.to_id + "@1:" + r.amount)) return false;
+    return true;
+  });
 }
 
 /* Build adjacency indexes over a row list. Rows are sanitized at this
@@ -415,6 +513,7 @@ var api = {
   parseableTs: parseableTs,
   sanitizeTransfer: sanitizeTransfer,
   sanitizeTransfers: sanitizeTransfers,
+  sanitizeSnapshotTransfers: sanitizeSnapshotTransfers,
   sanitizeSnapshotMeta: sanitizeSnapshotMeta,
   buildGraph: buildGraph,
   trace: trace,

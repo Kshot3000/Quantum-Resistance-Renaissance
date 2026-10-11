@@ -76,10 +76,15 @@ for (const r of out.transfers) {
   if (String(r.id).startsWith("genesis-")) synthGenesis++;
 }
 check("every decoded row has all 8 v1 fields, correctly typed", fieldsOk);
-// Block 1 holds the 22 synthetic genesis rows PLUS the largest allocation,
-// which is also a real indexer row inside the all-time top-600.
-check("genesis rows survive (synthetic set complete per meta)", synthGenesis === snap.meta.genesis_rows && genesis >= snap.meta.genesis_rows,
-  synthGenesis + " synthetic + " + (genesis - synthGenesis) + " real at block 1");
+// Block 1 holds exactly the genesis allocation set recorded in the meta:
+// the synthetic rows PLUS the largest allocation's real indexer row (the
+// top-600 catches it) — deduped by facts since 2026-10-11, when the merge
+// counted it twice (22 synthetic + the same transfer again as an indexer
+// row = 23 block-1 rows for a 22-transfer allocation).
+const genesisFacts = new Set(out.transfers.filter((r) => r.block_height === 1)
+  .map((r) => r.from_id + ">" + r.to_id + "@1:" + r.amount));
+check("genesis rows survive (block-1 set complete and fact-unique per meta)", genesis === snap.meta.genesis_rows && genesisFacts.size === genesis,
+  synthGenesis + " synthetic + " + (genesis - synthGenesis) + " real at block 1, " + genesisFacts.size + " distinct");
 let colTotal = 0n;
 for (const r of snap.transfers) colTotal += BigInt(r[1]);
 check("decoded BigInt total equals column total", total === colTotal, total.toString() + " plancks");

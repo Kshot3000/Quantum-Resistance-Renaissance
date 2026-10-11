@@ -66,7 +66,15 @@ async function loadData() {
   if (!snap || typeof snap !== "object" || !Array.isArray(snap.transfers)) throw new Error("snapshot is malformed");
   var m = F.sanitizeSnapshotMeta(snap.meta);
   if (!m) throw new Error("snapshot metadata is malformed");
-  snapGraph = F.buildGraph(snap.transfers);
+  // Round 2: the meta must restate the payload it describes — a row count
+  // that disagrees with the decoded list, or a cleaned block-1 set that is
+  // not exactly the recorded genesis allocation, means this file is not
+  // the capture its badge claims; fail honestly instead of painting it.
+  if (m.transfers != null && snap.transfers.length !== m.transfers) throw new Error("snapshot transfer count does not restate its metadata");
+  var cleaned = F.sanitizeSnapshotTransfers(snap.transfers, m);
+  if (m.genesis_rows != null && cleaned.filter(function (t) { return t.block_height === 1; }).length !== m.genesis_rows)
+    throw new Error("snapshot genesis rows do not restate its metadata");
+  snapGraph = F.buildGraph(cleaned);
   if (!snapGraph.rows.length) throw new Error("snapshot contained no valid transfers");
   var rows = snapGraph.rows;
   $("snap-badge").textContent = "snapshot: " + rows.length.toLocaleString() +
@@ -124,6 +132,15 @@ async function doTrace(addr, direction, hops) {
   if (liveOk) {
     try {
       rows = await liveTraceRows(addr);
+      // Round 2: a live answer anchors this address's trace and dossier —
+      // keep only rows that actually involve the queried address between
+      // two checksum-valid SS58-189 endpoints (the snapshot boundary's
+      // relation, applied to the live boundary too).
+      rows = rows.filter(function (r) {
+        return r && typeof r.from_id === "string" && typeof r.to_id === "string" &&
+          (r.from_id === addr || r.to_id === addr) &&
+          validAddress(r.from_id) === r.from_id && validAddress(r.to_id) === r.to_id;
+      });
       var liveGraph = F.buildGraph(rows);
       if (liveGraph.rows.length) { graph = liveGraph; mode = "live"; }
     } catch (e) { /* fall through to snapshot */ }

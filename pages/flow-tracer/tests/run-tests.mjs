@@ -104,8 +104,8 @@ t("trace default edge cap is 1200 (hub seed cannot flood the graph)", () => {
 /* --- aggregateEdges --- */
 t("aggregateEdges sums parallel transfers per ordered pair", () => {
   const g = F.buildGraph([
-    { id: "a1", amount: 10n * Q, from_id: "A", to_id: "B", block_height: 5, timestamp: "2026-01-01T00:00:00Z", fee: "0", extrinsic_id: null },
-    { id: "a2", amount: 25n * Q, from_id: "A", to_id: "B", block_height: 9, timestamp: "2026-01-02T00:00:00Z", fee: "0", extrinsic_id: null },
+    { id: "a1", amount: 10n * Q, from_id: "A", to_id: "B", block_height: 5, timestamp: "2026-10-01T00:00:00Z", fee: "0", extrinsic_id: null },
+    { id: "a2", amount: 25n * Q, from_id: "A", to_id: "B", block_height: 9, timestamp: "2026-10-02T00:00:00Z", fee: "0", extrinsic_id: null },
     { id: "a3", amount: 7n * Q, from_id: "B", to_id: "A", block_height: 1, timestamp: null, fee: "0", extrinsic_id: null },
   ]);
   const agg = F.aggregateEdges(g.rows);
@@ -115,7 +115,7 @@ t("aggregateEdges sums parallel transfers per ordered pair", () => {
   assert.equal(agg[0].count, 2);
   assert.equal(agg[0].maxAmount, 25n * Q);
   assert.equal(agg[0].lastBlock, 9);
-  assert.equal(agg[0].timestamp, "2026-01-02T00:00:00Z");
+  assert.equal(agg[0].timestamp, "2026-10-02T00:00:00Z");
   assert.equal(agg[0].genesis, false);
   assert.equal(agg[1].genesis, true);
   assert.equal(agg[1].amount, 7n * Q);
@@ -257,7 +257,7 @@ t("validPlancks accepts only non-negative integer plancks", () => {
 });
 t("sanitizeTransfers drops core poison, coerces recoverable fields", () => {
   const clean = F.sanitizeTransfers([
-    { id: "ok", amount: "2000000000000", from_id: "A", to_id: "B", block_height: 10, timestamp: "2026-01-01T00:00:00Z", fee: "5", extrinsic_id: "0x1" },
+    { id: "ok", amount: "2000000000000", from_id: "A", to_id: "B", block_height: 10, timestamp: "2026-10-01T00:00:00Z", fee: "5", extrinsic_id: "0x1" },
     { id: "frac", amount: "12.5", from_id: "A", to_id: "B", block_height: 11, timestamp: null, fee: "0", extrinsic_id: null },
     { id: "neg", amount: "-5", from_id: "A", to_id: "B", block_height: 12, timestamp: null, fee: "0", extrinsic_id: null },
     { id: "badh", amount: "1", from_id: "A", to_id: "B", block_height: "x", timestamp: null, fee: "0", extrinsic_id: null },
@@ -316,6 +316,44 @@ t("sanitizeSnapshotMeta validates heights and capture time", () => {
   assert.equal(F.sanitizeSnapshotMeta({ window_from: 50, chain_height: 10, captured_at: "2026-10-10T00:00:00Z" }), null);
   assert.equal(F.sanitizeSnapshotMeta({ window_from: 1, chain_height: 10, captured_at: "not-a-date" }), null);
   assert.equal(F.sanitizeSnapshotMeta(null), null);
+});
+
+/* --- round 2 relations (2026-10-11): validate RELATIONS, not just shapes --- */
+t("round 2: zero and over-cap amounts drop, chain-lifetime timestamps gate present values", () => {
+  const base = { from_id: "A", to_id: "B", fee: "0", extrinsic_id: null };
+  assert.equal(F.sanitizeTransfers([{ ...base, id: "z", amount: "0", block_height: 10, timestamp: null }]).length, 0);
+  assert.equal(F.sanitizeTransfers([{ ...base, id: "cap", amount: "100000000000000000000", block_height: 10, timestamp: null }]).length, 0);
+  assert.equal(F.sanitizeTransfers([{ ...base, id: "capok", amount: "21000000000000000000", block_height: 10, timestamp: null }]).length, 1);
+  assert.equal(F.sanitizeTransfers([{ ...base, id: "h0", amount: "1", block_height: 0, timestamp: null }]).length, 0);
+  assert.equal(F.sanitizeTransfers([{ ...base, id: "hbig", amount: "1", block_height: 99999999999, timestamp: null }]).length, 0);
+  assert.equal(F.sanitizeTransfers([{ ...base, id: "old", amount: "1", block_height: 10, timestamp: "2020-01-01T00:00:00.000Z" }]).length, 0);
+  assert.equal(F.sanitizeTransfers([{ ...base, id: "fut", amount: "1", block_height: 10, timestamp: "2999-01-01T00:00:00.000Z" }]).length, 0);
+});
+t("round 2: snapshot meta requires a real capture time and restated relations", () => {
+  const M = { window_from: 5, chain_height: 100, captured_at: "2026-10-01T00:00:00.000Z" };
+  assert.equal(F.sanitizeSnapshotMeta({ ...M, captured_at: "2020-01-01T00:00:00.000Z" }), null);
+  assert.equal(F.sanitizeSnapshotMeta({ ...M, captured_at: "2999-01-01T00:00:00.000Z" }), null);
+  assert.equal(F.sanitizeSnapshotMeta({ ...M, chain_height: 99999999999 }), null);
+  assert.equal(F.sanitizeSnapshotMeta({ ...M, window_blocks: 50 }), null);
+  assert.equal(F.sanitizeSnapshotMeta({ ...M, window_blocks: 95 }).window_blocks, 95);
+  assert.equal(F.sanitizeSnapshotMeta({ ...M, transfers: 5411 }).transfers, 5411);
+});
+t("round 2: snapshot rows must belong to the snapshot (shape, head, dust, capture, genesis dupe)", () => {
+  const A = "qz" + "A".repeat(47), B = "qz" + "B".repeat(47), C = "qz" + "C".repeat(47);
+  const M = F.sanitizeSnapshotMeta({ window_from: 5, chain_height: 100, captured_at: "2026-10-01T00:00:00.000Z", dust_threshold_planck: "1000000000000" });
+  const mk = (id, amount, from, to, h, extra = {}) => ({ id, amount, from_id: from, to_id: to, block_height: h, timestamp: "2026-10-01T00:00:00.000Z", fee: "0", extrinsic_id: null, ...extra });
+  const clean = F.sanitizeSnapshotTransfers([
+    mk("ok", "1000000000000", A, B, 50),
+    mk("badaddr", "1000000000000", "not-an-address", B, 50),
+    mk("future", "1000000000000", A, B, 101),
+    mk("dust", "999999999999", A, B, 60),
+    mk("late", "1000000000000", A, B, 50, { timestamp: "2026-10-05T00:00:00.000Z" }),
+    mk("0000000001-x-1", "5669940001000000000", C, A, 1),
+    mk("genesis-0", "5669940001000000000", C, A, 1, { timestamp: null }),
+    mk("genesis-1", "3000000000000", C, B, 1, { timestamp: null }),
+  ], M);
+  assert.deepEqual(clean.map((r) => r.id), ["ok", "0000000001-x-1", "genesis-1"]);
+  assert.deepEqual(F.sanitizeSnapshotTransfers([mk("ok", "1000000000000", A, B, 50)], null), []);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

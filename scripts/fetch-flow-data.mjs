@@ -84,6 +84,14 @@ async function main() {
   //    only caught the largest one; the genesis set is the root of every flow on
   //    the chain, so it is merged from the supply-audit snapshot (same indexer).
   //    Synthetic ids are namespaced to avoid colliding with indexer ids.
+  //    Round 2 (2026-10-11): dedupe by FACTS at block 1, not just by id — the
+  //    top-600's copy of the 5,669,940 QTC vesting transfer carries an indexer
+  //    id, so the synthetic genesis-0 copy sailed past the id dedupe and the
+  //    snapshot painted that transfer twice (double totals in the tracer).
+  //    genesisCount below counts the distinct block-1 transfers in the final
+  //    merged set, whichever source supplied them.
+  const genesisFacts = new Set(rows.filter((r) => r.block_height === 1)
+    .map((r) => `${r.from_id}>${r.to_id}@1:${r.amount}`));
   let genesisCount = 0;
   try {
     const supply = JSON.parse(readFileSync(join(__dirname, "..", "data", "supply.json"), "utf8"));
@@ -91,14 +99,16 @@ async function main() {
     list.forEach((g, i) => {
       const id = `genesis-${i}`;
       if (seen.has(id)) return;
+      if (genesisFacts.has(`${g.from}>${g.to}@1:${g.amount_plancks}`)) return; // already carried by the indexer copy
       seen.add(id);
-      genesisCount++;
+      genesisFacts.add(`${g.from}>${g.to}@1:${g.amount_plancks}`);
       rows.push({
         id, amount: g.amount_plancks, from_id: g.from, to_id: g.to,
         block_height: 1, timestamp: null, fee: "0", extrinsic_id: null,
       });
     });
   } catch { /* supply snapshot absent — flow data still valid */ }
+  genesisCount = rows.filter((r) => r.block_height === 1).length;
   rows.sort((a, b) => b.block_height - a.block_height || (BigInt(b.amount) > BigInt(a.amount) ? 1 : -1));
 
   mkdirSync(dirname(OUT), { recursive: true });

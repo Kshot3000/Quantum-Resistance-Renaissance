@@ -646,8 +646,8 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes('throw new Error("snapshot contained no valid transfers")'), "flowtracer: a zero-valid-transfer snapshot fails honestly");
   ok(app.includes("if (liveGraph.rows.length) { graph = liveGraph; mode = \"live\"; }"), "flowtracer: a poison-only live answer never suppresses the snapshot graph");
   const html = read("pages/flow-tracer/index.html");
-  ok(html.includes("js/flow-core.js?v=1.31.0"), "flowtracer: flow-core.js cache key bumped for the boundary fix");
-  ok(html.includes("app.js?v=1.33.0"), "flowtracer: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/flow-core.js?v=1.32.0"), "flowtracer: flow-core.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.34.0"), "flowtracer: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 19 (2026-10-10 04:19): ledger-desk (Tier 1, money-touching) —
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.11.3"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.11.4"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.48.3"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.4"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.51.3"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.51.4"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.48.3"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.4"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1618,19 +1618,19 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const mc = read("pages/mining-calculator/app.js");
   ok(mc.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: miningcalc rejects a pre-genesis capture time");
   ok(mc.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: miningcalc rejects a future capture time");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.3"), "fetchedat: miningcalc cache key bumped");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.4"), "fetchedat: miningcalc cache key bumped");
   const pd = read("pages/pool-desk/js/app.js");
   ok(pd.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: pooldesk rejects a pre-genesis capture time");
   ok(pd.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: pooldesk rejects a future capture time");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.3"), "fetchedat: pooldesk cache key bumped");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.4"), "fetchedat: pooldesk cache key bumped");
   const en = read("pages/energy-observatory/js/app.js");
   ok(en.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: energy rejects a pre-genesis capture time");
   ok(en.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: energy rejects a future capture time");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.3"), "fetchedat: energy cache key bumped");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.4"), "fetchedat: energy cache key bumped");
   const lk = read("pages/luck-lab/js/app.js");
   ok(lk.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: lucklab rejects a pre-genesis capture time");
   ok(lk.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: lucklab rejects a future capture time");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.3"), "fetchedat: lucklab cache key bumped");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.4"), "fetchedat: lucklab cache key bumped");
 }
 
 // Batch 50 (2026-10-11 12:19): fleet capture-time alignment, round 2 —
@@ -1680,6 +1680,44 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!src.includes("const fetchedMs = msStr(raw.fetched_at_ms);"), "vesting3: no msStr-only fetched_at_ms load remains");
   ok(src.includes("return n >= MS_MIN && n <= MS_MAX ? s : null;"), "vesting3: msStr itself stays 2000..2100 for schedule cliff/start/end");
   ok(read("pages/vesting-desk/index.html").includes("app.js?v=1.31.0"), "vesting3: app.js cache key bumped for the capture-time fix");
+}
+
+// Batch 52 (2026-10-11 14:19): flow-tracer snapshot-boundary hardening
+// round 2 — validate RELATIONS, not just shapes. Round 1 checked each row
+// and meta field alone, so a 0-planck row and a 100M QTC row (over the
+// 21M cap) painted, a height of 99,999,999,999 painted, a 2020/2999
+// timestamp painted, meta accepted 2020/2999 capture times and a
+// window_blocks contradicting its own heights, snapshot rows were never
+// checked against the snapshot (non-SS58 endpoints, heights above its
+// own head, in-window rows below its dust floor, post-capture stamps),
+// live rows were never checked against the queried address, and the
+// fetch merge's id-only dedupe let the synthetic genesis copy of the
+// 5,669,940 QTC vesting transfer paint TWICE in the live snapshot.
+// RED first (probe qa-flowtracer-relations: 13 failures, controls
+// passing). Pins: the core fleet bounds + snapshot layer, the loader's
+// meta-restatement checks, the live involvement filter, the fetch
+// script's fact dedupe, and the new cache keys.
+{
+  const core = read("pages/flow-tracer/js/flow-core.js");
+  ok(core.includes("function sanitizeSnapshotTransfers(rows, meta)"), "flowtracer2: sanitizeSnapshotTransfers() defined in flow-core");
+  ok(core.includes("BigInt(amount) > MAX_SUPPLY_PLANCKS"), "flowtracer2: amounts bounded by the 21M supply cap");
+  ok(core.includes("if (r.block_height > meta.chain_height) return false;"), "flowtracer2: snapshot rows bounded by the snapshot's own head");
+  ok(core.includes("genesisFacts.has(r.from_id"), "flowtracer2: synthetic genesis fact-duplicates drop, indexer row wins");
+  ok(core.includes("wb !== head - from"), "flowtracer2: meta window_blocks must restate its heights");
+  const app = read("pages/flow-tracer/app.js");
+  ok(app.includes("snapshot transfer count does not restate its metadata"), "flowtracer2: loader fails when meta.transfers contradicts the payload");
+  ok(app.includes("snapshot genesis rows do not restate its metadata"), "flowtracer2: loader fails when cleaned genesis rows contradict meta.genesis_rows");
+  ok(app.includes("var cleaned = F.sanitizeSnapshotTransfers(snap.transfers, m);"), "flowtracer2: loader sanitizes snapshot rows against the meta");
+  ok(app.includes("(r.from_id === addr || r.to_id === addr)"), "flowtracer2: live rows must involve the queried address");
+  const fetchScript = read("scripts/fetch-flow-data.mjs");
+  ok(fetchScript.includes("already carried by the indexer copy"), "flowtracer2: fetch merge dedupes genesis rows by facts, not just id");
+  const html = read("pages/flow-tracer/index.html");
+  ok(html.includes("js/flow-core.js?v=1.32.0"), "flowtracer2: flow-core.js cache key bumped for round 2");
+  ok(html.includes("app.js?v=1.34.0"), "flowtracer2: app.js cache key bumped for round 2");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.4"), "flowtracer2: miningcalc sync patch-bump pin");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.4"), "flowtracer2: pooldesk sync patch-bump pin");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.4"), "flowtracer2: energy sync patch-bump pin");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.4"), "flowtracer2: lucklab sync patch-bump pin");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
