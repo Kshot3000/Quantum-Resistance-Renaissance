@@ -241,5 +241,64 @@ t("real snapshot passes sanitizeMiners unchanged in shape", function(){
   assert.ok(out.window.observed_block_time_s > 5 && out.window.observed_block_time_s < 60);
 });
 
+// 15. Round 2: bucket RELATIONS — the kept buckets are one contiguous,
+// in-window, uniform-span run whose totals never exceed window_miners.
+t("sanitizeMiners drops a duplicated bucket", function(){
+  var p = fillGood(goodPayload());
+  p.buckets = [p.buckets[0], p.buckets[0], p.buckets[1]];
+  var out = m.sanitizeMiners(p);
+  assert.strictEqual(out.buckets.length, 2);
+  assert.strictEqual(out.buckets[1].start, 1501);
+});
+t("sanitizeMiners drops an out-of-window bucket", function(){
+  var p = fillGood(goodPayload());
+  p.buckets.unshift({ start: 1, end: 500, blocks: 500, miners: {} });
+  p.buckets[0].miners[VA("a")] = 500;
+  assert.strictEqual(m.sanitizeMiners(p).buckets.length, 2);
+});
+t("sanitizeMiners drops a bucket that breaks contiguity", function(){
+  var p = fillGood(goodPayload());
+  p.buckets[1] = { start: 1601, end: 2000, blocks: 400, miners: {} };
+  p.buckets[1].miners[VA("a")] = 250; p.buckets[1].miners[VA("c")] = 150;
+  var out = m.sanitizeMiners(p);
+  assert.strictEqual(out.buckets.length, 1);
+  assert.strictEqual(out.buckets[0].start, 1001);
+});
+t("sanitizeMiners drops a bucket whose miners exceed the window totals", function(){
+  var p = fillGood(goodPayload());
+  p.buckets[0].miners[VA("a")] = 400; p.buckets[0].miners[VA("b")] = 100;
+  var out = m.sanitizeMiners(p); // bucket 2 would take A to 700 > window 600
+  assert.strictEqual(out.buckets.length, 1);
+});
+t("sanitizeMiners drops a bucket mining for an address the window never saw", function(){
+  var p = fillGood(goodPayload());
+  p.buckets[0].miners = {}; p.buckets[0].miners[VA("d")] = 500;
+  var out = m.sanitizeMiners(p);
+  assert.strictEqual(out.buckets.length, 1);
+  assert.strictEqual(out.buckets[0].start, 1501);
+});
+t("sanitizeMiners keeps a short final bucket at the window end", function(){
+  var p = goodPayload();
+  p.chain_height = 1750;
+  p.window = { start_height: 1001, end_height: 1750, block_count: 750, observed_block_time_s: 10 };
+  p.window_miners[VA("a")] = 450; p.window_miners[VA("b")] = 300;
+  p.buckets = [
+    { start: 1001, end: 1500, blocks: 500, miners: {} },
+    { start: 1501, end: 1750, blocks: 250, miners: {} },
+  ];
+  p.buckets[0].miners[VA("a")] = 300; p.buckets[0].miners[VA("b")] = 200;
+  p.buckets[1].miners[VA("a")] = 150; p.buckets[1].miners[VA("b")] = 100;
+  p.all_time = [{ address: VA("a"), blocks: 900 }, { address: VA("b"), blocks: 600 }];
+  assert.strictEqual(m.sanitizeMiners(p).buckets.length, 2);
+});
+expectBad("sanitizeMiners rejects a fetched_at in the future", function(p){
+  p.fetched_at = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+});
+t("sanitizeMiners tolerates a fetched_at within the 1h future-skew bound", function(){
+  var p = fillGood(goodPayload());
+  p.fetched_at = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  assert.strictEqual(m.sanitizeMiners(p).chain_height, 2000);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

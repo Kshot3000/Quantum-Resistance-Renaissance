@@ -838,10 +838,10 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("window_miners counts do not sum to window.block_count"), "minobs: window counts cross-checked against the denominator they divide");
   ok(app.includes("window.end_height != chain_height"), "minobs: window must end at the claimed chain height");
   ok(app.includes("all_time duplicate address"), "minobs: duplicate all-time rows rejected (no split shares)");
-  ok(app.includes("function cleanBuckets(buckets)"), "minobs: cleanBuckets() defined for the auxiliary timeline");
+  ok(app.includes("function cleanBuckets(buckets, win, windowMiners)"), "minobs: cleanBuckets() defined for the auxiliary timeline (round 2: window-context signature)");
   ok(app.includes("wout.observed_block_time_s = cleanBlockTime(w.observed_block_time_s);"), "minobs: block time degraded to null, never .toFixed on a string");
   const html = read("pages/mining-observatory/index.html");
-  ok(html.includes("app.js?v=1.17.0"), "minobs: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.18.0"), "minobs: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 26 (2026-10-10 11:19): mining-calculator (Tier 2) — the fourth
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.20"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.21"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.20"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.21"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.19"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.20"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.18"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.19"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1532,6 +1532,40 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("if (b !== null && b > 0)"), "safesend-rail: the stale positive-only rail guard is gone");
   const html = read("pages/safesend/index.html");
   ok(html.includes("js/app.js?v=1.5.0"), "safesend-rail: app.js cache key bumped for the rail-staleness fix");
+}
+
+// Batch 47 (2026-10-11 09:19): Mining Observatory snapshot-boundary
+// hardening round 2 (Tier 2) — round 1 validated each bucket against
+// ITSELF and the core maps against their own totals, but never the
+// buckets against each other or the window they partition: a duplicated
+// bucket double-painted 500 blocks, an out-of-window bucket painted as
+// window history, a gapped sequence painted as consecutive (charts
+// space buckets by INDEX), bucket miners contradicting window_miners
+// painted a timeline at war with the headline view, a mid-run span
+// change made index spacing lie about time density, and a future
+// fetched_at rendered "0s ago" with the STALE warning unreachable.
+// Pin: cleanBuckets takes the window + window_miners context and keeps
+// only one contiguous, in-window, uniform-span run (short final bucket
+// at the window end allowed) whose per-address totals never exceed
+// window_miners; sanitizeMiners rejects a future fetched_at; the views
+// are built from the SANITIZED snapshot, never the raw payload. The
+// relation window_miners ⊆ all_time is deliberately NOT pinned —
+// all_time is the fetch script's top-100 and the relation is false on
+// real data (verified head 206,247: buckets tile the window exactly,
+// bucket aggregate == window_miners exactly).
+{
+  const app = read("pages/mining-observatory/app.js");
+  ok(app.includes("function cleanBuckets(buckets, win, windowMiners)"), "minobs2: cleanBuckets() takes the window context it must relate buckets to");
+  ok(app.includes("out.buckets = cleanBuckets(d.buckets, { start: wStart, end: wEnd }, wm);"), "minobs2: sanitizeMiners passes the validated window + miner totals into bucket cleaning");
+  ok(app.includes("if (b.start < win.start || b.end > win.end) return;"), "minobs2: a bucket outside the window is not window history");
+  ok(app.includes("if (nextStart !== null && b.start !== nextStart) return;"), "minobs2: kept buckets are one contiguous run — gaps, overlaps and duplicates break it");
+  ok(app.includes("!(b.end === win.end && span < runSpan)"), "minobs2: span may differ only for a short final bucket at the window end");
+  ok(app.includes("> (windowMiners[keys[i]] || 0)) return;"), "minobs2: bucket totals may never exceed the window totals they partition");
+  ok(app.includes('bad("fetched_at in the future")'), "minobs2: a future fetched_at is rejected, never rendered as fresh");
+  ok(app.includes("VIEWS = buildViews(DATA);"), "minobs2: views are built from the sanitized snapshot");
+  ok(!app.includes("VIEWS = buildViews(data);"), "minobs2: the raw payload never reaches the views");
+  const html = read("pages/mining-observatory/index.html");
+  ok(html.includes("app.js?v=1.18.0"), "minobs2: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

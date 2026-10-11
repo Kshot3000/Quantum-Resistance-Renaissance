@@ -118,7 +118,21 @@ function loadData(){
  * claimed chain height. Auxiliary data degrades instead: the fetch
  * script itself emits observed_block_time_s: null when it cannot
  * measure one, so an unusable block time becomes null ("—"), and
- * buckets (timeline only) are cleaned drop-and-continue. */
+ * buckets (timeline only) are cleaned drop-and-continue.
+ * Round 2 — RELATIONS, not just shapes: a bucket is a claim about a
+ * slice OF THE WINDOW, so the kept buckets must form one contiguous,
+ * in-window, uniform-span run (the charts space buckets by index, so
+ * index spacing IS time density; only a short final bucket at the
+ * window end may break the span) whose per-address totals never exceed
+ * window_miners — on the real snapshot the bucket aggregate EQUALS
+ * window_miners exactly and the buckets tile the window exactly.
+ * A duplicate, gapped, overlapping, out-of-window, span-changing, or
+ * window-contradicting bucket is dropped, never painted as history.
+ * (Deliberately NOT enforced: window_miners ⊆ all_time — all_time is
+ * the fetch script's top-100, so small window miners legitimately
+ * appear nowhere in it.) fetched_at must not be in the future either:
+ * timeAgo clamps a future stamp to "0s ago" and the 12h STALE warning
+ * could never fire on it. */
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
 
 function posInt(v, max){
@@ -150,10 +164,26 @@ function cleanBucket(b){
   return b;
 }
 
-function cleanBuckets(buckets){
+function cleanBuckets(buckets, win, windowMiners){
   if (!Array.isArray(buckets)) return [];
-  var out = [];
-  buckets.forEach(function(b){ var c = cleanBucket(b); if (c) out.push(c); });
+  var cleaned = [];
+  buckets.forEach(function(b){ var c = cleanBucket(b); if (c) cleaned.push(c); });
+  if (!win || !windowMiners) return cleaned; // no window context: per-bucket shapes only
+  var out = [], totals = {}, runSpan = null, nextStart = null;
+  cleaned.forEach(function(b){
+    if (b.start < win.start || b.end > win.end) return; // outside the window it claims to partition
+    if (nextStart !== null && b.start !== nextStart) return; // gap / overlap / duplicate breaks the run
+    var span = b.end - b.start + 1;
+    if (runSpan === null) runSpan = span;
+    else if (span !== runSpan && !(b.end === win.end && span < runSpan)) return; // only a short FINAL bucket may differ
+    var keys = Object.keys(b.miners);
+    for (var i = 0; i < keys.length; i++){
+      if ((totals[keys[i]] || 0) + b.miners[keys[i]] > (windowMiners[keys[i]] || 0)) return; // contradicts the window totals
+    }
+    keys.forEach(function(a){ totals[a] = (totals[a] || 0) + b.miners[a]; });
+    out.push(b);
+    nextStart = b.end + 1;
+  });
   return out;
 }
 
@@ -161,6 +191,7 @@ function sanitizeMiners(d){
   function bad(field){ throw new Error("malformed miners snapshot: " + field); }
   if (!d || typeof d !== "object" || Array.isArray(d)) bad("payload is not an object");
   if (typeof d.fetched_at !== "string" || !isFinite(Date.parse(d.fetched_at))) bad("fetched_at");
+  if (Date.parse(d.fetched_at) > Date.now() + 3600 * 1000) bad("fetched_at in the future");
   var height = posInt(d.chain_height, 10000000);
   if (height === null) bad("chain_height");
   var w = d.window;
@@ -201,7 +232,7 @@ function sanitizeMiners(d){
   Object.keys(w).forEach(function(k){ wout[k] = w[k]; });
   wout.observed_block_time_s = cleanBlockTime(w.observed_block_time_s);
   out.window = wout;
-  out.buckets = cleanBuckets(d.buckets);
+  out.buckets = cleanBuckets(d.buckets, { start: wStart, end: wEnd }, wm);
   return out;
 }
 
@@ -572,7 +603,7 @@ function init(){
   loadData().then(function(data){
     if (!data || !data.ok) throw new Error("snapshot payload missing or not ok");
     DATA = sanitizeMiners(data);
-    VIEWS = buildViews(data);
+    VIEWS = buildViews(DATA);
     snapshotLine();
     render("window");
   }).catch(function(e){
