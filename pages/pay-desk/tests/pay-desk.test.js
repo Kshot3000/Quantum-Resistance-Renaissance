@@ -142,6 +142,48 @@ eq("csv quotes doubled", P.csvEscape('a"b'), '"a""b"');
   t("minimal class", s2.includes("qtip-minimal"));
 })();
 
+/* ---- service fee split (2026-10-11, profit route) ---- */
+(function () {
+  const one = 1000000000000n; // 1 QTC in plancks
+  let s = P.splitServiceFee(one, 50);
+  eq("fee 0.5% of 1 QTC", s.feePlancks, 5000000000n);
+  eq("merchant leg 0.5%", s.merchantPlancks, 995000000000n);
+  t("legs sum exactly to total", s.feePlancks + s.merchantPlancks === one);
+  s = P.splitServiceFee(one, 0);
+  t("no fee -> merchant gets all", s.feePlancks === 0n && s.merchantPlancks === one && s.feeBps === 0);
+  s = P.splitServiceFee(one, 25);
+  eq("fee 0.25% of 1 QTC", s.feePlancks, 2500000000n);
+  s = P.splitServiceFee(one, 100);
+  eq("fee 1% of 1 QTC", s.feePlancks, 10000000000n);
+  s = P.splitServiceFee(one, 500);
+  t("bps capped at the 1% code maximum", s.feeBps === 100 && s.feePlancks === 10000000000n);
+  s = P.splitServiceFee(one, -50);
+  t("negative bps -> no fee", s.feeBps === 0 && s.feePlancks === 0n);
+  s = P.splitServiceFee(3n, 50); // fee = floor(3 * 50 / 10000) = 0
+  t("fee floors, never rounds past the quoted %", s.feePlancks === 0n && s.merchantPlancks === 3n);
+  s = P.splitServiceFee(19999n, 50); // floor(19999*50/10000) = 99
+  t("fee floor exact on odd plancks", s.feePlancks === 99n && s.feePlancks + s.merchantPlancks === 19999n);
+  s = P.splitServiceFee(0n, 50);
+  t("zero total -> zero legs", s.feePlancks === 0n && s.merchantPlancks === 0n);
+  // Sweep: legs always sum, fee never exceeds the quoted percentage.
+  let bad = 0;
+  for (let total = 1n; total < 5000000000000n; total += 123456789n) {
+    for (const bps of [25, 50, 100]) {
+      const r = P.splitServiceFee(total, bps);
+      if (r.feePlancks + r.merchantPlancks !== total) bad++;
+      if (r.feePlancks * 10000n > total * BigInt(bps)) bad++;
+      if (r.merchantPlancks < 0n) bad++;
+    }
+  }
+  t("split sweep: exact sums, fee never over quote", bad === 0, bad + " bad");
+  eq("fee label 50", P.feeBpsLabel(50), "0.5%");
+  eq("fee label 25", P.feeBpsLabel(25), "0.25%");
+  eq("fee label 100", P.feeBpsLabel(100), "1%");
+  eq("fee label 0", P.feeBpsLabel(0), "0%");
+  eq("service fee address is Kyle's QTC address", P.SERVICE_FEE_ADDRESS, "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau");
+  eq("service fee cap", P.SERVICE_FEE_MAX_BPS, 100);
+})();
+
 /* ---- constants ---- */
 eq("plancks per QTC", P.PLANCKS_PER_QTC, 1000000000000n);
 

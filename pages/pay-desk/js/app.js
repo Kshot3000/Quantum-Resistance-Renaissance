@@ -135,6 +135,38 @@ function validateAddress(addr) {
   return { ok: true };
 }
 
+/* Optional Pay Desk service fee (PROFIT route, added 2026-10-11): a
+ * merchant may add a small, plainly disclosed service fee to an invoice.
+ * The fee is NEVER hidden and NEVER collected by this page: the customer
+ * pays it as a SECOND, separate transfer to the service address below
+ * (the builder's own QTC address, the same one in this page's footer),
+ * and the merchant leg is the invoice total minus the fee, so the two
+ * legs always sum exactly to the invoice total in plancks. Exact BigInt
+ * math: fee = floor(total * bps / 10,000), merchant keeps the remainder
+ * (the fee never rounds up past the quoted percentage). Capped at
+ * 100 bps (1%) in code, whatever the UI offers. */
+var SERVICE_FEE_ADDRESS = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+var SERVICE_FEE_MAX_BPS = 100;
+
+function splitServiceFee(totalPlancks, feeBps) {
+  var total = BigInt(totalPlancks);
+  var bps = Number(feeBps);
+  if (!isFinite(bps) || bps < 0) bps = 0;
+  if (bps > SERVICE_FEE_MAX_BPS) bps = SERVICE_FEE_MAX_BPS;
+  bps = Math.floor(bps);
+  if (total <= 0n) return { feePlancks: 0n, merchantPlancks: total, feeBps: bps };
+  var fee = (total * BigInt(bps)) / 10000n;
+  return { feePlancks: fee, merchantPlancks: total - fee, feeBps: bps };
+}
+
+function feeBpsLabel(bps) {
+  var b = Math.floor(Number(bps) || 0);
+  var whole = Math.floor(b / 100), rem = b % 100;
+  if (rem === 0) return whole + "%";
+  var frac = String(rem).padStart(2, "0").replace(/0+$/, "");
+  return whole + "." + frac + "%";
+}
+
 function fmtCountdown(ms) {
   if (ms <= 0) return "expired";
   var s = Math.floor(ms / 1000);
@@ -287,9 +319,17 @@ function renderTotals() {
     var q = centsToQtcString(t.total, state.rate.usdPerQtc);
     $("t-qtc").textContent = q + " QTC";
     $("t-plancks").textContent = parseQtcToPlancks(q).toString() + " plancks";
+    var feeSel = $("inv-fee-bps");
+    var sp = splitServiceFee(parseQtcToPlancks(q), feeSel ? Number(feeSel.value) || 0 : 0);
+    if ($("t-fee")) $("t-fee").textContent = sp.feePlancks > 0n
+      ? plancksToQtcString(sp.feePlancks) + " QTC (" + feeBpsLabel(sp.feeBps) + ", second transfer)"
+      : "none";
+    if ($("t-merchant")) $("t-merchant").textContent = plancksToQtcString(sp.merchantPlancks) + " QTC";
   } else {
     $("t-qtc").textContent = "set a rate first";
     $("t-plancks").textContent = "—";
+    if ($("t-fee")) $("t-fee").textContent = "—";
+    if ($("t-merchant")) $("t-merchant").textContent = "—";
   }
   return t;
 }
@@ -341,6 +381,8 @@ function createInvoice() {
   if (t.total <= 0n) { err.textContent = "The invoice total must be greater than $0."; return; }
   var qtcStr = centsToQtcString(t.total, state.rate.usdPerQtc);
   var plancks = parseQtcToPlancks(qtcStr);
+  var split = splitServiceFee(plancks, Number($("inv-fee-bps").value) || 0);
+  var hasFee = split.feePlancks > 0n;
   var now = Date.now();
   var inv = {
     id: makeInvoiceId(now),
@@ -349,6 +391,12 @@ function createInvoice() {
     usdCents: t.total.toString(),
     qtc: qtcStr,
     plancks: plancks.toString(),
+    serviceFeeBps: hasFee ? split.feeBps : 0,
+    serviceFeeQtc: plancksToQtcString(split.feePlancks),
+    serviceFeePlancks: split.feePlancks.toString(),
+    serviceFeeAddress: hasFee ? SERVICE_FEE_ADDRESS : "",
+    merchantQtc: plancksToQtcString(split.merchantPlancks),
+    merchantPlancks: split.merchantPlancks.toString(),
     rate: state.rate.usdPerQtc,
     rateTs: state.rate.ts,
     created: now,
@@ -371,6 +419,15 @@ function renderRequest(inv) {
   $("req-fiat").textContent = "≈ " + fmtUsd(BigInt(inv.usdCents)) + " at the quoted rate";
   $("req-plancks").textContent = inv.plancks;
   $("req-addr").textContent = inv.address;
+  var hasFee = Number(inv.serviceFeeBps || 0) > 0 && !!inv.serviceFeePlancks && BigInt(inv.serviceFeePlancks) > 0n;
+  $("req-fee-row").hidden = !hasFee;
+  $("req-fee-addr-row").hidden = !hasFee;
+  $("req-merchant-row").hidden = !hasFee;
+  if (hasFee) {
+    $("req-fee-qtc").textContent = inv.serviceFeeQtc + " QTC (" + feeBpsLabel(inv.serviceFeeBps) + " of the total · " + inv.serviceFeePlancks + " plancks)";
+    $("req-fee-addr").textContent = inv.serviceFeeAddress || SERVICE_FEE_ADDRESS;
+    $("req-merchant").textContent = inv.merchantQtc + " QTC (" + inv.merchantPlancks + " plancks)";
+  }
   $("req-id").textContent = inv.id;
   drawQRInto($("qr-box"), inv.address, 264);
   startCountdown(inv);
@@ -466,12 +523,14 @@ function setStatus(id, status) {
 }
 
 function exportCsv() {
-  var rows = [["id", "reference", "qtc", "usd", "plancks", "rate_usd_per_qtc", "address", "created_iso", "status"]];
+  var rows = [["id", "reference", "qtc", "usd", "plancks", "rate_usd_per_qtc", "address", "service_fee_bps", "service_fee_qtc", "service_fee_plancks", "service_fee_address", "merchant_qtc", "merchant_plancks", "created_iso", "status"]];
   state.register.slice().reverse().forEach(function (inv) {
     rows.push([
       inv.id, inv.ref || "", inv.qtc,
       (BigInt(inv.usdCents) / CENT).toString() + "." + (BigInt(inv.usdCents) % CENT).toString().padStart(2, "0"),
       inv.plancks, inv.rate, inv.address,
+      inv.serviceFeeBps || 0, inv.serviceFeeQtc || "0", inv.serviceFeePlancks || "0", inv.serviceFeeAddress || "",
+      inv.merchantQtc || inv.qtc, inv.merchantPlancks || inv.plancks,
       new Date(inv.created).toISOString(), inv.status,
     ]);
   });
@@ -490,6 +549,14 @@ function openPos(inv) {
   $("pos-id").textContent = inv.id + (inv.ref ? " · " + inv.ref : "");
   $("pos-amount").textContent = inv.qtc + " QTC";
   $("pos-fiat").textContent = "≈ " + fmtUsd(BigInt(inv.usdCents));
+  var posFee = $("pos-fee");
+  if (posFee) {
+    var hasFee = Number(inv.serviceFeeBps || 0) > 0 && !!inv.serviceFeePlancks && BigInt(inv.serviceFeePlancks) > 0n;
+    posFee.textContent = hasFee
+      ? "Includes a disclosed " + feeBpsLabel(inv.serviceFeeBps) + " Pay Desk service fee: " + inv.serviceFeeQtc + " QTC as a second transfer to the service address on the payment request — the merchant receives " + inv.merchantQtc + " QTC."
+      : "";
+    posFee.hidden = !hasFee;
+  }
   drawQRInto($("pos-qr"), inv.address, 280);
   $("pos-addr").textContent = inv.address;
   function upd() {
@@ -595,6 +662,8 @@ function init() {
   });
   $("inv-discount").addEventListener("input", renderTotals);
   $("inv-tax").addEventListener("input", renderTotals);
+  $("inv-fee-bps").addEventListener("change", renderTotals);
+  $("inv-fee-bps").addEventListener("input", renderTotals);
   $("inv-create").addEventListener("click", createInvoice);
 
   $("req-new").addEventListener("click", function () {
@@ -656,6 +725,10 @@ if (typeof module !== "undefined" && module.exports) {
     fmtCountdown: fmtCountdown,
     csvEscape: csvEscape,
     tipSnippet: tipSnippet,
+    splitServiceFee: splitServiceFee,
+    feeBpsLabel: feeBpsLabel,
+    SERVICE_FEE_ADDRESS: SERVICE_FEE_ADDRESS,
+    SERVICE_FEE_MAX_BPS: SERVICE_FEE_MAX_BPS,
     PLANCKS_PER_QTC: PLANCKS_PER_QTC,
   };
 } else {

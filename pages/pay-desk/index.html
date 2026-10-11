@@ -90,6 +90,7 @@
       <li><strong>Marking "paid" is your attestation, not chain truth.</strong> Always verify the tx yourself — search the amount and address in the <a href="../block-explorer/">Block Explorer</a> — before you release goods or mark an invoice paid.</li>
       <li><strong>There is no listed spot price yet.</strong> QTC's first announced venue is NEAR Intents; no listing date was confirmed as of 2026-10-01. The rate card below is a manual entry — set it from whatever price you and the customer agree on, and stamp the timestamp.</li>
       <li><strong>Amounts are exact to the planck.</strong> QTC has 12 decimals (1 QTC = 10<sup>12</sup> plancks, verified from on-chain block rewards). QR codes encode your address; the amount travels alongside as copyable text — there is no QTC payment-URI standard yet, so the QR never invents one.</li>
+      <li><strong>The optional service fee is disclosed, never hidden.</strong> If you leave the Pay Desk service fee on, the invoice, the payment request, and the CSV export all show its exact amount; the customer pays it as a second, separate transfer to the service address shown on the request, and you receive the total minus the fee. This page never holds or forwards either transfer — set the fee to None and no fee leg exists.</li>
     </ul>
   </section>
 
@@ -148,6 +149,16 @@
     <div class="totals-grid">
       <div class="b-field"><label for="inv-discount">Discount (USD)</label><input id="inv-discount" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
       <div class="b-field"><label for="inv-tax">Tax (%)</label><input id="inv-tax" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
+      <div class="b-field">
+        <label for="inv-fee-bps">Pay Desk service fee (optional)</label>
+        <select id="inv-fee-bps">
+          <option value="0">None — no service fee</option>
+          <option value="25">0.25% of the QTC total</option>
+          <option value="50" selected>0.5% of the QTC total</option>
+          <option value="100">1% of the QTC total</option>
+        </select>
+        <p class="hint">Disclosed on the invoice, in the payment request, and in the CSV export. The customer pays it as a <strong>second, separate transfer</strong> to the Pay Desk service address — this page never holds or forwards funds, and the two transfers always sum exactly to the invoice total. Choose None to turn it off.</p>
+      </div>
       <div class="total-out" aria-live="polite">
         <div><span>Subtotal</span><strong id="t-sub">$0.00</strong></div>
         <div><span>Tax</span><strong id="t-tax">$0.00</strong></div>
@@ -155,6 +166,8 @@
         <div class="grand"><span>Total due</span><strong id="t-total">$0.00</strong></div>
         <div class="qtc"><span>≈ QTC at current rate</span><strong id="t-qtc">—</strong></div>
         <div class="plancks"><span>Exact plancks</span><strong id="t-plancks">—</strong></div>
+        <div><span>Service fee (second transfer)</span><strong id="t-fee">—</strong></div>
+        <div><span>You receive</span><strong id="t-merchant">—</strong></div>
       </div>
     </div>
 
@@ -175,6 +188,9 @@
         <div class="req-amount"><span>Amount due</span><strong id="req-qtc">—</strong><span class="fiat" id="req-fiat">—</span></div>
         <div class="req-field"><span>Plancks (exact)</span><code id="req-plancks">—</code><button class="copybtn" data-copy-target="req-plancks">Copy</button></div>
         <div class="req-field"><span>Address</span><code id="req-addr" class="addrline">—</code><button class="copybtn" data-copy-target="req-addr">Copy</button></div>
+        <div class="req-field" id="req-merchant-row" hidden><span>You receive</span><strong id="req-merchant">—</strong></div>
+        <div class="req-field" id="req-fee-row" hidden><span>Service fee — second transfer</span><code id="req-fee-qtc">—</code></div>
+        <div class="req-field" id="req-fee-addr-row" hidden><span>Service fee address</span><code id="req-fee-addr" class="addrline">—</code><button class="copybtn" data-copy-target="req-fee-addr">Copy</button></div>
         <div class="req-field"><span>Invoice ID</span><code id="req-id">—</code></div>
         <div class="req-field"><span>Expires in</span><strong id="req-countdown" class="countdown">—</strong></div>
         <div class="req-actions">
@@ -284,6 +300,7 @@
     <div class="pos-id" id="pos-id">—</div>
     <div class="pos-amount" id="pos-amount">—</div>
     <div class="pos-fiat" id="pos-fiat">—</div>
+    <div class="pos-fiat" id="pos-fee" hidden></div>
     <div class="pos-qr" id="pos-qr"></div>
     <div class="pos-addr" id="pos-addr">—</div>
     <div class="pos-countdown" id="pos-countdown">—</div>
@@ -298,6 +315,6 @@
 <script src="../../assets/app-nav.js?v=1.8.0"></script>
 <script src="js/ss58.js?v=1.44.0"></script>
 <script src="../../assets/vendor/qrcode.js?v=1.0.0"></script>
-<script src="js/app.js?v=1.45.0"></script>
+<script src="js/app.js?v=1.46.0"></script>
 </body>
 </html>

@@ -20,6 +20,14 @@ confirmation guidance, and an embeddable tip-button generator.
   invents one.)
 - **POS mode** — fullscreen overlay: huge amount, QR, countdown, Mark-paid /
   Expire buttons.
+- **Optional service fee** — the merchant may add a disclosed Pay Desk
+  service fee (0.25% / 0.5% / 1%, or None; capped at 1% in code). The
+  customer pays it as a second, separate transfer to the builder's QTC
+  address; the merchant leg is the total minus the fee, and the two legs
+  sum exactly to the invoice total in plancks (exact BigInt math, fee
+  floored so it never exceeds the quoted percentage). The fee is shown in
+  the builder totals, the payment request, the POS screen, and the CSV
+  export — never hidden, and this page never holds or forwards funds.
 - **Invoice register** — localStorage ledger of every request with statuses
   (pending / paid / expired / cancelled), "mark paid" confirmation prompt,
   CSV export. **Statuses are merchant attestations, not chain truth** — you
@@ -45,13 +53,15 @@ existential deposit are flagged in the playbook.
 - `js/ss58.js` — SS58 codec extracted verbatim from `../address-toolkit/app.js`
   (blake2b + base58 + ss58Decode), exposed as `window.QTC_SS58`
 - `js/qrcode.js` — vendored QR generator (shared copy from Key Forge)
-- `tests/pay-desk.test.js` — 54 node tests, all green
+- `tests/pay-desk.test.js` — 83 node tests, all green
 
 ## Verification
 
-- `node pages/pay-desk/tests/pay-desk.test.js` — 54/54 pass
+- `node pages/pay-desk/tests/pay-desk.test.js` — 83/83 pass
 - Headless-Chromium browser QA (`hidden_files/qa-paydesk-browser.mjs`) —
   full user flow exercised, zero console/page errors
+- Service-fee browser QA (`hidden_files/qa-paydesk-fee.mjs`) — 17/17:
+  fee on (legs shown, split stored, POS note) and fee off (no fee leg)
 
 Built by [@kshot9000](https://x.com/kshot9000) · QTC donations:
 `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`
