@@ -9,14 +9,14 @@ var E = EnergyCore;
 
 /* ---------- constants ---------- */
 var FALLBACK = {
-  difficulty: "546962510563758",
-  height: 206532,
+  difficulty: "545334838696797",
+  height: 206765,
   // total supply in plancks (free + reserved + frozen), balances aggregate @ block
-  // 206,532, fetched 2026-10-11 — the SAME capture as the difficulty above
-  // (@ block 206,532, fetched 1 seconds apart; never mix snapshot dates in one bundle).
+  // 206,765, fetched 2026-10-11 — the SAME capture as the difficulty above
+  // (@ block 206,765, fetched 1 seconds apart; never mix snapshot dates in one bundle).
   // This is total_issuance for the emission formula, NOT mined rewards alone
   // (genesis endowments count toward issuance).
-  totalSupplyPlancks: "5805442366392792584",
+  totalSupplyPlancks: "5805587854256578623",
   fetchedAt: null,
   txRate: null,
   txRateSub: null,
@@ -68,9 +68,17 @@ function validHeight(v) {
   var h = intField(v);
   return (h != null && h >= 1 && h <= 10000000) ? h : null;
 }
+/* A capture time must be a real one: inside the chain's lifetime
+ * (genesis floor 2026-09-01, the fleet bound) and not in the future —
+ * a fetched_at of 2999 was previously cited verbatim as the snapshot's
+ * provenance (mining-studio's round-2 bound, applied fleet-wide). */
 function validFetchedAt(v) {
   if (typeof v !== "string" || !v) return null;
-  return isFinite(Date.parse(v)) ? v : null;
+  var t = Date.parse(v);
+  if (!isFinite(t)) return null;
+  if (t < Date.parse("2026-09-01T00:00:00Z")) return null;
+  if (t > Date.now() + 3600000) return null;
+  return v;
 }
 
 /* Total supply in plancks from a supply snapshot: the first-class

@@ -863,13 +863,13 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 {
   const app = read("pages/mining-calculator/app.js");
   ok(app.includes("function intField(v)"), "miningcalc: intField() defined (integer shapes only)");
-  ok(app.includes("function validFetchedAt(v)"), "miningcalc: validFetchedAt() defined (parseable dates only)");
+  ok(app.includes("function validFetchedAt(v)"), "miningcalc: validFetchedAt() defined (real capture times only)");
   ok(app.includes("BigInt(hs) !== BigInt(diff) / 12n) hs = null;"), "miningcalc: hashrate cross-checked against difficulty / 12 exactly");
   ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "miningcalc: supply total cross-checked against its balances itemization");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.22"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.11.0"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -894,7 +894,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 {
   const app = read("pages/pool-desk/js/app.js");
   ok(app.includes("function intField(v)"), "pooldesk: intField() defined (integer shapes only)");
-  ok(app.includes("function validFetchedAt(v)"), "pooldesk: validFetchedAt() defined (parseable dates only)");
+  ok(app.includes("function validFetchedAt(v)"), "pooldesk: validFetchedAt() defined (real capture times only)");
   ok(app.includes("BigInt(h) !== BigInt(diff) / 12n) h = null;"), "pooldesk: hashrate cross-checked against difficulty / 12 exactly");
   ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "pooldesk: supply total cross-checked against its balances itemization");
   ok(app.includes("BigInt(MAX_SUPPLY_QTC) * 1000000000000n"), "pooldesk: total issuance capped at 21M before it anchors a reward");
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.22"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.0"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -929,7 +929,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const app = read("pages/energy-observatory/js/app.js");
   ok(app.includes("function deriveSnapshotState(con, sup, liv)"), "energy: deriveSnapshotState() defined (the snapshot boundary)");
   ok(app.includes("function intField(v)"), "energy: intField() defined (integer shapes only)");
-  ok(app.includes("function validFetchedAt(v)"), "energy: validFetchedAt() defined (parseable dates only)");
+  ok(app.includes("function validFetchedAt(v)"), "energy: validFetchedAt() defined (real capture times only)");
   ok(app.includes("BigInt(eh) !== BigInt(diff) / 12n) diff = null;"), "energy: difficulty cross-checked against est_hashrate x 12 exactly");
   ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "energy: supply total cross-checked against its balances itemization");
   ok(app.includes("BigInt(tp) <= 21000000n * 1000000000000n"), "energy: total issuance capped at 21M before it anchors a reward");
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.21"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.51.0"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -966,7 +966,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const app = read("pages/luck-lab/js/app.js");
   ok(app.includes("function deriveSnapshotState(con, sup)"), "lucklab: deriveSnapshotState() defined (the snapshot boundary)");
   ok(app.includes("function intField(v)"), "lucklab: intField() defined (integer shapes only)");
-  ok(app.includes("function validFetchedAt(v)"), "lucklab: validFetchedAt() defined (parseable dates only)");
+  ok(app.includes("function validFetchedAt(v)"), "lucklab: validFetchedAt() defined (real capture times only)");
   ok(app.includes("BigInt(eh) !== BigInt(diff) / 12n) diff = null;"), "lucklab: difficulty cross-checked against est_hashrate x 12 exactly");
   ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "lucklab: supply total cross-checked against its balances itemization");
   ok(app.includes("BigInt(tp) <= 21000000n * 1000000000000n"), "lucklab: total issuance capped at 21M before it anchors a reward");
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.20"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.0"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1602,6 +1602,35 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("if (t > Date.now() + 3600000) return null;"), "studio2: a future fetched_at is not a capture time");
   const html = read("pages/mining-studio/index.html");
   ok(html.includes("app.js?v=1.3.0"), "studio2: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 49 (2026-10-11 11:19): fleet capture-time alignment — Studio's
+// round-2 validFetchedAt bounds (genesis floor 2026-09-01, ceiling
+// now+1h) never propagated to the four sync-fallback siblings, whose
+// copies still accepted ANY parseable date: a fetched_at of 2999 (or
+// 2020, before the chain existed) was cited verbatim as the snapshot's
+// provenance in mining-calculator, pool-desk, energy-observatory and
+// luck-lab while Network Dashboard / Supply Audit / Studio rejected
+// the same payload. RED first (probe qa-fetchedat-bounds: 10 failures
+// across the four apps, controls passing). Pin: the bounded body in
+// all four copies and the new cache keys.
+{
+  const mc = read("pages/mining-calculator/app.js");
+  ok(mc.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: miningcalc rejects a pre-genesis capture time");
+  ok(mc.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: miningcalc rejects a future capture time");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.0"), "fetchedat: miningcalc cache key bumped");
+  const pd = read("pages/pool-desk/js/app.js");
+  ok(pd.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: pooldesk rejects a pre-genesis capture time");
+  ok(pd.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: pooldesk rejects a future capture time");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.0"), "fetchedat: pooldesk cache key bumped");
+  const en = read("pages/energy-observatory/js/app.js");
+  ok(en.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: energy rejects a pre-genesis capture time");
+  ok(en.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: energy rejects a future capture time");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.0"), "fetchedat: energy cache key bumped");
+  const lk = read("pages/luck-lab/js/app.js");
+  ok(lk.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: lucklab rejects a pre-genesis capture time");
+  ok(lk.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: lucklab rejects a future capture time");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.0"), "fetchedat: lucklab cache key bumped");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

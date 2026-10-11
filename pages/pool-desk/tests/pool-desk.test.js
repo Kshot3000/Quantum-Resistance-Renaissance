@@ -212,6 +212,8 @@ eq("validPlancks rejects fraction string", P.validPlancks("1.5"), null);
 eq("validHeight rejects fraction", P.validHeight(153406.9), null);
 eq("validFetchedAt rejects markup garbage", P.validFetchedAt('<b id="pwn">x</b>'), null);
 t("validFetchedAt accepts ISO", P.validFetchedAt("2026-10-02T15:00:29.848Z") !== null);
+eq("validFetchedAt rejects a future capture time (2999)", P.validFetchedAt("2999-01-01T00:00:00.000Z"), null);
+eq("validFetchedAt rejects a pre-genesis capture time (2020)", P.validFetchedAt("2020-01-01T00:00:00.000Z"), null);
 
 const bnd = (c, s, l) => P.deriveNetworkDefaults({ consensus: c, supply: s, live: l });
 const bCons = () => JSON.parse(JSON.stringify(fixture.consensus));

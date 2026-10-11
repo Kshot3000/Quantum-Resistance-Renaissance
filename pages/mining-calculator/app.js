@@ -30,17 +30,17 @@ CHAIN.BLOCKS_PER_DAY = 86400 / CHAIN.BLOCK_TIME_S; // 7200
 /* Dated static FALLBACK bundle — replaced at load by deriveNetworkDefaults()
  * from the hourly data/*.json snapshots. Kept honest and dated for the
  * no-fetch path (file://, offline). Every figure comes from ONE capture
- * (2026-10-11 15:22Z): consensus difficulty @206,532 and total issuance
- * @206,532, fetched 1 seconds apart — never mix snapshot dates in one bundle.
+ * (2026-10-11 16:20Z): consensus difficulty @206,765 and total issuance
+ * @206,765, fetched 1 seconds apart — never mix snapshot dates in one bundle.
  * Guarded by tests/calc.test.js (fallback-integrity suite). */
 var FALLBACK = {
-  difficulty: "546962510563758",        // data/consensus.json @206,532
-  netHs: 45580209213646,                // = floor(difficulty / 12 s)
-  totalSupplyPlancks: "5805442366392792584", // data/supply.json @206,532
-  supplyQtc: 5805442.3664,              // total issuance incl. genesis
-  avgBlockMs: 14168,                    // consensus block_times_ms (3,000-block sample)
-  height: 206532,
-  fetchedAt: "2026-10-11T15:22:42.857Z"
+  difficulty: "545334838696797",        // data/consensus.json @206,765
+  netHs: 45444569891399,                // = floor(difficulty / 12 s)
+  totalSupplyPlancks: "5805587854256578623", // data/supply.json @206,765
+  supplyQtc: 5805587.8543,              // total issuance incl. genesis
+  avgBlockMs: 14194,                    // consensus block_times_ms (3,000-block sample)
+  height: 206765,
+  fetchedAt: "2026-10-11T16:20:27.890Z"
 };
 
 /* Pure: block reward from total issuance (the emission formula's S —
@@ -79,9 +79,17 @@ function validHeight(v){
   var h = intField(v);
   return (h != null && h >= 1 && h <= 10000000) ? h : null;
 }
+/* A capture time must be a real one: inside the chain's lifetime
+ * (genesis floor 2026-09-01, the fleet bound) and not in the future —
+ * a fetched_at of 2999 was previously cited verbatim as the snapshot's
+ * provenance (mining-studio's round-2 bound, applied fleet-wide). */
 function validFetchedAt(v){
   if (typeof v !== "string" || !v) return null;
-  return isFinite(Date.parse(v)) ? v : null;
+  var t = Date.parse(v);
+  if (!isFinite(t)) return null;
+  if (t < Date.parse("2026-09-01T00:00:00Z")) return null;
+  if (t > Date.now() + 3600000) return null;
+  return v;
 }
 
 /* Pure: total supply in plancks from a supply snapshot — the first-class

@@ -125,8 +125,8 @@ t("fallback bundle is one consistent capture", function(){
   var F = m.FALLBACK;
   assert.strictEqual(F.netHs, Math.floor(Number(F.difficulty) / 12), "netHs = difficulty / 12s");
   approx(Number(F.totalSupplyPlancks) / 1e12, F.supplyQtc, 0.001); // supplyQtc stored rounded to 4dp
-  approx(m.blockReward(F.supplyQtc), 0.3038912, 1e-7);
-  assert.strictEqual(F.height, 206532);
+  approx(m.blockReward(F.supplyQtc), 0.3038882, 1e-7);
+  assert.strictEqual(F.height, 206765);
   assert.ok(F.fetchedAt.indexOf("2026-10-11") === 0, "fallback is dated 2026-10-11");
   // The old bug, pinned: the pre-v1.9.0 static default was 10 GH/s.
   assert.ok(F.netHs > 1e12, "fallback network rate is TH/s-scale, not the old 10 GH/s example");
@@ -143,24 +143,24 @@ t("estimate uses observed pace when given", function(){
   approx(paced.qtcPerDay, paced.blocksPerDay * 0.3, 1e-9);
 });
 
-// 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.0203 QTC/day
+// 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.0204 QTC/day
 // (band re-derived each fallback sync: share × observed pace × reward at the
-// @206,532 capture = 0.0203; it drifts down as the network grows)
+// @206,765 capture = 0.0204; it drifts down as the network grows)
 t("default rig estimate is honest at fallback defaults", function(){
   var e = estimate({ userHs: 500e6, netHs: m.FALLBACK.netHs, watts: 450, kwhPrice: 0.12,
                      qtcPrice: 0, reward: m.blockReward(m.FALLBACK.supplyQtc),
                      blocksPerDay: 86400000 / m.FALLBACK.avgBlockMs });
-  assert.ok(e.qtcPerDay > 0.016 && e.qtcPerDay < 0.026, "expected ~0.0203 QTC/day, got " + e.qtcPerDay);
+  assert.ok(e.qtcPerDay > 0.016 && e.qtcPerDay < 0.026, "expected ~0.0204 QTC/day, got " + e.qtcPerDay);
 });
 
 // 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
-t("index.html carries the fallback defaults and v1.10.22 key", function(){
+t("index.html carries the fallback defaults and v1.11.0 key", function(){
   var fs = require("fs"), path = require("path");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="45.580"') >= 0, "in-net defaults to the fallback TH/s figure");
+  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="45.445"') >= 0, "in-net defaults to the fallback TH/s figure");
   assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
   assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
-  assert.ok(html.indexOf("app.js?v=1.10.22") >= 0, "app.js cache key bumped to 1.10.22");
+  assert.ok(html.indexOf("app.js?v=1.11.0") >= 0, "app.js cache key bumped to 1.11.0");
   assert.ok(html.indexOf("falls back to the dated Oct 2, 2026 capture") < 0, "honesty bullet no longer pins the fallback to the stale Oct 2 capture");
   assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
 });
@@ -184,6 +184,20 @@ t("derive rejects non-integer snapshot scalars", function(){
   assert.strictEqual(m.deriveNetworkDefaults(fp, sup).blocksPerDay, null);
   var ts = JSON.parse(JSON.stringify(cons)); ts.block_times_ms.sample = 3;
   assert.strictEqual(m.deriveNetworkDefaults(ts, sup).blocksPerDay, null);
+});
+
+// 16b. Capture-time bounds: a fetched_at must be a REAL capture time —
+// inside the chain's lifetime (genesis floor 2026-09-01) and not in the
+// future. A 2999/2020 date was previously cited verbatim as provenance.
+t("validFetchedAt enforces the fleet capture-time bounds", function(){
+  assert.strictEqual(m.validFetchedAt("2999-01-01T00:00:00.000Z"), null);
+  assert.strictEqual(m.validFetchedAt("2020-01-01T00:00:00.000Z"), null);
+  assert.strictEqual(m.validFetchedAt("2026-10-02T15:00:29.848Z"), "2026-10-02T15:00:29.848Z");
+  var cons = { fetched_at: "2999-01-01T00:00:00.000Z", head: 153406,
+    current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "55758693964650" },
+    block_times_ms: { avg_ms: 12413, sample: 3000 } };
+  var sup = { fetched_at: "2026-10-02T15:00:40.038Z", block_height: 153406, total_supply_plancks: "5766179473775204913" };
+  assert.strictEqual(m.deriveNetworkDefaults(cons, sup).fetchedAt, "2026-10-02T15:00:40.038Z");
 });
 
 // 17. Exact cross-check: est_hashrate_hs == difficulty / 12 (fetch construction)

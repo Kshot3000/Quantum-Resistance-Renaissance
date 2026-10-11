@@ -9,19 +9,19 @@
   var $ = function (id) { return document.getElementById(id); };
 
   // Fallback bundle — ONE capture, never mixed dates: every field below comes
-  // from the 2026-10-11 15:22Z snapshot refresh (consensus @ block 206,532 +
-  // supply @ block 206,532, fetched 1 seconds apart). The previous bundle paired
+  // from the 2026-10-11 16:20Z snapshot refresh (consensus @ block 206,765 +
+  // supply @ block 206,765, fetched 1 seconds apart). The previous bundle paired
   // Oct 1 difficulty/head with an Oct 2 supply-derived reward, which silently
   // skewed every fallback-painted figure. Guarded by tests/luck-core.test.js
   // (cross-checked against energy-observatory's fallback bundle).
   var state = {
-    difficulty: 546962510563758,   // fallback: consensus snapshot 2026-10-11
-    netHs: 45580209213646,         // = difficulty / 12 s (indexer est. hashrate)
-    reward: 0.3038912,             // fallback: (21M − 5,805,442.3664 total supply) / 50M, same capture
-    blocksPerDay: 6098,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
-    avgBlockMs: 14168,
-    head: 206532,
-    fetchedAt: "2026-10-11T15:22:42.857Z",
+    difficulty: 545334838696797,   // fallback: consensus snapshot 2026-10-11
+    netHs: 45444569891399,         // = difficulty / 12 s (indexer est. hashrate)
+    reward: 0.3038882,             // fallback: (21M − 5,805,587.8543 total supply) / 50M, same capture
+    blocksPerDay: 6087,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
+    avgBlockMs: 14194,
+    head: 206765,
+    fetchedAt: "2026-10-11T16:20:27.890Z",
     source: "snapshot"
   };
 
@@ -84,9 +84,17 @@
     var h = intField(v);
     return (h != null && h >= 1 && h <= 10000000) ? h : null;
   }
+  /* A capture time must be a real one: inside the chain's lifetime
+   * (genesis floor 2026-09-01, the fleet bound) and not in the future —
+   * a fetched_at of 2999 was previously cited verbatim as the snapshot's
+   * provenance (mining-studio's round-2 bound, applied fleet-wide). */
   function validFetchedAt(v) {
     if (typeof v !== "string" || !v) return null;
-    return isFinite(Date.parse(v)) ? v : null;
+    var t = Date.parse(v);
+    if (!isFinite(t)) return null;
+    if (t < Date.parse("2026-09-01T00:00:00Z")) return null;
+    if (t > Date.now() + 3600000) return null;
+    return v;
   }
 
   /* Total supply in plancks from a supply snapshot: the first-class

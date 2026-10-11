@@ -164,6 +164,10 @@ const A = require("../js/app.js");
   t("boundary: current.height vs head disagreement rejected", A.deriveSnapshotState(disH, clone(SUP)).snapshotOk === false);
   const badDate = clone(CONS); badDate.fetched_at = '<b id="pwn">PWNED</b>';
   t("boundary: garbage fetched_at rejected", A.deriveSnapshotState(badDate, clone(SUP)).snapshotOk === false);
+  t("boundary: validFetchedAt rejects a future capture time (2999)", A.validFetchedAt("2999-01-01T00:00:00.000Z") === null);
+  t("boundary: validFetchedAt rejects a pre-genesis capture time (2020)", A.validFetchedAt("2020-01-01T00:00:00.000Z") === null);
+  const futDate = clone(CONS); futDate.fetched_at = "2999-01-01T00:00:00.000Z";
+  t("boundary: future-dated consensus rejected", A.deriveSnapshotState(futDate, clone(SUP)).snapshotOk === false);
 
   const contra = clone(SUP); contra.total_supply_plancks = "9000000000000000000";
   const dContra = A.deriveSnapshotState(clone(CONS), contra);

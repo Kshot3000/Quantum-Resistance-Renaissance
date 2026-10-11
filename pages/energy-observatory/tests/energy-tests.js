@@ -219,6 +219,10 @@ t("us home 10,791 kWh/yr", E.EXTERNAL.us_home_kwh_2022.value === 10791);
   t("boundary: head/current.height disagreement rejected", D(dis, SUP, LIV).snapshotOk === false);
   const und = cp(CONS); und.fetched_at = '<b id="pwn">PWNED</b>';
   t("boundary: garbage fetched_at rejected (payload is undated)", D(und, SUP, LIV).snapshotOk === false);
+  t("boundary: validFetchedAt rejects a future capture time (2999)", app.validFetchedAt("2999-01-01T00:00:00.000Z") === null);
+  t("boundary: validFetchedAt rejects a pre-genesis capture time (2020)", app.validFetchedAt("2020-01-01T00:00:00.000Z") === null);
+  const fut = cp(CONS); fut.fetched_at = "2999-01-01T00:00:00.000Z";
+  t("boundary: future-dated consensus rejected (payload is undated)", D(fut, SUP, LIV).snapshotOk === false);
 
   const contra = cp(SUP); contra.total_supply_plancks = "9000000000000000000";
   t("boundary: total contradicting balances itemization rejected", D(CONS, contra, LIV).rewardQtc === null);
