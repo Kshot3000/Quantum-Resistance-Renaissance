@@ -14,6 +14,7 @@ import {
   getAccountInfo, getNonce, buildUnsignedTransfer, finalizeTransfer, submitExtrinsic,
   parseRecipient,
 } from './rpc.js';
+import { sanitizeActivityRows } from './rpc-validate.js?v=1.1.0';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { plancksToQtc, qtcToPlancks, EXISTENTIAL_DEPOSIT, SIGNING_CONTEXT, describeExtrinsicParts } from './scale.js';
 
@@ -579,19 +580,14 @@ function timeoutSignal(ms) {
   return ctl.signal;
 }
 
-/* An indexer row is rendered as money movement, so it must carry a real
- * amount (non-negative integer plancks), a real block height, and string
- * endpoints. Poisoned rows are dropped; a payload whose transfer field
- * is not a list at all is malformed — never a fabricated "no transfers". */
-function validActivityRow(t) {
-  if (!t || typeof t !== 'object') return false;
-  const amountOk = (typeof t.amount === 'string' && /^\d+$/.test(t.amount)) ||
-    (typeof t.amount === 'number' && Number.isSafeInteger(t.amount) && t.amount >= 0);
-  const h = t.block_height;
-  const heightOk = (typeof h === 'number' && Number.isSafeInteger(h) && h >= 0) ||
-    (typeof h === 'string' && /^\d+$/.test(h));
-  return amountOk && heightOk && typeof t.from_id === 'string' && typeof t.to_id === 'string';
-}
+/* An indexer row is rendered as money movement, so its RELATIONS are
+ * validated before it paints (sanitizeActivityRows in rpc-validate.js):
+ * the row must be a transfer of THIS wallet between real SS58-189
+ * addresses, at a fleet-valid block height, for an amount inside the
+ * 21M QTC supply cap, with a timestamp inside the chain's lifetime;
+ * ids are unique, the list respects the query's limit:25 and runs
+ * newest-first. Poisoned rows drop alone; a payload failing wholesale
+ * is malformed — never a fabricated "no transfers". */
 
 let activitySeq = 0; // token: only the latest load for the CURRENT wallet may render
 async function loadActivity() {
@@ -629,7 +625,8 @@ async function loadActivity() {
     if (j && j.errors) throw new Error(j.errors[0] && typeof j.errors[0].message === 'string' ? j.errors[0].message : 'indexer error');
     const rawRows = j && j.data && Array.isArray(j.data.transfer) ? j.data.transfer : null;
     if (!rawRows) throw new Error('indexer returned malformed activity data');
-    const rows = rawRows.filter(validActivityRow);
+    const rows = sanitizeActivityRows(rawRows, addr, Date.now());
+    if (!rows) throw new Error('indexer returned malformed activity data');
     if (rawRows.length && !rows.length) throw new Error('indexer returned malformed activity data');
     if (!rows.length) { list.innerHTML = '<p class="muted">No transfers found for this address.</p>'; return; }
     list.innerHTML = '';

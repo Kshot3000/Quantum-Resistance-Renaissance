@@ -9,7 +9,7 @@ import { hexEncode, hexDecode } from './quantus-crypto.js';
 import { ss58Decode } from './quantus-crypto.js';
 import { SYSTEM_ACCOUNT_KEY } from './xxhash.js?v=1.39.0';
 import { decodeAccountInfo, eraBirth, encodeMortalEra, buildTransferCall, buildSigningPayload, buildExtrinsic, DILITHIUM65_VARIANT, DILITHIUM87_VARIANT } from './scale.js';
-import { parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex } from './rpc-validate.js?v=1.0.0';
+import { parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex } from './rpc-validate.js?v=1.1.0';
 
 export const DEFAULT_RPC = 'wss://rpc.quantus.network';
 export const QUANTUS_PREFIX = 189;

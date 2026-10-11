@@ -377,6 +377,70 @@ test('rpc boundary: account storage — null is not-on-chain, poison is malforme
   assert.equal(info.free, 5000n);
 });
 
+/* ---- Activity boundary round 2: indexer rows must be ABOUT this
+ * wallet, between real SS58-189 addresses, at real heights, for
+ * amounts the chain can hold (verified against live indexer data). */
+import { validBlockHeight, sanitizeActivityRows, MAX_SUPPLY_PLANCKS } from '../js/rpc-validate.js';
+
+const WALLET = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
+const SENTINEL = 'qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc';
+const OTHER = 'qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv';
+const NOW = Date.parse('2026-10-11T04:30:00Z');
+const aRow = (over = {}) => ({
+  id: 'r1', from_id: SENTINEL, to_id: WALLET, amount: '300000000000',
+  block_height: 203723, extrinsic_id: null, timestamp: '2026-10-11T04:20:31.721+00:00', ...over,
+});
+
+test('activity-validate: block heights are fleet-shaped (1..10M, canonical)', () => {
+  assert.equal(validBlockHeight(203723), 203723);
+  assert.equal(validBlockHeight('203723'), 203723);
+  assert.equal(validBlockHeight(0), null);
+  assert.equal(validBlockHeight(9007199254740991), null);
+  assert.equal(validBlockHeight('0203723'), null);
+  assert.equal(validBlockHeight(203723.5), null);
+  assert.equal(validBlockHeight(true), null);
+});
+
+test('activity boundary: a live-shaped row passes, normalized', () => {
+  const rows = sanitizeActivityRows([aRow()], WALLET, NOW);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].amount, '300000000000');
+  assert.equal(rows[0].block_height, 203723);
+});
+
+test('activity boundary: a stranger transfer is not this wallet history', () => {
+  const rows = sanitizeActivityRows([aRow({ from_id: SENTINEL, to_id: OTHER })], WALLET, NOW);
+  assert.equal(rows.length, 0);
+});
+
+test('activity boundary: non-SS58 and wrong-prefix endpoints drop', () => {
+  assert.equal(sanitizeActivityRows([aRow({ from_id: 'garbage' })], WALLET, NOW).length, 0);
+  const wrongPrefix = ss58Encode(new Uint8Array(32).fill(7), 42);
+  assert.equal(sanitizeActivityRows([aRow({ from_id: wrongPrefix })], WALLET, NOW).length, 0);
+});
+
+test('activity boundary: absurd height and over-supply amount drop', () => {
+  assert.equal(sanitizeActivityRows([aRow({ block_height: 9007199254740991 })], WALLET, NOW).length, 0);
+  assert.equal(sanitizeActivityRows([aRow({ amount: (MAX_SUPPLY_PLANCKS + 1n).toString() })], WALLET, NOW).length, 0);
+  assert.equal(sanitizeActivityRows([aRow({ amount: MAX_SUPPLY_PLANCKS.toString() })], WALLET, NOW).length, 1);
+});
+
+test('activity boundary: future and pre-genesis timestamps drop, missing is allowed', () => {
+  assert.equal(sanitizeActivityRows([aRow({ timestamp: '2027-01-01T00:00:00Z' })], WALLET, NOW).length, 0);
+  assert.equal(sanitizeActivityRows([aRow({ timestamp: '2026-08-01T00:00:00Z' })], WALLET, NOW).length, 0);
+  assert.equal(sanitizeActivityRows([aRow({ timestamp: null })], WALLET, NOW).length, 1);
+});
+
+test('activity boundary: duplicate ids render once; ascending and over-limit payloads are malformed', () => {
+  const dup = sanitizeActivityRows([aRow(), aRow({ block_height: 203722 })], WALLET, NOW);
+  assert.equal(dup.length, 1);
+  const asc = sanitizeActivityRows([aRow({ id: 'a', block_height: 203722 }), aRow({ id: 'b', block_height: 203723 })], WALLET, NOW);
+  assert.equal(asc, null);
+  const many = Array.from({ length: 26 }, (_, i) => aRow({ id: 'm' + i, block_height: 203723 - i }));
+  assert.equal(sanitizeActivityRows(many, WALLET, NOW), null);
+  assert.equal(sanitizeActivityRows('nope', WALLET, NOW), null);
+});
+
 test('rpc boundary: nonce and submit hash are validated', async () => {
   const addr = ss58Encode(new Uint8Array(32).fill(7), 189);
   assert.equal(await getNonce(stubRpc({ system_accountNextIndex: 7 }), addr), 7);

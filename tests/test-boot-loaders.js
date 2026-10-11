@@ -394,10 +394,10 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!rpc.includes("parseInt(header.number, 16)"), "wallet: no unchecked header parseInt remains");
   ok(!rpc.includes("BigInt(details.inclusionFee.baseFee)"), "wallet: no raw BigInt() fee coercion remains");
   const app = read("pages/web-wallet/js/app.js");
-  ok(app.includes("function validActivityRow(t)"), "wallet: activity rows validated before rendering");
+  ok(app.includes("sanitizeActivityRows(rawRows, addr, Date.now())"), "wallet: activity rows validated before rendering (round-1 shape check, superseded by the round-2 relational sanitize in Batch 38)");
   ok(app.includes("indexer returned malformed activity data"), "wallet: non-list activity payload is malformed, never a fake empty history");
   const html = read("pages/web-wallet/index.html");
-  ok(html.includes("js/app.js?v=1.40.0"), "wallet: app.js cache key bumped for the boundary fix (1.39.0, superseded by the 1.40.0 lock-scrub bump)");
+  ok(html.includes("js/app.js?v=1.41.0"), "wallet: app.js cache key bumped for the boundary fix (1.39.0, superseded by the 1.40.0 lock-scrub bump and the 1.41.0 activity round-2 bump)");
   // Lock scrub (2026-10-10): lock() zeroed the in-memory key but left the
   // revealed phrase words, Security-tab keys, address and send form rendered
   // in the DOM behind the unlock screen; fillSecurity was { once: true },
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.11"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.12"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.11"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.12"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.10"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.11"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.9"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.10"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1230,6 +1230,36 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const html = read("pages/supply-audit/index.html");
   ok(html.includes("js/audit-core.js?v=1.30.0"), "supply3: audit-core cache key bumped for the round-2 fix");
   ok(html.includes("app.js?v=1.32.0"), "supply3: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 38 (2026-10-10 23:19): web-wallet Activity round 2 (Tier 1) —
+// round 1 (Batch 12) validated each indexer row's shape; the RELATIONS
+// were unchecked: a transfer between two strangers painted as this
+// wallet's history, non-SS58 endpoints painted, height 2^53-1 and a
+// 100M QTC amount (over the 21M supply cap) painted, a future-dated
+// row painted, an ascending list painted as "Recent transfers", a
+// duplicated transfer id rendered twice, and a 26-row payload painted
+// despite the query's limit:25. Pin: sanitizeActivityRows in
+// rpc-validate.js validates the relations (all verified against live
+// indexer data at height 203,723 before tightening) and app.js routes
+// every payload through it.
+{
+  const val = read("pages/web-wallet/js/rpc-validate.js");
+  ok(val.includes("export function validBlockHeight(v)"), "wallet2: validBlockHeight() defined (fleet height shape)");
+  ok(val.includes("export function sanitizeActivityRows(raw, address, nowMs"), "wallet2: sanitizeActivityRows() defined");
+  ok(val.includes("if (t.from_id !== address && t.to_id !== address) continue;"), "wallet2: a row must be a transfer OF the queried wallet");
+  ok(val.includes("return prefix === 189;"), "wallet2: endpoints must be real SS58-189 addresses");
+  ok(val.includes("MAX_SUPPLY_PLANCKS = 21000000000000000000n"), "wallet2: amounts bounded by the 21M QTC supply cap");
+  ok(val.includes("raw.length > ACTIVITY_LIMIT"), "wallet2: over-limit payloads are malformed (limit:25 contract)");
+  ok(val.includes("rows[i].block_height > rows[i - 1].block_height) return null;"), "wallet2: kept rows must run newest-first, else the payload is malformed");
+  ok(val.includes("seen.has(t.id)"), "wallet2: duplicate transfer ids drop");
+  const rpc = read("pages/web-wallet/js/rpc.js");
+  ok(rpc.includes("rpc-validate.js?v=1.1.0"), "wallet2: rpc.js pins the bumped rpc-validate module");
+  const app = read("pages/web-wallet/js/app.js");
+  ok(app.includes("from './rpc-validate.js?v=1.1.0'"), "wallet2: app.js imports the sanitizer from the bumped module");
+  ok(!app.includes("function validActivityRow(t)"), "wallet2: the round-1 shape-only row check is gone");
+  const html = read("pages/web-wallet/index.html");
+  ok(html.includes("js/app.js?v=1.41.0"), "wallet2: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
