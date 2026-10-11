@@ -570,7 +570,23 @@ function importTicketString(s) {
     // package either — void the export, not just the review.
     voidSignedPackage('a new chain ticket was imported');
     renderColdTicket();
-  } catch (e) { err('cold-ticket-err', e.message); }
+  } catch (e) {
+    /* A FAILED import is still an attempted replacement: the user meant
+     * the standing ticket to be replaced, so leaving it installed — its
+     * summary on screen, the desk ready to sign against it — would let a
+     * signature be produced under a ticket the user believes they
+     * discarded (e.g. a pasted ticket decodeTicket just refused for an
+     * era relation no genuine issuer can produce). Void the standing
+     * ticket the same way a successful import voids its review and
+     * package; the desk stands empty until a valid ticket imports. */
+    if (cold.ticket) {
+      cold.ticket = null; cold.ticketStr = '';
+      $('cold-ticket-out').hidden = true;
+      if (cold.reviewed) { cold.reviewed = null; $('cold-review').hidden = true; }
+      voidSignedPackage('the replacement ticket was refused');
+    }
+    err('cold-ticket-err', e.message);
+  }
 }
 
 let ticketImportSeq = 0; // token: only the latest ticket import (file, paste, or camera) may land

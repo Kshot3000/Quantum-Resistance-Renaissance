@@ -31,7 +31,10 @@ function fixtureTicket(over = {}) {
     addr: sender.address, nonce: 3,
     genesis: GENESIS, spec: 42, txv: 7,
     head: 1_234_500, headHash: HEADH,
-    era: { period: 64, phase: 52, birth: 1_234_496, birthHash: BIRTHH },
+    // birth is the eraBirth(head, 64, 52) value the real issuer derives
+    // (rpc.js getEraBirthHash): 1_234_484 — congruent to phase mod period
+    // with the window [birth, birth+period) containing head 1_234_500.
+    era: { period: 64, phase: 52, birth: 1_234_484, birthHash: BIRTHH },
     fee: '1500000000',
     issued: '2026-09-30T21:40:00.000Z',
     ...over,
@@ -90,6 +93,30 @@ test('ticket: negative nonce rejected', () => {
   assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ nonce: -1 }))), /nonce/);
 });
 
+/* Round 2: era fields are one claim — relations, not just shapes. The
+ * fixture era is (period 64, phase 52, birth 1_234_484, head 1_234_500);
+ * each case below breaks exactly one relation a genuine issuer's ticket
+ * (rpc.js getEraBirthHash: phase = head % period, birth = eraBirth(...))
+ * always satisfies. */
+test('ticket: era relations enforced (round 2)', () => {
+  const era = (over) => fixtureTicket({ era: { period: 64, phase: 52, birth: 1_234_484, birthHash: BIRTHH, ...over } });
+  assert.throws(() => decodeTicket(encodeTicket(era({ period: 100 }))), /power of two/);
+  assert.throws(() => decodeTicket(encodeTicket(era({ period: 2 }))), /power of two/);
+  assert.throws(() => decodeTicket(encodeTicket(era({ period: 131072 }))), /power of two/);
+  assert.throws(() => decodeTicket(encodeTicket(era({ phase: 64, birth: 1_234_436 }))), /phase must be below/);
+  assert.throws(() => decodeTicket(encodeTicket(era({ birth: 1_234_496 }))), /congruent/);
+  assert.throws(() => decodeTicket(encodeTicket(era({ phase: 4, birth: 1_234_564 }))), /after the ticket head/);
+  assert.throws(() => decodeTicket(encodeTicket(era({ phase: 4, birth: 1_234_436 }))), /already expired/);
+  const big = fixtureTicket({ head: 1_234_500, era: { period: 8192, phase: 3, birth: 1_228_803, birthHash: BIRTHH } });
+  assert.throws(() => decodeTicket(encodeTicket(big)), /quantize step/);
+});
+
+test('ticket: spec/tx versions must fit u32 (round 2)', () => {
+  assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ spec: 4294967296 }))), /fit u32/);
+  assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ txv: 4294967296 }))), /fit u32/);
+  assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ head: 10000001 }))), /chain-height bound/);
+});
+
 /* ---------------- chunks ---------------- */
 test('chunks: encode/reassemble round-trip, shuffled + duplicated', () => {
   const hex = '0x' + 'deadbeef'.repeat(1500); // 6000 bytes
@@ -114,6 +141,27 @@ test('chunks: mixed sessions + malformed lines rejected', () => {
   assert.throws(() => decodeChunks([...a, ...b]), /more than one session/);
   assert.throws(() => decodeChunks(['hello world']), /malformed chunk/);
   assert.throws(() => decodeChunks([]), /no chunks/);
+});
+
+/* Round 2: duplicates must be IDENTICAL copies, non-final chunks share
+ * one byte size (the encoder slices uniformly), and the count is bounded
+ * so a hostile header is refused instantly. */
+test('chunks: conflicting duplicate rejected (round 2)', () => {
+  const good = encodeChunks('a1b2', '0x' + 'deadbeef'.repeat(600), 900);
+  const evil = encodeChunks('a1b2', '0x' + 'cafebabe'.repeat(600), 900);
+  assert.throws(() => decodeChunks([good[0], evil[1], good[1], good[2]]), /conflicting duplicate/);
+  const { hex } = decodeChunks([good[0], good[1], good[1], good[2]]); // identical dup still fine
+  assert.equal(hex.toLowerCase(), ('0x' + 'deadbeef'.repeat(600)).toLowerCase());
+});
+
+test('chunks: short middle chunk rejected (round 2)', () => {
+  const good = encodeChunks('a1b2', '0x' + 'deadbeef'.repeat(600), 900);
+  const short = good[1].replace(/:[A-Za-z0-9\-_]+$/, (m) => ':' + m.slice(1, 40));
+  assert.throws(() => decodeChunks([good[0], short, good[2]]), /chunk size/);
+});
+
+test('chunks: absurd count rejected instantly (round 2)', () => {
+  assert.throws(() => decodeChunks(['QAGX:aa:1/999999999:xx']), /exceeds the session bound/);
 });
 
 test('chunks: single-chunk payload works', () => {

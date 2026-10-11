@@ -116,8 +116,43 @@ export function decodeTicket(str) {
   for (const k of ['spec', 'txv', 'head']) {
     if (!Number.isInteger(obj[k]) || obj[k] < 0) throw new Error(`ticket: ${k} must be a non-negative integer`);
   }
+  // spec/tx versions are serialized u32le into the signing payload
+  // (scale.js buildSigningPayload) — a value >= 2^32 would wrap silently
+  // and the cold side would sign a payload naming version 0.
+  for (const k of ['spec', 'txv']) {
+    if (obj[k] > 0xFFFFFFFF) throw new Error(`ticket: ${k} must fit u32 (<= 4294967295)`);
+  }
+  // Fleet chain-height bound (validChainHeight): no genuine ticket head
+  // can sit above it; an absurd head would anchor era reasoning to a
+  // block that cannot exist.
+  if (obj.head > 10000000) throw new Error('ticket: head is above the fleet chain-height bound (10000000)');
   for (const k of ['period', 'phase', 'birth']) {
     if (!Number.isInteger(obj.era[k]) || obj.era[k] < 0) throw new Error(`ticket: era.${k} must be a non-negative integer`);
+  }
+  /* Era RELATIONS (round 2): the fields above are shapes; the era is one
+   * claim about a window, and its parts must agree the way the SCALE
+   * mortal-era codec (scale.js encodeMortalEra / decodeMortalEra here)
+   * can actually encode it, and the way eraBirth() derives it:
+   *   period = 2 << (encoded % 16) — a power of two in [4, 65536];
+   *   phase is stored divided by the quantize step, so it must be a
+   *   multiple of it, and must sit below period;
+   *   birth ≡ phase (mod period) and the window [birth, birth+period)
+   *   must contain the ticket head — a birth after head, or a window that
+   *   already closed at head, describes an era the runtime would decode
+   *   differently from the one this ticket claims to bind. */
+  {
+    const { period, phase, birth } = obj.era;
+    if (period < 4 || period > 65536 || (period & (period - 1)) !== 0)
+      throw new Error('ticket: era.period must be a power of two in 4..65536 (SCALE mortal era)');
+    if (phase >= period) throw new Error('ticket: era.phase must be below era.period');
+    const quantize = Math.max(1, Math.floor(period / 4096));
+    if (phase % quantize !== 0)
+      throw new Error('ticket: era.phase must be a multiple of the era quantize step');
+    if (birth % period !== phase)
+      throw new Error('ticket: era.birth must be congruent to era.phase mod era.period');
+    if (birth > obj.head) throw new Error('ticket: era.birth is after the ticket head');
+    if (obj.head >= birth + period)
+      throw new Error('ticket: era window already expired at the ticket head');
   }
   if (obj.fee !== null && obj.fee !== undefined && !/^\d+$/.test(String(obj.fee)))
     throw new Error('ticket: fee must be a plancks integer string');
@@ -142,8 +177,20 @@ export function encodeChunks(sessionId, hexPayload, chunkBytes = 900) {
 
 const CHUNK_RE = /^QAGX:([0-9a-fA-F]{1,8}):(\d+)\/(\d+):([A-Za-z0-9\-_]+)$/;
 
-/* Reassemble chunk strings (any order, duplicates tolerated) into 0x hex.
- * Throws on mixed sessions, missing chunks, or malformed lines. */
+/* A signed package is ~7.5 KB worst case (ML-DSA-87); even at a tiny
+ * 100-byte chunk size that is under 100 chunks. This bound exists so a
+ * hostile count (1/999999999) is refused instantly instead of grinding
+ * the missing-chunk list construction. */
+export const MAX_CHUNKS = 10000;
+
+/* Reassemble chunk strings (any order, IDENTICAL duplicates tolerated)
+ * into 0x hex. Throws on mixed sessions, missing chunks, or malformed
+ * lines. Round 2 (relations): a duplicate carrying DIFFERENT bytes for
+ * the same index is a conflict, not a spare copy — first-copy-wins would
+ * silently assemble whichever package was pasted first; and every
+ * non-final chunk of a session carries the same byte count (the encoder
+ * slices uniformly), so a short middle chunk means the reassembled
+ * bytes shift — refuse it instead of assembling a different payload. */
 export function decodeChunks(lines) {
   const arr = (Array.isArray(lines) ? lines : String(lines).split(/\s+/))
     .map((l) => l.trim()).filter(Boolean);
@@ -158,13 +205,29 @@ export function decodeChunks(lines) {
     if (sid === null) { sid = s; n = nn; }
     if (s !== sid) throw new Error('chunks from more than one session — keep sessions separate');
     if (nn !== n) throw new Error('inconsistent chunk counts in session ' + sid);
+    if (nn > MAX_CHUNKS) throw new Error(`chunk count ${nn} exceeds the session bound (${MAX_CHUNKS})`);
     if (i < 1 || i > n) throw new Error(`chunk index ${i} out of range 1..${n}`);
-    if (!slots.has(i)) slots.set(i, b64urlDecode(body));
+    const bytes = b64urlDecode(body);
+    if (bytes.length === 0) throw new Error(`chunk ${i}: empty body`);
+    if (slots.has(i)) {
+      const prev = slots.get(i);
+      if (prev.length !== bytes.length || prev.some((b, j) => b !== bytes[j]))
+        throw new Error(`chunk ${i}: conflicting duplicate (two different copies in one session)`);
+    } else slots.set(i, bytes);
   }
   if (slots.size !== n) {
     const missing = [];
     for (let i = 1; i <= n; i++) if (!slots.has(i)) missing.push(i);
     throw new Error(`missing chunk(s): ${missing.join(', ')} of ${n}`);
+  }
+  if (n > 1) {
+    const size = slots.get(1).length;
+    for (let i = 2; i < n; i++) {
+      if (slots.get(i).length !== size)
+        throw new Error(`chunk ${i}: ${slots.get(i).length} bytes, expected the session chunk size ${size} — reassembly would shift the payload`);
+    }
+    if (slots.get(n).length > size)
+      throw new Error(`chunk ${n}: final chunk longer than the session chunk size ${size}`);
   }
   const total = [...slots.values()].reduce((a, b) => a + b.length, 0);
   const out = new Uint8Array(total);

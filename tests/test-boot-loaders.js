@@ -495,7 +495,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("scheme changed since review"), "airgap: sign refuses a scheme switched after review, named as such");
   ok(app.includes("nonce: nonceRaw, scheme }"), "airgap: the review pins the scheme alongside dest/amount/nonce");
   const html = read("pages/airgap-desk/index.html");
-  ok(html.includes("js/app.js?v=1.44.0"), "airgap: app.js cache key bumped for the sign-staleness fix (1.43.0, superseded by the 1.44.0 cold-void bump)");
+  ok(html.includes("js/app.js?v=1.45.0"), "airgap: app.js cache key bumped for the cold-void fix (1.44.0, superseded by the 1.45.0 round-2 bump)");
 }
 
 // Batch 15 (2026-10-09 19:19): notary-desk (Tier 1) — the last Tier 1 app
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.17"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.18"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.17"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.18"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.16"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.17"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.15"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.16"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1443,6 +1443,37 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const html = read("pages/notary-desk/index.html");
   ok(html.includes("js/app.js?v=1.53.0"), "notary2: app.js cache key bumped for the round-2 fix");
   ok(html.includes("js/notary-codec.js?v=1.49.0"), "notary2: notary-codec.js cache key bumped for the round-2 fix");
+}
+
+// Batch 44 (2026-10-11 06:19): Airgap Desk round 2 (Tier 1) — validate
+// RELATIONS, not just shapes. Round 1 shape-checked each ticket field and
+// chunk line alone, so a ticket whose era birth was not congruent to its
+// phase, whose window had already expired at its own head, whose period
+// the SCALE mortal-era codec cannot encode, or whose spec/tx version
+// wrapped u32le in the signing payload was accepted and signed against;
+// a chunk session assembled a conflicting duplicate first-copy-wins, a
+// short middle chunk shifted every later byte, and a 1/999999999 count
+// ground the missing-list construction; and a FAILED ticket import left
+// the previous ticket installed and signable. Pin: decodeTicket's era /
+// u32 / height relations, decodeChunks' duplicate / uniform-size / count
+// relations, and importTicketString voiding the standing ticket on a
+// refused replacement.
+{
+  const core = read("pages/airgap-desk/js/airgap.js");
+  ok(core.includes("era.period must be a power of two in 4..65536"), "airgap2: era period must be SCALE-encodable");
+  ok(core.includes("era.phase must be a multiple of the era quantize step"), "airgap2: era phase must respect the quantize step");
+  ok(core.includes("era.birth must be congruent to era.phase mod era.period"), "airgap2: era birth must be congruent to phase");
+  ok(core.includes("era window already expired at the ticket head"), "airgap2: era window must contain the ticket head");
+  ok(core.includes("must fit u32 (<= 4294967295)"), "airgap2: spec/tx versions must fit u32, never wrap in the payload");
+  ok(core.includes("head is above the fleet chain-height bound (10000000)"), "airgap2: ticket head bound to the fleet chain height");
+  ok(core.includes("export const MAX_CHUNKS = 10000"), "airgap2: chunk count bound present");
+  ok(core.includes("conflicting duplicate (two different copies in one session)"), "airgap2: a conflicting duplicate is refused, never first-copy-wins");
+  ok(core.includes("reassembly would shift the payload"), "airgap2: a short middle chunk is refused, never byte-shifted");
+  const app = read("pages/airgap-desk/js/app.js");
+  ok(app.includes("voidSignedPackage('the replacement ticket was refused')"), "airgap2: a refused import voids the standing ticket's package");
+  ok(app.includes("cold.ticket = null; cold.ticketStr = '';"), "airgap2: a refused import clears the standing ticket");
+  const html = read("pages/airgap-desk/index.html");
+  ok(html.includes("js/app.js?v=1.45.0"), "airgap2: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
