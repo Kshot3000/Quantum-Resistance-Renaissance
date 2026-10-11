@@ -91,5 +91,62 @@ check("sanitizeData coerces digit-string counts to numbers",
   (function(){ var c = D.sanitizeData(payload(function(d){ d.status.block_height = "200000"; }));
     return c && c.status.block_height === 200000; })());
 
+/* ---- boundary hardening round 2 (Batch 36): relations, not shapes ---- */
+check("validBlockHeight fleet shape", D.validBlockHeight(200000) === 200000 && D.validBlockHeight("200000") === 200000 &&
+  D.validBlockHeight(0) === null && D.validBlockHeight(9007199254740991) === null && D.validBlockHeight(true) === null &&
+  D.validBlockHeight(1.5) === null && D.validBlockHeight("2.02e5") === null && D.validBlockHeight(10000001) === null);
+check("validFetchedAt requires a real capture time",
+  D.validFetchedAt("2026-10-10T01:00:00.000Z", Date.parse("2026-10-10T01:00:00Z")) === Date.parse("2026-10-10T01:00:00.000Z") &&
+  D.validFetchedAt("2026-08-01T00:00:00.000Z", Date.parse("2026-10-10T01:00:00Z")) === null &&
+  D.validFetchedAt("2026-10-12T00:00:00.000Z", Date.parse("2026-10-10T01:00:00Z")) === null &&
+  D.validFetchedAt("not-a-date", Date.parse("2026-10-10T01:00:00Z")) === null && D.validFetchedAt(null) === null);
+check("rewardPlausible follows the emission schedule for the block's own height",
+  D.rewardPlausible(200000, "310000000000") === true && D.rewardPlausible(200000, "300000000000") === true &&
+  D.rewardPlausible(200000, "370000000000") === true && /* fee-bearing live block */
+  D.rewardPlausible(200000, "250000000000") === false && /* below the schedule floor */
+  D.rewardPlausible(200000, "999000000000000") === false && D.rewardPlausible(200000, "0") === false);
+
+function payload3(mut){
+  var d = { status: { block_height: 200000, total_accounts: 12000, total_immediate_transfers: 270000, total_scheduled_transfers: 15 },
+    blocks: [0, 1, 2].map(function(k){ return { height: 200000 - k, hash: "0x" + (200000 - k).toString(16).padStart(64, "0"),
+      timestamp: "2026-10-10T00:0" + (6 - k) + ":00.000Z", reward: "310000000000" }; }),
+    daily: [{ date: "2026-10-10T00:00:00+00:00", blocks_count: 6100, tx_count: 8300, active_accounts: 950 },
+            { date: "2026-10-09T00:00:00+00:00", blocks_count: 6000, tx_count: 8000, active_accounts: 900 }] };
+  if (mut) mut(d);
+  return d;
+}
+var OPTS = { fetchedAt: "2026-10-10T01:00:00.000Z", nowMs: Date.parse("2026-10-10T01:00:00Z") };
+check("sanitizeData r2 accepts a relationally sound payload", (function(){ var c = D.sanitizeData(payload3(), OPTS); return c && c.blocks.length === 3 && c.daily.length === 2; })());
+check("sanitizeData r2 rejects absurd / zero / boolean status heights",
+  D.sanitizeData(payload3(function(d){ d.status.block_height = 9007199254740991; })) === null &&
+  D.sanitizeData(payload3(function(d){ d.status.block_height = 0; })) === null &&
+  D.sanitizeData(payload3(function(d){ d.status.block_height = true; })) === null);
+check("sanitizeData r2 rejects a head that disagrees with the status height",
+  D.sanitizeData(payload3(function(d){ d.status.block_height = 200001; }), OPTS) === null);
+check("sanitizeData r2 rejects ascending blocks and ascending daily rows",
+  D.sanitizeData(payload3(function(d){ d.blocks.reverse(); }), OPTS) === null &&
+  D.sanitizeData(payload3(function(d){ d.daily.reverse(); }), OPTS) === null);
+check("sanitizeData r2 drops a duplicated block, keeps the uniques",
+  (function(){ var c = D.sanitizeData(payload3(function(d){ d.blocks[2] = JSON.parse(JSON.stringify(d.blocks[1])); }), OPTS);
+    return c && c.blocks.length === 2; })());
+check("sanitizeData r2 drops impossible rewards (999 QTC, 0), rejects when none survive",
+  (function(){ var c = D.sanitizeData(payload3(function(d){ d.blocks[1].reward = "999000000000000"; }), OPTS);
+    return c && c.blocks.length === 2; })() &&
+  (function(){ var c = D.sanitizeData(payload3(function(d){ d.blocks[1].reward = "0"; }), OPTS);
+    return c && c.blocks.length === 2; })() &&
+  D.sanitizeData(payload3(function(d){ d.blocks.forEach(function(b){ b.reward = "999000000000000"; }); }), OPTS) === null);
+check("sanitizeData r2 drops a daily row whose active accounts exceed all accounts",
+  (function(){ var c = D.sanitizeData(payload3(function(d){ d.daily[0].active_accounts = 99999; }), OPTS);
+    return c && c.daily.length === 1 && c.daily[0].tx_count === 8000; })());
+check("sanitizeData r2 drops non-midnight and future daily rows",
+  (function(){ var c = D.sanitizeData(payload3(function(d){ d.daily[0].date = "2026-10-10T06:00:00+00:00"; }), OPTS);
+    return c && c.daily.length === 1; })() &&
+  (function(){ var c = D.sanitizeData(payload3(function(d){ d.daily[0].date = "2027-10-10T00:00:00+00:00"; }), OPTS);
+    return c && c.daily.length === 1; })());
+check("sanitizeData r2 rejects over-limit lists and an invalid capture time",
+  D.sanitizeData(payload3(function(d){ for (var k = 3; k < 16; k++) d.blocks.push({ height: 200000 - k, hash: "0x" + (200000 - k).toString(16).padStart(64, "0"), timestamp: "2026-10-09T23:5" + (9 - (k % 10)) + ":00.000Z", reward: "310000000000" }); }), OPTS) === null &&
+  D.sanitizeData(payload3(), { fetchedAt: "2020-01-01T00:00:00.000Z", nowMs: OPTS.nowMs }) === null &&
+  D.sanitizeData(payload3(), { fetchedAt: "2026-10-09T00:00:00.000Z", nowMs: OPTS.nowMs }) === null);
+
 console.log(fails === 0 ? "\nALL TESTS PASSED" : "\n" + fails + " TEST(S) FAILED");
 process.exit(fails === 0 ? 0 : 1);

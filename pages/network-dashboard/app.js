@@ -21,14 +21,22 @@ var CHAIN = {
 
 /* ---------------- pure helpers (Node-testable) ---------------- */
 
-/* Indexer/snapshot boundary (fleet pattern, Batch 23): every field that
- * crosses from the indexer or the snapshot file is validated BEFORE it
- * anchors a stat, a block row, or a chart point. Core status fields
- * reject the whole payload (the caller reads it exactly like a failed
- * fetch — last good telemetry stays, the pill reports the failure);
- * individual block/daily rows that are malformed are dropped, never
- * rendered. The format helpers below are hardened the same way as
- * defense in depth, so a raw value can never reach innerHTML. */
+/* Indexer/snapshot boundary (fleet pattern, Batch 23; relations round
+ * 2, Batch 36): every field that crosses from the indexer or the
+ * snapshot file is validated BEFORE it anchors a stat, a block row,
+ * or a chart point. Round 1 validated each field's SHAPE; round 2
+ * validates the RELATIONS between fields — the status height must be
+ * a plausible chain height and agree with the blocks list's head,
+ * kept rows must run newest-first in height and time with no
+ * duplicates, every reward must fit the emission schedule for its
+ * own height, a day's active accounts cannot exceed all accounts,
+ * and the snapshot's capture time must be real. Core status fields
+ * and payload-level contradictions reject the whole payload (the
+ * caller reads it exactly like a failed fetch — last good telemetry
+ * stays, the pill reports the failure); individual rows that are
+ * malformed or relationally impossible are dropped, never rendered.
+ * The format helpers below are hardened the same way as defense in
+ * depth, so a raw value can never reach innerHTML. */
 function nonNegInt(v){
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
   if (typeof v === "string" && /^\d+$/.test(v)){
@@ -51,38 +59,133 @@ function validHash(v){
   return typeof v === "string" && /^0x[0-9a-fA-F]{64}$/.test(v) ? v : null;
 }
 
-function sanitizeData(data){
+/* The chain did not exist before this floor (mainnet Sept 2026; the
+ * fleet-wide genesis floor used by every round-2 validator). A capture
+ * time or block time before it is not an early record, it is poison. */
+var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
+
+/* Fleet validBlockHeight (round 2): the status height anchors the
+ * supply/reward ESTIMATES, so it must be a plausible chain height —
+ * a strict safe integer 1..10,000,000. Round 1's nonNegInt accepted 0
+ * and MAX_SAFE_INTEGER, and both painted as chain fact. Canonical
+ * digit strings are accepted (the indexer serializes counts both
+ * ways); booleans, fractions and scientific strings reject. */
+function validBlockHeight(v){
+  var n;
+  if (typeof v === "number") n = v;
+  else if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) n = Number(v);
+  else return null;
+  return (Number.isSafeInteger(n) && n >= 1 && n <= 10000000) ? n : null;
+}
+
+/* A capture time must be real: parseable, not before the chain
+ * existed, not in the future. Returns epoch ms or null. */
+function validFetchedAt(v, nowMs){
+  if (typeof v !== "string") return null;
+  var ms = Date.parse(v);
+  if (!isFinite(ms)) return null;
+  var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : Date.now();
+  return (ms >= GENESIS_FLOOR_MS && ms <= now + 3600000) ? ms : null;
+}
+
+/* Emission relation (round 2): a block's reward is not a free
+ * number. The schedule pays (21M - supply)/50,000,000 — ~0.3066 QTC
+ * at genesis, declining from there — and the indexer reports the
+ * total rounded to the nearest 0.01 QTC, fees included: live blocks
+ * sit at 0.30/0.31 around the ~0.305 model value and fee-bearing
+ * blocks reach 0.37. Two bounds follow. The FLOOR is definitional:
+ * fees only add, so a reward below the schedule minus the 0.01
+ * rounding slack (0.25 when the schedule pays 0.305, or 0 for any
+ * mined block) did not come from this chain. The CEILING is a
+ * sanity bound, labeled as such: the largest fee deviation observed
+ * live is +0.07 QTC, so a block paying more than 0.5 QTC above its
+ * schedule is not a fee spike, it is poison (999 QTC included). */
+function rewardPlausible(height, rewardPlanckStr){
+  var est = blockRewardEst(height);
+  if (!isFinite(est)) return false;
+  var qtc = Number(rewardPlanckStr) / CHAIN.PLANCK;
+  return isFinite(qtc) && qtc >= est - 0.01 && qtc <= est + 0.5;
+}
+
+function sanitizeData(data, opts){
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   var st = data.status;
   if (!st || typeof st !== "object" || Array.isArray(st)) return null;
-  var height = nonNegInt(st.block_height);
+  var height = validBlockHeight(st.block_height);
   var accounts = nonNegInt(st.total_accounts);
   var imm = nonNegInt(st.total_immediate_transfers);
   var sched = nonNegInt(st.total_scheduled_transfers);
   if (height === null || accounts === null || imm === null || sched === null) return null;
-  if (!Array.isArray(data.blocks)) return null;
+  var nowMs = (opts && typeof opts.nowMs === "number" && isFinite(opts.nowMs)) ? opts.nowMs : Date.now();
+  /* When the caller knows when this payload was captured (the
+   * snapshot's fetched_at, or the live fetch time), that capture
+   * time must itself be real, and no block may postdate it. */
+  var fetchedMs = null;
+  if (opts && opts.fetchedAt !== undefined){
+    fetchedMs = validFetchedAt(opts.fetchedAt, nowMs);
+    if (fetchedMs === null) return null;
+  }
+  if (!Array.isArray(data.blocks) || data.blocks.length === 0 || data.blocks.length > BLOCKS_LIMIT) return null;
+  /* Head relation: the query asks for the newest blocks first, so a
+   * parseable first-row height that disagrees with the status height
+   * means the two halves of the payload describe different chain
+   * states — the whole answer is poison, not a table with a caveat. */
+  var rawHead = (data.blocks[0] && typeof data.blocks[0] === "object" && !Array.isArray(data.blocks[0]))
+    ? nonNegInt(data.blocks[0].height) : null;
+  if (rawHead !== null && rawHead !== height) return null;
   var blocks = [];
+  var seenHeights = {}, seenHashes = {};
+  var orderBroken = false;
   data.blocks.forEach(function(b){
+    if (orderBroken) return;
     if (!b || typeof b !== "object" || Array.isArray(b)) return;
     var h = nonNegInt(b.height);
     var hash = validHash(b.hash);
     var reward = validPlancks(b.reward);
     if (h === null || hash === null || reward === null) return;
     if (typeof b.timestamp !== "string" || !isFinite(Date.parse(b.timestamp))) return;
+    var tsMs = Date.parse(b.timestamp);
+    if (h < 1 || h > height) return; /* a block above the claimed head contradicts it */
+    if (seenHeights[h] || seenHashes[hash]) return; /* the same block twice is one block */
+    if (tsMs < GENESIS_FLOOR_MS || tsMs > nowMs + 3600000) return;
+    if (fetchedMs !== null && tsMs > fetchedMs + 120000) return;
+    if (!rewardPlausible(h, reward)) return;
+    /* Order relation: two otherwise-valid rows that run ascending
+     * (in height or in time) contradict the newest-first query —
+     * payload-level poison, not a row to quietly drop. */
+    if (blocks.length){
+      var prev = blocks[blocks.length - 1];
+      if (h >= prev.height || tsMs >= Date.parse(prev.timestamp)){ orderBroken = true; return; }
+    }
+    seenHeights[h] = 1; seenHashes[hash] = 1;
     blocks.push({ height: h, hash: hash, timestamp: b.timestamp, reward: reward });
   });
+  if (orderBroken) return null;
+  if (!blocks.length) return null; /* every row poisoned: nothing may anchor the stats */
   var dailyRaw = data.daily === undefined ? [] : data.daily;
-  if (!Array.isArray(dailyRaw)) return null;
+  if (!Array.isArray(dailyRaw) || dailyRaw.length > DAILY_LIMIT) return null;
   var daily = [];
+  var seenDates = {};
+  var dailyOrderBroken = false;
   dailyRaw.forEach(function(d){
+    if (dailyOrderBroken) return;
     if (!d || typeof d !== "object" || Array.isArray(d)) return;
     var bc = nonNegInt(d.blocks_count);
     var tc = nonNegInt(d.tx_count);
     var aa = nonNegInt(d.active_accounts);
     if (bc === null || tc === null || aa === null) return;
     if (typeof d.date !== "string" || !isFinite(Date.parse(d.date))) return;
+    var dateMs = Date.parse(d.date);
+    if (dateMs % 86400000 !== 0) return; /* a daily aggregate starts at UTC midnight */
+    if (dateMs < GENESIS_FLOOR_MS || dateMs > nowMs + 86400000) return;
+    if (aa > accounts) return; /* a day's active accounts are a subset of all accounts */
+    if (seenDates[dateMs]) return;
+    if (daily.length && dateMs >= Date.parse(daily[daily.length - 1].date)){ dailyOrderBroken = true; return; }
+    seenDates[dateMs] = 1;
     daily.push({ date: d.date, blocks_count: bc, tx_count: tc, active_accounts: aa });
   });
+  if (dailyOrderBroken) return null;
+  if (dailyRaw.length && !daily.length) return null; /* TPS must never be fabricated from an empty set */
   return {
     status: { block_height: height, total_accounts: accounts,
       total_immediate_transfers: imm, total_scheduled_transfers: sched },
@@ -169,7 +272,8 @@ var API = { fmtInt: fmtInt, fmtQTC: fmtQTC, fmtRewardQTC: fmtRewardQTC, ageFmt: 
   tps24h: tps24h, avgBlockGap: avgBlockGap, supplyEst: supplyEst,
   blockRewardEst: blockRewardEst, shortHash: shortHash, CHAIN: CHAIN,
   nonNegInt: nonNegInt, validPlancks: validPlancks, validHash: validHash,
-  sanitizeData: sanitizeData };
+  validBlockHeight: validBlockHeight, validFetchedAt: validFetchedAt,
+  rewardPlausible: rewardPlausible, sanitizeData: sanitizeData };
 if (typeof module !== "undefined" && module.exports) module.exports = API;
 
 /* ---------------- fetch layer ---------------- */
@@ -237,7 +341,12 @@ function fetchSnapshot(){
     return res.json();
   }).then(function(payload){
     if (!payload || !payload.ok || !payload.data) throw new Error("snapshot empty");
-    return { data: payload.data, mode: "snapshot", fetchedAt: payload.fetched_at || null };
+    /* The snapshot's capture time is itself indexer-adjacent data:
+     * a pre-genesis or future fetched_at would defeat the pill's
+     * freshness label and the block-time ceiling alike — reject it
+     * like any other failed fetch. */
+    if (validFetchedAt(payload.fetched_at) === null) throw new Error("snapshot capture time invalid");
+    return { data: payload.data, mode: "snapshot", fetchedAt: payload.fetched_at };
   });
 }
 
@@ -452,7 +561,7 @@ function refresh(){
      * A malformed answer is thrown into the catch below and read
      * exactly like a failed fetch — last good telemetry stays on
      * screen, the pill reports the failure, nothing is fabricated. */
-    var data = sanitizeData(result.data);
+    var data = sanitizeData(result.data, { fetchedAt: result.fetchedAt, nowMs: Date.now() });
     if (!data) throw new Error("malformed chain data");
     var h = incomingHeight(data);
     if (result.mode === "snapshot" && h !== null && displayedHeight !== null && h < displayedHeight){

@@ -769,15 +769,15 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 // telemetry kept); fmtQTC/fmtInt reject non-numeric input outright.
 {
   const app = read("pages/network-dashboard/app.js");
-  ok(app.includes("function sanitizeData(data)"), "netdash: sanitizeData() defined");
+  ok(app.includes("function sanitizeData(data, opts)"), "netdash: sanitizeData() defined");
   ok(app.includes("function validHash(v)"), "netdash: validHash() defined (0x + 64 hex)");
   ok(app.includes("function validPlancks(v)"), "netdash: validPlancks() defined");
   ok(app.includes("function nonNegInt(v)"), "netdash: nonNegInt() defined");
-  ok(app.includes("var data = sanitizeData(result.data);"), "netdash: refresh() sanitizes before rendering");
+  ok(app.includes("var data = sanitizeData(result.data, { fetchedAt: result.fetchedAt, nowMs: Date.now() });"), "netdash: refresh() sanitizes before rendering");
   ok(app.includes('if (!data) throw new Error("malformed chain data");'), "netdash: malformed payload routes to the failure path");
   ok(app.includes('if (valid === null) return "—";'), "netdash: fmtQTC rejects non-planck input instead of passing it through");
   const html = read("pages/network-dashboard/index.html");
-  ok(html.includes("app.js?v=1.9.0"), "netdash: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.0"), "netdash: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 24 (2026-10-10 09:19): supply-audit (Tier 2) — the second Tier 2
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.9"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.10"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.9"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.10"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.8"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.9"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.7"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.8"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1166,6 +1166,33 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const html = read("pages/exposure-lab/index.html");
   ok(html.includes("js/exposure-core.js?v=1.54.0"), "exposure2: exposure-core.js cache key bumped for the boundary fix");
   ok(html.includes("js/app.js?v=1.54.0"), "exposure2: app.js cache key bumped for the boundary fix");
+}
+
+// Batch 36 (2026-10-10 21:19): network-dashboard round 2 (Tier 2) —
+// round 1 (Batch 23) validated each field's shape, but the relations
+// between fields were unchecked: an absurd (MAX_SAFE_INTEGER) or zero
+// status height anchored the supply/reward estimates, a blocks list
+// whose head disagreed with the status height (or ran ascending, or
+// duplicated a block) painted as the chain head, a well-shaped but
+// impossible block reward (999 QTC, or 0) rendered as fact even
+// though the emission schedule caps rewards near 0.31 QTC, a daily
+// row could claim more active accounts than the chain has ever had,
+// and the snapshot's fetched_at was never required to be a real
+// capture time. Pin: validBlockHeight/validFetchedAt gate the height
+// and capture time, the head/order/duplicate relations reject or drop
+// before render, rewardPlausible ties every reward to the emission
+// schedule for its own height, and fetchSnapshot rejects a bogus
+// capture time like any other failed fetch.
+{
+  const app = read("pages/network-dashboard/app.js");
+  ok(app.includes("function validBlockHeight(v)"), "netdash2: validBlockHeight() defined (fleet height shape)");
+  ok(app.includes("function validFetchedAt(v, nowMs)"), "netdash2: validFetchedAt() defined (real capture times only)");
+  ok(app.includes("function rewardPlausible(height, rewardPlanckStr)"), "netdash2: rewardPlausible() ties rewards to the emission schedule");
+  ok(app.includes("if (rawHead !== null && rawHead !== height) return null;"), "netdash2: blocks head must agree with the status height");
+  ok(app.includes("if (aa > accounts) return;"), "netdash2: a day's active accounts cannot exceed all accounts");
+  ok(app.includes('if (validFetchedAt(payload.fetched_at) === null) throw new Error("snapshot capture time invalid");'), "netdash2: fetchSnapshot rejects a bogus capture time");
+  const html = read("pages/network-dashboard/index.html");
+  ok(html.includes("app.js?v=1.10.0"), "netdash2: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
