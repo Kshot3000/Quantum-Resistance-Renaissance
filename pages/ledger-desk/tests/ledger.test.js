@@ -267,4 +267,87 @@ t("sanitized state runs the ledger without throwing", () => {
   assert.equal(res.lots[0].qtyPlanck, 2000000000000n);
 });
 
+// --- snapshot-boundary relations (round 2) ---
+const NOW2 = D("2026-10-11T12:00:00Z");
+const A1 = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+const A2 = "qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv";
+t("validChainHeight: fleet bound, no coercion traps", () => {
+  assert.equal(L.validChainHeight(205505), 205505);
+  assert.equal(L.validChainHeight("205505"), 205505);
+  assert.equal(L.validChainHeight(0), null);
+  assert.equal(L.validChainHeight(10000001), null);
+  assert.equal(L.validChainHeight(99999999999), null);
+  assert.equal(L.validChainHeight(1.5), null);
+  assert.equal(L.validChainHeight(""), null);
+  assert.equal(L.validChainHeight(null), null);
+  assert.equal(L.validChainHeight(true), null);
+  assert.equal(L.validChainHeight("0x10"), null);
+});
+t("validChainTimeMs: chain lifetime window", () => {
+  assert.equal(L.validChainTimeMs(D("2026-09-09T08:51:57Z"), NOW2), true);
+  assert.equal(L.validChainTimeMs(D("2026-08-31T23:59:59Z"), NOW2), false);
+  assert.equal(L.validChainTimeMs(NOW2 + 61 * 60000, NOW2), false);
+  assert.equal(L.validChainTimeMs(NaN, NOW2), false);
+});
+t("isSs58_189: strict qz + 47 base58 shape", () => {
+  assert.equal(L.isSs58_189(A1), true);
+  assert.equal(L.isSs58_189(A1 + "ab"), false);
+  assert.equal(L.isSs58_189("not-an-address"), false);
+  assert.equal(L.isSs58_189(null), false);
+});
+t("validateLiveHead: status must restate blocks[0]", () => {
+  const good = { ok: true, data: { status: { block_height: 1000 },
+    blocks: [{ height: 1000, timestamp: "2026-10-11T11:00:00Z" }] } };
+  assert.equal(L.validateLiveHead(good, NOW2), 1000);
+  assert.equal(L.validateLiveHead({ ok: true, data: { status: { block_height: 999 },
+    blocks: good.data.blocks } }, NOW2), null);
+  assert.equal(L.validateLiveHead({ ok: false, data: good.data }, NOW2), null);
+  assert.equal(L.validateLiveHead({ ok: true, data: { status: { block_height: 1000 },
+    blocks: [{ height: 1000, timestamp: "2020-01-01T00:00:00Z" }] } }, NOW2), null);
+});
+function minersFx(mut) {
+  const m = { ok: true, chain_height: 1000,
+    window: { start_height: 901, end_height: 1000, block_count: 100, observed_block_time_s: 14.8 },
+    buckets: [
+      { start: 901, end: 950, blocks: 50, miners: { [A1]: 30, [A2]: 20 } },
+      { start: 951, end: 1000, blocks: 50, miners: { [A1]: 10, [A2]: 40 } } ],
+    window_miners: { [A1]: 40, [A2]: 60 },
+    all_time: [{ address: A1, blocks: 500 }, { address: A2, blocks: 900 }] };
+  if (mut) mut(m);
+  return m;
+}
+t("validateMiners: coherent snapshot passes with its window", () => {
+  const v = L.validateMiners(minersFx(), 1000);
+  assert.equal(v.startHeight, 901);
+  assert.equal(v.endHeight, 1000);
+  assert.equal(v.blockTimeS, 14.8);
+});
+t("validateMiners: bucket counts must sum to the bucket span", () => {
+  assert.equal(L.validateMiners(minersFx((m) => { m.buckets[0].miners[A1] = 29; }), 1000), null);
+  assert.equal(L.validateMiners(minersFx((m) => { m.buckets[0].miners = { [A1]: 30.5, [A2]: 19.5 }; }), 1000), null);
+});
+t("validateMiners: buckets must tile the window contiguously", () => {
+  assert.equal(L.validateMiners(minersFx((m) => { m.buckets[1].start = 952; }), 1000), null);
+  assert.equal(L.validateMiners(minersFx((m) => { m.buckets[0].start = 900; }), 1000), null);
+});
+t("validateMiners: window_miners must restate bucket sums; missing map fails", () => {
+  assert.equal(L.validateMiners(minersFx((m) => { m.window_miners[A1] = 41; }), 1000), null);
+  assert.equal(L.validateMiners(minersFx((m) => { delete m.window_miners; }), 1000), null);
+});
+t("validateMiners: window end = chain_height, within skew of the live head", () => {
+  assert.equal(L.validateMiners(minersFx((m) => { m.window.end_height = 999; }), 1000), null);
+  assert.equal(L.validateMiners(minersFx(), 5000), null);
+  assert.ok(L.validateMiners(minersFx(), 1002) !== null); // capture skew tolerated
+});
+t("validateMiners: all_time must cover the window, no duplicates", () => {
+  assert.equal(L.validateMiners(minersFx((m) => { m.all_time[0].blocks = 39; }), 1000), null);
+  assert.equal(L.validateMiners(minersFx((m) => { m.all_time.push({ address: A1, blocks: 600 }); }), 1000), null);
+});
+t("validateFlowsMeta: v2 meta restates the payload; v1 passes on shape", () => {
+  assert.equal(L.validateFlowsMeta({ ok: true, meta: { transfers: 2, chain_height: 1000 }, transfers: [1, 2] }, 1000), true);
+  assert.equal(L.validateFlowsMeta({ ok: true, meta: { transfers: 3, chain_height: 1000 }, transfers: [1, 2] }, 1000), false);
+  assert.equal(L.validateFlowsMeta({ ok: false, meta: { transfers: 2, chain_height: 1000 }, transfers: [1, 2] }, 1000), false);
+  assert.equal(L.validateFlowsMeta({ transfers: [1, 2] }, 1000), true);
+});
+
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nAll " + n + " tests passed.");

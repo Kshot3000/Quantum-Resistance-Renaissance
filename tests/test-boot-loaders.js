@@ -681,7 +681,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes('voidReport("the vault was wiped")'), "ledger: wipe voids the report");
   ok(app.includes('$("addrCheck").innerHTML = "";'), "ledger: wipe voids a pending address confirm");
   const html = read("pages/ledger-desk/index.html");
-  ok(html.includes("app.js?v=1.5.0"), "ledger: app.js cache key bumped for the report-staleness fix");
+  ok(html.includes("app.js?v=1.6.0"), "ledger: app.js cache key bumped for the report-staleness fix");
 }
 
 // Batch 20 (2026-10-10 05:19): chain-console (Tier 1) — the gated broadcast
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.18"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.19"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.18"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.19"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.17"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.18"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.16"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.17"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1474,6 +1474,38 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("cold.ticket = null; cold.ticketStr = '';"), "airgap2: a refused import clears the standing ticket");
   const html = read("pages/airgap-desk/index.html");
   ok(html.includes("js/app.js?v=1.45.0"), "airgap2: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 45 (2026-10-11 07:19): Ledger Desk round 2 (Tier 1) — validate
+// RELATIONS, not just shapes. Round 1 shape-checked each snapshot field
+// alone, so a live status height disagreeing with blocks[0] anchored the
+// scan, bucket counts that did not sum to their span (or a window_miners
+// map that did not restate them) modeled phantom mining income, a
+// MISSING window_miners read as 0 window blocks so the pre-window
+// aggregate double-counted the whole window, a duplicated transfer id
+// double-wrote the ledger, a transfer above the 21M supply cap or past
+// the snapshot head painted, a present-but-impossible timestamp painted,
+// a null extrinsic_id rendered as "null…", and re-importing the desk's
+// own CSV export doubled every event. Pin: the ledger-core relation
+// validators, the scan's per-row relations + id dedup, and the CSV
+// import's id/ref idempotence.
+{
+  const core = read("pages/ledger-desk/ledger-core.js");
+  ok(core.includes("function validateLiveHead(live, nowMs)"), "ledger2: validateLiveHead() defined (status restates blocks[0])");
+  ok(core.includes("function validateMiners(miners, liveHead)"), "ledger2: validateMiners() defined (bucket/window relations)");
+  ok(core.includes("function validateFlowsMeta(flows, liveHead)"), "ledger2: validateFlowsMeta() defined (meta restates payload)");
+  ok(core.includes("if (sum !== span) return null;"), "ledger2: bucket miner counts must sum to the bucket span");
+  ok(core.includes("if (!isPlainObject(miners.window_miners)) return null;"), "ledger2: a missing window_miners fails, never reads as 0");
+  ok(core.includes("MAX_SUPPLY_PLANCKS = 21000000n * PLANCK"), "ledger2: supply-cap constant present");
+  const app = read("pages/ledger-desk/app.js");
+  ok(app.includes("var anchorH = L.validateLiveHead(live, nowMs);"), "ledger2: scan anchors on the validated live head");
+  ok(app.includes("if (seenTx[idKey]) { skipped++; return; }"), "ledger2: a duplicated transfer id drops, never double-writes");
+  ok(app.includes("amt > L.MAX_SUPPLY_PLANCKS"), "ledger2: an over-supply-cap transfer drops");
+  ok(app.includes("(csvId && existingIds[csvId]) || (csvRef && existingRefs[csvRef])"), "ledger2: CSV import dedupes on exported id/ref");
+  ok(app.includes("duplicates skipped"), "ledger2: CSV import reports duplicates separately");
+  const html = read("pages/ledger-desk/index.html");
+  ok(html.includes("ledger-core.js?v=1.2.0"), "ledger2: ledger-core.js cache key bumped for the round-2 fix");
+  ok(html.includes("app.js?v=1.6.0"), "ledger2: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

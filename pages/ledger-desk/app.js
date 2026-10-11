@@ -234,32 +234,40 @@ async function runScan() {
     $("detectActions").hidden = true;
     status.textContent = msg;
   }
-  var headBlock = (live && live.data && Array.isArray(live.data.blocks)) ? live.data.blocks[0] : null;
-  var anchorMs = headBlock ? Date.parse(headBlock.timestamp) : NaN;
-  var anchorH = headBlock ? Number(headBlock.height) : NaN;
-  if (!headBlock || !isFinite(anchorMs) || !Number.isInteger(anchorH) || anchorH < 0) {
+  /* Round 2: validate RELATIONS, not just shapes (ledger-core validators,
+   * verified against live indexer data). The live head's status must
+   * restate blocks[0]; the miners buckets must tile the window with
+   * span-exact counts that window_miners restates exactly (a missing
+   * window_miners once read as 0 window blocks, so the pre-window
+   * aggregate double-counted every window block); the flows meta must
+   * restate its payload. Core corruption fails the scan honestly. */
+  var nowMs = Date.now();
+  var anchorH = L.validateLiveHead(live, nowMs);
+  if (anchorH === null) {
     scanFail("Snapshots are malformed (live snapshot has no valid head block) \u2014 scan aborted; nothing was inferred.");
     return;
   }
-  var blockS = (miners && miners.window) ? Number(miners.window.observed_block_time_s) : NaN;
-  if (!isFinite(blockS) || blockS <= 0 || blockS > 3600) {
-    scanFail("Snapshots are malformed (miners snapshot has no valid block time) \u2014 scan aborted; nothing was inferred.");
+  var headBlock = live.data.blocks[0];
+  var anchorMs = Date.parse(headBlock.timestamp);
+  var minersVal = L.validateMiners(miners, anchorH);
+  if (!minersVal) {
+    scanFail("Snapshots are malformed (miners snapshot fails its internal consistency checks) \u2014 scan aborted; nothing was inferred.");
     return;
   }
-  if (!miners || !Array.isArray(miners.buckets) || !Number.isInteger(Number(miners.window.start_height))) {
-    scanFail("Snapshots are malformed (miners snapshot is missing its buckets/window) \u2014 scan aborted; nothing was inferred.");
+  var blockS = minersVal.blockTimeS;
+  if (!flows || !Array.isArray(flows.transfers) || !L.validateFlowsMeta(flows, anchorH)) {
+    scanFail("Snapshots are malformed (flows snapshot has no transfers list, or its meta does not restate the payload) \u2014 scan aborted; nothing was inferred.");
     return;
   }
-  if (!flows || !Array.isArray(flows.transfers)) {
-    scanFail("Snapshots are malformed (flows snapshot has no transfers list) \u2014 scan aborted; nothing was inferred.");
-    return;
-  }
-  // A block count is an integer >= 0 (number, or integer string); anything
-  // else (2.5, "abc", -1) is a poisoned row, never a BigInt conversion.
-  function validCount(v) {
-    if (typeof v === "string" && /^\d+$/.test(v.trim())) v = Number(v);
-    return (typeof v === "number" && Number.isInteger(v) && v >= 0) ? v : null;
-  }
+  // Transfer heights belong to the flows snapshot: they may not exceed
+  // its own stated head (or, for a meta-less v1 payload, the live head
+  // plus capture skew).
+  var flowsMetaH = (flows.meta && typeof flows.meta === "object") ?
+    L.validChainHeight(flows.meta.chain_height) : null;
+  var flowsCap = flowsMetaH !== null ? flowsMetaH : anchorH + L.HEAD_SKEW_BLOCKS;
+  // A block count is an integer >= 0 (number, or canonical integer
+  // string); anything else (2.5, "abc", -1) is poison, never coerced.
+  var validCount = L.validCount;
 
   var found = [], skipped = 0;
   try {
@@ -293,6 +301,11 @@ async function runScan() {
       // pre-window aggregate: clearly labeled, user splits by tax year.
       // Needs a trustworthy window count to split against; without one the
       // split could double-count the bucket rows above, so it is skipped.
+      // Round 2: validateMiners now REQUIRES window_miners to restate the
+      // bucket sums exactly before the scan reaches this loop, so an
+      // absent entry here definitively means 0 window blocks \u2014 pre-fix
+      // a missing window_miners map silently read as 0 for every address
+      // and the aggregate double-counted the whole window.
       var all = (Array.isArray(miners.all_time) ? miners.all_time : []).find(function (r) { return r && r.address === addr; });
       var allBlocks = all ? validCount(all.blocks) : null;
       var pre = (allBlocks !== null && winBlocks !== null) ? allBlocks - winBlocks : 0;
@@ -313,39 +326,60 @@ async function runScan() {
     });
 
     // --- transfers touching vault addresses (snapshot floor: >= 1 QTC)
+    var seenTx = {};
     flows.transfers.forEach(function (t) {
       if (!t || typeof t !== "object") { skipped++; return; }
       var fromMine = !!vault[t.from_id], toMine = !!vault[t.to_id];
       if (!fromMine && !toMine) return;
-      if (t.id === null || t.id === undefined) { skipped++; return; }
+      if (t.id === null || t.id === undefined || t.id === "") { skipped++; return; }
       var ref = "tx:" + t.id;
       if (existingRefs[ref]) return;
       var amt = L.toBigIntOrNull(t.amount);
       var fee = (t.fee === null || t.fee === undefined) ? 0n : L.toBigIntOrNull(t.fee);
-      if (amt === null || amt < 0n || fee === null || fee < 0n) { skipped++; return; }
-      /* A missing/unparseable timestamp does NOT poison the row: the
-       * indexer snapshot carries null timestamps on real rows (the
-       * genesis allocation among them), and the amount/parties are chain
-       * fact. Estimate the date from the block height — the same model
-       * the mining detections use — and flag it, in the list and in the
-       * ledger event it becomes. Only a row with no usable timestamp AND
-       * no usable height is skipped. (Pre-fix these rows rendered dated
-       * "NaN-NaN-NaN".) */
-      var when = Date.parse(t.timestamp);
-      var estFlag = null;
-      if (!isFinite(when)) {
-        var bh = Number(t.block_height);
-        if (!Number.isInteger(bh) || bh < 0) { skipped++; return; }
+      /* Round-2 relations: a transfer is a move of a positive amount
+       * within the 21M QTC supply cap, between two real SS58-189
+       * endpoints, at a fleet-bounded height the flows snapshot itself
+       * contains. A zero/over-cap amount, a garbage endpoint, or a
+       * height above the snapshot head is poison, not a ledger event. */
+      if (amt === null || amt <= 0n || amt > L.MAX_SUPPLY_PLANCKS ||
+          fee === null || fee < 0n) { skipped++; return; }
+      if (!L.isSs58_189(t.from_id) || !L.isSs58_189(t.to_id)) { skipped++; return; }
+      var bh = L.validChainHeight(t.block_height);
+      if (bh === null || bh > flowsCap) { skipped++; return; }
+      /* A missing timestamp does NOT poison the row: the indexer
+       * snapshot carries null timestamps on real rows (the genesis
+       * allocation among them), and the amount/parties are chain fact.
+       * Estimate the date from the block height \u2014 the same model the
+       * mining detections use \u2014 and flag it, in the list and in the
+       * ledger event it becomes. But a timestamp that is PRESENT and
+       * impossible (unparseable, pre-genesis, or in the future) is a
+       * corrupt date claim: the row drops instead of being re-dated.
+       * (Pre-fix these rows rendered dated "NaN-NaN-NaN", and any
+       * parseable date \u2014 2020, 2035 \u2014 painted as chain fact.) */
+      var when, estFlag = null;
+      if (t.timestamp === null || t.timestamp === undefined || t.timestamp === "") {
         when = tsForHeight(bh, anchorH, anchorMs, blockS);
         estFlag = "date estimated";
+      } else {
+        when = Date.parse(t.timestamp);
+        if (!L.validChainTimeMs(when, nowMs)) { skipped++; return; }
       }
+      /* The same transfer id twice in one payload is one transfer: the
+       * second copy drops instead of double-writing the ledger when the
+       * user adds the candidates. (Checked only after the row otherwise
+       * validates, so a poisoned first copy cannot suppress a good one.) */
+      var idKey = String(t.id);
+      if (seenTx[idKey]) { skipped++; return; }
+      seenTx[idKey] = 1;
       var bothMine = fromMine && toMine;
       found.push({ key: ref, ref: ref, dateMs: when,
         type: toMine ? "transfer_in" : "transfer_out",
         address: toMine ? t.to_id : t.from_id,
         qtyPlanck: amt,
         feePlanck: fee,
-        note: "block " + t.block_height + " \u00b7 " + String(t.extrinsic_id).slice(0, 18) + "\u2026" +
+        note: "block " + bh +
+          ((typeof t.extrinsic_id === "string" && t.extrinsic_id) ?
+            " \u00b7 " + t.extrinsic_id.slice(0, 18) + "\u2026" : "") +
           (estFlag ? " \u00b7 timestamp missing in snapshot \u2014 date estimated from block height" : "") +
           (bothMine ? " \u00b7 both ends are yours \u2014 marked internal" : ""),
         internal: bothMine, flag: estFlag });
@@ -470,7 +504,20 @@ function importEventsCsv(file) {
     if (!rows.length) { alert("Empty CSV."); return; }
     var head = rows[0].map(function (h) { return h.trim().toLowerCase(); });
     var idx = function (n) { return head.indexOf(n); };
-    var added = 0, bad = 0;
+    /* The desk's own export carries id/source/ref columns, and a round
+     * trip must be idempotent: the old import ignored them, minted a
+     * fresh uid for every row, and so re-importing your own export
+     * doubled every event \u2014 and every tax figure downstream of it.
+     * Rows whose exported id, or whose non-empty ref, is already in the
+     * ledger (or was added earlier in this same file) are duplicates,
+     * counted separately from malformed rows; surviving rows keep their
+     * exported id/source/ref so the NEXT round trip dedupes too. */
+    var existingIds = {}, existingRefs = {};
+    state.events.forEach(function (e) {
+      if (e.id) existingIds[e.id] = 1;
+      if (e.ref) existingRefs[e.ref] = 1;
+    });
+    var added = 0, bad = 0, dup = 0;
     for (var i = 1; i < rows.length; i++) {
       try {
         var r = rows[i];
@@ -480,18 +527,27 @@ function importEventsCsv(file) {
         if (!isFinite(dm)) { bad++; continue; }
         var t = (r[idx("type")] || "").trim();
         if (!L.INFLOW[t] && !L.OUTFLOW[t]) { bad++; continue; }
+        var csvId = idx("id") >= 0 ? String(r[idx("id")] || "").trim() : "";
+        var csvRef = idx("ref") >= 0 ? String(r[idx("ref")] || "").trim() : "";
+        if ((csvId && existingIds[csvId]) || (csvRef && existingRefs[csvRef])) { dup++; continue; }
         var fee = L.parseQtcToPlanck(r[idx("fee_qtc")] || "") || 0n;
-        state.events.push({ id: uid(), dateMs: dm, type: t,
+        var newId = csvId || uid();
+        state.events.push({ id: newId, dateMs: dm, type: t,
           address: r[idx("address")] || "", qtyPlanck: qty,
           priceMicro: L.parseUsdPerQtcToMicro(r[idx("price_usd_per_qtc")] || ""),
-          feePlanck: fee, note: r[idx("note")] || "", source: "csv-import",
-          ref: "", internal: /^y/i.test(r[idx("internal")] || ""), flags: [] });
+          feePlanck: fee, note: r[idx("note")] || "",
+          source: (idx("source") >= 0 && String(r[idx("source")] || "").trim()) || "csv-import",
+          ref: csvRef, internal: /^y/i.test(r[idx("internal")] || ""), flags: [] });
+        existingIds[newId] = 1;
+        if (csvRef) existingRefs[csvRef] = 1;
         added++;
       } catch (e) { bad++; }
     }
     if (added) voidReport("events were imported");
     save(); renderAll();
-    alert("Imported " + added + " events" + (bad ? " (" + bad + " rows skipped)" : "") + ".");
+    alert("Imported " + added + " events" +
+      (dup ? " (" + dup + " duplicates skipped)" : "") +
+      (bad ? " (" + bad + " rows skipped)" : "") + ".");
   };
   rd.readAsText(file);
 }

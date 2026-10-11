@@ -358,9 +358,178 @@ function sanitizeState(raw) {
   return clean;
 }
 
+// ---- Snapshot-boundary relations (round 2) --------------------------------
+// Round 1 checked each snapshot field's shape alone. These validators check
+// RELATIONS between fields and between snapshots, verified against live
+// indexer data (head ~205,505, 2026-10-11): the miners buckets tile the
+// window contiguously with span-exact block counts, per-bucket miner counts
+// sum to the bucket span, window_miners restates the bucket sums exactly,
+// all_time covers the window for every shared address, the live status
+// height equals blocks[0], flows meta restates its payload's count and
+// head, and every height/amount sits inside the chain's own bounds
+// (heights 1..10,000,000 fleet bound; amounts within the 21M QTC cap).
+// Core corruption fails the scan honestly; only row-level poison drops a
+// row. Cross-snapshot heads may drift by capture skew (the refresh writes
+// the files seconds apart), never by a generation.
+var MAX_CHAIN_HEIGHT = 10000000;
+var MAX_SUPPLY_PLANCKS = 21000000n * PLANCK;
+var GENESIS_FLOOR_MS = Date.UTC(2026, 8, 1); // chain lifetime floor (fleet)
+var HEAD_SKEW_BLOCKS = 1000;
+
+function validChainHeight(v) {
+  var n;
+  if (typeof v === "number") {
+    if (!Number.isSafeInteger(v)) return null;
+    n = v;
+  } else if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v.trim())) {
+    n = Number(v.trim());
+    if (!Number.isSafeInteger(n)) return null;
+  } else return null;
+  return (n >= 1 && n <= MAX_CHAIN_HEIGHT) ? n : null;
+}
+function validCount(v) {
+  // An integer >= 0 (number, or canonical integer string); 2.5, "abc", -1,
+  // "" and booleans are poison, never a coerced count.
+  if (typeof v === "number") return (Number.isSafeInteger(v) && v >= 0) ? v : null;
+  if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v.trim())) {
+    var n = Number(v.trim());
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  return null;
+}
+function validChainTimeMs(ms, nowMs) {
+  var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : Date.now();
+  return typeof ms === "number" && isFinite(ms) &&
+    ms >= GENESIS_FLOOR_MS && ms <= now + 3600000;
+}
+function isSs58_189(a) {
+  // Strict indexer shape: qz + 47 base58 chars (49 total), fleet pattern.
+  return typeof a === "string" && /^qz[1-9A-HJ-NP-Za-km-z]{47}$/.test(a);
+}
+function isPlainObject(o) {
+  return !!o && typeof o === "object" && !Array.isArray(o);
+}
+
+// The live snapshot's head is the scan's anchor: its status height must
+// restate blocks[0] exactly, both fleet-bounded, and the head timestamp
+// must sit inside the chain's lifetime. Returns the head height or null.
+function validateLiveHead(live, nowMs) {
+  if (!live || live.ok !== true || !isPlainObject(live.data)) return null;
+  var blocks = live.data.blocks;
+  if (!Array.isArray(blocks) || !blocks.length || !isPlainObject(blocks[0])) return null;
+  var head = validChainHeight(blocks[0].height);
+  if (head === null) return null;
+  if (!isPlainObject(live.data.status) ||
+      validChainHeight(live.data.status.block_height) !== head) return null;
+  var ts = Date.parse(blocks[0].timestamp);
+  if (!validChainTimeMs(ts, nowMs)) return null;
+  return head;
+}
+
+// The miners snapshot is internally one claim about the window: buckets
+// tile [window.start_height, window.end_height] contiguously, each
+// bucket's `blocks` restates its span and the sum of its miner counts,
+// window_miners restates the per-address bucket sums exactly, the window
+// ends at the snapshot's own chain_height within capture skew of the live
+// head, and all_time covers the window for every shared address (the
+// pre-window split all - window is meaningless otherwise — and a MISSING
+// window_miners used to read as 0, double-counting every window block in
+// the pre-window aggregate). Returns the validated window or null.
+function validateMiners(miners, liveHead) {
+  if (!miners || miners.ok !== true) return null;
+  var chainHeight = validChainHeight(miners.chain_height);
+  if (chainHeight === null) return null;
+  if (typeof liveHead === "number" &&
+      Math.abs(chainHeight - liveHead) > HEAD_SKEW_BLOCKS) return null;
+  var win = miners.window;
+  if (!isPlainObject(win)) return null;
+  var startH = validChainHeight(win.start_height);
+  var endH = validChainHeight(win.end_height);
+  if (startH === null || endH === null || startH > endH) return null;
+  if (endH !== chainHeight) return null;
+  var blockCount = validCount(win.block_count);
+  if (blockCount === null || blockCount !== endH - startH + 1) return null;
+  var blockS = Number(win.observed_block_time_s);
+  if (!isFinite(blockS) || blockS <= 0 || blockS > 3600) return null;
+  var buckets = miners.buckets;
+  if (!Array.isArray(buckets) || !buckets.length) return null;
+  var sums = {};
+  for (var i = 0; i < buckets.length; i++) {
+    var b = buckets[i];
+    if (!isPlainObject(b)) return null;
+    var bs = validChainHeight(b.start), be = validChainHeight(b.end);
+    if (bs === null || be === null || bs > be) return null;
+    if (i === 0 && bs !== startH) return null;
+    if (i > 0 && bs !== validChainHeight(buckets[i - 1].end) + 1) return null;
+    if (i === buckets.length - 1 && be !== endH) return null;
+    var span = validCount(b.blocks);
+    if (span === null || span !== be - bs + 1) return null;
+    if (!isPlainObject(b.miners)) return null;
+    var sum = 0;
+    var addrs = Object.keys(b.miners);
+    for (var j = 0; j < addrs.length; j++) {
+      var c = validCount(b.miners[addrs[j]]);
+      if (c === null) return null;
+      sum += c;
+      sums[addrs[j]] = (sums[addrs[j]] || 0) + c;
+    }
+    if (sum !== span) return null;
+  }
+  if (!isPlainObject(miners.window_miners)) return null;
+  var wmKeys = Object.keys(miners.window_miners);
+  var total = 0;
+  for (var k = 0; k < wmKeys.length; k++) {
+    var wv = validCount(miners.window_miners[wmKeys[k]]);
+    if (wv === null || sums[wmKeys[k]] !== wv) return null;
+    total += wv;
+  }
+  if (Object.keys(sums).length !== wmKeys.length || total !== blockCount) return null;
+  if (miners.all_time !== undefined && miners.all_time !== null) {
+    if (!Array.isArray(miners.all_time)) return null;
+    var seen = {};
+    for (var a = 0; a < miners.all_time.length; a++) {
+      var row = miners.all_time[a];
+      if (!isPlainObject(row) || !isSs58_189(row.address)) return null;
+      var ab = validCount(row.blocks);
+      if (ab === null || ab < 1) return null;
+      if (seen[row.address]) return null;
+      seen[row.address] = 1;
+      var wmv = miners.window_miners[row.address];
+      if (wmv !== undefined && ab < validCount(wmv)) return null;
+    }
+  }
+  return { startHeight: startH, endHeight: endH, chainHeight: chainHeight, blockTimeS: blockS };
+}
+
+// The flows envelope: when meta is present (format v2) ok is required
+// and the meta's transfer count must restate the payload length and its
+// chain height must be a real height within capture skew of the live
+// head. A v1 payload (no meta, no ok \u2014 the pre-v2 envelope) has
+// nothing to restate and passes on shape alone: flows-decode guarantees
+// stale cached v1 snapshots keep working mid-deploy.
+function validateFlowsMeta(flows, liveHead) {
+  if (!flows || !Array.isArray(flows.transfers)) return false;
+  var meta = flows.meta;
+  if (meta === undefined || meta === null) return true;
+  if (flows.ok !== true || !isPlainObject(meta)) return false;
+  if (meta.transfers !== undefined && validCount(meta.transfers) !== flows.transfers.length) return false;
+  if (meta.chain_height !== undefined) {
+    var mh = validChainHeight(meta.chain_height);
+    if (mh === null) return false;
+    if (typeof liveHead === "number" && Math.abs(mh - liveHead) > HEAD_SKEW_BLOCKS) return false;
+  }
+  return true;
+}
+
 var api = {
   PLANCK: PLANCK, QUANTUM: QUANTUM, EMISSION_DIVISOR: EMISSION_DIVISOR,
   MICRO: MICRO, LONG_TERM_DAYS: LONG_TERM_DAYS,
+  MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT, MAX_SUPPLY_PLANCKS: MAX_SUPPLY_PLANCKS,
+  GENESIS_FLOOR_MS: GENESIS_FLOOR_MS, HEAD_SKEW_BLOCKS: HEAD_SKEW_BLOCKS,
+  validChainHeight: validChainHeight, validCount: validCount,
+  validChainTimeMs: validChainTimeMs, isSs58_189: isSs58_189,
+  validateLiveHead: validateLiveHead, validateMiners: validateMiners,
+  validateFlowsMeta: validateFlowsMeta,
   toBigIntOrNull: toBigIntOrNull, sanitizeState: sanitizeState,
   rewardModelPlancks: rewardModelPlancks,
   parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc,
