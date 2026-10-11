@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../../assets/shared.css?v=1.13.3">
 <title>QTC Distribution Planner — batch airdrops &amp; payouts, planned to the byte</title>
 <meta name="description" content="QTC Distribution Planner: validate recipient SS58 addresses, compute exact planck amounts, split payouts into utility.batch_all batches, estimate fees from the runtime polynomial, and export CLI-ready batch files for quantus batch send.">
-<link rel="stylesheet" href="styles.css?v=1.21.1">
+<link rel="stylesheet" href="styles.css?v=1.22.0">
 <style>:root{--focus:#a78bfa;}</style>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -158,7 +158,22 @@
           <option value="ml-dsa-87">ML-DSA-87 · 4,627 B sig</option>
         </select>
       </label>
+      <label>Planner service fee <span class="hint">(optional — supports this tool)</span>
+        <select id="service-fee-bps">
+          <option value="0">None — no service fee</option>
+          <option value="25">0.25% of the recipient total</option>
+          <option value="50" selected>0.5% of the recipient total</option>
+          <option value="100">1% of the recipient total</option>
+        </select>
+      </label>
     </div>
+    <p class="fine">The optional <strong>planner service fee</strong> is added <strong>on top of</strong>
+    the recipient total — every recipient still receives exactly the amount in your list. It is one
+    extra transfer to the builder's address
+    <code>qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code>, placed in the <strong>final batch</strong>
+    (so a run that stops early pays no fee for batches never sent), floored so it never exceeds the
+    quoted percentage, and capped at 1% in code. It appears in the totals below, in its batch card, in
+    the batch file, and in the run script. Choose <strong>None</strong> to plan without it.</p>
     <p class="fine">Default 256 comes from the Quantus team's own airdrop example
     (<q>up to 256 transfer(s) each</q>, CLI README Sept 30, 2026). The chain's live limits win:
     run <code>quantus batch config --limits</code> and match this box to the safe limit it prints.</p>
@@ -178,7 +193,7 @@
           <input type="text" id="sender-balance" placeholder="e.g. 1000" spellcheck="false">
         </label>
       </div>
-      <p id="balance-verdict" class="fine">Enter the funding wallet's balance to check it covers recipients + fee floor.</p>
+      <p id="balance-verdict" class="fine">Enter the funding wallet's balance to check it covers recipients + any service fee + the chain fee floor.</p>
     </div>
   </section>
 
@@ -214,6 +229,7 @@
       <li><strong>Never re-run blind.</strong> A timed-out or failed submission may still have landed on chain. Check the sender's nonce / the explorer before re-running, or recipients get paid twice.</li>
       <li><strong>No passwords on the command line.</strong> The CLI reads wallet passwords from a hidden prompt or <code>--password-file</code> — never paste one into a terminal command or a file you share.</li>
       <li><strong>Verify checkphrases out of band.</strong> Confirm each recipient's five-word phrase with them directly before the run — the phrase is the last line of defense against a pasted wrong address.</li>
+      <li><strong>Service fee is optional and on top.</strong> If you keep it, the fee is a separate, labeled transfer in the final batch to the builder's address shown in Step 3 — recipient amounts are never reduced, and choosing None removes the transfer entirely.</li>
       <li><strong>This page is a planner.</strong> It never signs, never submits, never sees your keys. Execution happens in your own <code>quantus</code> CLI.</li>
     </ul>
   </section>
@@ -233,7 +249,7 @@
 <script src="js/wordlist.js?v=1.21.0"></script>
 <script src="js/checkphrase-core.js?v=1.21.0"></script>
 <script src="js/ss58.js?v=1.21.0"></script>
-<script src="js/core.js?v=1.21.1"></script>
-<script src="js/app.js?v=1.21.1"></script>
+<script src="js/core.js?v=1.22.0"></script>
+<script src="js/app.js?v=1.22.0"></script>
 </body>
 </html>

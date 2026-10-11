@@ -203,6 +203,105 @@ t("wordsFromKey over WebCrypto PBKDF2 matches the reference phrase", async funct
   assert.strictEqual(words.join("-"), "list-bliss-asset-camp-portion");
 });
 
+/* ---------- planner service fee (optional, disclosed, on top) ---------- */
+t("computeServiceFee: floored exact split, capped at 100 bps", function () {
+  var B = BigInt;
+  assert.strictEqual(DistCore.computeServiceFee(B("1000000000000"), 50).feePlancks, B("5000000000")); // 1 QTC @ 0.5% = 0.005 QTC
+  assert.strictEqual(DistCore.computeServiceFee(B("19999"), 50).feePlancks, B(99)); // floor(19999*50/10000)
+  assert.strictEqual(DistCore.computeServiceFee(B("1000000000000"), 500).feePlancks, B("10000000000")); // capped at 1%
+  assert.strictEqual(DistCore.computeServiceFee(B("1000000000000"), 500).feeBps, 100);
+  assert.strictEqual(DistCore.computeServiceFee(B("1000000000000"), -50).feePlancks, B(0));
+  assert.strictEqual(DistCore.computeServiceFee(B("1000000000000"), 0).feePlancks, B(0));
+  assert.strictEqual(DistCore.computeServiceFee(B(0), 50).feePlancks, B(0));
+  assert.strictEqual(DistCore.computeServiceFee(B(3), 50).feePlancks, B(0)); // floors to zero
+  assert.strictEqual(DistCore.computeServiceFee(B("1000000000000"), 50.9).feeBps, 50); // fractional bps floored
+});
+t("computeServiceFee sweep: never above the quoted percentage", function () {
+  var totals = [1n, 9999n, 10000n, 123456789n, 186250001000000000n, 21000000000000000000000n];
+  [1, 25, 50, 99, 100].forEach(function (bps) {
+    totals.forEach(function (total) {
+      var f = DistCore.computeServiceFee(total, bps);
+      assert.ok(f.feePlancks >= 0n, "fee never negative");
+      assert.ok(f.feePlancks * 10000n <= total * BigInt(bps), "fee never exceeds quote");
+      assert.ok((total * BigInt(bps)) / 10000n - f.feePlancks === 0n, "fee is exactly the floor");
+    });
+  });
+});
+t("feeBpsLabel formats basis points", function () {
+  assert.strictEqual(DistCore.feeBpsLabel(0), "0%");
+  assert.strictEqual(DistCore.feeBpsLabel(25), "0.25%");
+  assert.strictEqual(DistCore.feeBpsLabel(50), "0.5%");
+  assert.strictEqual(DistCore.feeBpsLabel(100), "1%");
+});
+t("withServiceFee: recipients untouched, fee row last, exact sums", function () {
+  var rows = DistCore.parseInput(POOL + " 10\n" + MSIG + " 2.5\n");
+  var v = DistCore.validateRows(rows, ss58, check, WORDLIST);
+  var valid = v.filter(function (r) { return r.ok; });
+  var plan = DistCore.withServiceFee(valid, 50);
+  assert.strictEqual(plan.recipientTotalPlancks, BigInt("12500000000000"));
+  assert.strictEqual(plan.feePlancks, BigInt("62500000000")); // 0.5% of 12.5 QTC = 0.0625 QTC
+  assert.strictEqual(plan.rows.length, 3);
+  assert.strictEqual(plan.rows[0], valid[0], "recipient rows pass through in order");
+  assert.strictEqual(plan.rows[1], valid[1]);
+  assert.strictEqual(plan.rows[2].isServiceFee, true);
+  assert.strictEqual(plan.rows[2].address, DistCore.SERVICE_FEE_ADDRESS);
+  var sum = plan.rows.reduce(function (a, r) { return a + r.plancks; }, BigInt(0));
+  assert.strictEqual(sum, plan.recipientTotalPlancks + plan.feePlancks, "rows sum to total + fee exactly");
+  // the fee row is a real CLI batch entry for the fee address
+  var batch = { index: 1, rows: plan.rows, totalPlancks: sum };
+  var parsed = JSON.parse(DistCore.buildBatchJson(batch));
+  assert.deepStrictEqual(parsed[2], { to: DistCore.SERVICE_FEE_ADDRESS, amount: "62500000000" });
+});
+t("withServiceFee: None and floor-to-zero add no row", function () {
+  var rows = DistCore.parseInput(POOL + " 10\n");
+  var v = DistCore.validateRows(rows, ss58, check, WORDLIST);
+  var valid = v.filter(function (r) { return r.ok; });
+  var none = DistCore.withServiceFee(valid, 0);
+  assert.strictEqual(none.rows.length, 1);
+  assert.strictEqual(none.feeRow, null);
+  var tiny = DistCore.withServiceFee([{ plancks: BigInt(3) }], 50);
+  assert.strictEqual(tiny.rows.length, 1, "a fee floored to 0 plancks adds no invalid 0-transfer");
+  assert.strictEqual(tiny.feePlancks, BigInt(0));
+});
+t("service fee lands in the FINAL batch only", function () {
+  var rows = [];
+  for (var i = 0; i < 600; i++)
+    rows.push({ line: i + 1, address: POOL, plancks: BigInt("1000000000000"), ok: true });
+  var plan = DistCore.withServiceFee(rows, 100); // 1% of 600 QTC = 6 QTC
+  assert.strictEqual(plan.feePlancks, BigInt("6000000000000"));
+  var batches = DistCore.planBatches(plan.rows, 256);
+  assert.strictEqual(batches.length, 3);
+  assert.strictEqual(batches[2].rows.length, 89, "88 recipients + the fee row");
+  assert.ok(batches[2].rows.some(function (r) { return r.isServiceFee; }), "fee in final batch");
+  assert.ok(!batches[0].rows.some(function (r) { return r.isServiceFee; }), "fee not in batch 1");
+  assert.ok(!batches[1].rows.some(function (r) { return r.isServiceFee; }), "fee not in batch 2");
+  var grand = batches.reduce(function (a, b) { return a + b.totalPlancks; }, BigInt(0));
+  assert.strictEqual(grand, BigInt(606) * BigInt("1000000000000"), "batches sum to recipients + fee");
+});
+t("service fee address is Kyle's verified QTC address", function () {
+  assert.strictEqual(DistCore.SERVICE_FEE_ADDRESS, "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau");
+  assert.strictEqual(DistCore.SERVICE_FEE_MAX_BPS, 100);
+  var v = DistCore.validateAddress(DistCore.SERVICE_FEE_ADDRESS, ss58);
+  assert.strictEqual(v.ok, true, "fee address is a valid SS58-189 address");
+});
+t("buildRunScript discloses the service fee; fee-free scripts stay clean", function () {
+  var rows = DistCore.parseInput(POOL + " 10\n" + MSIG + " 2.5\n");
+  var v = DistCore.validateRows(rows, ss58, check, WORDLIST);
+  var valid = v.filter(function (r) { return r.ok; });
+  var plan = DistCore.withServiceFee(valid, 50);
+  var batches = DistCore.planBatches(plan.rows, 256);
+  var sh = DistCore.buildRunScript(batches, "treasury", "",
+    { feePlancks: plan.feePlancks, feeBps: plan.feeBps });
+  assert.ok(sh.indexOf("Service fee (optional, disclosed)") >= 0, "script header discloses the fee");
+  assert.ok(sh.indexOf("0.0625 QTC (0.5% of the recipient total)") >= 0, "amount + rate stated");
+  assert.ok(sh.indexOf(DistCore.SERVICE_FEE_ADDRESS) >= 0, "fee address stated");
+  assert.ok(sh.indexOf("added ON TOP") >= 0, "on-top semantics stated");
+  assert.ok(sh.indexOf("includes the 0.0625 QTC service fee") >= 0, "fee batch annotated");
+  var plain = DistCore.buildRunScript(DistCore.planBatches(valid, 256), "treasury", "");
+  assert.ok(plain.indexOf("Service fee") < 0, "no fee text without a fee");
+  assert.ok(plain.indexOf(DistCore.SERVICE_FEE_ADDRESS) < 0, "no fee address without a fee");
+});
+
 /* ---------- summarize ---------- */
 t("summarize counts and totals", function () {
   var rows = DistCore.parseInput(POOL + " 1\n" + MSIG + " 2\n" + "bad 3\n");

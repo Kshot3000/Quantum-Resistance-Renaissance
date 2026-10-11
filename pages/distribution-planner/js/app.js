@@ -183,6 +183,11 @@ function currentTipPlancks() {
   var p = core.parseAmountToPlancks(s);
   return p.ok ? { ok: true, plancks: p.plancks } : { ok: false, error: p.error };
 }
+function currentServiceFeeBps() {
+  var el = $("service-fee-bps");
+  var n = el ? parseInt(el.value, 10) : 0;
+  return isFinite(n) && n > 0 ? n : 0;
+}
 
 function renderPlan() {
   var sum = core.summarize(state.validated);
@@ -197,7 +202,10 @@ function renderPlan() {
     return;
   }
   state.scheme = $("scheme").value;
-  var batches = core.planBatches(sum.validRows, currentBatchSize());
+  var plan = core.withServiceFee(sum.validRows, currentServiceFeeBps());
+  state.serviceFeePlancks = plan.feePlancks;
+  state.serviceFeeBps = plan.feeBps;
+  var batches = core.planBatches(plan.rows, currentBatchSize());
   var fees = batches.map(function (b) { return core.estimateBatchFee(b, state.scheme); });
   state.batches = batches;
   state.fees = fees;
@@ -205,16 +213,21 @@ function renderPlan() {
   var tip = currentTipPlancks();
   var feeTotal = fees.reduce(function (a, f) { return a + f.feePlancks; }, BigInt(0));
   var tipTotal = tip.ok ? tip.plancks * BigInt(batches.length) : BigInt(0);
-  var grand = sum.totalPlancks + feeTotal + tipTotal;
+  var grand = sum.totalPlancks + plan.feePlancks + feeTotal + tipTotal;
 
   totals.innerHTML =
-    totalCard("Recipients", sum.valid + " addresses", core.formatQTC(sum.totalPlancks) + " QTC") +
-    totalCard("Fee floor", batches.length + (batches.length === 1 ? " batch" : " batches") +
+    totalCard("Recipients", sum.valid + " addresses · exact amounts", core.formatQTC(sum.totalPlancks) + " QTC") +
+    (plan.feePlancks > BigInt(0)
+      ? totalCard("Service fee", core.feeBpsLabel(plan.feeBps) + " of recipient total · added on top · final batch",
+          core.formatQTC(plan.feePlancks) + " QTC")
+      : "") +
+    totalCard("Chain fee floor", batches.length + (batches.length === 1 ? " batch" : " batches") +
       " · length fee only", core.formatQTC6(feeTotal) + " QTC") +
     (tip.ok && tip.plancks > BigInt(0)
       ? totalCard("Tips", tip.plancks > BigInt(0) ? core.formatQTC(tip.plancks) + " × " + batches.length : "—",
           core.formatQTC(tipTotal) + " QTC") : "") +
-    totalCard("Sender needs ≥", "recipients + fee floor" + (tipTotal > BigInt(0) ? " + tips" : ""),
+    totalCard("Sender needs ≥", "recipients" + (plan.feePlancks > BigInt(0) ? " + service fee" : "") +
+      " + chain fee floor" + (tipTotal > BigInt(0) ? " + tips" : ""),
       core.formatQTC(grand) + " QTC", true);
   function totalCard(k, s, v, hot) {
     return '<div class="tcard' + (hot ? " hot" : "") + '"><div class="k">' + esc(k) +
@@ -226,11 +239,14 @@ function renderPlan() {
   }
 
   cards.innerHTML = batches.map(function (b, i) {
+    var hasFee = b.rows.some(function (r) { return r.isServiceFee; });
     return '<div class="bcard"><div class="bh"><span>Batch ' + b.index + " / " + batches.length +
       "</span><span>" + b.rows.length + " transfers</span></div>" +
       '<div class="bv">' + esc(core.formatQTC(b.totalPlancks)) + ' <span class="u">QTC</span></div>' +
-      '<div class="bs">fee floor ≈ ' + esc(core.formatQTC6(fees[i].feePlancks)) + " QTC · " +
-      esc(String(fees[i].totalBytes)) + " bytes</div></div>";
+      '<div class="bs">chain fee floor ≈ ' + esc(core.formatQTC6(fees[i].feePlancks)) + " QTC · " +
+      esc(String(fees[i].totalBytes)) + " bytes</div>" +
+      (hasFee ? '<div class="bs feenote">includes the ' + esc(core.formatQTC(plan.feePlancks)) +
+        " QTC service fee transfer to the planner address</div>" : "") + "</div>";
   }).join("");
 
   var f0 = fees[0], b0 = batches[0];
@@ -262,7 +278,7 @@ function updateBalanceCheck(grand) {
   var s = $("sender-balance").value.trim();
   if (grand == null || !s) {
     el.className = "fine";
-    el.textContent = "Enter the funding wallet's balance to check it covers recipients + fee floor.";
+    el.textContent = "Enter the funding wallet's balance to check it covers recipients + any service fee + the chain fee floor.";
     return;
   }
   var p = core.parseAmountToPlancks(s);
@@ -295,7 +311,9 @@ function renderExports(tipPlancks) {
     ' <button class="primary" data-dl-script="1" type="button">Download run-batches.sh</button>';
   var tipStr = tipPlancks > BigInt(0)
     ? core.formatQTC(tipPlancks) : "";
-  var script = core.buildRunScript(state.batches, wallet, tipStr);
+  var feeInfo = state.serviceFeePlancks > BigInt(0)
+    ? { feePlancks: state.serviceFeePlancks, feeBps: state.serviceFeeBps } : null;
+  var script = core.buildRunScript(state.batches, wallet, tipStr, feeInfo);
   $("script-preview").firstChild.textContent = script;
   state.script = script;
   state.wallet = wallet;
@@ -317,7 +335,7 @@ function commandsOnly() {
 /* ---------- wiring ---------- */
 function init() {
   $("recipients").addEventListener("input", scheduleRevalidate);
-  ["batch-size", "wallet", "tip", "scheme"].forEach(function (id) {
+  ["batch-size", "wallet", "tip", "scheme", "service-fee-bps"].forEach(function (id) {
     $(id).addEventListener("input", renderPlan);
     $(id).addEventListener("change", renderPlan);
   });
@@ -327,7 +345,7 @@ function init() {
     var feeTotal = state.fees.reduce(function (a, f) { return a + f.feePlancks; }, BigInt(0));
     var tip = currentTipPlancks();
     var tipTotal = (tip.ok ? tip.plancks : BigInt(0)) * BigInt(state.batches.length);
-    updateBalanceCheck(sum.totalPlancks + feeTotal + tipTotal);
+    updateBalanceCheck(sum.totalPlancks + (state.serviceFeePlancks || BigInt(0)) + feeTotal + tipTotal);
   });
   $("load-sample").addEventListener("click", function () {
     $("recipients").value = SAMPLE;

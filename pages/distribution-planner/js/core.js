@@ -26,6 +26,15 @@
  * fee component and any tip, which the CLI quotes exactly before submission.
  * This planner never submits anything — it produces files for you to run.
  *
+ * Optional planner service fee (PROFIT route, added 2026-10-11): the sender
+ * may add a small, plainly disclosed service fee ON TOP of the recipient
+ * total — recipient amounts are NEVER reduced. The fee is one extra
+ * transfer to the builder's QTC address (SERVICE_FEE_ADDRESS, the same
+ * address in this page's footer), appended LAST so it rides in the final
+ * batch: if a run stops early, no fee is paid for batches never sent.
+ * Exact BigInt math: fee = floor(total * bps / 10,000), so it never
+ * exceeds the quoted percentage; capped at 100 bps (1%) in code.
+ *
  * Environment-agnostic: browser global DistCore, Node module.exports.
  */
 (function (global) {
@@ -161,6 +170,49 @@ function wordsFromKey(keyBytes, wordlist) {
   }
   return words;
 }
+/* ---------- optional planner service fee (disclosed, on top) ---------- */
+var SERVICE_FEE_ADDRESS = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+var SERVICE_FEE_MAX_BPS = 100;
+
+function computeServiceFee(totalPlancks, feeBps) {
+  var total = BigInt(totalPlancks);
+  var bps = Number(feeBps);
+  if (!isFinite(bps) || bps < 0) bps = 0;
+  if (bps > SERVICE_FEE_MAX_BPS) bps = SERVICE_FEE_MAX_BPS;
+  bps = Math.floor(bps);
+  if (total <= BigInt(0) || bps === 0) return { feePlancks: BigInt(0), feeBps: bps };
+  var fee = (total * BigInt(bps)) / BigInt(10000); // floor: never over the quote
+  return { feePlancks: fee, feeBps: bps };
+}
+
+function feeBpsLabel(bps) {
+  var b = Math.floor(Number(bps) || 0);
+  var whole = Math.floor(b / 100), rem = b % 100;
+  if (rem === 0) return whole + "%";
+  var frac = String(rem).padStart(2, "0").replace(/0+$/, "");
+  return whole + "." + frac + "%";
+}
+
+/* Append the service-fee transfer (when any) as the LAST row, so it lands
+ * in the final batch. Recipient rows pass through untouched and in order;
+ * recipientTotalPlancks restates their sum exactly. A fee that floors to
+ * zero plancks (tiny total) adds NO row — a 0-planck transfer is invalid. */
+function withServiceFee(validRows, feeBps) {
+  var recipientTotal = validRows.reduce(function (a, r) { return a + r.plancks; }, BigInt(0));
+  var f = computeServiceFee(recipientTotal, feeBps);
+  var rows = validRows.slice();
+  var feeRow = null;
+  if (f.feePlancks > BigInt(0)) {
+    feeRow = { line: 0, raw: "", address: SERVICE_FEE_ADDRESS,
+               amountStr: formatQTC(f.feePlancks), ok: true, warnings: [],
+               error: null, plancks: f.feePlancks, checkphrase: null,
+               isServiceFee: true };
+    rows.push(feeRow);
+  }
+  return { rows: rows, feeRow: feeRow, feePlancks: f.feePlancks,
+           feeBps: f.feeBps, recipientTotalPlancks: recipientTotal };
+}
+
 function planBatches(validRows, batchSize) {
   var n = Math.max(1, Math.floor(batchSize) || DEFAULT_BATCH_SIZE);
   var batches = [];
@@ -214,10 +266,18 @@ function shellQuote(s) {
   return "'" + String(s).replace(/'/g, "'\\''") + "'";
 }
 
-function buildRunScript(batches, fromWallet, tipQTC) {
+function buildRunScript(batches, fromWallet, tipQTC, feeInfo) {
   var from = (fromWallet || "my_wallet").trim() || "my_wallet";
   var tip = (tipQTC || "").trim();
   var tipFlag = tip ? " --tip " + shellQuote(tip) : "";
+  var fee = (feeInfo && feeInfo.feePlancks > BigInt(0))
+    ? { plancks: feeInfo.feePlancks, bps: feeInfo.feeBps, batchIndex: 0 } : null;
+  if (fee) {
+    for (var fi = 0; fi < batches.length; fi++) {
+      if (batches[fi].rows.some(function (r) { return r.isServiceFee; }))
+        fee.batchIndex = batches[fi].index;
+    }
+  }
   var L = [];
   L.push("#!/usr/bin/env bash");
   L.push("# QTC Distribution Planner — generated run script (Quantum Resistance Renaissance).");
@@ -225,6 +285,16 @@ function buildRunScript(batches, fromWallet, tipQTC) {
   L.push("# Atomic per batch: every transfer in a batch succeeds, or the whole batch fails.");
   L.push("# Review every file below before running. Never paste a wallet password on the");
   L.push("# command line — the CLI reads it from a hidden prompt or --password-file.");
+  if (fee) {
+    L.push("#");
+    L.push("# Service fee (optional, disclosed): this plan includes the Distribution");
+    L.push("# Planner service fee of " + formatQTC(fee.plancks) + " QTC (" +
+           feeBpsLabel(fee.bps) + " of the recipient total), paid as ONE extra");
+    L.push("# transfer to " + SERVICE_FEE_ADDRESS + " in batch " + fee.batchIndex + ".");
+    L.push("# Recipient amounts are unchanged — the fee is added ON TOP of the");
+    L.push("# recipient total, never deducted from it. To run without it, choose");
+    L.push("# \"None\" for the service fee in the planner and rebuild the plan.");
+  }
   L.push("set -euo pipefail");
   L.push("");
   L.push("# 0) Sanity: confirm the chain's live batch limits match this plan");
@@ -237,9 +307,12 @@ function buildRunScript(batches, fromWallet, tipQTC) {
   for (var i = 0; i < batches.length; i++) {
     var b = batches[i];
     var qtc = formatQTC(b.totalPlancks);
+    var hasFee = fee && b.rows.some(function (r) { return r.isServiceFee; });
     L.push("");
     L.push("# Batch " + b.index + "/" + batches.length + ": " + b.rows.length +
-           " transfer(s), " + qtc + " QTC to recipients");
+           " transfer(s), " + qtc + " QTC" +
+           (hasFee ? " total (includes the " + formatQTC(fee.plancks) + " QTC service fee)"
+                   : " to recipients"));
     L.push("quantus batch send --from " + shellQuote(from) +
            " --batch-file transfers-batch-" + b.index + ".json" + tipFlag);
   }
@@ -282,6 +355,11 @@ var api = {
   DEFAULT_BATCH_SIZE: DEFAULT_BATCH_SIZE,
   SIG_BYTES: SIG_BYTES,
   EXTENSIONS_ESTIMATE_BYTES: EXTENSIONS_ESTIMATE_BYTES,
+  SERVICE_FEE_ADDRESS: SERVICE_FEE_ADDRESS,
+  SERVICE_FEE_MAX_BPS: SERVICE_FEE_MAX_BPS,
+  computeServiceFee: computeServiceFee,
+  feeBpsLabel: feeBpsLabel,
+  withServiceFee: withServiceFee,
   parseAmountToPlancks: parseAmountToPlancks,
   compactLenU128: compactLenU128,
   parseInput: parseInput,
