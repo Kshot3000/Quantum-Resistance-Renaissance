@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.12"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.13"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.12"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.13"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.11"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.12"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.10"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.11"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1260,6 +1260,40 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("function validActivityRow(t)"), "wallet2: the round-1 shape-only row check is gone");
   const html = read("pages/web-wallet/index.html");
   ok(html.includes("js/app.js?v=1.41.0"), "wallet2: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 39 (2026-10-11 00:19): Key Forge verdict staleness (Tier 1) —
+// every rendered verdict is a function of specific inputs, but nothing
+// voided any of them: a "Valid Quantus address" badge stayed up after
+// the address was replaced with garbage, a hex-encode result stayed up
+// after the hex was edited, a "Signed & verified" panel (with its copy/
+// download buttons for the signature) stayed up after the message was
+// edited OR a new keypair was forged (that signature was the old key's),
+// and a verify verdict stayed up after any of its three inputs changed
+// — including the programmatic useForgedPk fill, which fires no input
+// event. Pin: the four void functions exist, are wired to every
+// determinant (input listeners + explicit voids in forge() and
+// useForgedPk), and each render path marks its panel rendered.
+{
+  const app = read("pages/key-forge/js/app.js");
+  ok(app.includes("function voidInsp(what)"), "keyforge: voidInsp() defined");
+  ok(app.includes("function voidHex(what)"), "keyforge: voidHex() defined");
+  ok(app.includes("function voidSign(what)"), "keyforge: voidSign() defined");
+  ok(app.includes("function voidVerify(what)"), "keyforge: voidVerify() defined");
+  ok(app.includes("$('inspAddr').addEventListener('input'"), "keyforge: inspector verdict voids on address edit");
+  ok(app.includes("$('inspHex').addEventListener('input'"), "keyforge: hex verdict voids on hex edit");
+  ok(app.includes("$('signMsg').addEventListener('input'"), "keyforge: sign verdict voids on message edit");
+  ok(app.includes("$('verPubkey').addEventListener('input'"), "keyforge: verify verdict voids on pubkey edit");
+  ok(app.includes("$('verMsg').addEventListener('input'"), "keyforge: verify verdict voids on message edit");
+  ok(app.includes("$('verSig').addEventListener('input'"), "keyforge: verify verdict voids on signature edit");
+  ok(app.includes("voidSign('a new keypair was forged"), "keyforge: forging a new key explicitly voids the old key's sign panel");
+  ok(app.includes("voidVerify('the public key was replaced with the forged key"), "keyforge: useForgedPk fill explicitly voids the verify verdict");
+  ok(app.includes("inspRendered = true;"), "keyforge: inspector render marks its panel rendered");
+  ok(app.includes("hexRendered = true;"), "keyforge: hex render marks its panel rendered");
+  ok(app.includes("signRendered = true;"), "keyforge: sign render marks its panel rendered");
+  ok(app.includes("verifyRendered = true;"), "keyforge: verify render marks its panel rendered");
+  const html = read("pages/key-forge/index.html");
+  ok(html.includes("js/app.js?v=1.3.0"), "keyforge: app.js cache key bumped for the staleness fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

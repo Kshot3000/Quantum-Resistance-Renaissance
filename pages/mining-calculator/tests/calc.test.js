@@ -125,8 +125,8 @@ t("fallback bundle is one consistent capture", function(){
   var F = m.FALLBACK;
   assert.strictEqual(F.netHs, Math.floor(Number(F.difficulty) / 12), "netHs = difficulty / 12s");
   approx(Number(F.totalSupplyPlancks) / 1e12, F.supplyQtc, 0.001); // supplyQtc stored rounded to 4dp
-  approx(m.blockReward(F.supplyQtc), 0.3039459, 1e-7);
-  assert.strictEqual(F.height, 203723);
+  approx(m.blockReward(F.supplyQtc), 0.3039429, 1e-7);
+  assert.strictEqual(F.height, 203966);
   assert.ok(F.fetchedAt.indexOf("2026-10-11") === 0, "fallback is dated 2026-10-11");
   // The old bug, pinned: the pre-v1.9.0 static default was 10 GH/s.
   assert.ok(F.netHs > 1e12, "fallback network rate is TH/s-scale, not the old 10 GH/s example");
@@ -145,7 +145,7 @@ t("estimate uses observed pace when given", function(){
 
 // 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.0207 QTC/day
 // (band re-derived each fallback sync: share × observed pace × reward at the
-// @203,723 capture = 0.0207; it drifts down as the network grows)
+// @203,966 capture = 0.0207; it drifts down as the network grows)
 t("default rig estimate is honest at fallback defaults", function(){
   var e = estimate({ userHs: 500e6, netHs: m.FALLBACK.netHs, watts: 450, kwhPrice: 0.12,
                      qtcPrice: 0, reward: m.blockReward(m.FALLBACK.supplyQtc),
@@ -154,13 +154,13 @@ t("default rig estimate is honest at fallback defaults", function(){
 });
 
 // 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
-t("index.html carries the fallback defaults and v1.10.12 key", function(){
+t("index.html carries the fallback defaults and v1.10.13 key", function(){
   var fs = require("fs"), path = require("path");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="43.584"') >= 0, "in-net defaults to the fallback TH/s figure");
+  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="43.180"') >= 0, "in-net defaults to the fallback TH/s figure");
   assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
   assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
-  assert.ok(html.indexOf("app.js?v=1.10.12") >= 0, "app.js cache key bumped to 1.10.12");
+  assert.ok(html.indexOf("app.js?v=1.10.13") >= 0, "app.js cache key bumped to 1.10.13");
   assert.ok(html.indexOf("falls back to the dated Oct 2, 2026 capture") < 0, "honesty bullet no longer pins the fallback to the stale Oct 2 capture");
   assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
 });

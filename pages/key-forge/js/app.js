@@ -110,6 +110,9 @@ async function forge() {
   // secret backup's scheme field.
   const pinnedScheme = scheme;
   const S = SCHEMES[pinnedScheme];
+  // A new keypair strands any signature the previous key made: the sign
+  // panel must not present the old key's signature under the new key.
+  voidSign('a new keypair was forged, so that signature (made by the previous key) no longer applies.');
   $('forgeIdle').hidden = true;
   $('forgeResult').hidden = true;
   $('forgeBusy').hidden = false;
@@ -194,6 +197,47 @@ $('dlSecret').addEventListener('click', () => {
   }, null, 2), 'application/json');
 });
 
+/* ---------- verdict staleness ----------
+ * Every rendered verdict below is a function of specific inputs: the
+ * inspector verdict of the address in the box, the hex verdict of the
+ * account-ID hex, the sign panel of (forged key, message), and the
+ * verify verdict of (public key, message, signature). Editing any
+ * determinant after a verdict renders must void it — otherwise a
+ * "Valid Quantus address" badge stays up over a replaced garbage
+ * address, and a "Signed & verified" panel stays up after the message
+ * is edited or a NEW key is forged (that signature was the old key's).
+ * Voiding replaces the panel with a cleared note naming what changed;
+ * each void is a no-op when its panel holds no verdict. Programmatic
+ * fills fire no input events, so they void EXPLICITLY: forge() voids
+ * the sign panel, and useForgedPk voids the verify panel. */
+let inspRendered = false, hexRendered = false, signRendered = false, verifyRendered = false;
+function voidInsp(what) {
+  if (!inspRendered) return;
+  inspRendered = false;
+  $('inspResult').innerHTML = `<p class="hint">Inspection cleared — ${what} Inspect again for the current input.</p>`;
+}
+function voidHex(what) {
+  if (!hexRendered) return;
+  hexRendered = false;
+  $('hexResult').innerHTML = `<p class="hint">Result cleared — ${what} Encode again for the current input.</p>`;
+}
+function voidSign(what) {
+  if (!signRendered) return;
+  signRendered = false;
+  $('signResult').innerHTML = `<p class="hint">Signature cleared — ${what} Sign again for the current key and message.</p>`;
+}
+function voidVerify(what) {
+  if (!verifyRendered) return;
+  verifyRendered = false;
+  $('verifyResult').innerHTML = `<p class="hint">Verdict cleared — ${what} Verify again for the current inputs.</p>`;
+}
+$('inspAddr').addEventListener('input', () => voidInsp('the address changed after this inspection, so it no longer describes the current input.'));
+$('inspHex').addEventListener('input', () => voidHex('the account ID changed after this result, so it no longer describes the current input.'));
+$('signMsg').addEventListener('input', () => voidSign('the message changed after this signature was made, so it no longer describes the current message.'));
+$('verPubkey').addEventListener('input', () => voidVerify('the public key changed after this verdict, so it no longer describes the current inputs.'));
+$('verMsg').addEventListener('input', () => voidVerify('the message changed after this verdict, so it no longer describes the current inputs.'));
+$('verSig').addEventListener('input', () => voidVerify('the signature changed after this verdict, so it no longer describes the current inputs.'));
+
 /* ---------- inspector ---------- */
 function inspHtml(rows, okBadge, badgeText) {
   return `<span class="badge ${okBadge ? 'ok' : 'bad'}">${badgeText}</span>` +
@@ -202,7 +246,7 @@ function inspHtml(rows, okBadge, badgeText) {
 $('inspBtn').addEventListener('click', () => {
   const box = $('inspResult');
   const input = $('inspAddr').value.trim();
-  if (!input) { box.innerHTML = '<p class="hint">Paste an address first.</p>'; return; }
+  if (!input) { box.innerHTML = '<p class="hint">Paste an address first.</p>'; inspRendered = false; return; }
   try {
     const { prefix, accountId } = ss58Decode(input);
     const canon = ss58Encode(accountId, prefix);
@@ -215,6 +259,7 @@ $('inspBtn').addEventListener('click', () => {
   } catch (err) {
     box.innerHTML = inspHtml([['Error', err.message]], false, 'Invalid address');
   }
+  inspRendered = true;
 });
 $('inspKyle').addEventListener('click', () => {
   $('inspAddr').value = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
@@ -230,6 +275,7 @@ $('hexBtn').addEventListener('click', () => {
   } catch (err) {
     box.innerHTML = inspHtml([['Error', err.message]], false, 'Invalid input');
   }
+  hexRendered = true;
 });
 
 /* ---------- sign & verify ---------- */
@@ -238,7 +284,7 @@ $('signBtn').addEventListener('click', async () => {
   if (!currentKey) return;
   const S = SCHEMES[currentKey.scheme];
   const msg = te.encode($('signMsg').value);
-  if (!msg.length) { box.innerHTML = '<p class="hint">Type a message first.</p>'; return; }
+  if (!msg.length) { box.innerHTML = '<p class="hint">Type a message first.</p>'; signRendered = false; return; }
   box.innerHTML = '<p class="hint">Signing…</p>';
   await sleep(30);
   let sig;
@@ -246,6 +292,7 @@ $('signBtn').addEventListener('click', async () => {
     sig = S.mod.sign(msg, currentKey.secretKey);
   } catch (err) {
     box.innerHTML = inspHtml([['Error', err.message]], false, 'Cannot sign');
+    signRendered = true;
     return;
   }
   const sigHex = hexEncode(sig);
@@ -264,10 +311,13 @@ $('signBtn').addEventListener('click', async () => {
   db.className = 'btn mini'; db.textContent = 'Download .sig';
   db.addEventListener('click', () => download('quantus-signature.hex', sigHex));
   row.append(cb, db); box.appendChild(row);
+  signRendered = true;
 });
 $('useForgedPk').addEventListener('click', () => {
-  if (!currentKey) { $('verifyResult').innerHTML = '<p class="hint">Forge a keypair first.</p>'; return; }
+  if (!currentKey) { $('verifyResult').innerHTML = '<p class="hint">Forge a keypair first.</p>'; verifyRendered = false; return; }
   $('verPubkey').value = hexEncode(currentKey.publicKey);
+  // Programmatic fill fires no input event — void the stale verdict here.
+  voidVerify('the public key was replaced with the forged key, so that verdict no longer describes the current inputs.');
 });
 $('verifyBtn').addEventListener('click', async () => {
   const box = $('verifyResult');
@@ -291,6 +341,7 @@ $('verifyBtn').addEventListener('click', async () => {
   } catch (err) {
     box.innerHTML = inspHtml([['Error', err.message]], false, 'Cannot verify');
   }
+  verifyRendered = true;
 });
 
 /* ---------- paper card ---------- */
