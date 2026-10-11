@@ -308,6 +308,39 @@ async function ta(name, fn){
     assert.strictEqual(s.score, 100);
   });
 
+  /* --- API-payload boundary round 2: relations + identity signal (2026-10-10) --- */
+  t("BTC: spent outputs cannot exceed funded outputs", function(){
+    assert.strictEqual(C.sanitizeBtcApi({ spent_txo_count: 5, funded_txo_count: 3, tx_count: 6, balance_sats: 100 }), null);
+    var a = C.analyzeBTC({ chain: "btc", ok: true, format: "P2PKH (legacy)" },
+      { spent_txo_count: 5, funded_txo_count: 3, tx_count: 6, balance_sats: 100 });
+    assert.strictEqual(a.verdict, "unknown");
+  });
+  t("BTC: zero transactions cannot coexist with funded/balance", function(){
+    assert.strictEqual(C.sanitizeBtcApi({ spent_txo_count: 0, funded_txo_count: 3, tx_count: 0, balance_sats: 100 }), null);
+    assert.strictEqual(C.sanitizeBtcApi({ spent_txo_count: 0, funded_txo_count: 0, tx_count: 0, balance_sats: 0 }) !== null, true);
+  });
+  t("BTC: positive balance needs an unspent funded output", function(){
+    assert.strictEqual(C.sanitizeBtcApi({ spent_txo_count: 2, funded_txo_count: 2, tx_count: 4, balance_sats: 500 }), null);
+    var a = C.analyzeBTC({ chain: "btc", ok: true, format: "P2PKH (legacy)" },
+      { spent_txo_count: 2, funded_txo_count: 2, tx_count: 4, balance_sats: 0 });
+    assert.strictEqual(a.verdict, "exposed"); // all spent, zero balance: consistent
+  });
+  t("ETH: n_tx 0 cannot coexist with received/balance", function(){
+    assert.strictEqual(C.sanitizeEthApi({ n_tx: 0, total_sent_wei: "0", total_received_wei: "100", balance_wei: "100" }), null);
+    var a = C.analyzeETH({ chain: "eth", ok: true },
+      { n_tx: 0, total_sent_wei: "0", total_received_wei: "0", balance_wei: "0" });
+    assert.strictEqual(a.verdict, "clean");
+  });
+  t("ETH: Blockscout sent_signal survives sanitize and names itself in evidence", function(){
+    var s = C.sanitizeEthApi({ n_tx: null, total_sent_wei: "1", balance_wei: "500", sent_signal: true });
+    assert.strictEqual(s.sent_signal, true);
+    var a = C.analyzeETH({ chain: "eth", ok: true },
+      { n_tx: null, total_sent_wei: "1", total_received_wei: "0", balance_wei: "500", sent_signal: true, source: "blockscout" });
+    assert.strictEqual(a.verdict, "exposed");
+    assert.ok(/Blockscout fallback/.test(a.evidence.join(" ")));
+    assert.ok(!/0\.000000000000000001/.test(a.evidence.join(" ")), a.evidence.join(" "));
+  });
+
   /* --- samples --- */
   await ta("every sample address validates on its chain", async function(){
     for (var i = 0; i < C.SAMPLES.length; i++){

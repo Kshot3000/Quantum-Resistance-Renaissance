@@ -38,6 +38,10 @@ async function fetchBTC(addr, validation){
     var info = await fetchJSON("https://mempool.space/api/address/" + encodeURIComponent(addr));
     if (!info || typeof info !== "object" || Array.isArray(info))
       return { offline: true, error: "malformed mempool.space answer" };
+    // Identity (round 2): the answer must be FOR the address asked — a
+    // response naming any other address anchors nothing here.
+    if (typeof info.address !== "string" || info.address !== addr)
+      return { offline: true, error: "mempool.space answer for a different address" };
     var cs = info.chain_stats || {}, ms = info.mempool_stats || {};
     if (typeof cs !== "object" || Array.isArray(cs) || typeof ms !== "object" || Array.isArray(ms))
       return { offline: true, error: "malformed mempool.space stats" };
@@ -97,6 +101,8 @@ async function fetchETH(addr){
   try {
     var b = await fetchJSON("https://api.blockcypher.com/v1/eth/main/addrs/" + encodeURIComponent(addr));
     if (!b || typeof b !== "object" || Array.isArray(b)) throw new Error("malformed BlockCypher answer");
+    if (typeof b.address !== "string" || b.address.toLowerCase() !== addr.toLowerCase())
+      throw new Error("BlockCypher answer for a different address");
     // Validate before normalizing: a garbage wei total or count must
     // not be String()-coerced into the analysis ("[object Object] wei"
     // was rendered as evidence pre-fix). Malformed primary data falls
@@ -116,13 +122,23 @@ async function fetchETH(addr){
       var out = await fetchJSON("https://eth.blockscout.com/api/v2/addresses/" +
                                 encodeURIComponent(addr) + "/transactions?filter=from");
       if (!a || typeof a !== "object" || Array.isArray(a)) throw new Error("malformed Blockscout answer");
+      if (typeof a.hash !== "string" || a.hash.toLowerCase() !== addr.toLowerCase())
+        throw new Error("Blockscout answer for a different address");
       if (!out || typeof out !== "object" || !Array.isArray(out.items)) throw new Error("malformed Blockscout tx list");
       var bal = (a.coin_balance === undefined || a.coin_balance === null) ? "0" : C.validPlancks(a.coin_balance);
       if (bal === null) throw new Error("malformed Blockscout balance");
-      var sent = out.items.length > 0;
+      // A listed item proves a send only if its sender IS this address —
+      // an unverifiable or foreign sender proves nothing (round 2).
+      var sent = false;
+      for (var ti = 0; ti < out.items.length; ti++){
+        var fh = out.items[ti] && out.items[ti].from_address && out.items[ti].from_address.hash;
+        if (typeof fh !== "string") throw new Error("malformed Blockscout tx item");
+        if (fh.toLowerCase() === addr.toLowerCase()) sent = true;
+      }
       return {
         n_tx: null,
         total_sent_wei: sent ? "1" : "0", // boolean signal only on the fallback path
+        sent_signal: sent,
         total_received_wei: "0",
         balance_wei: bal,
         source: "blockscout",

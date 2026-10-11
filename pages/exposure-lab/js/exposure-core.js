@@ -411,6 +411,14 @@ function sanitizeBtcApi(api){
   var tx = api.tx_count == null ? 0 : nonNegInt(api.tx_count);
   var bal = api.balance_sats == null ? 0 : nonNegInt(api.balance_sats);
   if (spent === null || funded === null || tx === null || bal === null) return null;
+  // Relations (round 2): the counts describe ONE address's UTXO set, so
+  // they must agree with each other — an output cannot be spent before
+  // it was funded, a zero-transaction address cannot hold funded/spent
+  // outputs or a balance, and a positive balance requires at least one
+  // funded output that was never spent.
+  if (spent > funded) return null;
+  if (tx === 0 && (spent > 0 || funded > 0 || bal > 0)) return null;
+  if (bal > 0 && funded <= spent) return null;
   return {
     spent_txo_count: spent, funded_txo_count: funded, tx_count: tx,
     balance_sats: bal,
@@ -427,10 +435,16 @@ function sanitizeEthApi(api){
   var recv = api.total_received_wei == null ? "0" : validPlancks(api.total_received_wei);
   var bal = api.balance_wei == null ? "0" : validPlancks(api.balance_wei);
   if (sent === null || recv === null || bal === null) return null;
+  // Relation (round 2): a zero-transaction address has never sent,
+  // received, or held anything — n_tx 0 alongside any value is two
+  // copies of the history disagreeing, so the payload is malformed.
+  // (The Blockscout fallback carries n_tx null, exempt by construction.)
+  if (nTx === 0 && (sent !== "0" || recv !== "0" || bal !== "0")) return null;
   var out = {
     n_tx: nTx, total_sent_wei: sent, total_received_wei: recv, balance_wei: bal,
     sample: api.sample === true
   };
+  if (api.sent_signal === true) out.sent_signal = true;
   if (typeof api.source === "string") out.source = api.source;
   if (typeof api.fallback_note === "string") out.fallback_note = api.fallback_note;
   if (api.is_contract === true) out.is_contract = true;
@@ -493,9 +507,15 @@ function analyzeETH(v, api){
   try { sent = BigInt(api.total_sent_wei || "0") > 0; } catch (e){ sent = !!api.n_tx; }
   var bal = fmtETH(api.balance_wei || "0");
   if (sent){
+    // The Blockscout fallback knows THAT the address sent, not how much:
+    // its total_sent_wei is a boolean sentinel ("1"), never an amount —
+    // the evidence must name the fallback instead of rendering 1 wei.
+    var sentEv = api.sent_signal
+      ? "This address has at least one outgoing transaction on record (Blockscout fallback: sent/not-sent signal only — the exact sent total is unavailable, so no sent amount is claimed)."
+      : "This address has sent " + fmtETH(api.total_sent_wei || "0") + " in " + (api.n_tx || "?") + " transaction(s).";
     return { verdict: "exposed", title: "EXPOSED — public key recoverable",
       evidence: [
-        "This address has sent " + fmtETH(api.total_sent_wei || "0") + " in " + (api.n_tx || "?") + " transaction(s).",
+        sentEv,
         "Every Ethereum transaction carries an ECDSA signature from which the public key is mathematically recoverable — it is on-chain forever.",
         "Current balance: " + bal + "."
       ],

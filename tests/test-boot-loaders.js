@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.8"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.9"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.8"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.9"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.7"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.8"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.6"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.7"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1138,6 +1138,34 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const html = read("pages/reversal-desk/index.html");
   ok(html.includes("js/app.js?v=1.51.0"), "reversal2: app.js cache key bumped for the boundary fix");
   ok(html.includes("js/reversal-core.js?v=1.51.0"), "reversal2: reversal-core.js cache key bumped for the boundary fix");
+}
+
+// Batch 35 (2026-10-10 20:19): exposure-lab round 2 (Tier 2) — round 1
+// validated each BTC/ETH API field's shape, but the relations between
+// fields were unchecked (spent outputs could exceed funded, a zero
+// tx_count could coexist with a balance, n_tx 0 could coexist with
+// received value), no client checked that an answer was FOR the
+// address asked, and the Blockscout fallback's 1-wei sent sentinel
+// rendered as a sent amount ("has sent 0.000000000000000001 ETH").
+// Pin: the core sanitizers reject relational poison, every client
+// verifies response identity, and the fallback evidence names itself.
+{
+  const core = read("pages/exposure-lab/js/exposure-core.js");
+  const src = read("pages/exposure-lab/js/app.js");
+  ok(core.includes("if (spent > funded) return null;"), "exposure2: spent outputs cannot exceed funded outputs");
+  ok(core.includes("tx === 0 && (spent > 0 || funded > 0 || bal > 0)"), "exposure2: zero transactions cannot coexist with funded/spent/balance");
+  ok(core.includes("bal > 0 && funded <= spent"), "exposure2: a positive balance needs an unspent funded output");
+  ok(core.includes('nTx === 0 && (sent !== "0" || recv !== "0" || bal !== "0")'), "exposure2: ETH n_tx 0 cannot coexist with value");
+  ok(core.includes("if (api.sent_signal === true) out.sent_signal = true;"), "exposure2: sanitize preserves the sent_signal flag");
+  ok(core.includes("Blockscout fallback: sent/not-sent signal only"), "exposure2: fallback evidence names the fallback, never the sentinel amount");
+  ok(src.includes("mempool.space answer for a different address"), "exposure2: mempool answer identity is verified");
+  ok(src.includes("BlockCypher answer for a different address"), "exposure2: BlockCypher answer identity is verified");
+  ok(src.includes("Blockscout answer for a different address"), "exposure2: Blockscout answer identity is verified");
+  ok(src.includes("fh.toLowerCase() === addr.toLowerCase()"), "exposure2: a Blockscout item proves a send only when its sender is this address");
+  ok(src.includes("sent_signal: sent,"), "exposure2: the fallback marks its sent sentinel as a signal");
+  const html = read("pages/exposure-lab/index.html");
+  ok(html.includes("js/exposure-core.js?v=1.54.0"), "exposure2: exposure-core.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.54.0"), "exposure2: app.js cache key bumped for the boundary fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
