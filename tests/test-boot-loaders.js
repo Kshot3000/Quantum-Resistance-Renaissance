@@ -259,7 +259,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!src.includes("b.extrinsics_aggregate && b.extrinsics_aggregate.aggregate) ? b.extrinsics_aggregate.aggregate.count"),
     "explorer: no raw extrinsics-count interpolation remains");
   const html = read("pages/block-explorer/index.html");
-  ok(html.includes("app.js?v=1.2.0"), "explorer: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.3.0"), "explorer: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 14. Chain Console: validate RPC results at the summarizer boundary ----
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.13"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.14"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.13"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.14"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.12"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.13"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.11"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.12"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1294,6 +1294,37 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("verifyRendered = true;"), "keyforge: verify render marks its panel rendered");
   const html = read("pages/key-forge/index.html");
   ok(html.includes("js/app.js?v=1.3.0"), "keyforge: app.js cache key bumped for the staleness fix");
+}
+
+// Batch 40 (2026-10-11 01:19): Block Explorer round 2 (Tier 1) —
+// validate RELATIONS, not just shapes. Round 1 checked each field
+// alone, so a home payload whose blocks head disagreed with its own
+// stats painted, a 999 QTC reward painted (the schedule pays ~0.305),
+// a 100M QTC transfer painted (over the 21M cap), ascending/future
+// lists painted as "latest", a stranger-to-stranger transfer painted
+// as the queried account's own outgoing history, balances summing
+// past the cap painted, duplicate extrinsic indices and foreign
+// events painted, and a block returned for the wrong height painted.
+// Pin: fleet height/chain-time/strict-address validators, the supply
+// cap and emission-schedule relations, list limits and newest-first
+// order with payload-level rejection, cleanAccountData gating the
+// account view, and blockMatchesKey gating the block view.
+{
+  const src = read("pages/block-explorer/app.js");
+  ok(src.includes("function validAddress(v)"), "explorer2: strict SS58-189 address validator defined");
+  ok(src.includes("function rewardPlausible(height, rewardPlanckStr)"), "explorer2: emission-schedule reward relation defined");
+  ok(src.includes("function planckWithinSupply(p)"), "explorer2: 21M supply-cap relation defined");
+  ok(src.includes("function cleanAccountData(d, id)"), "explorer2: account payload cleaner defined");
+  ok(src.includes("function blockMatchesKey(b, key)"), "explorer2: block/key match defined");
+  ok(src.includes("cleanAccountData(d, id)"), "explorer2: account view gates on cleanAccountData");
+  ok(src.includes("blockMatchesKey(b, key)"), "explorer2: block view gates on blockMatchesKey");
+  ok(src.includes("t.from_id !== id && t.to_id !== id"), "explorer2: account transfers must involve the queried account");
+  ok(src.includes("rawHead !== stats.block_height"), "explorer2: home head must restate the stats height");
+  ok(src.includes("d.blocks.length > HOME_LIMIT"), "explorer2: home lists respect their query limit");
+  ok(src.includes("d.t.length > ACCOUNT_TX_LIMIT"), "explorer2: account transfers respect limit:25");
+  ok(src.includes("MAX_SUPPLY_PLANCKS"), "explorer2: supply cap constant present");
+  const html = read("pages/block-explorer/index.html");
+  ok(html.includes("app.js?v=1.3.0"), "explorer2: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

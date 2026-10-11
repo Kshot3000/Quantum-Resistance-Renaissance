@@ -129,32 +129,102 @@ function prettyArgs(args){
  * misreported. Core objects (home stats, a block, an extrinsic, an
  * account's balances) fail honestly when malformed; row collections
  * (blocks, transfers, extrinsics, events) drop the poisoned rows and
- * render the survivors. */
+ * render the survivors.
+ *
+ * Round 2 (relations, not just shapes — verified against live indexer
+ * data at head 204,204 before coding): shapes alone still let a home
+ * payload whose blocks head disagreed with its own stats paint, a
+ * 999 QTC block reward (the emission schedule pays ~0.305) paint, a
+ * transfer of 100M QTC (over the 21M hard cap) paint, an ascending or
+ * future-dated block list paint as "latest", a transfer between two
+ * strangers paint as the queried account's own history (rendered as an
+ * outgoing payment from it), account balances summing past the supply
+ * cap paint, duplicate extrinsic indices and events belonging to a
+ * different block paint, and a block returned for a different height
+ * than the one requested paint. The cleaners below therefore verify
+ * relations: fleet validBlockHeight (1..10,000,000), timestamps inside
+ * the chain's lifetime (genesis floor 2026-09-01, <= now+1h), strict
+ * SS58-189 address shape (qz + 47 base58 chars — the loose isQz shape
+ * stays ONLY for classifying user search input), every planck figure
+ * within the 21M cap, rewards within the emission schedule (floor:
+ * schedule - 0.01 rounding slack; sanity ceiling: schedule + 0.5, the
+ * fleet bound from Network Dashboard), list limits (home 10/10,
+ * account 25) respected, kept rows newest-first with duplicates
+ * dropped, account transfers involving the queried account and not
+ * above its last_updated height, and a block answer matching the key
+ * it was asked for. Payload-level contradictions (head mismatch,
+ * order broken, over-limit, a raw list that cleans to empty) fail the
+ * whole payload honestly instead of painting a partial lie. */
+var MAX_HEIGHT = 10000000;
+var GENESIS_FLOOR_MS = Date.UTC(2026, 8, 1); // chain genesis: Sept 2026
+var MAX_SUPPLY_PLANCKS = "21000000000000000000"; // 21M QTC hard cap, in planck
+var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
+var HOME_LIMIT = 10, ACCOUNT_TX_LIMIT = 25;
+
 function validCount(v){
-  if (typeof v === "number") return (isFinite(v) && Math.floor(v) === v && v >= 0) ? v : null;
-  if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
+  if (typeof v === "number") return (Number.isSafeInteger(v) && v >= 0) ? v : null;
+  if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)){
+    var n = Number(v);
+    return Number.isSafeInteger(n) ? n : null;
+  }
   return null;
 }
+/* Fleet validBlockHeight: a strict safe integer 1..10,000,000. Round
+ * 1's validCount-based check accepted 0 (rejected separately), 2^53-1
+ * and "007" — all of which painted as chain fact. */
 function validHeight(v){
   var n = validCount(v);
-  return (n !== null && n > 0) ? n : null;
+  return (n !== null && n >= 1 && n <= MAX_HEIGHT) ? n : null;
 }
 function validPlanck(v){
   if (typeof v === "number") return (isFinite(v) && Math.floor(v) === v && v >= 0) ? String(v) : null;
   if (typeof v === "string" && /^\d+$/.test(v)) return v;
   return null;
 }
-function validTimestamp(v){
-  return (typeof v === "string" && isFinite(Date.parse(v))) ? v : null;
+/* Planck figure within the chain's hard cap, compared as BigInt so a
+ * 20-digit string cannot round its way past the cap through Number. */
+function planckWithinSupply(p){
+  if (p === null) return null;
+  return BigInt(p) <= BigInt(MAX_SUPPLY_PLANCKS) ? p : null;
+}
+/* A chain timestamp must be a time this chain could have produced:
+ * at/after the genesis floor and at most an hour ahead of now. */
+function validTimestamp(v, nowMs){
+  if (typeof v !== "string") return null;
+  var ms = Date.parse(v);
+  if (!isFinite(ms)) return null;
+  var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : Date.now();
+  return (ms >= GENESIS_FLOOR_MS && ms <= now + 3600000) ? v : null;
 }
 function validHashStr(v){
-  return (typeof v === "string" && /^0x[0-9a-fA-F]{8,}$/.test(v)) ? v : null;
+  return (typeof v === "string" && /^0x[0-9a-fA-F]{64}$/.test(v)) ? v : null;
 }
 function validIdStr(v){
   return (typeof v === "string" && /^[\w-]+$/.test(v)) ? v : null;
 }
 function validName(v){
   return (typeof v === "string" && /^\w+$/.test(v)) ? v : null;
+}
+/* Strict SS58-189 shape for INDEXER DATA (the fleet ADDR_RE). User
+ * search input keeps the looser isQz classifier; data rows must be
+ * real base58 — the loose shape accepted 0/O/I/l, which base58 never
+ * contains, and lengths no Quantus address has. */
+function validAddress(v){
+  return (typeof v === "string" && ADDR_RE.test(v)) ? v : null;
+}
+/* Emission relation (fleet formula, as in Network Dashboard): the
+ * schedule pays (21M - supply)/50,000,000 with a 5.67M genesis mint —
+ * ~0.3058 QTC at height 135,568, ~0.3054 at 204,204 — the indexer
+ * rounds to 0.01 and fees only add (live fee blocks reach +0.07). */
+function blockRewardEst(height){
+  var remaining = (21000000 - 5670000) * Math.exp(-height / 50000000);
+  return remaining / 50000000;
+}
+function rewardPlausible(height, rewardPlanckStr){
+  var est = blockRewardEst(height);
+  if (!isFinite(est)) return false;
+  var qtc = Number(rewardPlanckStr) / PLANCK;
+  return isFinite(qtc) && qtc >= est - 0.01 && qtc <= est + 0.5;
 }
 
 function cleanStats(raw){
@@ -172,9 +242,10 @@ function cleanBlockRow(raw){
   var height = validHeight(raw.height);
   var hash = validHashStr(raw.hash);
   var ts = validTimestamp(raw.timestamp);
-  var reward = validPlanck(raw.reward);
+  var reward = planckWithinSupply(validPlanck(raw.reward));
   if (height === null || hash === null || ts === null || reward === null) return null;
-  if (!isQz(raw.mined_by_id || "")) return null;
+  if (!rewardPlausible(height, reward)) return null;
+  if (validAddress(raw.mined_by_id || "") === null) return null;
   var cnt = null;
   if (raw.extrinsics_aggregate && raw.extrinsics_aggregate.aggregate)
     cnt = validCount(raw.extrinsics_aggregate.aggregate.count);
@@ -185,12 +256,12 @@ function cleanBlockRow(raw){
 function cleanTransferRow(raw){
   if (!raw || typeof raw !== "object") return null;
   var id = validIdStr(raw.id);
-  var amount = validPlanck(raw.amount);
+  var amount = planckWithinSupply(validPlanck(raw.amount));
   var height = validHeight(raw.block_height);
   var ts = validTimestamp(raw.timestamp);
   if (id === null || amount === null || height === null || ts === null) return null;
-  if (!isQz(raw.from_id || "") || !isQz(raw.to_id || "")) return null;
-  if (raw.fee !== undefined && raw.fee !== null && validPlanck(raw.fee) === null) return null;
+  if (validAddress(raw.from_id || "") === null || validAddress(raw.to_id || "") === null) return null;
+  if (raw.fee !== undefined && raw.fee !== null && planckWithinSupply(validPlanck(raw.fee)) === null) return null;
   return { id: id, amount: amount, from_id: raw.from_id, to_id: raw.to_id,
     block_height: height, timestamp: ts, fee: raw.fee };
 }
@@ -201,10 +272,10 @@ function cleanExtrinsicRow(raw){
   var idx = validCount(raw.index_in_block);
   var pallet = validName(raw.pallet);
   var call = validName(raw.call);
-  var fee = validPlanck(raw.fee);
+  var fee = planckWithinSupply(validPlanck(raw.fee));
   if (id === null || idx === null || pallet === null || call === null || fee === null) return null;
   if (typeof raw.success !== "boolean") return null;
-  if (raw.signer_id !== null && raw.signer_id !== undefined && !isQz(raw.signer_id)) return null;
+  if (raw.signer_id !== null && raw.signer_id !== undefined && validAddress(raw.signer_id) === null) return null;
   return { id: id, index_in_block: idx, pallet: pallet, call: call,
     signer_id: raw.signer_id || null, success: raw.success, fee: fee, args: raw.args };
 }
@@ -223,8 +294,29 @@ function cleanBlock(raw){
   var base = cleanBlockRow(raw);
   if (!base) return null;
   if (!Array.isArray(raw.extrinsics) || !Array.isArray(raw.events)) return null;
-  base.extrinsics = raw.extrinsics.map(cleanExtrinsicRow).filter(Boolean);
-  base.events = raw.events.map(cleanEventRow).filter(Boolean);
+  /* Relations inside the block: extrinsic indices are the block's
+   * ordering (the query asks index-ascending) — a duplicate or
+   * descending index is a second, conflicting claim about the same
+   * slot, so the row drops; an event naming an extrinsic that is not
+   * in this block does not belong to this block and drops; duplicate
+   * event ids are one event. Live blocks start at index 1 (index 0
+   * is not an extrinsic row in this indexer), so ascending-unique is
+   * the relation, not 0-based contiguity. */
+  var xts = [], lastIdx = -1, xtIds = {};
+  raw.extrinsics.map(cleanExtrinsicRow).filter(Boolean).forEach(function(x){
+    if (x.index_in_block <= lastIdx) return;
+    lastIdx = x.index_in_block;
+    xts.push(x); xtIds[x.id] = 1;
+  });
+  var evs = [], seenEv = {};
+  raw.events.map(cleanEventRow).filter(Boolean).forEach(function(e){
+    if (seenEv[e.id]) return;
+    if (e.extrinsic_id !== null && !xtIds[e.extrinsic_id]) return;
+    seenEv[e.id] = 1;
+    evs.push(e);
+  });
+  base.extrinsics = xts;
+  base.events = evs;
   return base;
 }
 
@@ -244,23 +336,121 @@ function cleanExtrinsic(raw){
 
 function cleanAccount(raw){
   if (!raw || typeof raw !== "object") return null;
-  var free = validPlanck(raw.free);
-  var frozen = validPlanck(raw.frozen);
-  var reserved = validPlanck(raw.reserved);
+  var free = planckWithinSupply(validPlanck(raw.free));
+  var frozen = planckWithinSupply(validPlanck(raw.frozen));
+  var reserved = planckWithinSupply(validPlanck(raw.reserved));
   if (free === null || frozen === null || reserved === null) return null;
-  return { free: free, frozen: frozen, reserved: reserved,
+  /* Relation: one account cannot hold more than will ever exist —
+   * each field under the cap but a 22M total still painted pre-fix. */
+  if (BigInt(free) + BigInt(frozen) + BigInt(reserved) > BigInt(MAX_SUPPLY_PLANCKS)) return null;
+  var lastUpdated = null;
+  if (raw.last_updated !== null && raw.last_updated !== undefined){
+    lastUpdated = validHeight(raw.last_updated);
+    if (lastUpdated === null) return null;
+  }
+  return { free: free, frozen: frozen, reserved: reserved, last_updated: lastUpdated,
     is_deposit_only: raw.is_deposit_only === true, is_guardian: raw.is_guardian === true,
     is_high_security: raw.is_high_security === true, is_multisig: raw.is_multisig === true };
 }
 
+/* Account view payload (vAccount): the transfers list is a claim
+ * about THE QUERIED account — every kept row must involve it (a
+ * stranger-to-stranger row painted as this account's outgoing payment
+ * pre-fix), must not sit above the account record's own last_updated
+ * height, must respect the query's limit:25 and run newest-first
+ * (equal heights/timestamps within one block are normal), with
+ * duplicate ids dropped. A raw list that cleans to empty is
+ * malformed wholesale — the honest indexer error instead of a painted
+ * "no transfers" — exactly the Wallet Activity round-2 rule. */
+function cleanAccountData(d, id){
+  if (!d || typeof d !== "object" || !Array.isArray(d.t)) return null;
+  if (d.t.length > ACCOUNT_TX_LIMIT) return null;
+  var a = null;
+  if (d.a !== null && d.a !== undefined){
+    a = cleanAccount(d.a);
+    if (!a) return null;
+  }
+  var mined = (d.mined && d.mined.aggregate) ? validCount(d.mined.aggregate.count) : null;
+  var txs = [], seen = {}, orderBroken = false;
+  d.t.forEach(function(raw){
+    if (orderBroken) return;
+    var t = cleanTransferRow(raw);
+    if (!t) return;
+    if (t.from_id !== id && t.to_id !== id) return; // not this account's transfer
+    if (a && a.last_updated !== null && t.block_height > a.last_updated) return;
+    if (seen[t.id]) return;
+    if (txs.length){
+      var prev = txs[txs.length - 1];
+      if (t.block_height > prev.block_height || Date.parse(t.timestamp) > Date.parse(prev.timestamp)){ orderBroken = true; return; }
+    }
+    seen[t.id] = 1;
+    txs.push(t);
+  });
+  if (orderBroken) return null;
+  if (d.t.length && !txs.length) return null;
+  return { a: a, txs: txs, mined: mined };
+}
+
+/* Home payload: stats and lists are one answer about one chain
+ * state. The blocks head must restate the stats height, both lists
+ * must respect their limit:10, kept blocks must run strictly
+ * newest-first in height AND time (duplicate height/hash rows are
+ * one block, dropped), kept transfers must run newest-first (ties
+ * inside one block are normal) and cannot sit above the stats head,
+ * and a raw list that cleans to empty fails the payload — the stats
+ * must not anchor on a list that was entirely poison. */
 function cleanHome(d){
   if (!d || typeof d !== "object") return null;
   var stats = cleanStats(d.stats);
   if (!stats) return null;
   if (!Array.isArray(d.blocks) || !Array.isArray(d.transfers)) return null;
-  return { stats: stats,
-    blocks: d.blocks.map(cleanBlockRow).filter(Boolean),
-    transfers: d.transfers.map(cleanTransferRow).filter(Boolean) };
+  if (d.blocks.length > HOME_LIMIT || d.transfers.length > HOME_LIMIT) return null;
+  var rawHead = (d.blocks[0] && typeof d.blocks[0] === "object") ? validCount(d.blocks[0].height) : null;
+  if (rawHead !== null && rawHead !== stats.block_height) return null;
+  var blocks = [], seenH = {}, seenHash = {}, orderBroken = false;
+  d.blocks.forEach(function(raw){
+    if (orderBroken) return;
+    var b = cleanBlockRow(raw);
+    if (!b) return;
+    if (b.height > stats.block_height) return;
+    if (seenH[b.height] || seenHash[b.hash]) return;
+    if (blocks.length){
+      var prev = blocks[blocks.length - 1];
+      if (b.height >= prev.height || Date.parse(b.timestamp) >= Date.parse(prev.timestamp)){ orderBroken = true; return; }
+    }
+    seenH[b.height] = 1; seenHash[b.hash] = 1;
+    blocks.push(b);
+  });
+  if (orderBroken) return null;
+  if (d.blocks.length && !blocks.length) return null;
+  var txs = [], seenT = {};
+  d.transfers.forEach(function(raw){
+    if (orderBroken) return;
+    var t = cleanTransferRow(raw);
+    if (!t) return;
+    if (t.block_height > stats.block_height) return;
+    if (seenT[t.id]) return;
+    if (txs.length){
+      var prev = txs[txs.length - 1];
+      if (t.block_height > prev.block_height || Date.parse(t.timestamp) > Date.parse(prev.timestamp)){ orderBroken = true; return; }
+    }
+    seenT[t.id] = 1;
+    txs.push(t);
+  });
+  if (orderBroken) return null;
+  if (d.transfers.length && !txs.length) return null;
+  return { stats: stats, blocks: blocks, transfers: txs };
+}
+
+/* A block answer must be the block that was asked for: by height,
+ * the returned height restates the key; by hash, the returned hash
+ * restates it (case-insensitively — the query lowercases). */
+function blockMatchesKey(b, key){
+  if (!b || key === null || key === undefined) return false;
+  var k = String(key);
+  if (isHeight(k)) return b.height === Number(k);
+  if (isHex64(k)) return typeof b.hash === "string" && b.hash.toLowerCase() === k.toLowerCase();
+  return false;
 }
 
 var API = { esc: esc, fmtInt: fmtInt, fmtQTC: fmtQTC, ageFmt: ageFmt,
@@ -271,7 +461,10 @@ var API = { esc: esc, fmtInt: fmtInt, fmtQTC: fmtQTC, ageFmt: ageFmt,
   cleanStats: cleanStats, cleanBlockRow: cleanBlockRow,
   cleanTransferRow: cleanTransferRow, cleanExtrinsicRow: cleanExtrinsicRow,
   cleanEventRow: cleanEventRow, cleanBlock: cleanBlock,
-  cleanExtrinsic: cleanExtrinsic, cleanAccount: cleanAccount, cleanHome: cleanHome };
+  cleanExtrinsic: cleanExtrinsic, cleanAccount: cleanAccount, cleanHome: cleanHome,
+  validAddress: validAddress, rewardPlausible: rewardPlausible,
+  blockRewardEst: blockRewardEst, cleanAccountData: cleanAccountData,
+  blockMatchesKey: blockMatchesKey };
 if (typeof module !== "undefined" && module.exports) module.exports = API;
 
 /* ---------------- fetch layer ---------------- */
@@ -513,6 +706,7 @@ function vBlock(key){
     }
     var b = cleanBlock(rawB);
     if (!b) throw new Error("indexer returned malformed block data");
+    if (!blockMatchesKey(b, key)) throw new Error("indexer returned malformed block data");
     setBadge("live", "height " + fmtInt(b.height));
     var xt = b.extrinsics || [];
     var ev = b.events || [];
@@ -599,6 +793,7 @@ function vExtrinsic(id){
     }
     var x = cleanExtrinsic(rawX);
     if (!x) throw new Error("indexer returned malformed extrinsic data");
+    if (x.id !== id) throw new Error("indexer returned malformed extrinsic data");
     if (!Array.isArray(d.ev)) throw new Error("indexer returned malformed extrinsic data");
     var height = x.blockHeight;
     var evs = d.ev.map(cleanEventRow).filter(Boolean);
@@ -637,14 +832,11 @@ function vAccount(id){
   showLoading("loading account…");
   gql(qAccount(id)).then(function(d){
     if (!alive(my)) return;
-    if (!d || typeof d !== "object" || !Array.isArray(d.t)) throw new Error("indexer returned malformed account data");
-    var a = null;
-    if (d.a !== null && d.a !== undefined){
-      a = cleanAccount(d.a);
-      if (!a) throw new Error("indexer returned malformed account data");
-    }
-    var txs = d.t.map(cleanTransferRow).filter(Boolean);
-    var mined = (d.mined && d.mined.aggregate) ? validCount(d.mined.aggregate.count) : null;
+    var cleaned = cleanAccountData(d, id);
+    if (!cleaned) throw new Error("indexer returned malformed account data");
+    var a = cleaned.a;
+    var txs = cleaned.txs;
+    var mined = cleaned.mined;
     setBadge("live", "account lookup");
 
     var flags = [];

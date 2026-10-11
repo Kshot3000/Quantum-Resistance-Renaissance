@@ -170,5 +170,96 @@ t("cleanAccount / cleanExtrinsicRow boundaries", function(){
   assert.strictEqual(A.cleanExtrinsicRow({ ...x, success: "yes" }), null);
 });
 
+/* --- round 2: relations, not just shapes --- */
+var TS_OLD = "2026-09-29T19:00:20.000+00:00";
+t("round2 validators: fleet height / chain-time / strict address", function(){
+  assert.strictEqual(A.validHeight(9007199254740991), null); // 2^53-1 painted as fact pre-fix
+  assert.strictEqual(A.validHeight(10000001), null);
+  assert.strictEqual(A.validHeight("007"), null);
+  assert.strictEqual(A.validHeight("204204"), 204204);
+  assert.strictEqual(A.validTimestamp("2025-12-31T00:00:00.000+00:00"), null); // pre-genesis
+  assert.strictEqual(A.validTimestamp(new Date(Date.now() + 2 * 86400000).toISOString()), null); // future
+  assert.ok(A.validTimestamp(TS_OLD));
+  assert.strictEqual(A.validAddress(GOOD_MINER), GOOD_MINER);
+  assert.strictEqual(A.validAddress("qz0OIl" + "a".repeat(43)), null); // non-base58 chars passed the loose isQz
+  assert.strictEqual(A.validAddress("qzshort"), null);
+});
+t("round2 rewardPlausible: emission schedule bounds", function(){
+  assert.ok(A.rewardPlausible(135568, "310000000000"));
+  assert.ok(A.rewardPlausible(135568, "300000000000"));
+  assert.strictEqual(A.rewardPlausible(135568, "999000000000000"), false); // 999 QTC
+  assert.strictEqual(A.rewardPlausible(135568, "0"), false);
+  assert.strictEqual(A.rewardPlausible(135568, "200000000000"), false); // below schedule - 0.01
+});
+t("round2 cleanBlockRow: reward/timestamp/address relations", function(){
+  var good = { height: 135568, hash: "0x" + "ab".repeat(32), timestamp: TS_OLD, reward: "310000000000", mined_by_id: GOOD_MINER, extrinsics_aggregate: { aggregate: { count: 0 } } };
+  assert.ok(A.cleanBlockRow(good));
+  assert.strictEqual(A.cleanBlockRow({ ...good, reward: "999000000000000" }), null);
+  assert.strictEqual(A.cleanBlockRow({ ...good, timestamp: "2027-06-01T00:00:00.000+00:00" }), null);
+  assert.strictEqual(A.cleanBlockRow({ ...good, mined_by_id: "qz0OIl" + "a".repeat(43) }), null);
+});
+t("round2 cleanTransferRow: supply cap", function(){
+  var good = { id: "t-1", amount: "310000000000", from_id: GOOD_SENDER, to_id: GOOD_MINER, block_height: 135565, timestamp: TS_OLD };
+  assert.ok(A.cleanTransferRow(good));
+  assert.strictEqual(A.cleanTransferRow({ ...good, amount: "100000000000000000000" }), null); // 100M QTC
+  assert.strictEqual(A.cleanTransferRow({ ...good, fee: "100000000000000000000" }), null);
+});
+t("round2 cleanHome: head/order/limit relations", function(){
+  var stats = { block_height: 135568, total_accounts: 6595, total_immediate_transfers: 154203, total_scheduled_transfers: 12 };
+  var b1 = { height: 135568, hash: "0x" + "ab".repeat(32), timestamp: "2026-09-29T19:00:20.000+00:00", reward: "310000000000", mined_by_id: GOOD_MINER, extrinsics_aggregate: { aggregate: { count: 0 } } };
+  var b2 = { ...b1, height: 135567, hash: "0x" + "cd".repeat(32), timestamp: "2026-09-29T19:00:08.000+00:00" };
+  var b3 = { ...b1, height: 135569, hash: "0x" + "ef".repeat(32), timestamp: "2026-09-29T19:00:32.000+00:00" };
+  assert.ok(A.cleanHome({ stats, blocks: [b1, b2], transfers: [] }));
+  assert.strictEqual(A.cleanHome({ stats, blocks: [b2], transfers: [] }), null); // head != stats
+  assert.strictEqual(A.cleanHome({ stats, blocks: [b1, { ...b2, height: 135566, timestamp: "2026-09-29T19:00:08.000+00:00" }, { ...b2, height: 135567, hash: "0x" + "34".repeat(32), timestamp: "2026-09-29T19:00:12.000+00:00" }], transfers: [] }), null); // height ascends mid-list
+  assert.strictEqual(A.cleanHome({ stats, blocks: [b1, { ...b2, height: 135566, timestamp: "2026-09-29T19:00:25.000+00:00" }], transfers: [] }), null); // time ascends while height descends
+  var dup = A.cleanHome({ stats, blocks: [b1, b1], transfers: [] });
+  assert.ok(dup && dup.blocks.length === 1); // same block twice is one block
+  var many = Array.from({ length: 11 }, (_, i) => ({ ...b1, height: 135568 - i, hash: "0x" + String(i).padStart(2, "0").repeat(32), timestamp: "2026-09-29T19:00:" + String(59 - i).padStart(2, "0") + ".000+00:00" }));
+  assert.strictEqual(A.cleanHome({ stats, blocks: many, transfers: [] }), null); // over the query limit:10
+  assert.strictEqual(A.cleanHome({ stats, blocks: [{ ...b1, reward: "999000000000000" }], transfers: [] }), null); // raw non-empty cleans to empty
+  assert.ok(b3.height === 135569); // (fixture sanity)
+});
+t("round2 cleanAccount: balance sum cap + last_updated", function(){
+  assert.strictEqual(A.cleanAccount({ free: "20000000000000000000", frozen: "0", reserved: "2000000000000000000" }), null); // 22M total
+  var a = A.cleanAccount({ free: "1000", frozen: "0", reserved: "0", last_updated: 135568 });
+  assert.ok(a && a.last_updated === 135568);
+  assert.strictEqual(A.cleanAccount({ free: "1000", frozen: "0", reserved: "0", last_updated: "oops" }), null);
+});
+t("round2 cleanAccountData: involvement / order / limit relations", function(){
+  var acctRaw = { free: "1000", frozen: "0", reserved: "0", last_updated: 135568 };
+  var mine = { id: "t-1", amount: "1000", from_id: GOOD_SENDER, to_id: GOOD_MINER, block_height: 135565, timestamp: TS_OLD };
+  var stranger = { ...mine, id: "t-2", from_id: GOOD_SENDER, to_id: "qzkJAZCwGaihdq9vAGvFeCfcKfvYNR1rG8VkXVRv2FjCo8CwQ" };
+  var okData = A.cleanAccountData({ a: acctRaw, t: [mine], mined: { aggregate: { count: 2 } } }, GOOD_MINER);
+  assert.ok(okData && okData.txs.length === 1 && okData.mined === 2);
+  assert.strictEqual(A.cleanAccountData({ a: acctRaw, t: [stranger], mined: { aggregate: { count: 0 } } }, GOOD_MINER), null); // strangers only -> malformed, not empty history
+  var mixed = A.cleanAccountData({ a: acctRaw, t: [mine, stranger], mined: { aggregate: { count: 0 } } }, GOOD_MINER);
+  assert.ok(mixed && mixed.txs.length === 1); // stranger row drops alone
+  assert.strictEqual(A.cleanAccountData({ a: acctRaw, t: [{ ...mine, block_height: 135570 }], mined: { aggregate: { count: 0 } } }, GOOD_MINER), null); // above last_updated, cleans to empty
+  var many = Array.from({ length: 26 }, (_, i) => ({ ...mine, id: "t-" + i, block_height: 135565 - i }));
+  assert.strictEqual(A.cleanAccountData({ a: acctRaw, t: many, mined: { aggregate: { count: 0 } } }, GOOD_MINER), null); // over limit:25
+});
+t("round2 cleanBlock: extrinsic index + event relations", function(){
+  var raw = { height: 135568, hash: "0x" + "ab".repeat(32), timestamp: TS_OLD, reward: "310000000000", mined_by_id: GOOD_MINER,
+    extrinsics: [
+      { id: "0x" + "11".repeat(32), index_in_block: 1, pallet: "Balances", call: "transfer_allow_death", signer_id: GOOD_SENDER, success: true, fee: "1000", args: "{}" },
+      { id: "0x" + "22".repeat(32), index_in_block: 1, pallet: "Balances", call: "transfer_allow_death", signer_id: GOOD_SENDER, success: true, fee: "1000", args: "{}" },
+      { id: "0x" + "33".repeat(32), index_in_block: 2, pallet: "System", call: "remark", signer_id: null, success: true, fee: "0", args: "{}" } ],
+    events: [
+      { id: "ev-1", type: "TRANSFER", extrinsic_id: "0x" + "11".repeat(32) },
+      { id: "ev-2", type: "TRANSFER", extrinsic_id: "0x" + "99".repeat(32) },
+      { id: "ev-3", type: "EXTRINSIC_SUCCESS", extrinsic_id: null } ] };
+  var b = A.cleanBlock(raw);
+  assert.ok(b && b.extrinsics.length === 2); // duplicate index drops
+  assert.ok(b && b.events.length === 2); // foreign event drops, block-level keeps
+});
+t("round2 blockMatchesKey", function(){
+  var b = { height: 135568, hash: "0x" + "AB".repeat(32) };
+  assert.ok(A.blockMatchesKey(b, "135568"));
+  assert.strictEqual(A.blockMatchesKey(b, "135569"), false);
+  assert.ok(A.blockMatchesKey(b, "0x" + "ab".repeat(32)));
+  assert.strictEqual(A.blockMatchesKey(b, "0x" + "cd".repeat(32)), false);
+});
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
