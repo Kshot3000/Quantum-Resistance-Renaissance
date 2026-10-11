@@ -9,6 +9,10 @@
 
 var PLANCK_PER_QTC = 1000000000000n; // 1e12
 var MAX_SEEN_IDS = 400;              // cap per stored id-set
+var MAX_SUPPLY_PLANCKS = 21000000n * PLANCK_PER_QTC; // 21M QTC hard cap
+var MAX_CHAIN_HEIGHT = 10000000;     // fleet bound on a plausible height
+var GENESIS_FLOOR_MS = Date.UTC(2026, 8, 1); // 2026-09-01; genesis was 2026-09-09
+var SS58_189_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // strict shape: qz + 47 base58
 
 /* ---------- planck <-> QTC ---------- */
 
@@ -86,14 +90,21 @@ function addressActivity(byAddr, address) {
 
 function buildBalanceMap(whalesTop) {
   // whales.json "top" rows -> Map address -> free plancks (BigInt).
-  // A row anchors balance rules, so it must be a string address with a
-  // non-negative integer planck count — a negative "balance" (BigInt
-  // accepts "-5") would fire balance_below on fiction.
+  // A row anchors balance rules, so it must carry a strict SS58-189
+  // address with a non-negative integer planck count — a negative
+  // "balance" (BigInt accepts "-5") would fire balance_below on
+  // fiction, and a free balance above the 21M supply cap is not a
+  // balance at all. A duplicated address counts once: the first valid
+  // row wins, so a poisoned second copy cannot overwrite a good one
+  // (and a poisoned first copy cannot suppress a good second one,
+  // because only validated rows are set).
   var m = new Map();
   (whalesTop || []).forEach(function (row) {
-    if (!row || typeof row.address !== "string" || !row.address) return;
+    if (!row || typeof row.address !== "string" || !SS58_189_RE.test(row.address)) return;
+    if (m.has(row.address)) return;
     var v = validPlancks(row.free_plancks);
-    if (v !== null) m.set(row.address, v);
+    if (v === null || v > MAX_SUPPLY_PLANCKS) return;
+    m.set(row.address, v);
   });
   return m;
 }
@@ -138,48 +149,134 @@ function parseableTs(v) {
   return typeof v === "string" && isFinite(Date.parse(v)) ? v : null;
 }
 
+function validChainHeight(v) {
+  // A height the chain could actually be at: parseHeight plus the
+  // fleet 10,000,000 ceiling — 99,999,999,999 parses fine and painted
+  // as chain fact in round 1.
+  var h = parseHeight(v);
+  return h !== null && h <= MAX_CHAIN_HEIGHT ? h : null;
+}
+
+function chainTimeMs(v) {
+  // Milliseconds of a timestamp that could be a chain time: parseable
+  // AND inside the chain's lifetime (genesis floor 2026-09-01, now+1h
+  // ceiling with 1h clock skew tolerated). A parseable 2020 stamp is
+  // not a chain time, and a 2999 stamp is not either — round 1's
+  // parseable-only check let the first fire instant false chain_stall
+  // alerts and the second disable stall detection forever.
+  if (typeof v !== "string") return null;
+  var ms = Date.parse(v);
+  if (!isFinite(ms)) return null;
+  return ms >= GENESIS_FLOOR_MS && ms <= Date.now() + 3600000 ? ms : null;
+}
+
 var HASH32_RE = /^0x[0-9a-fA-F]{64}$/;
 
 function sanitizeBlocks(rows) {
-  // Only blocks whose height AND timestamp both validate may anchor the
-  // head / stall math; hash and reward are kept only when well-formed.
+  // Only blocks whose height AND timestamp both validate may anchor
+  // the head / stall math; hash and reward are kept only when
+  // well-formed. Round 2 validates the RELATIONS between blocks, all
+  // verified on live data (live.json runs strictly newest-first,
+  // timestamps monotonic in height, inside the chain's lifetime):
+  // heights are bounded (validChainHeight), timestamps must be real
+  // chain times (chainTimeMs — a 2020 head stamp fired instant false
+  // chain_stall alerts, a 2999 stamp disabled stall detection
+  // forever), a duplicated height counts once, the result is sorted
+  // newest-first so blocks[0] IS the head even when the payload
+  // arrives shuffled (round 1 trusted input order, so an ascending
+  // list made the OLDEST block the head), and a block whose timestamp
+  // contradicts the height order (later than a higher block's) drops.
+  // Dedupe happens after validation, so a poisoned first copy of a
+  // height cannot suppress a good second one. An over-cap reward is
+  // an annotation, not core: it coerces to null, the block survives.
   if (!Array.isArray(rows)) return [];
-  var out = [];
+  var byHeight = new Map();
   rows.forEach(function (b) {
     if (!b || typeof b !== "object") return;
-    var h = parseHeight(b.height);
-    var ts = parseableTs(b.timestamp);
-    if (h === null || ts === null) return;
+    var h = validChainHeight(b.height);
+    if (h === null) return;
+    var ms = chainTimeMs(b.timestamp);
+    if (ms === null) return;
+    if (byHeight.has(h)) return;
     var reward = validPlancks(b.reward);
-    out.push({
-      height: h, timestamp: ts,
+    byHeight.set(h, {
+      height: h, timestamp: b.timestamp, ms: ms,
       hash: typeof b.hash === "string" && HASH32_RE.test(b.hash) ? b.hash : null,
-      reward: reward !== null ? reward.toString() : null,
+      reward: reward !== null && reward <= MAX_SUPPLY_PLANCKS ? reward.toString() : null,
     });
+  });
+  var sorted = Array.from(byHeight.values()).sort(function (a, b) { return b.height - a.height; });
+  var out = [], lastMs = Infinity;
+  sorted.forEach(function (b) {
+    if (b.ms > lastMs) return; // timestamp contradicts the height order
+    lastMs = b.ms;
+    out.push({ height: b.height, timestamp: b.timestamp, hash: b.hash, reward: b.reward });
   });
   return out;
 }
 
-function sanitizeTransfers(rows) {
+function resolveHead(blocks, status) {
+  // The head is the one fact the stall math and the head readout both
+  // anchor on, and the payload carries it TWICE: status.block_height
+  // and blocks[0]. Round 1 never looked at the status, so the two
+  // reads could disagree and the block list's version painted as
+  // chain fact. When a status is present it must restate the head
+  // exactly (a bounded height equal to blocks[0]); any disagreement —
+  // or an unparseable / out-of-bound status — trusts NEITHER read and
+  // the head is unknown (null), never a guess. An absent status
+  // leaves the validated blocks to decide alone.
+  if (!Array.isArray(blocks) || !blocks.length) return null;
+  var head = blocks[0];
+  if (status && typeof status === "object") {
+    var sh = validChainHeight(status.block_height);
+    if (sh === null || sh !== head.height) return null;
+  }
+  return head;
+}
+
+function sanitizeTransfers(rows, maxHeight) {
   // A transfer row anchors rule evaluation and the pulse table: id,
-  // from/to, a non-negative integer amount, and an integer block height
-  // are core — a row missing any of them is dropped, never repaired into
-  // a plausible-looking transfer. A garbage timestamp is recoverable
-  // (sorting and ages use block height), so it coerces to null.
+  // from/to, a non-negative integer amount, and an integer block
+  // height are core — a row missing any of them is dropped, never
+  // repaired into a plausible-looking transfer. A garbage timestamp
+  // is recoverable (sorting and ages use block height), so it coerces
+  // to null. Round 2 validates the RELATIONS, all verified on live
+  // data (5,300/5,300 flows rows pass with zero drops): the amount is
+  // positive and within the 21M supply cap (a 0-planck row and a 100M
+  // QTC row both painted in round 1), the height is a real chain
+  // height and — when the caller knows the snapshot's own head
+  // (maxHeight, from flows meta chain_height) — not above it, both
+  // endpoints match the strict SS58-189 shape (a non-address endpoint
+  // anchored the rollup in round 1), a PRESENT timestamp must be a
+  // real chain time (2020 pre-genesis / 2999 drops the row; only the
+  // unparseable still coerces to null), and ids dedupe AFTER
+  // validation so a duplicated id counts once and a poisoned first
+  // copy cannot suppress a good second one.
   if (!Array.isArray(rows)) return [];
-  var out = [];
+  var capH = validChainHeight(maxHeight);
+  var out = [], seen = {};
   rows.forEach(function (t) {
     if (!t || typeof t !== "object") return;
     if (typeof t.id !== "string" || !t.id) return;
-    if (typeof t.from_id !== "string" || !t.from_id) return;
-    if (typeof t.to_id !== "string" || !t.to_id) return;
+    if (typeof t.from_id !== "string" || !SS58_189_RE.test(t.from_id)) return;
+    if (typeof t.to_id !== "string" || !SS58_189_RE.test(t.to_id)) return;
     var amt = validPlancks(t.amount);
-    if (amt === null) return;
-    var h = parseHeight(t.block_height);
+    if (amt === null || amt <= 0n || amt > MAX_SUPPLY_PLANCKS) return;
+    var h = validChainHeight(t.block_height);
     if (h === null) return;
+    if (capH !== null && h > capH) return;
+    var ts = null;
+    if (t.timestamp != null) {
+      if (parseableTs(t.timestamp) !== null) {
+        if (chainTimeMs(t.timestamp) === null) return; // present but impossible
+        ts = t.timestamp;
+      }
+    }
+    if (seen[t.id]) return;
+    seen[t.id] = true;
     out.push({
       id: t.id, amount: amt.toString(), from_id: t.from_id, to_id: t.to_id,
-      block_height: h, timestamp: parseableTs(t.timestamp),
+      block_height: h, timestamp: ts,
       extrinsic_id: typeof t.extrinsic_id === "string" ? t.extrinsic_id : null,
     });
   });
@@ -611,7 +708,11 @@ var api = {
   nonNegInt: nonNegInt,
   validPlancks: validPlancks,
   parseableTs: parseableTs,
+  validChainHeight: validChainHeight,
+  chainTimeMs: chainTimeMs,
+  MAX_SUPPLY_PLANCKS: MAX_SUPPLY_PLANCKS,
   sanitizeBlocks: sanitizeBlocks,
+  resolveHead: resolveHead,
   sanitizeTransfers: sanitizeTransfers,
   sanitizeGovernance: sanitizeGovernance,
   sanitizeBaselines: sanitizeBaselines,

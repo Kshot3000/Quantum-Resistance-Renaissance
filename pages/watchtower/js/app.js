@@ -245,10 +245,9 @@ function buildScanContext(bundle) {
   // fabricated 0, which used to reset the chain baselines and fire
   // false "new referendum" alerts on the next good scan.
   var blocks = QWATCH.sanitizeBlocks(src && src.data && src.data.blocks);
-  var head = blocks[0] || null;
-  var transfers = QWATCH.sanitizeTransfers(bundle.flows && bundle.flows.transfers);
-  var gov = QWATCH.sanitizeGovernance(bundle.gov && bundle.gov.data);
-  var balances = QWATCH.buildBalanceMap((bundle.whales && bundle.whales.top) || []);
+  // The payload carries the head twice (status.block_height and
+  // blocks[0]); resolveHead trusts it only when both reads agree.
+  var head = QWATCH.resolveHead(blocks, src && src.data && src.data.status);
   var fm = bundle.flows && bundle.flows.meta;
   var flowsMeta = null;
   if (fm && typeof fm === "object" && !Array.isArray(fm)) {
@@ -256,11 +255,17 @@ function buildScanContext(bundle) {
     if (wb !== null) {
       flowsMeta = {
         window_blocks: wb,
+        chain_height: QWATCH.validChainHeight(fm.chain_height),
         dust_threshold_qtc: (typeof fm.dust_threshold_qtc === "string" || typeof fm.dust_threshold_qtc === "number")
           ? String(fm.dust_threshold_qtc) : "?",
       };
     }
   }
+  // Transfers are bounded by the snapshot they claim to belong to:
+  // no row may sit above the flows meta's own chain_height.
+  var transfers = QWATCH.sanitizeTransfers(bundle.flows && bundle.flows.transfers, flowsMeta ? flowsMeta.chain_height : null);
+  var gov = QWATCH.sanitizeGovernance(bundle.gov && bundle.gov.data);
+  var balances = QWATCH.buildBalanceMap((bundle.whales && bundle.whales.top) || []);
   var fetchedAt = src ? QWATCH.parseableTs(src.fetched_at) : null;
   return {
     bundle: bundle,

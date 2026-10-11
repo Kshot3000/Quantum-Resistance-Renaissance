@@ -52,10 +52,13 @@ test("indexTransfers groups by address, newest first", () => {
   assert.equal(W.addressActivity(idx, "NOBODY").count, 0);
 });
 
+const ADDR_A = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7";
+const ADDR_B = "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk";
+
 test("buildBalanceMap reads free plancks", () => {
-  const m = W.buildBalanceMap([{ address: "A", free_plancks: "5000000000000" }]);
-  assert.equal(m.get("A"), 5000000000000n);
-  assert.equal(m.has("B"), false);
+  const m = W.buildBalanceMap([{ address: ADDR_A, free_plancks: "5000000000000" }]);
+  assert.equal(m.get(ADDR_A), 5000000000000n);
+  assert.equal(m.has(ADDR_B), false);
 });
 
 const ADDR = "qzTESTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
@@ -224,13 +227,13 @@ test("runSelfTest produces synthetic alerts for each enabled rule", () => {
 
 test("sanitizeBlocks keeps only height+timestamp-valid blocks", () => {
   const out = W.sanitizeBlocks([
-    { height: 100, timestamp: "2026-01-01T00:00:00Z", hash: "0x" + "ab".repeat(32), reward: "300000000000" },
-    { height: "garbage", timestamp: "2026-01-01T00:00:00Z" },
-    { height: 12.5, timestamp: "2026-01-01T00:00:00Z" },
-    { height: -4, timestamp: "2026-01-01T00:00:00Z" },
+    { height: 100, timestamp: "2026-10-01T00:00:00Z", hash: "0x" + "ab".repeat(32), reward: "300000000000" },
+    { height: "garbage", timestamp: "2026-10-01T00:00:00Z" },
+    { height: 12.5, timestamp: "2026-10-01T00:00:00Z" },
+    { height: -4, timestamp: "2026-10-01T00:00:00Z" },
     { height: 99, timestamp: "not-a-date" },
     null,
-    { height: "98", timestamp: "2026-01-01T00:00:00Z", hash: "0xzz", reward: "-5" },
+    { height: "98", timestamp: "2026-10-01T00:00:00Z", hash: "0xzz", reward: "-5" },
   ]);
   assert.equal(out.length, 2);
   assert.equal(out[0].height, 100);
@@ -244,13 +247,13 @@ test("sanitizeBlocks keeps only height+timestamp-valid blocks", () => {
 
 test("sanitizeTransfers drops poisoned rows, keeps valid ones verbatim", () => {
   const out = W.sanitizeTransfers([
-    { id: "T1", amount: "2000", from_id: "A", to_id: "B", block_height: 10, timestamp: "2026-01-01T00:00:00Z" },
-    { id: "T2", amount: "12.5", from_id: "A", to_id: "B", block_height: 10 },
-    { id: "T3", amount: "-5", from_id: "A", to_id: "B", block_height: 10 },
-    { amount: "100", from_id: "A", to_id: "B", block_height: 10 },
+    { id: "T1", amount: "2000", from_id: ADDR_A, to_id: ADDR_B, block_height: 10, timestamp: "2026-10-01T00:00:00Z" },
+    { id: "T2", amount: "12.5", from_id: ADDR_A, to_id: ADDR_B, block_height: 10 },
+    { id: "T3", amount: "-5", from_id: ADDR_A, to_id: ADDR_B, block_height: 10 },
+    { amount: "100", from_id: ADDR_A, to_id: ADDR_B, block_height: 10 },
     null,
-    { id: "T4", amount: "100", from_id: "A", to_id: "B", block_height: "x" },
-    { id: "T5", amount: 4000, from_id: "A", to_id: "B", block_height: 9, timestamp: "garbage" },
+    { id: "T4", amount: "100", from_id: ADDR_A, to_id: ADDR_B, block_height: "x" },
+    { id: "T5", amount: 4000, from_id: ADDR_A, to_id: ADDR_B, block_height: 9, timestamp: "garbage" },
   ]);
   assert.equal(out.length, 2);
   assert.equal(out[0].id, "T1");
@@ -301,15 +304,80 @@ test("sanitizeAlerts drops brick-rows, coerces annotation fields", () => {
 
 test("buildBalanceMap rejects negative and non-string-address rows", () => {
   const m = W.buildBalanceMap([
-    { address: "A", free_plancks: "500" },
-    { address: "B", free_plancks: "-5" },
+    { address: ADDR_A, free_plancks: "500" },
+    { address: ADDR_B, free_plancks: "-5" },
     { address: 42, free_plancks: "500" },
-    { address: "C", free_plancks: "12.5" },
+    { address: ADDR_B, free_plancks: "12.5" },
   ]);
-  assert.equal(m.get("A"), 500n);
-  assert.equal(m.has("B"), false);
-  assert.equal(m.has("C"), false);
+  assert.equal(m.get(ADDR_A), 500n);
+  assert.equal(m.has(ADDR_B), false);
   assert.equal(m.size, 1);
+});
+
+test("sanitizeBlocks round 2: relations, not just shapes", () => {
+  const blk = (patch) => Object.assign({
+    height: 207816, timestamp: "2026-10-11T20:19:37.660Z",
+    hash: "0x" + "ab".repeat(32), reward: "310000000000",
+  }, patch);
+  // a parseable timestamp outside the chain's lifetime is not a chain time
+  assert.equal(W.sanitizeBlocks([blk({ timestamp: "2020-01-01T00:00:00Z" })]).length, 0);
+  assert.equal(W.sanitizeBlocks([blk({ timestamp: "2999-01-01T00:00:00Z" })]).length, 0);
+  assert.equal(W.sanitizeBlocks([blk({ height: 99999999999 })]).length, 0);
+  // shuffled input still puts the highest block first; duplicates count once
+  const shuffled = W.sanitizeBlocks([
+    blk({ height: 207814, timestamp: "2026-10-11T20:18:30.781Z" }),
+    blk({}),
+    blk({ height: 207815, timestamp: "2026-10-11T20:19:17.821Z" }),
+    blk({}),
+  ]);
+  assert.deepEqual(shuffled.map((b) => b.height), [207816, 207815, 207814]);
+  // a lower block stamped later than a higher block contradicts the order
+  const nonmono = W.sanitizeBlocks([blk({}), blk({ height: 207815, timestamp: "2026-10-11T20:25:00.000Z" })]);
+  assert.deepEqual(nonmono.map((b) => b.height), [207816]);
+  // over-cap reward is an annotation: coerced to null, block survives
+  assert.equal(W.sanitizeBlocks([blk({ reward: "999999000000000000000000" })])[0].reward, null);
+});
+
+test("resolveHead: status must restate blocks[0]", () => {
+  const blocks = W.sanitizeBlocks([
+    { height: 100, timestamp: "2026-10-01T00:00:00Z" },
+    { height: 99, timestamp: "2026-10-01T00:00:00Z" },
+  ]);
+  assert.equal(W.resolveHead(blocks, { block_height: 100 }).height, 100);
+  assert.equal(W.resolveHead(blocks, { block_height: 101 }), null); // disagreement trusts neither
+  assert.equal(W.resolveHead(blocks, { block_height: "garbage" }), null);
+  assert.equal(W.resolveHead(blocks, null).height, 100); // absent status: blocks decide
+  assert.equal(W.resolveHead([], { block_height: 100 }), null);
+});
+
+test("sanitizeTransfers round 2: relations, not just shapes", () => {
+  const row = (patch) => Object.assign({
+    id: "t1", amount: "1000000000000", from_id: ADDR_A, to_id: ADDR_B,
+    block_height: 200000, timestamp: "2026-10-11T00:00:00.000Z",
+  }, patch);
+  assert.equal(W.sanitizeTransfers([row({})]).length, 1); // control
+  assert.equal(W.sanitizeTransfers([row({ amount: "0" })]).length, 0); // zero paints nothing
+  assert.equal(W.sanitizeTransfers([row({ amount: "22000000000000000000000" })]).length, 0); // over the 21M cap
+  assert.equal(W.sanitizeTransfers([row({ block_height: 99999999999 })]).length, 0);
+  assert.equal(W.sanitizeTransfers([row({ from_id: "not-an-address" })]).length, 0);
+  assert.equal(W.sanitizeTransfers([row({ timestamp: "2020-01-01T00:00:00.000Z" })]).length, 0); // present but impossible
+  assert.equal(W.sanitizeTransfers([row({ timestamp: "2999-01-01T00:00:00.000Z" })]).length, 0);
+  assert.equal(W.sanitizeTransfers([row({}), row({})]).length, 1); // duplicated id counts once
+  // dedupe after validation: a poisoned first copy cannot suppress a good one
+  assert.equal(W.sanitizeTransfers([row({ amount: "22000000000000000000000" }), row({})]).length, 1);
+  // the snapshot's own head bounds its rows
+  assert.equal(W.sanitizeTransfers([row({ block_height: 207819 })], 207818).length, 0);
+  assert.equal(W.sanitizeTransfers([row({ block_height: 207818 })], 207818).length, 1);
+});
+
+test("buildBalanceMap round 2: cap, shape, duplicates", () => {
+  assert.equal(W.buildBalanceMap([{ address: ADDR_A, free_plancks: "22000000000000000000000" }]).size, 0); // over cap
+  assert.equal(W.buildBalanceMap([{ address: "not-an-address", free_plancks: "500" }]).size, 0);
+  const dup = W.buildBalanceMap([
+    { address: ADDR_A, free_plancks: "500" },
+    { address: ADDR_A, free_plancks: "999" },
+  ]);
+  assert.equal(dup.get(ADDR_A), 500n); // first valid row wins
 });
 
 test("unknown governance counts neither fire nor reset the baseline", () => {
