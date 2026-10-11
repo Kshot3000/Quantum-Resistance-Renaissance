@@ -9,7 +9,10 @@
  * the same gate Contact Vault applies) BEFORE any phrase is derived, so a
  * corrupted or foreign address never gets an authoritative-looking
  * checkphrase; the simulator parses amount and delay strictly (planck-exact
- * amount shape, whole-block delays) instead of parseFloat/parseInt coercion.
+ * amount shape, whole-block delays) instead of parseFloat/parseInt coercion;
+ * and the "Your chosen delay" rail restates itself for EVERY custom-delay
+ * state — invalid ones included — so it never describes a delay Schedule
+ * would reject as the chosen one.
  */
 (function () {
 "use strict";
@@ -17,6 +20,7 @@
 var BLOCK_MS = 12000;
 var MIN_DELAY_BLOCKS = 2;
 var DEFAULT_DELAY_BLOCKS = 7200;
+var MAX_DELAY_BLOCKS = 1000000; // the lab's demo cap — Schedule rejects above it
 var MAX_SUPPLY_QTC = 21000000; // the chain's hard cap — no transfer can exceed it
 
 function $(id) { return document.getElementById(id); }
@@ -272,6 +276,17 @@ function railDelayText(b) {
   return fmtNum(b) + " blocks ≈ " + fmtBlocks(b) +
     " on mainnet (12 s blocks). Below the 2-block runtime minimum is rejected by the chain.";
 }
+/* The rail is a rendered output bound to the CURRENT effective delay, so it
+ * must be a pure function of that state — including its invalid states. The
+ * old custom-delay handler updated it only for a positive whole number, so
+ * an invalid custom delay (fractional, zero, an unsafe integer) left the
+ * PREVIOUS delay's text standing under "Your chosen delay", and a
+ * valid-but-unschedulable delay (below the 2-block minimum, or above the
+ * lab's demo cap) was presented as chosen even though Schedule rejects
+ * both. Every branch of the handler now restates the rail. */
+function railDelayInvalidText(reason) {
+  return "Invalid custom delay — " + reason + " No transfer can be scheduled with it.";
+}
 function activatePreset(blocks) {
   document.querySelectorAll(".preset").forEach(function (x) {
     x.classList.toggle("active", +x.dataset.blocks === blocks);
@@ -298,7 +313,19 @@ $("customBlocks").addEventListener("input", function () {
   }
   document.querySelectorAll(".preset").forEach(function (x) { x.classList.remove("active"); });
   var b = parseDelayStrict($("customBlocks").value);
-  if (b !== null && b > 0) $("railDelay").textContent = railDelayText(b);
+  if (b === null) {
+    $("railDelay").textContent = railDelayInvalidText("it is not a whole number of blocks. Enter whole blocks only, or clear the field to use a preset.");
+    return;
+  }
+  if (b < MIN_DELAY_BLOCKS) {
+    $("railDelay").textContent = railDelayInvalidText("it is below the 2-block runtime minimum, so the chain would reject the transfer. Choose at least 2 blocks.");
+    return;
+  }
+  if (b > MAX_DELAY_BLOCKS) {
+    $("railDelay").textContent = railDelayInvalidText("it is above the lab's 1,000,000-block demo cap. Choose 1,000,000 blocks or fewer.");
+    return;
+  }
+  $("railDelay").textContent = railDelayText(b);
 });
 
 function simLog(msg, cls) {
@@ -396,7 +423,7 @@ $("scheduleBtn").addEventListener("click", function () {
   if (!Number.isInteger(blocks) || blocks < MIN_DELAY_BLOCKS) {
     err.textContent = "Delay must be a whole number of blocks ≥ 2 (the runtime minimum)."; err.hidden = false; return;
   }
-  if (blocks > 1000000) { err.textContent = "Keep the demo under 1,000,000 blocks."; err.hidden = false; return; }
+  if (blocks > MAX_DELAY_BLOCKS) { err.textContent = "Keep the demo under 1,000,000 blocks."; err.hidden = false; return; }
 
   $("simEmpty").hidden = true; $("simActive").hidden = false; $("liveDot").hidden = false;
   $("simLog").innerHTML = "";

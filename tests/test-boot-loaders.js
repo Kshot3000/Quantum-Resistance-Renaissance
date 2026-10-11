@@ -450,7 +450,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("the running simulation was for the previous recipient, amount and delay"), "safesend: the void explains itself");
   const html = read("pages/safesend/index.html");
   ok(html.includes("js/ss58.js?v=1.0.0"), "safesend: ss58.js loaded with its cache key");
-  ok(html.includes("js/app.js?v=1.4.0"), "safesend: app.js cache key bumped for the boundary fix (1.3.0, superseded by the 1.4.0 sim-staleness bump)");
+  ok(html.includes("js/app.js?v=1.5.0"), "safesend: app.js cache key bumped for the boundary fix (1.3.0, superseded by the 1.4.0 sim-staleness bump and the 1.5.0 rail-staleness bump)");
 }
 
 // Batch 14 (2026-10-09 17:19): airgap-desk (Tier 1) hot side trusted
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.19"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.20"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.19"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.20"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.18"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.19"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.17"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.18"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1506,6 +1506,32 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const html = read("pages/ledger-desk/index.html");
   ok(html.includes("ledger-core.js?v=1.2.0"), "ledger2: ledger-core.js cache key bumped for the round-2 fix");
   ok(html.includes("app.js?v=1.6.0"), "ledger2: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 46 (2026-10-11 08:19): SafeSend rail-staleness (Tier 1) — the
+// "Your chosen delay" rail is a rendered output bound to the CURRENT
+// effective delay, but the custom-delay handler restated it only for a
+// positive whole number (`if (b !== null && b > 0)`), so an invalid
+// custom delay (fractional 2.5, zero, an unsafe integer) left the
+// PREVIOUS delay's text standing as the chosen one while Schedule
+// rejected the input, and a valid-but-unschedulable delay (1 block,
+// below the runtime minimum; 1,000,001, above the lab's demo cap) was
+// presented as chosen with no invalid marker. Pin: every handler branch
+// restates the rail (valid text or an explicit invalid text naming the
+// reason), the demo cap is one shared constant used by both the rail
+// and Schedule, and the stale positive-only guard is gone.
+{
+  const app = read("pages/safesend/js/app.js");
+  ok(app.includes("var MAX_DELAY_BLOCKS = 1000000;"), "safesend-rail: demo cap pinned as a shared constant");
+  ok(app.includes("function railDelayInvalidText(reason)"), "safesend-rail: invalid rail text defined");
+  ok(app.includes("Invalid custom delay"), "safesend-rail: invalid states are marked invalid in the rail");
+  ok(app.includes("it is not a whole number of blocks"), "safesend-rail: non-whole custom delay restates the rail");
+  ok(app.includes("it is below the 2-block runtime minimum"), "safesend-rail: below-minimum custom delay restates the rail");
+  ok(app.includes("it is above the lab's 1,000,000-block demo cap"), "safesend-rail: over-cap custom delay restates the rail");
+  ok(app.includes("blocks > MAX_DELAY_BLOCKS"), "safesend-rail: Schedule enforces the same demo cap the rail names");
+  ok(!app.includes("if (b !== null && b > 0)"), "safesend-rail: the stale positive-only rail guard is gone");
+  const html = read("pages/safesend/index.html");
+  ok(html.includes("js/app.js?v=1.5.0"), "safesend-rail: app.js cache key bumped for the rail-staleness fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
