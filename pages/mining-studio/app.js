@@ -72,37 +72,84 @@ function intField(v) {
   if (typeof v === "number") return Number.isInteger(v) ? v : null;
   return null;
 }
+function validPlancks(v) {
+  if (typeof v === "string") return /^\d+$/.test(v.trim()) ? v.trim() : null;
+  if (typeof v === "number" && Number.isInteger(v) && v >= 0) return String(v);
+  return null;
+}
 function validHeight(v) {
   var h = intField(v);
-  return (h != null && h > 0) ? h : null;
+  return (h != null && h >= 1 && h <= 10000000) ? h : null;
 }
+/* A capture time must be a real one: inside the chain's lifetime (genesis
+ * floor 2026-09-01, the fleet bound) and not in the future — a fetched_at
+ * of 2999 was previously cited verbatim as the snapshot's provenance. */
 function validFetchedAt(v) {
   if (typeof v !== "string" || !v) return null;
-  return isFinite(Date.parse(v)) ? v : null;
+  var t = Date.parse(v);
+  if (!isFinite(t)) return null;
+  if (t < Date.parse("2026-09-01T00:00:00Z")) return null;
+  if (t > Date.now() + 3600000) return null;
+  return v;
 }
+/* Total supply in plancks from a supply snapshot: the first-class
+ * total_supply_plancks field when present, else the balances aggregate
+ * (free + reserved + frozen) = Currency::total_issuance(). The fetch
+ * script DEFINES the total as that aggregate, so when both are present
+ * they must agree exactly: a total that contradicts its own itemization
+ * is tamper/truncation evidence and neither side is trusted (null).
+ * (Same totalSupplyOf as mining-calculator / pool-desk.) */
+function totalSupplyOf(sup) {
+  if (!sup) return null;
+  var total = validPlancks(sup.total_supply_plancks);
+  var b = sup.balances_plancks, sum = null;
+  if (b) {
+    var f = validPlancks(b.free), r = validPlancks(b.reserved), z = validPlancks(b.frozen);
+    if (f != null && r != null && z != null) sum = BigInt(f) + BigInt(r) + BigInt(z);
+  }
+  if (total != null && sum != null && BigInt(total) !== sum) return null;
+  if (total != null) return total;
+  return sum != null ? sum.toString() : null;
+}
+Studio.totalSupplyOf = totalSupplyOf;
+/* Round 2 (relations, not just shapes — the mining-calculator standard,
+ * verified on live data at head 206,532 before enforcing): the hashrate
+ * must restate its own difficulty (est_hashrate_hs == difficulty / 12,
+ * the fetch script's exact construction), current.height and head are
+ * two reads of the same tip and must agree, the observed pace needs the
+ * >= 100-block sample the fetch construction guarantees, and the supply
+ * payload must belong to the same capture as the consensus payload
+ * (heights within 100 blocks; the sync script asserts a 0–10 gap). */
 Studio.deriveNetworkDefaults = function (consensus, supply) {
   var out = { netGH: null, supplyQtc: null, blocksPerDay: null, avgBlockMs: null, height: null, fetchedAt: null };
   if (consensus && consensus.current) {
     var hs = intField(consensus.current.est_hashrate_hs);
+    var diff = validPlancks(consensus.current.difficulty);
+    if (hs != null && diff != null && BigInt(hs) !== BigInt(diff) / 12n) hs = null;
     if (hs != null && hs > 0) out.netGH = hs / 1e9;
-    out.height = validHeight(consensus.current.height);
-    if (out.height == null) out.height = validHeight(consensus.head);
+    var hh = validHeight(consensus.current.height), hd = validHeight(consensus.head);
+    if (hh != null && hd != null && hh !== hd) out.height = null;
+    else out.height = hh != null ? hh : hd;
     out.fetchedAt = validFetchedAt(consensus.fetched_at);
   }
   if (consensus && consensus.block_times_ms) {
-    var avg = Number(consensus.block_times_ms.avg_ms);
-    if (isFinite(avg) && avg > 1000 && avg < 120000) {
+    var avg = intField(consensus.block_times_ms.avg_ms);
+    var sample = intField(consensus.block_times_ms.sample);
+    if (avg != null && avg > 1000 && avg < 120000 && sample != null && sample >= 100) {
       out.avgBlockMs = avg;
       out.blocksPerDay = 86400000 / avg;
     }
   }
-  if (supply && supply.total_supply_plancks != null) {
-    var plancks = intField(supply.total_supply_plancks);
-    if (plancks != null) {
-      var qtc = plancks / 1e12;
-      if (qtc >= Studio.CHAIN.GENESIS_MINT && qtc <= Studio.CHAIN.MAX_SUPPLY) out.supplyQtc = qtc;
+  var plancks = totalSupplyOf(supply);
+  if (plancks != null) {
+    var qtc = Number(plancks) / 1e12;
+    if (isFinite(qtc) && qtc >= Studio.CHAIN.GENESIS_MINT && qtc <= Studio.CHAIN.MAX_SUPPLY) out.supplyQtc = qtc;
+    var sHeight = supply ? validHeight(supply.block_height) : null;
+    if (out.supplyQtc != null && out.height != null && sHeight != null &&
+        Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;
+    if (out.supplyQtc != null) {
       if (!out.fetchedAt) out.fetchedAt = validFetchedAt(supply.fetched_at);
-      if (out.height == null) out.height = validHeight(supply.block_height);
+      if (out.height == null) out.height = sHeight;
     }
   }
   return out;

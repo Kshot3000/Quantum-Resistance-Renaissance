@@ -203,13 +203,13 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(src.includes("function intField(v)"), "studio: intField() defined");
   ok(src.includes("/^\\d+$/"), "studio: integer fields require a pure-digit string");
   ok(src.includes("function validFetchedAt(v)"), "studio: validFetchedAt() defined");
-  ok(src.includes("isFinite(Date.parse(v)) ? v : null"), "studio: fetched_at must parse before it is kept");
+  ok(src.includes("if (!isFinite(t)) return null;"), "studio: fetched_at must parse before it is kept");
   ok(!src.includes("String(consensus.fetched_at)") && !src.includes("String(supply.fetched_at)"),
     "studio: no raw String() fetched_at coercion remains");
   ok(src.includes('return isNaN(d) ? "unknown time"'), "studio: fmtUtc renders unknown time, never the raw string");
   ok(src.includes("if (!isFinite(supply) || supply < 0) return null;"), "studio: estimate rejects a non-finite/negative supply");
   const html = read("pages/mining-studio/index.html");
-  ok(html.includes("app.js?v=1.2.0"), "studio: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.3.0"), "studio: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 12. Node Desk: validate snapshot scalars at BOTH load boundaries ----
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.21"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.22"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.21"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.22"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.20"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.21"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.19"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.20"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1566,6 +1566,42 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("VIEWS = buildViews(data);"), "minobs2: the raw payload never reaches the views");
   const html = read("pages/mining-observatory/index.html");
   ok(html.includes("app.js?v=1.18.0"), "minobs2: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 48 (2026-10-11 10:19): Mining Studio snapshot-boundary
+// hardening round 2 (Tier 2) — Studio's deriveNetworkDefaults was the
+// fleet's original intField pattern, but its sibling copies
+// (mining-calculator, pool-desk) had since gained RELATION checks it
+// never got, so the same poisoned snapshot was rejected by the
+// calculator and painted by the studio: a hashrate contradicting its
+// own difficulty (est "1000" vs difficulty 5.4e14 rounded the network
+// input to 0 GH/s), current.height disagreeing with head, a supply
+// total contradicting its own balances itemization (and no aggregate
+// fallback when the total was missing), a supply 50,000 blocks from
+// the consensus height mixed in as the same capture, a pace anchored
+// by a 3-block sample, a fetched_at of 2999 cited as provenance, and
+// a 99,999,999,999 height cited as the capture height. All relations
+// verified on live data first (head 206,532: hs == difficulty/12
+// exactly, current.height == head, sample 3000, total == balances sum
+// exactly, heights equal across snapshots). Pin: the difficulty
+// cross-check, the height-agreement rule, totalSupplyOf, the
+// one-capture rule, the >=100 sample gate, the fleet height bound,
+// and real capture-time bounds on fetched_at.
+{
+  const app = read("pages/mining-studio/app.js");
+  ok(app.includes("if (hs != null && diff != null && BigInt(hs) !== BigInt(diff) / 12n) hs = null;"), "studio2: a hashrate must restate its own difficulty (difficulty / 12)");
+  ok(app.includes("if (hh != null && hd != null && hh !== hd) out.height = null;"), "studio2: current.height and head are two reads of one tip — disagreement trusts neither");
+  ok(app.includes("function totalSupplyOf(sup)"), "studio2: totalSupplyOf() defined");
+  ok(app.includes("Studio.totalSupplyOf = totalSupplyOf;"), "studio2: totalSupplyOf exported for tests");
+  ok(app.includes("if (total != null && sum != null && BigInt(total) !== sum) return null;"), "studio2: a total contradicting its balances itemization is trusted on neither side");
+  ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "studio2: one-capture rule — a supply far from the consensus height is a different capture");
+  ok(app.includes("sample != null && sample >= 100"), "studio2: observed pace requires the >=100-block sample the fetch construction guarantees");
+  ok(app.includes("var avg = intField(consensus.block_times_ms.avg_ms);"), "studio2: avg_ms is an integer field (the fetch emits a rounded mean), never Number()-coerced");
+  ok(app.includes("h >= 1 && h <= 10000000"), "studio2: heights carry the fleet 10,000,000 bound");
+  ok(app.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "studio2: a pre-genesis fetched_at is not a capture time");
+  ok(app.includes("if (t > Date.now() + 3600000) return null;"), "studio2: a future fetched_at is not a capture time");
+  const html = read("pages/mining-studio/index.html");
+  ok(html.includes("app.js?v=1.3.0"), "studio2: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

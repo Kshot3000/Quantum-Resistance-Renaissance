@@ -82,7 +82,7 @@ ok("no dev-tax claim in constants", Studio.CHAIN.WORMHOLE_EXIT_FEE_BPS === 4);
  * data/consensus.json + data/supply.json shapes at block ~151,373 */
 var CONS = { fetched_at: "2026-10-02T08:02:18.680Z", head: 151372,
   current: { height: 151372, difficulty: "541503155817540", est_hashrate_hs: "45125262984795" },
-  block_times_ms: { avg_ms: 12413 } };
+  block_times_ms: { avg_ms: 12413, sample: 3000 } };
 var SUP = { fetched_at: "2026-10-02T08:02:28.460Z", block_height: 151373, total_supply_plancks: "5763610080351232263" };
 var dn = Studio.deriveNetworkDefaults(CONS, SUP);
 ok("derive netGH from est hashrate", Math.abs(dn.netGH - 45125.262984795) < 1e-6, dn.netGH);
@@ -105,7 +105,7 @@ ok("derive partial: consensus only", dpart.netGH > 0 && dpart.supplyQtc === null
  * fetched_at was rendered verbatim into the hint's innerHTML, and a
  * float height was cited as the capture height. */
 var dpoison = Studio.deriveNetworkDefaults(
-  { fetched_at: '<b id="pwn">PWNED</b>', head: 194177.9, current: { height: 194177.9, est_hashrate_hs: "9.9e13" }, block_times_ms: { avg_ms: 15000 } },
+  { fetched_at: '<b id="pwn">PWNED</b>', head: 194177.9, current: { height: 194177.9, est_hashrate_hs: "9.9e13" }, block_times_ms: { avg_ms: 15000, sample: 3000 } },
   { fetched_at: "garbage!!", block_height: -5, total_supply_plancks: "6.5e18" });
 ok("derive rejects sci hashrate", dpoison.netGH === null, dpoison.netGH);
 ok("derive rejects float height (no supply fallback either)", dpoison.height === null, dpoison.height);
@@ -122,6 +122,63 @@ var dhfall = Studio.deriveNetworkDefaults(
   { current: { height: 1.5, est_hashrate_hs: "45125262984795" } }, SUP);
 ok("derive falls back to supply integer height when consensus height is a float",
    dhfall.height === SUP.block_height, dhfall.height);
+
+/* snapshot-boundary round 2 (relations, not just shapes — the
+ * mining-calculator standard, verified on live data at head 206,532:
+ * est_hashrate_hs == difficulty/12 exactly, current.height == head,
+ * block_times sample 3000, supply total == free+reserved+frozen exactly,
+ * consensus/supply heights equal). Pre-fix every case below painted:
+ * a hashrate of "1000" against a 5.4e14 difficulty rounded the network
+ * input to 0 GH/s, a total contradicting its balances rewrote supply,
+ * a 50,000-block-stale supply mixed captures, a 3-block sample anchored
+ * the pace, a 2999 fetched_at was cited as provenance, and a
+ * 99,999,999,999 height was cited as the capture height. */
+var dr = Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151372, current: { height: 151372, difficulty: "541503155817540", est_hashrate_hs: "1000" }, block_times_ms: { avg_ms: 12413, sample: 3000 } }, SUP);
+ok("round2: hashrate contradicting its difficulty rejected", dr.netGH === null, dr.netGH);
+var dr2 = Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151379, current: { height: 151372, difficulty: "541503155817540", est_hashrate_hs: "45125262984795" }, block_times_ms: { avg_ms: 12413, sample: 3000 } },
+  { fetched_at: SUP.fetched_at, block_height: 151379, total_supply_plancks: SUP.total_supply_plancks });
+ok("round2: height disagreement trusts neither consensus read (supply-agreed head wins)", dr2.height === 151379 && Math.abs(dr2.supplyQtc - 5763610.080351232) < 1e-6, dr2.height);
+var SUPBAL = { fetched_at: SUP.fetched_at, block_height: 151373, total_supply_plancks: "5763610080351232263",
+  balances_plancks: { free: "5763610080351232163", reserved: "100", frozen: "0" } };
+ok("round2: totalSupplyOf accepts a total restated by its balances", Studio.totalSupplyOf(SUPBAL) === "5763610080351232263");
+var SUPBAD = JSON.parse(JSON.stringify(SUPBAL)); SUPBAD.balances_plancks.free = "5763610080351231163";
+ok("round2: total contradicting its balances rejected", Studio.totalSupplyOf(SUPBAD) === null);
+ok("round2: derive rejects the contradictory supply", Studio.deriveNetworkDefaults(CONS, SUPBAD).supplyQtc === null);
+var SUPAGG = JSON.parse(JSON.stringify(SUPBAL)); delete SUPAGG.total_supply_plancks;
+ok("round2: balances aggregate adopted when the total is missing", Math.abs(Studio.deriveNetworkDefaults(CONS, SUPAGG).supplyQtc - 5763610.080351232) < 1e-6);
+var SUPFRAC = JSON.parse(JSON.stringify(SUPAGG)); SUPFRAC.balances_plancks.free = "5763610080351232163.5";
+ok("round2: fractional balance poisons the aggregate", Studio.totalSupplyOf(SUPFRAC) === null);
+var SUPSTALE = { fetched_at: SUP.fetched_at, block_height: 101373, total_supply_plancks: SUP.total_supply_plancks };
+ok("round2: supply from a different capture rejected", Studio.deriveNetworkDefaults(CONS, SUPSTALE).supplyQtc === null);
+var SUPNEAR = { fetched_at: SUP.fetched_at, block_height: 151374, total_supply_plancks: SUP.total_supply_plancks };
+ok("round2: supply one block from consensus adopted", Math.abs(Studio.deriveNetworkDefaults(CONS, SUPNEAR).supplyQtc - 5763610.080351232) < 1e-6);
+var dpace = Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151372, current: CONS.current, block_times_ms: { avg_ms: 12413, sample: 3 } }, SUP);
+ok("round2: pace from a 3-block sample rejected", dpace.blocksPerDay === null && dpace.avgBlockMs === null);
+var dpace2 = Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151372, current: CONS.current, block_times_ms: { avg_ms: 12413.5, sample: 3000 } }, SUP);
+ok("round2: fractional avg_ms rejected (fetch emits a rounded mean)", dpace2.blocksPerDay === null);
+var dfut = Studio.deriveNetworkDefaults(
+  { fetched_at: "2999-01-01T00:00:00.000Z", head: 151372, current: CONS.current, block_times_ms: CONS.block_times_ms }, SUP);
+ok("round2: future fetched_at rejected, supply capture time stands", dfut.fetchedAt === SUP.fetched_at, dfut.fetchedAt);
+var dold = Studio.deriveNetworkDefaults(
+  { fetched_at: "2020-01-01T00:00:00.000Z", head: 151372, current: CONS.current, block_times_ms: CONS.block_times_ms }, SUP);
+ok("round2: pre-genesis fetched_at rejected", dold.fetchedAt === SUP.fetched_at, dold.fetchedAt);
+var dhuge = Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 99999999999, current: { height: 99999999999, difficulty: "541503155817540", est_hashrate_hs: "45125262984795" }, block_times_ms: CONS.block_times_ms },
+  { fetched_at: SUP.fetched_at, block_height: 99999999999, total_supply_plancks: SUP.total_supply_plancks });
+ok("round2: height past the 10,000,000 fleet bound rejected everywhere", dhuge.height === null, dhuge.height);
+/* the REAL current snapshots pass their own boundary unchanged */
+var fsr = require("fs"), pathr = require("path");
+var realCons = JSON.parse(fsr.readFileSync(pathr.join(__dirname, "..", "..", "..", "data", "consensus.json"), "utf8"));
+var realSup = JSON.parse(fsr.readFileSync(pathr.join(__dirname, "..", "..", "..", "data", "supply.json"), "utf8"));
+var dreal = Studio.deriveNetworkDefaults(realCons, realSup);
+ok("round2: real snapshots pass unchanged", dreal.netGH === Number(realCons.current.est_hashrate_hs) / 1e9 &&
+  Math.abs(dreal.supplyQtc - Number(realSup.total_supply_plancks) / 1e12) < 1e-6 &&
+  dreal.height === realCons.head && Math.abs(dreal.blocksPerDay - 86400000 / realCons.block_times_ms.avg_ms) < 1e-9,
+  JSON.stringify(dreal));
 
 /* estimate supply guard: a cleared/negative supply field must dash the
  * earnings, never paint "NaN QTC" (blockReward(NaN) is NaN). */
@@ -158,7 +215,7 @@ ok("fallback curSupply within emission bounds", Number(csVal) >= 5670000 && Numb
 var hintM = html.match(/id="supplyHint"[^>]*>([\s\S]*?)<\/p>/);
 ok("fallback hint cites a dated capture height", !!hintM && /block [0-9]{1,3},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
 ok("fallback hint difficulty matches painted netHash (one capture)",
-   !!hintM && /534,057,624,650,299/.test(hintM[1]) && Math.abs(Number(nhVal) - 534057624650299 / 12 / 1e9) < 1,
+   !!hintM && /546,962,510,563,758/.test(hintM[1]) && Math.abs(Number(nhVal) - 546962510563758 / 12 / 1e9) < 1,
    nhVal);
 ok("stale 45,125 example gone", !/45,125/.test(html));
 
