@@ -130,10 +130,15 @@ function loadData(){
  * window-contradicting bucket is dropped, never painted as history.
  * (Deliberately NOT enforced: window_miners ⊆ all_time — all_time is
  * the fetch script's top-100, so small window miners legitimately
- * appear nowhere in it.) fetched_at must not be in the future either:
+ * appear nowhere in it.) fetched_at must be a real capture time too:
  * timeAgo clamps a future stamp to "0s ago" and the 12h STALE warning
- * could never fire on it. */
+ * could never fire on it, and a pre-genesis stamp (2020, before the
+ * chain existed) was cited as this snapshot's provenance. Round 3: the
+ * fleet capture-time bounds (genesis floor 2026-09-01, now+1h ceiling)
+ * that Batch 49 aligned across the sync-fallback siblings now gate
+ * this validator too — it was the fleet's last future-only copy. */
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
+var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
 
 function posInt(v, max){
   return (typeof v === "number" && Number.isSafeInteger(v) && v >= 1 && v <= max) ? v : null;
@@ -191,6 +196,7 @@ function sanitizeMiners(d){
   function bad(field){ throw new Error("malformed miners snapshot: " + field); }
   if (!d || typeof d !== "object" || Array.isArray(d)) bad("payload is not an object");
   if (typeof d.fetched_at !== "string" || !isFinite(Date.parse(d.fetched_at))) bad("fetched_at");
+  if (Date.parse(d.fetched_at) < GENESIS_FLOOR_MS) bad("fetched_at before genesis");
   if (Date.parse(d.fetched_at) > Date.now() + 3600 * 1000) bad("fetched_at in the future");
   var height = posInt(d.chain_height, 10000000);
   if (height === null) bad("chain_height");

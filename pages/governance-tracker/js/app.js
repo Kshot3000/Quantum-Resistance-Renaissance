@@ -30,8 +30,12 @@ function timeoutSignal(ms) {
  * fetched_at, a non-array collection, or a snapshot whose referendum
  * events are ALL invalid — fails the load honestly; malformed rows drop
  * individually and the board renders from the survivors, re-sorted into
- * chronological order so status/tally derivation sees the true sequence. */
+ * chronological order so status/tally derivation sees the true sequence.
+ * The fetched_at must also be a REAL capture time (fleet bounds: genesis
+ * floor 2026-09-01, now+1h ceiling) — a parseable 2020 or 2999 stamp used
+ * to be rendered verbatim as the board's snapshot provenance. */
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // prefix-189 shape (qz + 47 base58), as in Vesting Desk
+var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain exists from Sept 2026
 
 function nonNegInt(v) {
   if (typeof v === "number") return Number.isInteger(v) && v >= 0 ? v : null;
@@ -105,6 +109,8 @@ function validateSnapshot(raw) {
   var d = raw.data && typeof raw.data === "object" ? raw.data : raw;
   var fetched = d.fetched_at || raw.fetched_at;
   if (typeof fetched !== "string" || !isFinite(Date.parse(fetched))) return null;
+  var fetchedMs = Date.parse(fetched);
+  if (fetchedMs < GENESIS_FLOOR_MS || fetchedMs > Date.now() + 3600000) return null;
   if (!Array.isArray(d.referenda)) return null;
   if (d.extrinsics !== undefined && !Array.isArray(d.extrinsics)) return null;
   if (d.upgrades !== undefined && !Array.isArray(d.upgrades)) return null;

@@ -299,6 +299,17 @@ t("sanitizeMiners tolerates a fetched_at within the 1h future-skew bound", funct
   p.fetched_at = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   assert.strictEqual(m.sanitizeMiners(p).chain_height, 2000);
 });
+expectBad("sanitizeMiners rejects a pre-genesis fetched_at", function(p){
+  p.fetched_at = "2020-01-01T00:00:00.000Z";
+});
+expectBad("sanitizeMiners rejects a fetched_at just before the genesis floor", function(p){
+  p.fetched_at = "2026-08-31T23:59:59.000Z";
+});
+t("sanitizeMiners tolerates a fetched_at at the genesis floor", function(){
+  var p = fillGood(goodPayload());
+  p.fetched_at = "2026-09-01T00:00:00.000Z";
+  assert.strictEqual(m.sanitizeMiners(p).chain_height, 2000);
+});
 
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

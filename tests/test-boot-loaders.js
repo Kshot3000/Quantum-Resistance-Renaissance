@@ -186,7 +186,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(src.includes("d.referenda.length && !refs.length"), "governance: all-invalid referenda fail honestly (no empty-board lie)");
   ok(src.includes('throw new Error("snapshot failed validation")'), "governance: invalid snapshot throws into the boot catch");
   const html = read("pages/governance-tracker/index.html");
-  ok(html.includes("js/app.js?v=1.43.0"), "governance: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.44.0"), "governance: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 11. Mining Studio: validate snapshot scalars at the load boundary ----
@@ -233,7 +233,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!src.includes("Number(S.head)"), "nodedesk: no raw Number(S.head) coercion remains");
   ok(!src.includes("Date.parse(S.fetched_at)"), "nodedesk: no raw Date.parse(S.fetched_at) age remains");
   const html = read("pages/node-desk/index.html");
-  ok(html.includes("app.js?v=1.40.0"), "nodedesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.41.0"), "nodedesk: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 13. Block Explorer: validate GraphQL responses at the load boundary ----
@@ -841,7 +841,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanBuckets(buckets, win, windowMiners)"), "minobs: cleanBuckets() defined for the auxiliary timeline (round 2: window-context signature)");
   ok(app.includes("wout.observed_block_time_s = cleanBlockTime(w.observed_block_time_s);"), "minobs: block time degraded to null, never .toFixed on a string");
   const html = read("pages/mining-observatory/index.html");
-  ok(html.includes("app.js?v=1.18.0"), "minobs: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.19.0"), "minobs: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 26 (2026-10-10 11:19): mining-calculator (Tier 2) — the fourth
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.11.0"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.11.2"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.48.0"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.2"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.51.0"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.51.2"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.48.0"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.2"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1565,7 +1565,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("VIEWS = buildViews(DATA);"), "minobs2: views are built from the sanitized snapshot");
   ok(!app.includes("VIEWS = buildViews(data);"), "minobs2: the raw payload never reaches the views");
   const html = read("pages/mining-observatory/index.html");
-  ok(html.includes("app.js?v=1.18.0"), "minobs2: app.js cache key bumped for the round-2 fix");
+  ok(html.includes("app.js?v=1.19.0"), "minobs2: app.js cache key bumped for the round-2 fix");
 }
 
 // Batch 48 (2026-10-11 10:19): Mining Studio snapshot-boundary
@@ -1618,19 +1618,46 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const mc = read("pages/mining-calculator/app.js");
   ok(mc.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: miningcalc rejects a pre-genesis capture time");
   ok(mc.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: miningcalc rejects a future capture time");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.0"), "fetchedat: miningcalc cache key bumped");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.2"), "fetchedat: miningcalc cache key bumped");
   const pd = read("pages/pool-desk/js/app.js");
   ok(pd.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: pooldesk rejects a pre-genesis capture time");
   ok(pd.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: pooldesk rejects a future capture time");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.0"), "fetchedat: pooldesk cache key bumped");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.2"), "fetchedat: pooldesk cache key bumped");
   const en = read("pages/energy-observatory/js/app.js");
   ok(en.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: energy rejects a pre-genesis capture time");
   ok(en.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: energy rejects a future capture time");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.0"), "fetchedat: energy cache key bumped");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.2"), "fetchedat: energy cache key bumped");
   const lk = read("pages/luck-lab/js/app.js");
   ok(lk.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: lucklab rejects a pre-genesis capture time");
   ok(lk.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: lucklab rejects a future capture time");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.0"), "fetchedat: lucklab cache key bumped");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.2"), "fetchedat: lucklab cache key bumped");
+}
+
+// Batch 50 (2026-10-11 12:19): fleet capture-time alignment, round 2 —
+// Batch 49 aligned the four sync-fallback siblings, but a fleet grep
+// found three more snapshot consumers whose fetched_at validators still
+// accepted any parseable date: mining-observatory's sanitizeMiners had
+// the future bound only (a 2020 stamp was cited as provenance for a
+// chain that did not exist), governance-tracker's validateSnapshot was
+// parseable-only (2020 AND 2999 both rendered as the board's snapshot
+// provenance), and node-desk's parseSnapshot was parseable-only with a
+// future stamp clamped to "0m old" (a poisoned snapshot masquerading
+// as brand new, its head adopted as the network head). RED first
+// (probe qa-capturetime-fleet: 10 failures across the three apps,
+// controls passing). Pin: the fleet bounds (genesis floor 2026-09-01,
+// now+1h ceiling, 1h skew still tolerated) in all three validators and
+// the new cache keys.
+{
+  const mo = read("pages/mining-observatory/app.js");
+  ok(mo.includes('if (Date.parse(d.fetched_at) < GENESIS_FLOOR_MS) bad("fetched_at before genesis");'), "capturetime: minobs rejects a pre-genesis capture time");
+  ok(mo.includes('bad("fetched_at in the future")'), "capturetime: minobs keeps the future capture-time rejection");
+  ok(read("pages/mining-observatory/index.html").includes("app.js?v=1.19.0"), "capturetime: minobs cache key bumped");
+  const gv = read("pages/governance-tracker/js/app.js");
+  ok(gv.includes("if (fetchedMs < GENESIS_FLOOR_MS || fetchedMs > Date.now() + 3600000) return null;"), "capturetime: governance rejects a non-capture fetched_at (pre-genesis or future)");
+  ok(read("pages/governance-tracker/index.html").includes("js/app.js?v=1.44.0"), "capturetime: governance cache key bumped");
+  const nd = read("pages/node-desk/node-core.js");
+  ok(nd.includes("if (t < GENESIS_FLOOR_MS || t > now + 3600000) return null;"), "capturetime: nodedesk rejects a non-capture fetched_at (pre-genesis or future)");
+  ok(read("pages/node-desk/index.html").includes("app.js?v=1.41.0"), "capturetime: nodedesk cache key bumped");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

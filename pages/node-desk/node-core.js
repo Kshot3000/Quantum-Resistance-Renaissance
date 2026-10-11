@@ -297,7 +297,13 @@ export function syncProgress(localHeight, networkHeight) {
  * renders as "NaNm old". A snapshot whose head is not a positive integer
  * or whose capture time does not parse is NO snapshot — callers must
  * fall back honestly (protocol constants / manual entry), never render
- * the poisoned values. Returns { head, ageMin } or null. */
+ * the poisoned values. The capture time must also be REAL (fleet bounds:
+ * genesis floor 2026-09-01, now+1h ceiling): a pre-genesis stamp is not
+ * a capture of this chain, and a far-future stamp used to clamp to
+ * "0m old" — a poisoned snapshot masquerading as brand new. A stamp
+ * within the 1h clock-skew ceiling still clamps to 0m. Returns
+ * { head, ageMin } or null. */
+const GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
 export function parseSnapshot(S, nowMs) {
   if (!S || typeof S !== "object") return null;
   let head = null;
@@ -310,6 +316,7 @@ export function parseSnapshot(S, nowMs) {
   const t = Date.parse(S.fetched_at);
   if (!Number.isFinite(t)) return null;
   const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+  if (t < GENESIS_FLOOR_MS || t > now + 3600000) return null;
   return { head, ageMin: Math.max(0, Math.round((now - t) / 60000)) };
 }
 
