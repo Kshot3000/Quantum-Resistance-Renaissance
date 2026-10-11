@@ -7,9 +7,9 @@ import {
   QUANTUS_SS58_PREFIX, MAINNET_RPC, LOCAL_RPC, ENDPOINT_PRESETS,
   validateEndpoint, parseParamsJson, explainError, shortHex, formatMs, formatNumber,
   parseAddressInput, decodeBalanceStorage, buildMapKeyHex, accountStorageKeyHex,
-  summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion,
+  summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion, summarizeSyncState,
   historyEntry, loadHistory, saveHistory, normalizeHex, isHex, formatPartialFeeQtc,
-  parseBlockNumber, isHash32, validPlanckField,
+  parseBlockNumber, isHash32, validPlanckField, validChainHeight,
 } from './core.js';
 import { ConsoleRpc } from './rpc-client.js';
 import { RECIPES, RECIPE_CATEGORIES, getRecipe } from './recipes.js';
@@ -113,15 +113,14 @@ const SUMMARIZERS = {
       + `</tbody></table></div>` + (rows.length > 25 ? `<div class="note">${rows.length - 25} more peers in raw JSON.</div>` : '');
   },
   sync(r) {
-    if (!r || typeof r !== 'object') return null;
-    const start = parseBlockNumber(r.startingBlock);
-    const cur = parseBlockNumber(r.currentBlock);
-    const high = parseBlockNumber(r.highestBlock);
-    if (start === null || cur === null || high === null) return null; // a gap computed from garbage is a lie in both directions
-    const gap = high - cur;
-    return kvRow('Starting block', formatNumber(start)) + kvRow('Current block', formatNumber(cur))
-      + kvRow('Highest known', formatNumber(high))
-      + kvRow('Gap', gap <= 0 ? '<b class="green">synced</b>' : `<b class="amber">${formatNumber(gap)} blocks behind</b>`);
+    // The relation lives in core (summarizeSyncState): starting <=
+    // current <= highest, all real chain heights — an answer that breaks
+    // the order is malformed, never a negative gap painted "synced".
+    const s = summarizeSyncState(r);
+    if (!s) return null;
+    return kvRow('Starting block', formatNumber(s.startingBlock)) + kvRow('Current block', formatNumber(s.currentBlock))
+      + kvRow('Highest known', formatNumber(s.highestBlock))
+      + kvRow('Gap', s.gap <= 0 ? '<b class="green">synced</b>' : `<b class="amber">${formatNumber(s.gap)} blocks behind</b>`);
   },
   fee(r) {
     if (!r || typeof r !== 'object') return null;
@@ -650,10 +649,12 @@ const SUB_DEFS = [
     blurb: 'Every new block, live, with block times.',
     render(n, prev) {
       // A notification is untrusted like any other result: a head whose
-      // number does not parse is not logged as "#NaN" chain fact — the
-      // render returns null and the caller skips the feed row entirely.
+      // number is not a real chain height is not logged as chain fact —
+      // the render returns null and the caller skips the feed row entirely.
+      // (New heads may legitimately revisit a height on a fork, so no
+      // monotonic gate here — finality below is the monotonic one.)
       if (!n || typeof n !== 'object') return null;
-      const num = parseBlockNumber(n.number);
+      const num = validChainHeight(n.number);
       if (num === null) return null;
       const dt = prev && prev.t ? ` · +${((Date.now() - prev.t) / 1000).toFixed(1)}s` : '';
       const hash = isHash32(n.hash) ? ` · <span class="mono dim">${esc(shortHex(n.hash, 12))}</span>` : '';
@@ -663,10 +664,14 @@ const SUB_DEFS = [
   {
     key: 'finalized', title: 'Finalized heads', sub: 'chain_subscribeFinalizedHeads', unsub: 'chain_unsubscribeFinalizedHeads',
     blurb: 'Only the heads the network irreversibly agrees on.',
-    render(n) {
+    render(n, prev) {
       if (!n || typeof n !== 'object') return null;
-      const num = parseBlockNumber(n.number);
+      const num = validChainHeight(n.number);
       if (num === null) return null;
+      // Finality never regresses: a finalized head at or below the last
+      // logged one contradicts every finalized head before it — a broken
+      // or hostile node re-narrating history, not a new finalization.
+      if (prev && typeof prev.num === 'number' && num <= prev.num) return null;
       const hash = isHash32(n.hash) ? ` · <span class="mono dim">${esc(shortHex(n.hash, 12))}</span>` : '';
       return `#${formatNumber(num)} finalized${hash}`;
     },
@@ -794,7 +799,7 @@ async function stopSub(key) {
   toast('Subscription stopped.', '');
 }
 
-function feedLog(key, html) {
+function feedLog(key, html, n) {
   const el = $('feed');
   const row = document.createElement('div');
   row.className = 'feed-row';
@@ -803,7 +808,10 @@ function feedLog(key, html) {
   el.prepend(row);
   while (el.children.length > 100) el.lastChild.remove();
   const prev = activeSubs.get(key);
-  if (prev) prev.prev = { t: Date.now() };
+  // Remember the logged head's height, not just its time: the finalized
+  // render gates on it (finality is monotonic), and the head callbacks
+  // have always passed the notification here — it was simply dropped.
+  if (prev) prev.prev = { t: Date.now(), num: n && typeof n === 'object' ? validChainHeight(n.number) : null };
 }
 
 /* ---------- reference ---------- */

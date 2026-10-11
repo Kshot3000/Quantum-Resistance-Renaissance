@@ -285,7 +285,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("balance key changed${at}"), "console: storage watch renders the block as a hash");
   ok(app.includes("if (html) feedLog(key, html, n)"), "console: malformed head notifications produce no feed row");
   const html = read("pages/chain-console/index.html");
-  ok(html.includes("js/app.js?v=1.44.0"), "console: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.45.0"), "console: app.js cache key bumped for the boundary fix");
 }
 
 // ---- 15. Mempool Desk: validate RPC answers at the node boundary ----
@@ -707,7 +707,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok((app.match(/pendingBroadcast = null;/g) || []).length >= 5, "console: renderResult + node-identity writes clear an orphaned review");
   ok(!app.includes("$('endpoint').addEventListener('input'"), "console: uncommitted endpoint typing does not void the review");
   const html = read("pages/chain-console/index.html");
-  ok(html.includes("js/app.js?v=1.44.0"), "console: app.js cache key bumped for the broadcast-staleness fix");
+  ok(html.includes("js/app.js?v=1.45.0"), "console: app.js cache key bumped for the broadcast-staleness fix");
 }
 
 // Batch 21 (2026-10-10 06:19): extrinsic-lab (Tier 1) — the Decode tab's
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.14"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.15"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.14"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.15"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.13"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.14"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.12"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.13"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1327,5 +1327,35 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("app.js?v=1.3.0"), "explorer2: app.js cache key bumped for the round-2 fix");
 }
 
+// Batch 41 (2026-10-11 02:19): Chain Console round 2 (Tier 1) —
+// validate RELATIONS, not just shapes. Round 1 checked each RPC field
+// alone, so a syncState whose currentBlock sat ABOVE its highestBlock
+// painted "synced" (the gap went negative), a header/block/peer height
+// of 99,999,999,999 painted as chain fact, non-hex strings in a block's
+// extrinsics list inflated its count and byte total, a duplicated
+// peerId painted the same peer twice, and a finalized-heads feed
+// logged regressing/duplicate heads — finality re-narrated. Pin: the
+// fleet height bound in core (validChainHeight, genesis 0 valid over
+// RPC), validExtrinsicHex gating block counts, peer dedup, the
+// syncState order relation in summarizeSyncState, and the finalized
+// monotonic gate fed by feedLog's stored head height.
+{
+  const core = read("pages/chain-console/js/core.js");
+  ok(core.includes("export function validChainHeight(v)"), "console2: validChainHeight() defined in core");
+  ok(core.includes("export function validExtrinsicHex(s)"), "console2: validExtrinsicHex() defined in core");
+  ok(core.includes("export function summarizeSyncState(r)"), "console2: summarizeSyncState() defined in core");
+  ok(core.includes("if (!(startingBlock <= currentBlock && currentBlock <= highestBlock)) return null"), "console2: sync order relation enforced");
+  ok(core.includes("if (seen.has(p.peerId)) continue;"), "console2: duplicate peer identities dropped");
+  ok(core.includes("const number = validChainHeight(h.number);"), "console2: header height bound to the chain");
+  ok(core.includes("filter(validExtrinsicHex)"), "console2: block extrinsics must be extrinsic hex");
+  const app = read("pages/chain-console/js/app.js");
+  ok(app.includes("const s = summarizeSyncState(r);"), "console2: sync summarizer gates on the relation");
+  ok(app.includes("if (prev && typeof prev.num === 'number' && num <= prev.num) return null;"), "console2: finalized heads cannot regress or repeat");
+  ok(app.includes("num: n && typeof n === 'object' ? validChainHeight(n.number) : null"), "console2: feedLog stores the logged head height");
+  const html = read("pages/chain-console/index.html");
+  ok(html.includes("js/app.js?v=1.45.0"), "console2: app.js cache key bumped for the round-2 fix");
+}
+
+console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -173,6 +173,26 @@ export function isHash32(s) {
   return typeof s === 'string' && /^0x[0-9a-fA-F]{64}$/.test(s.trim());
 }
 
+/* Round 2 — RELATIONS, not just shapes. A block HEIGHT is a block number
+ * that could name a block on this chain: the fleet bound is 10,000,000
+ * (the chain is at ~204k; a "height" of 99,999,999,999 or 2^53-1 is not
+ * a future block, it is a broken or hostile answer). Height 0 IS valid
+ * here — over RPC the genesis header/block legitimately sit at 0, unlike
+ * the indexer payloads where the fleet's 1..10,000,000 rule applies. */
+export const MAX_CHAIN_HEIGHT = 10000000;
+export function validChainHeight(v) {
+  const n = parseBlockNumber(v);
+  return n !== null && n <= MAX_CHAIN_HEIGHT ? n : null;
+}
+
+/* An extrinsic is Bytes: even-length 0x hex, at least 1 byte. A block
+ * entry of any other shape ("garbage", "0xzz", odd-length hex) is a
+ * malformed entry, not an extrinsic — it must not inflate the count or
+ * the byte total with length/2 arithmetic on prose. */
+export function validExtrinsicHex(s) {
+  return typeof s === 'string' && /^0x[0-9a-fA-F]+$/.test(s) && s.length % 2 === 0 && s.length >= 4;
+}
+
 /* A planck amount field is a non-negative integer, as a JSON integer or
  * a pure-digit string; anything else renders as a dash, never String(x). */
 export function validPlanckField(v) {
@@ -185,18 +205,18 @@ export function validPlanckField(v) {
 
 export function summarizeHeader(h) {
   if (!h || typeof h !== 'object') return null;
-  const number = parseBlockNumber(h.number);
-  if (number === null) return null; // the height is the identity of a header — no valid number, no summary
+  const number = validChainHeight(h.number);
+  if (number === null) return null; // the height is the identity of a header — no valid height, no summary
   const hashField = (v) => (isHash32(v) ? v : null); // display-only: dash a bad hash, keep the block
   return { number, hash: hashField(h.hash), parentHash: hashField(h.parentHash), stateRoot: hashField(h.stateRoot), extrinsicsRoot: hashField(h.extrinsicsRoot) };
 }
 
 export function summarizeBlock(block) {
   if (!block || typeof block !== 'object' || !block.header || typeof block.header !== 'object') return null;
-  const number = parseBlockNumber(block.header.number);
+  const number = validChainHeight(block.header.number);
   if (number === null) return null;
   if (block.extrinsics !== undefined && !Array.isArray(block.extrinsics)) return null;
-  const extrinsics = (block.extrinsics || []).filter((x) => typeof x === 'string');
+  const extrinsics = (block.extrinsics || []).filter(validExtrinsicHex);
   return {
     number,
     hash: isHash32(block.header.hash) ? block.header.hash : null,
@@ -208,11 +228,14 @@ export function summarizeBlock(block) {
 export function summarizePeers(peers) {
   if (!Array.isArray(peers)) return null;
   const rows = [];
+  const seen = new Set();
   for (const p of peers) {
     if (!p || typeof p !== 'object') continue;
     if (typeof p.peerId !== 'string' || !p.peerId) continue;   // a row without a usable identity is dropped
-    const bestNumber = parseBlockNumber(p.bestNumber);
-    if (bestNumber === null) continue;                          // its "best block" is the row's fact — garbage drops the row
+    if (seen.has(p.peerId)) continue;                          // one entry per peer — a duplicated identity is one peer, not two
+    const bestNumber = validChainHeight(p.bestNumber);
+    if (bestNumber === null) continue;                          // its "best block" is the row's fact — garbage/absurd drops the row
+    seen.add(p.peerId);
     rows.push({
       peerId: p.peerId,
       roles: typeof p.roles === 'string' ? p.roles : null,
@@ -221,6 +244,23 @@ export function summarizePeers(peers) {
     });
   }
   return rows;
+}
+
+/* system_syncState is a relation, not three independent numbers:
+ * startingBlock is where this sync session began, currentBlock is the
+ * node's head, highestBlock is the highest head it knows of — so
+ * starting <= current <= highest BY CONSTRUCTION. An answer that breaks
+ * the order (current ABOVE highest painted "synced" pre-fix, because
+ * the gap went negative) is malformed wholesale: no gap may be derived
+ * from it in either direction. */
+export function summarizeSyncState(r) {
+  if (!r || typeof r !== 'object') return null;
+  const startingBlock = validChainHeight(r.startingBlock);
+  const currentBlock = validChainHeight(r.currentBlock);
+  const highestBlock = validChainHeight(r.highestBlock);
+  if (startingBlock === null || currentBlock === null || highestBlock === null) return null;
+  if (!(startingBlock <= currentBlock && currentBlock <= highestBlock)) return null;
+  return { startingBlock, currentBlock, highestBlock, gap: highestBlock - currentBlock };
 }
 
 export function summarizeHealth(h) {

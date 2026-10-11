@@ -3,9 +3,9 @@ import {
   validateEndpoint, buildRequest, parseParamsJson, explainError,
   isHex, normalizeHex, shortHex, formatMs,
   parseAddressInput, accountStorageKeyHex, buildMapKeyHex, decodeBalanceStorage,
-  summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion,
+  summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion, summarizeSyncState,
   RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory, formatPartialFeeQtc,
-  parseBlockNumber, isHash32, validPlanckField,
+  parseBlockNumber, isHash32, validPlanckField, validChainHeight, validExtrinsicHex, MAX_CHAIN_HEIGHT,
 } from '../js/core.js';
 import { ConsoleRpc } from '../js/rpc-client.js';
 import { ss58Encode, hexEncode } from '../js/lib/quantus-crypto.js';
@@ -149,6 +149,38 @@ t('validPlanckField', validPlanckField('1500000000') === '1500000000' && validPl
   const rv = summarizeRuntimeVersion({ specName: 'quantus', specVersion: 100, implName: 7, transactionVersion: null });
   t('runtime: display-only fields nulled', rv.implName === null && rv.transactionVersion === null && rv.specVersion === 100);
 }
+
+/* ---- round 2: relations, not just shapes ---- */
+t('height: genesis 0 valid over RPC', validChainHeight(0) === 0);
+t('height: current head valid', validChainHeight(204469) === 204469 && validChainHeight('0x' + (204469).toString(16)) === 204469);
+t('height: cap valid, cap+1 rejected', validChainHeight(MAX_CHAIN_HEIGHT) === MAX_CHAIN_HEIGHT && validChainHeight(MAX_CHAIN_HEIGHT + 1) === null);
+t('height: absurd rejected', validChainHeight(99999999999) === null && validChainHeight(Number.MAX_SAFE_INTEGER) === null && validChainHeight(-1) === null && validChainHeight('garbage') === null);
+t('extrinsicHex: valid', validExtrinsicHex('0x' + 'aa'.repeat(10)) === true);
+t('extrinsicHex: prose/odd/short rejected', !validExtrinsicHex('garbage-no-hex') && !validExtrinsicHex('0xzz') && !validExtrinsicHex('0xabc') && !validExtrinsicHex('0x') && !validExtrinsicHex(42));
+t('header2: absurd height -> null', summarizeHeader({ number: 99999999999 }) === null);
+t('header2: genesis height survives', summarizeHeader({ number: 0 }).number === 0);
+{
+  const b = summarizeBlock({ header: { number: 7 }, extrinsics: ['garbage-no-hex', '0xzz', '0xabc', '0x' + 'aa'.repeat(50)] });
+  t('block2: only valid-hex extrinsics count', b.extrinsicCount === 1 && b.totalBytes === 50);
+  t('block2: absurd height -> null', summarizeBlock({ header: { number: 99999999999 }, extrinsics: [] }) === null);
+}
+{
+  const H = (c) => '0x' + c.repeat(32);
+  const ps = summarizePeers([
+    { peerId: 'peer-dup', roles: 'FULL', bestNumber: 9, bestHash: H('66') },
+    { peerId: 'peer-dup', roles: 'FULL', bestNumber: 9, bestHash: H('66') },
+    { peerId: 'peer-absurd', roles: 'FULL', bestNumber: 99999999999, bestHash: H('66') },
+    { peerId: 'peer-good', roles: 'FULL', bestNumber: 9, bestHash: H('66') },
+  ]);
+  t('peers2: duplicate identity paints once', ps.filter((p) => p.peerId === 'peer-dup').length === 1);
+  t('peers2: absurd best dropped, good survives', ps.length === 2 && ps[1].peerId === 'peer-good');
+}
+t('sync2: synced state', (() => { const s = summarizeSyncState({ startingBlock: 1, currentBlock: 5678, highestBlock: 5678 }); return s && s.gap === 0; })());
+t('sync2: real gap exact', (() => { const s = summarizeSyncState({ startingBlock: 4000, currentBlock: 5000, highestBlock: 5678 }); return s && s.gap === 678; })());
+t('sync2: current above highest -> null', summarizeSyncState({ startingBlock: 1, currentBlock: 6000, highestBlock: 5678 }) === null);
+t('sync2: starting above current -> null', summarizeSyncState({ startingBlock: 6000, currentBlock: 5678, highestBlock: 5678 }) === null);
+t('sync2: absurd height -> null', summarizeSyncState({ startingBlock: 1, currentBlock: 5678, highestBlock: 99999999999 }) === null);
+t('sync2: garbage/missing -> null', summarizeSyncState({ startingBlock: 'genesis?', currentBlock: {}, highestBlock: -3 }) === null && summarizeSyncState(null) === null && summarizeSyncState({}) === null);
 
 /* ---- recipe builders ---- */
 {
