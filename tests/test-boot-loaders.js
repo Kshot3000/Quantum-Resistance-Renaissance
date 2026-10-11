@@ -355,8 +355,8 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("parseInt(block.block.header.number, 16)"), "extrinsic: no unchecked header parseInt remains in the scanner");
   ok(!app.includes("block.block.extrinsics || []"), "extrinsic: no silent non-list-to-empty extrinsics coercion remains");
   const html = read("pages/extrinsic-lab/index.html");
-  ok(html.includes("js/app.js?v=1.44.0"), "extrinsic: app.js cache key bumped (1.44.0 clear-staleness, supersedes the 1.43.0 boundary fix)");
-  ok(html.includes("js/rpc-validate.js?v=1.0.0"), "extrinsic: rpc-validate.js cache key present");
+  ok(html.includes("js/app.js?v=1.45.0"), "extrinsic: app.js cache key bumped (1.45.0 round-2, supersedes the 1.44.0 clear-staleness bump)");
+  ok(html.includes("js/rpc-validate.js?v=1.1.0"), "extrinsic: rpc-validate.js cache key present (1.1.0 round-2)");
 }
 
 // ---- 17. Web Wallet: validate RPC answers at the node boundary ----
@@ -724,7 +724,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("voidVerify('The decoded extrinsic was cleared"), "extrinsic: Clear voids a shown verdict with an explanation");
   ok((app.match(/voidVerify\(/g) || []).length >= 6, "extrinsic: voidVerify wired at definition + decode + hex-void + context-fetch + context-edit + Clear");
   const html = read("pages/extrinsic-lab/index.html");
-  ok(html.includes("js/app.js?v=1.44.0"), "extrinsic: app.js cache key bumped for the clear-staleness fix");
+  ok(html.includes("js/app.js?v=1.45.0"), "extrinsic: app.js cache key bumped for the clear-staleness fix (1.44.0, superseded by the 1.45.0 round-2 bump)");
 }
 
 // Batch 22 (2026-10-10 07:19): notary-desk (Tier 1) — the last Tier 1
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.15"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.16"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.15"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.16"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.14"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.15"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.13"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.14"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1354,6 +1354,52 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("num: n && typeof n === 'object' ? validChainHeight(n.number) : null"), "console2: feedLog stores the logged head height");
   const html = read("pages/chain-console/index.html");
   ok(html.includes("js/app.js?v=1.45.0"), "console2: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 42 (2026-10-11 03:19): Extrinsic Lab round 2 (Tier 1) —
+// validate RELATIONS, not just shapes. Round 1 checked each RPC field
+// alone, so a finalized header number of 99,999,999,999 painted as
+// chain fact in BOTH the Verify context and the Live scanner, a
+// specVersion of 2^32 anchored a verdict (wrapping to 0 in the
+// payload's u32le — parseVersionNumber documented "u32" but never
+// bounded it), an era-birth block AFTER the finalized head fetched a
+// "birth hash" for a block that cannot exist yet, a fetched context
+// for an immortal extrinsic left a previous extrinsic's era-birth hash
+// standing (immortal birth IS genesis), the manual Verify path coerced
+// its fields with parseInt(...)||default (truncation, silent 153/6
+// substitution, u32 wrap) and rendered VALID for a target block before
+// the era-birth block, and the scanner painted a duplicated extrinsic
+// and a trailing-byte entry as clean decoded rows. Pin: the fleet
+// validChainHeight in rpc-validate gating both header numbers,
+// parseVersionNumber enforcing its u32 bound, verify.js refusing
+// out-of-range versions / short hashes instead of wrapping, the
+// era-birth <= head gate before the birth-hash request, the fetched
+// context always restating v-block and clearing v-birth for immortal,
+// the manual path parsing through the validators with the era-birth
+// and immortal-genesis relations as errors, and the scanner's
+// duplicate / length-trailing malformed rows.
+{
+  const core = read("pages/extrinsic-lab/js/rpc-validate.js");
+  ok(core.includes("function validChainHeight(v)"), "extrinsic2: validChainHeight() defined in rpc-validate");
+  ok(core.includes("n <= MAX_U32 ? n : null"), "extrinsic2: parseVersionNumber enforces the u32 bound");
+  ok(core.includes("var MAX_CHAIN_HEIGHT = 10000000"), "extrinsic2: fleet 10,000,000 height bound present");
+  const vf = read("pages/extrinsic-lab/js/verify.js");
+  ok(vf.includes("must be a u32 integer"), "extrinsic2: verifyExtrinsic refuses out-of-range versions instead of wrapping");
+  const app = read("pages/extrinsic-lab/js/app.js");
+  ok(app.includes("R.validChainHeight(header.number)"), "extrinsic2: context header height bound to the chain");
+  ok(app.includes("R.validChainHeight(hdr.number)"), "extrinsic2: scanner header height bound to the chain");
+  ok(app.includes("is after the finalized head"), "extrinsic2: era-birth after the head fails the context fetch");
+  ok(app.includes("$('v-birth').value = birthHash || '';"), "extrinsic2: fetched context clears v-birth for immortal/no extrinsic");
+  ok(app.includes("R.parseVersionNumber($('v-spec').value.trim())"), "extrinsic2: manual verify parses spec through the validator");
+  ok(!app.includes("parseInt($('v-spec').value.trim(), 10) || 153"), "extrinsic2: no silent parseInt spec fallback remains");
+  ok(app.includes("is before this extrinsic"), "extrinsic2: target before era-birth is an error, not a verdict");
+  ok(app.includes("Immortal era: the era-birth hash is the genesis hash"), "extrinsic2: immortal era-birth must equal genesis");
+  ok(app.includes("duplicate entry"), "extrinsic2: scanner labels a duplicated extrinsic entry");
+  ok(app.includes("the length prefix does not match the entry bytes"), "extrinsic2: scanner labels length/trailing-mismatched entries malformed");
+  const html = read("pages/extrinsic-lab/index.html");
+  ok(html.includes("js/app.js?v=1.45.0"), "extrinsic2: app.js cache key bumped for the round-2 fix");
+  ok(html.includes("js/rpc-validate.js?v=1.1.0"), "extrinsic2: rpc-validate.js cache key bumped for the round-2 fix");
+  ok(html.includes("js/verify.js?v=1.40.1"), "extrinsic2: verify.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -23,6 +23,21 @@ function verifyExtrinsic(parts, ctx) {
   if (!parts.version.signed) throw new Error('unsigned (inherent) extrinsics carry no signature to verify');
   var sig = parts.signature;
 
+  /* The payload packs spec/tx versions as u32le — an out-of-range or
+   * non-integer version would WRAP silently and the verdict would stand
+   * on different bytes than the context claims. Refuse, never wrap.
+   * The hashes are concatenated as raw bytes; anything but a 32-byte
+   * array would corrupt the payload layout the same way. */
+  var vers = [['specVersion', ctx.specVersion], ['txVersion', ctx.txVersion]];
+  for (var vi = 0; vi < vers.length; vi++) {
+    var vv = vers[vi][1];
+    if (!Number.isInteger(vv) || vv < 0 || vv > 4294967295) {
+      throw new Error(vers[vi][0] + ' must be a u32 integer (0–4,294,967,295)');
+    }
+  }
+  if (!ctx.genesisHash || ctx.genesisHash.length !== 32) throw new Error('genesis hash must be 32 bytes');
+  if (ctx.eraBirthHash && ctx.eraBirthHash.length !== 32) throw new Error('era-birth hash must be 32 bytes');
+
   // Re-slice the raw call + era bytes from the original hex for byte-exactness.
   var raw = global.QEL_DECODE.hexToBytes(parts._hex);
   var callSec = null, eraSec = null;

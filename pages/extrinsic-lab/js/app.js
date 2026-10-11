@@ -373,18 +373,44 @@
       if (!state.last) throw new Error('Nothing to verify — decode an extrinsic in the Decode tab first (or load a lab sample).');
       var d = state.last;
       if (!d.version.signed) throw new Error('Unsigned (inherent) extrinsics carry no signature to verify.');
+      /* The context fields are parsed through the RPC validators, not
+       * parseInt(...)||default: parseInt silently truncated "153.9",
+       * ignored trailing garbage, substituted 153 for a cleared field,
+       * and passed 4,294,967,296 through to wrap to 0 in the payload's
+       * u32le — every one of those renders a verdict for a context
+       * that is not the context on screen. A malformed field is an
+       * honest error, never a coerced verdict. */
+      var specV = R.parseVersionNumber($('v-spec').value.trim());
+      if (specV == null) throw new Error('Spec version must be a u32 integer (0–4,294,967,295).');
+      var txV = R.parseVersionNumber($('v-tx').value.trim());
+      if (txV == null) throw new Error('Transaction version must be a u32 integer (0–4,294,967,295).');
       var ctx = {
-        specVersion: parseInt($('v-spec').value.trim(), 10) || 153,
-        txVersion: parseInt($('v-tx').value.trim(), 10) || 6,
+        specVersion: specV,
+        txVersion: txV,
         genesisHash: $('v-genesis').value.trim() ? hexTo32($('v-genesis').value, 'genesis hash') : null,
         eraBirthHash: $('v-birth').value.trim() ? hexTo32($('v-birth').value, 'era-birth hash') : null
       };
       if (!ctx.genesisHash) throw new Error('Genesis hash is required — use “Fetch context from node” or paste it manually.');
-      var blockNum = $('v-block').value.trim() ? parseInt($('v-block').value.trim(), 10) : null;
+      var blockRaw = $('v-block').value.trim();
+      var blockNum = blockRaw ? R.validChainHeight(blockRaw) : null;
+      if (blockRaw && blockNum == null) throw new Error('Target block number must be a valid chain height (0–10,000,000).');
       if (!d.era.immortal) {
         if (blockNum == null) throw new Error('Mortal-era extrinsic: enter the target block number so the era-birth block can be computed (or fetch context from the node).');
         ctx.eraBirth = V.birthFor(d, blockNum);
+        /* The era-birth block is by definition AT or BEFORE the block
+         * the extrinsic targets — a target before its own birth block
+         * (reachable when the target is below the era phase) is an
+         * inconsistent context, not a verdict. */
+        if (ctx.eraBirth > blockNum) throw new Error('Target block #' + blockNum.toLocaleString('en-US') + ' is before this extrinsic\u2019s era-birth block #' + ctx.eraBirth.toLocaleString('en-US') + ' — the era-birth relation cannot hold, so no verdict can stand on this context.');
         if (!ctx.eraBirthHash) throw new Error('Mortal-era extrinsic: the era-birth block hash (block ' + ctx.eraBirth + ') is required — use “Fetch context from node”.');
+      } else if (ctx.eraBirthHash) {
+        /* CheckEra: an immortal era's birth block IS the genesis block,
+         * so its birth hash must equal the genesis hash — any other
+         * hash in the field (typically a previous extrinsic's, left
+         * standing) is a wrong context, not an INVALID signature. */
+        if (D.bytesToHex(ctx.eraBirthHash) !== D.bytesToHex(ctx.genesisHash)) {
+          throw new Error('Immortal era: the era-birth hash is the genesis hash — the era-birth field holds a different hash, so this context is wrong. Clear the era-birth field (or set it to the genesis hash) and verify again.');
+        }
       }
       var r = V.verifyExtrinsic(d, ctx);
       resBox.hidden = false;
@@ -485,7 +511,7 @@
           var headHash = await rpcCall(ws, pending, 'chain_getFinalizedHead', []);
           if (!R.isHash32(headHash)) throw new Error('node returned a malformed finalized head hash — context not fetched');
           var header = await rpcCall(ws, pending, 'chain_getHeader', [headHash]);
-          var blockNum = (header && typeof header === 'object') ? R.parseBlockNumber(header.number) : null;
+          var blockNum = (header && typeof header === 'object') ? R.validChainHeight(header.number) : null;
           if (blockNum == null) throw new Error('node returned a malformed finalized header — context not fetched');
           var rt = await rpcCall(ws, pending, 'state_getRuntimeVersion', []);
           var specV = (rt && typeof rt === 'object') ? R.parseVersionNumber(rt.specVersion) : null;
@@ -497,6 +523,13 @@
           var birth = null, birthHash = null;
           if (d && d.version.signed && !d.era.immortal) {
             birth = V.birthFor(d, blockNum);
+            /* RELATION: the era-birth block must sit at or before the
+             * finalized head — birthFor only overshoots when the head
+             * is below the era phase, and a block after the head does
+             * not exist yet, so its "hash" would anchor the verdict to
+             * a block from the future. Fail the whole fetch BEFORE
+             * asking for that hash. */
+            if (birth == null || birth > blockNum) throw new Error('node returned an inconsistent context — era-birth block #' + birth + ' is after the finalized head #' + blockNum.toLocaleString('en-US') + ' — context not fetched');
             birthHash = await rpcCall(ws, pending, 'chain_getBlockHash', [birth]);
             if (!R.isHash32(birthHash)) throw new Error('node returned a malformed era-birth block hash — context not fetched');
           }
@@ -504,17 +537,21 @@
           $('v-spec').value = specV;
           $('v-tx').value = txV;
           $('v-genesis').value = genesis;
+          /* The target block is chain context: always restate it from
+           * the header just validated (a stale number from an earlier
+           * fetch must not stand next to a fresh head). */
+          $('v-block').value = blockNum;
+          /* The era-birth field is EXTRINSIC context: set it for a
+           * mortal extrinsic, and CLEAR it otherwise — for an immortal
+           * era the birth hash is the genesis hash by definition, and
+           * a previous extrinsic's birth hash left standing here would
+           * be fed into the next verdict's payload. */
+          $('v-birth').value = birthHash || '';
           /* Programmatic writes fire no input event — void any verdict
            * earned under the old context explicitly. */
           voidVerify('Fresh context was fetched from the node, so the previous verdict no longer applies. Verify again.');
           var note = 'spec ' + specV + ' · tx v' + txV + ' · finalized #' + blockNum.toLocaleString('en-US');
-          if (birthHash) {
-            $('v-birth').value = birthHash;
-            $('v-block').value = blockNum;
-            note += ' · era-birth #' + birth;
-          } else if (d && d.version.signed) {
-            $('v-block').value = blockNum;
-          }
+          if (birthHash) note += ' · era-birth #' + birth;
           toast('Context fetched: ' + note);
         } catch (e) {
           if (myCtx !== ctxSeq) return;
@@ -559,7 +596,7 @@
        * block state unknown, not empty — never a fake empty block. */
       var blk = (block && typeof block === 'object') ? block.block : null;
       var hdr = (blk && typeof blk === 'object') ? blk.header : null;
-      var num = (hdr && typeof hdr === 'object') ? R.parseBlockNumber(hdr.number) : null;
+      var num = (hdr && typeof hdr === 'object') ? R.validChainHeight(hdr.number) : null;
       if (num == null) throw new Error('node returned a malformed block header');
       if (!Array.isArray(blk.extrinsics)) throw new Error('node returned a malformed block (extrinsics is not a list) — block state unknown, not empty');
       var exts = blk.extrinsics;
@@ -567,6 +604,15 @@
       meta.innerHTML = 'Finalized block <span class="mono">#' + num.toLocaleString('en-US') + '</span> · <span class="mono">' +
         esc(headHash.slice(0, 18)) + '…</span> · ' + exts.length + ' extrinsic' + (exts.length === 1 ? '' : 's');
       list.innerHTML = '';
+      /* Entry RELATIONS, not just per-entry shapes: the same extrinsic
+       * bytes cannot appear twice in one valid block (a signed
+       * extrinsic spends its nonce once; an inherent is issued once),
+       * and an entry whose length prefix no longer covers exactly the
+       * bytes the decoder consumed (or that leaves trailing bytes) is
+       * not the extrinsic it decodes as a prefix of. Both render as
+       * malformed rows — the raw entry count in the meta stays honest,
+       * but neither paints as a clean decoded extrinsic. */
+      var seenExts = {};
       exts.forEach(function (hex, i) {
         var row = document.createElement('div');
         row.className = 'live-row';
@@ -574,11 +620,20 @@
         if (!R.validExtrinsicHex(hex)) {
           label = '<span style="color:var(--amber)">malformed entry</span>';
           sub = 'not extrinsic hex — the node returned a malformed entry for this slot';
+        } else if (seenExts[hex.toLowerCase()]) {
+          label = '<span style="color:var(--amber)">duplicate entry</span>';
+          sub = 'the same extrinsic already appears in this block — a valid block cannot contain it twice';
         } else try {
+          seenExts[hex.toLowerCase()] = true;
           decoded = D.decodeExtrinsic(hex);
-          label = decoded.call ? esc((decoded.call.palletName || ('pallet ' + decoded.call.palletIndex)) + '.' + (decoded.call.callName || ('call ' + decoded.call.callIndex))) : '—';
-          var signer = decoded.signer && decoded.signer.account ? shortAddr(decoded.signer.account.ss58) : (decoded.version.signed ? '?' : 'inherent');
-          sub = esc(signer) + ' · ' + esc(decoded.signature ? decoded.signature.scheme : 'unsigned') + ' · ' + ((hex.length - 2) / 2).toLocaleString('en-US') + ' B';
+          if (!decoded.lengthOk || decoded.trailing) {
+            label = '<span style="color:var(--amber)">malformed entry</span>';
+            sub = 'the length prefix does not match the entry bytes' + (decoded.trailing ? ' (' + decoded.trailing + ' trailing byte' + (decoded.trailing === 1 ? '' : 's') + ' after the decoded call)' : '') + ' — not a well-formed extrinsic';
+          } else {
+            label = decoded.call ? esc((decoded.call.palletName || ('pallet ' + decoded.call.palletIndex)) + '.' + (decoded.call.callName || ('call ' + decoded.call.callIndex))) : '—';
+            var signer = decoded.signer && decoded.signer.account ? shortAddr(decoded.signer.account.ss58) : (decoded.version.signed ? '?' : 'inherent');
+            sub = esc(signer) + ' · ' + esc(decoded.signature ? decoded.signature.scheme : 'unsigned') + ' · ' + ((hex.length - 2) / 2).toLocaleString('en-US') + ' B';
+          }
         } catch (e) {
           label = '<span style="color:var(--amber)">undecodable</span>';
           sub = esc(e.message);

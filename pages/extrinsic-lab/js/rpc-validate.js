@@ -28,11 +28,29 @@ function isHash32(s) {
 }
 
 /* A runtime version field (specVersion / transactionVersion) is a u32:
- * a JSON safe integer, a decimal string, or a 0x-hex string. Anything
- * else — an object String()'d into "[object Object]", a float, a
- * negative — is not a version and must never anchor a verdict. */
+ * a JSON safe integer, a decimal string, or a 0x-hex string WITHIN the
+ * u32 range. Anything else — an object String()'d into "[object Object]",
+ * a float, a negative, or 2^32 and above — is not a version and must
+ * never anchor a verdict: buildSigningPayload packs versions with
+ * u32le, so an out-of-range value would wrap silently and the verdict
+ * would stand on a different version than the one displayed. */
+var MAX_U32 = 4294967295;
 function parseVersionNumber(v) {
-  return parseBlockNumber(v);
+  var n = parseBlockNumber(v);
+  return n !== null && n <= MAX_U32 ? n : null;
+}
+
+/* A chain HEIGHT is a block number that could name a block on this
+ * chain: the fleet bound is 10,000,000 (the chain is at ~204k; a
+ * "height" of 99,999,999,999 or 2^53-1 is not a future block, it is a
+ * broken or hostile answer). Height 0 IS valid here — over RPC the
+ * genesis header/block legitimately sit at 0, unlike the indexer
+ * payloads where the fleet's 1..10,000,000 rule applies. Mirrors
+ * chain-console core.js validChainHeight exactly. */
+var MAX_CHAIN_HEIGHT = 10000000;
+function validChainHeight(v) {
+  var n = parseBlockNumber(v);
+  return n !== null && n <= MAX_CHAIN_HEIGHT ? n : null;
 }
 
 /* An extrinsic is Bytes: even-length 0x hex, at least 1 byte. A block
@@ -45,7 +63,10 @@ var api = {
   parseBlockNumber: parseBlockNumber,
   isHash32: isHash32,
   parseVersionNumber: parseVersionNumber,
+  validChainHeight: validChainHeight,
   validExtrinsicHex: validExtrinsicHex,
+  MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT,
+  MAX_U32: MAX_U32,
 };
 global.QEL_RPC = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;

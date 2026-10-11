@@ -284,6 +284,43 @@ test('validExtrinsicHex accepts even 0x hex >= 1 byte only', () => {
     assert(!R.validExtrinsicHex(bad), 'reject ' + JSON.stringify(bad));
   }
 });
+/* Round 2 — relations: a version is a u32 (2^32 would wrap in the
+ * payload's u32le) and a height must be able to name a block on this
+ * chain (fleet bound 10,000,000; genesis 0 valid over RPC). */
+test('parseVersionNumber enforces the u32 bound it documents', () => {
+  assertEq(R.parseVersionNumber(4294967295), 4294967295, 'u32 max');
+  assertEq(R.parseVersionNumber('4294967295'), 4294967295, 'u32 max string');
+  for (const bad of [4294967296, '4294967296', '0x100000000', 9007199254740991]) {
+    assertEq(R.parseVersionNumber(bad), null, 'reject over-u32 ' + JSON.stringify(bad));
+  }
+});
+test('validChainHeight bounds heights to the fleet 10,000,000 cap', () => {
+  assertEq(R.validChainHeight(0), 0, 'genesis valid over RPC');
+  assertEq(R.validChainHeight(204469), 204469, 'current head');
+  assertEq(R.validChainHeight('0x2fbec'), 195564, 'hex head');
+  assertEq(R.validChainHeight(10000000), 10000000, 'cap inclusive');
+  for (const bad of [10000001, 99999999999, '99999999999', -1, 1.5, 'garbage', null]) {
+    assertEq(R.validChainHeight(bad), null, 'reject ' + JSON.stringify(bad));
+  }
+});
+test('verifyExtrinsic refuses out-of-range versions instead of wrapping them', () => {
+  const kp = ml_dsa65.keygen(); kp.accountId = rand32(60);
+  const { hex } = signAndAssemble({ kp, scheme: 65, call: buildCallTransfer(rand32(61), 1000000000000n), era: Uint8Array.of(0), nonce: 1n, tip: 0n, specVersion: SPEC, txVersion: TXV, genesisHash: GENESIS, birthHash: GENESIS });
+  const d = D.decodeExtrinsic(hex); d._hex = hex;
+  for (const badCtx of [
+    { specVersion: 4294967296, txVersion: TXV, genesisHash: GENESIS, eraBirthHash: GENESIS },
+    { specVersion: SPEC, txVersion: -1, genesisHash: GENESIS, eraBirthHash: GENESIS },
+    { specVersion: SPEC, txVersion: TXV, genesisHash: GENESIS.subarray(0, 16), eraBirthHash: GENESIS },
+  ]) {
+    let threw = false;
+    try { V.verifyExtrinsic(d, badCtx); } catch (e) { threw = /u32|32 bytes/.test(e.message); }
+    assert(threw, 'must throw a clear bound error for ' + JSON.stringify({ s: String(badCtx.specVersion), t: String(badCtx.txVersion), g: badCtx.genesisHash.length }));
+  }
+  // eraBirth overshoot documents why the app must gate target >= birth:
+  // at a head below the era phase, eraBirth lands AFTER the head.
+  assertEq(D.eraBirth(5, 64, 8), 8, 'eraBirth below phase overshoots the head');
+  assertEq(D.eraBirth(100, 64, 8), 72, 'eraBirth at/above phase stays <= head');
+});
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
