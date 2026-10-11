@@ -306,6 +306,146 @@
     };
   }
 
+  /* ================= snapshot boundary (round 2) =================
+   * data/reversal.json is written by scripts/fetch-reversal-data.mjs from
+   * ONE GraphQL query, and renderLive paints its height, totals and queue
+   * rows as chain fact (the height also anchors the planner ETA and the
+   * quota ages via window.__revHeight). The pre-round-2 boundary was a
+   * single `snap.ok` check: an absurd / fractional / scientific-string /
+   * boolean height painted and anchored, fetched_at was never consulted,
+   * pending was computed with `|| 0` (an unknown total silently became
+   * 0, and cancelled + executed could exceed scheduled for a negative
+   * pending), and rows rendered raw. This boundary validates shapes AND
+   * the relations the fetcher guarantees; whole-snapshot poison returns
+   * null (the app shows "snapshot unavailable" and the planners keep
+   * working offline), while a malformed ROW drops out of its queue
+   * instead of poisoning the snapshot — unless every row drops, which
+   * means the list itself is not what the fetcher produced. */
+  var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain exists from Sept 2026
+  var SNAPSHOT_LIST_CAP = 25; // fetch-reversal-data.mjs: limit: 25 on every list
+
+  function nonNegInt(v) {
+    var n;
+    if (typeof v === "number") n = v;
+    else if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) n = Number(v);
+    else return null; // booleans, fractions, "2.02e5", objects all reject
+    return (Number.isSafeInteger(n) && n >= 0) ? n : null;
+  }
+  /* Fleet block-height shape: strict integer 1..10,000,000 only. */
+  function validBlockHeight(v) {
+    var n = nonNegInt(v);
+    return (n !== null && n >= 1 && n <= 10000000) ? n : null;
+  }
+  function validPlancks(v) {
+    if (typeof v !== "string" || !/^(0|[1-9]\d*)$/.test(v)) return null;
+    try { BigInt(v); } catch (e) { return null; }
+    return v;
+  }
+  function validTxId(v) {
+    return (typeof v === "string" && /^0x[0-9a-fA-F]{64}$/.test(v)) ? v : null;
+  }
+  function validRowTs(v, fetchedMs) {
+    if (typeof v !== "string") return null;
+    var ms = Date.parse(v);
+    if (!Number.isFinite(ms) || ms < GENESIS_FLOOR_MS || ms > fetchedMs + 300000) return null;
+    return ms;
+  }
+  function isQzAddress(v) { return typeof v === "string" && ss58Decode(v).ok; }
+
+  function cleanSnapshotList(rows, total, kind, fetchedMs) {
+    if (!Array.isArray(rows)) return null;
+    if (rows.length > SNAPSHOT_LIST_CAP) return null;
+    // The list and the aggregate count come from the same query: the
+    // list is exactly the newest min(cap, total) entries.
+    if (total !== null && rows.length !== Math.min(SNAPSHOT_LIST_CAP, total)) return null;
+    var out = [], seen = {}, prevMs = Infinity;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (!r || typeof r !== "object" || Array.isArray(r)) continue;
+      // scheduled/cancelled/executed rows are keyed by tx_id; the
+      // high-security query carries no tx_id — its rows key on who_id
+      // (one permanent enrollment per account).
+      var rowId = kind === "high_security" ? r.who_id : r.tx_id;
+      if (kind !== "high_security" && validTxId(r.tx_id) === null) continue;
+      if (typeof rowId !== "string" || seen[rowId]) continue;
+      var ms = validRowTs(r.timestamp, fetchedMs);
+      if (ms === null) continue;
+      // The fetcher orders every list newest-first (order_by timestamp
+      // desc); a survivor out of order means the payload is not the
+      // fetcher's — fail the snapshot, do not silently re-sort history.
+      if (ms > prevMs) return null;
+      if (kind === "scheduled") {
+        if (validPlancks(r.amount) === null || validPlancks(r.fee) === null) continue;
+        if (!isQzAddress(r.from_id) || !isQzAddress(r.to_id)) continue;
+      } else if (kind === "cancelled") {
+        if (!isQzAddress(r.cancelled_by_id)) continue;
+      } else if (kind === "executed") {
+        if (typeof r.result !== "string" || !r.result) continue;
+      } else if (kind === "high_security") {
+        if (!isQzAddress(r.who_id) || !isQzAddress(r.guardian_id)) continue;
+        var dl = r.delay;
+        if (!((typeof dl === "string" && !!dl) || (typeof dl === "number" && Number.isFinite(dl)))) continue;
+      }
+      seen[rowId] = 1;
+      prevMs = ms;
+      out.push(r);
+    }
+    if (rows.length > 0 && out.length === 0) return null;
+    return out;
+  }
+
+  function validateSnapshot(raw, nowMs) {
+    try {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+      if (raw.ok !== true) return null;
+      var now = (typeof nowMs === "number" && Number.isFinite(nowMs)) ? nowMs : Date.now();
+      if (typeof raw.fetched_at !== "string") return null;
+      var fetchedMs = Date.parse(raw.fetched_at);
+      if (!Number.isFinite(fetchedMs) || fetchedMs < GENESIS_FLOOR_MS || fetchedMs > now + 3600000) return null;
+      var d = raw.data;
+      if (!d || typeof d !== "object" || Array.isArray(d)) return null;
+      if (!d.status || typeof d.status !== "object") return null;
+      var height = validBlockHeight(d.status.block_height);
+      if (height === null) return null;
+      var statusTotal = nonNegInt(d.status.total_scheduled_transfers);
+      if (statusTotal === null) return null;
+      if (!d.totals || typeof d.totals !== "object") return null;
+      var totals = {}, tKeys = ["scheduled", "cancelled", "executed", "high_security"];
+      for (var i = 0; i < tKeys.length; i++) {
+        var tv = d.totals[tKeys[i]];
+        if (tv === null || tv === undefined) totals[tKeys[i]] = null;
+        else {
+          var tn = nonNegInt(tv);
+          if (tn === null) return null;
+          totals[tKeys[i]] = tn;
+        }
+      }
+      // The chain_stats row and the scheduled aggregate are two copies
+      // of the same count from the same query: they must agree exactly,
+      // and the scheduled total must be present — the hero paints it,
+      // so an unknown here is not paintable as 0.
+      if (totals.scheduled === null || totals.scheduled !== statusTotal) return null;
+      // Pending is derived, never stored: cancelled + executed cannot
+      // exceed scheduled, or the derived count would go negative.
+      if (totals.cancelled !== null && totals.executed !== null &&
+          totals.cancelled + totals.executed > totals.scheduled) return null;
+      var scheduled = cleanSnapshotList(d.scheduled, totals.scheduled, "scheduled", fetchedMs);
+      var cancelled = cleanSnapshotList(d.cancelled, totals.cancelled, "cancelled", fetchedMs);
+      var executed = cleanSnapshotList(d.executed, totals.executed, "executed", fetchedMs);
+      var highSec = cleanSnapshotList(d.high_security, totals.high_security, "high_security", fetchedMs);
+      if (scheduled === null || cancelled === null || executed === null || highSec === null) return null;
+      return {
+        ok: true,
+        fetched_at: raw.fetched_at,
+        data: {
+          status: { block_height: height, total_scheduled_transfers: statusTotal },
+          scheduled: scheduled, cancelled: cancelled, executed: executed,
+          high_security: highSec, totals: totals,
+        },
+      };
+    } catch (e) { return null; }
+  }
+
   /* ================= formatting ================= */
   function formatQTC(planck, decimals) {
     decimals = decimals === undefined ? 6 : decimals;
@@ -344,6 +484,8 @@
     encodeCancel: encodeCancel,
     encodeRecoverFunds: encodeRecoverFunds,
     validateDelay: validateDelay,
+    validBlockHeight: validBlockHeight, nonNegInt: nonNegInt,
+    validPlancks: validPlancks, validateSnapshot: validateSnapshot,
     blocksToMs: blocksToMs,
     executeAtBlock: executeAtBlock,
     volumeFee: volumeFee,

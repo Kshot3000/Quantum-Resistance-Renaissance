@@ -76,7 +76,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(live.includes("renderQuota()"), "reversal: renderLive re-runs renderQuota when the real height lands");
   ok(src.includes("no honest default to add at"), "reversal: qAdd refuses to fabricate a default height");
   const html = read("pages/reversal-desk/index.html");
-  ok(html.includes("js/app.js?v=1.50.2"), "reversal: app.js cache key bumped for the quota fix");
+  ok(html.includes("js/app.js?v=1.51.0"), "reversal: app.js cache key bumped for the quota fix");
 }
 
 // ---- 4. Mining Observatory: audited clean — keep its shape ----
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.7"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.8"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.7"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.8"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.6"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.7"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.5"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.6"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1106,6 +1106,38 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(core.includes("trendTail[2] !== cur.difficulty || recentTail[2] !== cur.difficulty"), "consensus2: trend/recent tails must land on current");
   const html = read("pages/consensus-lab/index.html");
   ok(html.includes("app.js?v=1.38.0"), "consensus2: app.js cache key bumped for the boundary fix");
+}
+
+// Batch 34 (2026-10-10 19:19): reversal-desk round 2 (Tier 2) — the
+// desk trusted data/reversal.json except for `snap.ok`: the height was
+// any truthy value (absurd / fractional / scientific-string / boolean
+// all painted and anchored the planner ETA + quota ages), fetched_at
+// was never consulted, totals painted raw with pending computed via
+// `|| 0` (a null total silently became 0; cancelled + executed could
+// exceed scheduled for a negative pending), the chain_stats scheduled
+// total was never reconciled with the aggregate total, list lengths
+// were never reconciled with the fetcher's limit:25 / counts, and
+// queue rows rendered raw. Pin: one boundary (validateSnapshot in
+// reversal-core.js) checks shapes AND relations; poison fails the
+// snapshot honestly, a malformed row drops out of its queue.
+{
+  const core = read("pages/reversal-desk/js/reversal-core.js");
+  const src = read("pages/reversal-desk/js/app.js");
+  ok(core.includes("function validateSnapshot(raw, nowMs)"), "reversal2: validateSnapshot() defined in reversal-core.js");
+  ok(core.includes("function validBlockHeight(v)"), "reversal2: validBlockHeight() defined (fleet 1..10,000,000 shape)");
+  ok(core.includes("raw.ok !== true"), "reversal2: snapshot must carry ok:true");
+  ok(core.includes("fetchedMs > now + 3600000"), "reversal2: a future fetched_at fails the snapshot");
+  ok(core.includes("fetchedMs < GENESIS_FLOOR_MS"), "reversal2: a pre-genesis fetched_at fails the snapshot");
+  ok(core.includes("totals.scheduled !== statusTotal"), "reversal2: status total must agree with the aggregate total");
+  ok(core.includes("totals.cancelled + totals.executed > totals.scheduled"), "reversal2: cancelled + executed cannot exceed scheduled");
+  ok(core.includes("Math.min(SNAPSHOT_LIST_CAP, total)"), "reversal2: list length must equal min(cap, total)");
+  ok(core.includes("if (ms > prevMs) return null;"), "reversal2: lists must stay newest-first as the fetcher orders them");
+  ok(src.includes("RC.validateSnapshot(snap)"), "reversal2: renderLive goes through the boundary");
+  ok(src.includes("t.cancelled == null || t.executed == null"), "reversal2: pending is derived only from known totals (null paints —)");
+  ok(!src.includes("(t.scheduled || 0) - (t.cancelled || 0)"), "reversal2: no || 0 pending fabrication remains");
+  const html = read("pages/reversal-desk/index.html");
+  ok(html.includes("js/app.js?v=1.51.0"), "reversal2: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/reversal-core.js?v=1.51.0"), "reversal2: reversal-core.js cache key bumped for the boundary fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

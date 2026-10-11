@@ -144,5 +144,80 @@ eq(RC.formatQTC(1234567890123456789n), "1,234,567.890123", "format with thousand
 eq(RC.formatDuration(90061000), "1d 1h 1m 1s", "duration formatting");
 eq(RC.formatDuration(5000), "5s", "short duration");
 
+/* ---------- snapshot boundary (round 2) ---------- */
+const REAL_SNAP = JSON.parse(require("fs").readFileSync(
+  require("path").join(__dirname, "..", "..", "..", "data", "reversal.json"), "utf8"));
+const NOW = Date.parse(REAL_SNAP.fetched_at) + 60000; // deterministic "now" just after capture
+const snapClone = () => JSON.parse(JSON.stringify(REAL_SNAP));
+
+ok(RC.validateSnapshot(snapClone(), NOW) !== null, "boundary: the REAL snapshot passes its own boundary");
+{
+  const c = RC.validateSnapshot(snapClone(), NOW);
+  eq(c.data.status.block_height, REAL_SNAP.data.status.block_height, "boundary: cleaned height is the validated number");
+  eq(c.data.scheduled.length, REAL_SNAP.data.scheduled.length, "boundary: real scheduled rows all survive cleaning");
+  eq(c.data.cancelled.length, REAL_SNAP.data.cancelled.length, "boundary: real cancelled rows all survive cleaning");
+  eq(c.data.executed.length, REAL_SNAP.data.executed.length, "boundary: real executed rows all survive cleaning");
+  eq(c.data.totals.scheduled, REAL_SNAP.data.totals.scheduled, "boundary: cleaned totals preserved");
+}
+eq(RC.validBlockHeight(202509), 202509, "validBlockHeight: plain height");
+eq(RC.validBlockHeight("202509"), 202509, "validBlockHeight: canonical digit string");
+eq(RC.validBlockHeight(9007199254740991), null, "validBlockHeight: absurd height rejects");
+eq(RC.validBlockHeight(202509.5), null, "validBlockHeight: fractional rejects");
+eq(RC.validBlockHeight("2.02e5"), null, "validBlockHeight: scientific string rejects");
+eq(RC.validBlockHeight(true), null, "validBlockHeight: boolean rejects");
+eq(RC.validBlockHeight(0), null, "validBlockHeight: zero rejects");
+
+const POISONS = {
+  "absurd height": (s) => { s.data.status.block_height = 9007199254740991; },
+  "fractional height": (s) => { s.data.status.block_height += 0.5; },
+  "ok false": (s) => { s.ok = false; },
+  "fetched_at in 2999": (s) => { s.fetched_at = "2999-01-01T00:00:00.000Z"; },
+  "fetched_at pre-genesis": (s) => { s.fetched_at = "2020-01-01T00:00:00.000Z"; },
+  "status total disagrees with aggregate": (s) => { s.data.status.total_scheduled_transfers += 1; },
+  "aggregate scheduled disagrees with status": (s) => { s.data.totals.scheduled += 5; },
+  "scheduled total null": (s) => { s.data.totals.scheduled = null; },
+  "pending would go negative": (s) => { s.data.totals.cancelled = s.data.totals.scheduled; },
+  "fractional total": (s) => { s.data.totals.executed += 0.5; },
+  "list longer than its total": (s) => { s.data.totals.cancelled = 5; },
+  "list over the fetcher cap": (s) => { s.data.scheduled.push({ ...s.data.scheduled[0] }); },
+  "scheduled list ascending (fetcher is desc)": (s) => { s.data.scheduled.reverse(); },
+  "every scheduled amount poisoned": (s) => { s.data.scheduled.forEach((r) => { r.amount = "abc"; }); },
+};
+for (const [name, poison] of Object.entries(POISONS)) {
+  const s = snapClone(); poison(s);
+  eq(RC.validateSnapshot(s, NOW), null, "boundary rejects: " + name);
+}
+{
+  const s = snapClone(); s.data.scheduled[3].amount = "12.5";
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.scheduled.length === REAL_SNAP.data.scheduled.length - 1,
+    "boundary drops: one fractional amount drops its row only");
+}
+{
+  const s = snapClone(); s.data.scheduled[2].to_id = "not-an-address";
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.scheduled.length === REAL_SNAP.data.scheduled.length - 1,
+    "boundary drops: one non-SS58 recipient drops its row only");
+}
+{
+  const s = snapClone(); s.data.scheduled[5].tx_id = s.data.scheduled[4].tx_id;
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.scheduled.length === REAL_SNAP.data.scheduled.length - 1,
+    "boundary drops: a duplicated tx_id drops the dupe only");
+}
+{
+  const s = snapClone();
+  s.data.executed[0].timestamp = new Date(Date.parse(s.fetched_at) + 3600000).toISOString();
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.executed.length === REAL_SNAP.data.executed.length - 1,
+    "boundary drops: a row postdating its snapshot drops only");
+}
+{
+  const s = snapClone(); s.data.totals.cancelled = null;
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.totals.cancelled === null,
+    "boundary: a null non-scheduled total stays null (paints —, never 0)");
+}
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

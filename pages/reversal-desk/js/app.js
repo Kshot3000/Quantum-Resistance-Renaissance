@@ -281,7 +281,7 @@
     return ctl.signal;
   }
   function loadSnapshot() {
-    fetch("../../data/reversal.json?v=1.50.2", { cache: "no-store", signal: timeoutSignal(9000) })
+    fetch("../../data/reversal.json?v=1.51.0", { cache: "no-store", signal: timeoutSignal(9000) })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -293,19 +293,32 @@
       });
   }
   function renderLive(snap) {
-    if (!snap || !snap.ok) throw new Error("bad snapshot");
-    var d = snap.data;
-    var h = d.status && d.status.block_height;
-    window.__revHeight = h || null;
-    $("snapPill").textContent = "snapshot · block " + (h ? h.toLocaleString() : "?") + " · " + ago(snap.fetched_at);
+    // One boundary before anything paints (round 2): RC.validateSnapshot
+    // checks shapes AND the relations the fetcher guarantees — fleet
+    // height, real capture time, status total == aggregate total,
+    // cancelled + executed <= scheduled, lists == min(25, total) and
+    // newest-first, rows carrying real tx_ids / SS58 ids / planck
+    // strings / in-window timestamps. Poison throws into loadSnapshot's
+    // catch ("snapshot unavailable", planners keep working offline)
+    // instead of anchoring the hero, the planner ETA, or quota ages.
+    var clean = RC.validateSnapshot(snap);
+    if (!clean) throw new Error("bad snapshot");
+    var d = clean.data;
+    var h = d.status.block_height;
+    window.__revHeight = h;
+    $("snapPill").textContent = "snapshot · block " + h.toLocaleString() + " · " + ago(clean.fetched_at);
     var t = d.totals;
-    var pending = (t.scheduled || 0) - (t.cancelled || 0) - (t.executed || 0);
+    // Pending is derived only when all three totals are known: an
+    // unknown (null) total paints "—", never a silent 0 (pre-fix a
+    // null cancelled total fabricated pending = scheduled - executed).
+    var pending = (t.scheduled == null || t.cancelled == null || t.executed == null)
+      ? null : t.scheduled - t.cancelled - t.executed;
     $("pScheduled").textContent = t.scheduled == null ? "—" : t.scheduled;
     $("pExecuted").textContent = t.executed == null ? "—" : t.executed;
     $("pCancelled").textContent = t.cancelled == null ? "—" : t.cancelled;
-    $("pPending").textContent = pending;
+    $("pPending").textContent = pending == null ? "—" : pending;
     $("pHS").textContent = t.high_security == null ? "—" : t.high_security;
-    $("liveNote").innerHTML = "Snapshot from the public Subsquid indexer (<code>sqm.quantus.com</code>), fetched " + esc(ago(snap.fetched_at)) + ". " +
+    $("liveNote").innerHTML = "Snapshot from the public Subsquid indexer (<code>sqm.quantus.com</code>), fetched " + esc(ago(clean.fetched_at)) + ". " +
       "Pending = scheduled − cancelled − executed. The indexer records schedule/cancel/execute events; the exact execute-at block lives in the <code>TransactionScheduled</code> event args, which this snapshot does not carry.";
     renderQueue(d);
     // re-run planner ETA now that we know the height
