@@ -195,6 +195,33 @@ t("sanitizeVault coerces a non-numeric block annotation to null, anchor survives
   (() => { const v = codec.sanitizeVault([{ ...GOOD, block: "<b>9</b>" }]);
     return v.length === 1 && v[0].block === null; })());
 
+/* --- round 2: RELATIONS, not just shapes --- */
+t("validChainHeight accepts a real height", codec.validChainHeight(204982) === true);
+t("validChainHeight accepts genesis 0 (valid over RPC)", codec.validChainHeight(0) === true);
+t("validChainHeight rejects 99,999,999,999", codec.validChainHeight(99999999999) === false);
+t("validChainHeight rejects negative/fractional/string",
+  codec.validChainHeight(-1) === false && codec.validChainHeight(1.5) === false &&
+  codec.validChainHeight("204982") === false);
+t("sanitizeVault drops a call carrying a different payload than the envelope",
+  codec.sanitizeVault([{ ...GOOD, callHex: codec.buildRemarkCall(codec.utf8ToBytes("hi"), true).callHex }]).length === 0);
+t("sanitizeVault drops a call carrying another document's envelope",
+  codec.sanitizeVault([{ ...GOOD, callHex: codec.buildRemarkCall(codec.buildEnvelope(1, new Array(32).fill(9), "Deed").bytes, true).callHex }]).length === 0);
+t("sanitizeVault drops a call whose length prefix lies",
+  codec.sanitizeVault([{ ...GOOD, callHex: codec.bytesToHex([0, 7].concat(codec.compactU32(100)).concat(codec.hexToBytes(goodEnv.hex))) }]).length === 0);
+t("sanitizeVault drops a call with a trailing byte",
+  codec.sanitizeVault([{ ...GOOD, callHex: goodCall.callHex + "ff" }]).length === 0);
+t("sanitizeVault nulls an absurd block annotation, anchor survives",
+  (() => { const v = codec.sanitizeVault([{ ...GOOD, block: "99999999999999999999999" }]);
+    return v.length === 1 && v[0].block === null; })());
+t("sanitizeVault nulls a block-0 annotation (genesis holds no remarks)",
+  (() => { const v = codec.sanitizeVault([{ ...GOOD, block: "0" }]);
+    return v.length === 1 && v[0].block === null; })());
+t("events reject trailing bytes after the last record",
+  codec.decodeSystemEvents(craftEvents().concat([0xaa])).ok === false);
+t("events reject a Remarked record under the Finalization phase",
+  codec.decodeSystemEvents([0x04, 0x01, 0x00, 0x05,
+    ...new Array(32).fill(0x11), ...new Array(32).fill(0x22), 0x00]).ok === false);
+
 /* --- storage key --- */
 const evKey = codec.systemEventsKey((b) => twox.twox128bytes(b));
 t("System.Events key shape",

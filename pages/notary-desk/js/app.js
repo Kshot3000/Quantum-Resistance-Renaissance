@@ -364,7 +364,10 @@ function renderVault() {
        * block, a chain fact the user never proved. */
       const t = blk.value.trim();
       const vv = loadVault(); if (!vv[idx]) return;
-      vv[idx].block = /^\d+$/.test(t) ? t : null;
+      /* Same bound sanitizeVault enforces at load: a landed-block claim
+       * must be a height the chain can have (1..10,000,000). */
+      vv[idx].block = (/^\d+$/.test(t) && C.validChainHeight(Number(t)) && Number(t) >= 1)
+        ? String(Number(t)) : null;
       if (t && !vv[idx].block) blk.value = "";
       saveVault(vv);
       /* A HIT verdict quotes the anchor's recorded block, so editing
@@ -522,6 +525,10 @@ function spotRemarkCall(extHex) {
     if (!b || b.length < 4) return null;
     let o = 0;
     const lc = C.readCompact(b, o); if (!lc) return null; o = lc.next;
+    // RELATION: the length prefix must cover the extrinsic EXACTLY —
+    // a shorter/longer entry is a different byte string than the one
+    // whose payload hash the event carries.
+    if (lc.value !== b.length - o) return null;
     const version = b[o++];
     if (version === 0x84) {
       // signed: MultiAddress::Id
@@ -540,13 +547,18 @@ function spotRemarkCall(extHex) {
     const pallet = b[o], callIdx = b[o + 1];
     if (pallet !== 0 || (callIdx !== 0 && callIdx !== 7)) return null;
     const pl = C.readCompact(b, o + 2); if (!pl) return null;
-    if (pl.next + pl.value > b.length) return null;
+    // The call is the extrinsic's last component: its payload must end
+    // the entry exactly — trailing bytes are not part of this call.
+    if (pl.next + pl.value !== b.length) return null;
     return { pallet, call: callIdx, payload: b.slice(pl.next, pl.next + pl.value) };
   } catch { return null; }
 }
 
 function renderRemarked(blockNum, senderHex, eventHash, payloadInfo, seenAt) {
-  const key = blockNum + ":" + eventHash;
+  // RELATION: the row's identity is (block, SENDER, hash) — two
+  // different senders anchoring the same bytes in one block are two
+  // anchors, and keying on the hash alone silently dropped the second.
+  const key = blockNum + ":" + senderHex + ":" + eventHash;
   if (board.seen.has(key)) return;
   const senderBytes = C.hexToBytes(senderHex);
   const sender = senderBytes ? C.ss58Encode32(senderBytes, b2b512) : null;
@@ -587,7 +599,7 @@ function renderRemarked(blockNum, senderHex, eventHash, payloadInfo, seenAt) {
  * never a "#NaN" row, never a silently-swallowed blob behind a
  * "scan complete" claim, and never a fake empty block. A null storage
  * answer is legitimate (no System.Events value at that hash). */
-async function processBlock(blockHash) {
+async function processBlock(blockHash, expectedNum) {
   if (!C.isHash32(blockHash)) throw new Error("node returned a malformed block hash");
   const [blockRes, evRes] = await Promise.all([
     rpc("chain_getBlock", [blockHash]),
@@ -599,6 +611,14 @@ async function processBlock(blockHash) {
     throw new Error("node returned a malformed block");
   const blockNum = C.parseBlockNumber(blockRes.block.header.number);
   if (blockNum === null) throw new Error("node returned a malformed block number");
+  // RELATIONS: the height must be one this chain can have, and when the
+  // caller asked for a specific height (scan step / live head), the
+  // returned block must BE that height — a block answering a different
+  // height paints its remarks under the wrong number.
+  if (!C.validChainHeight(blockNum))
+    throw new Error("node returned a block number outside the chain's height range");
+  if (expectedNum !== undefined && expectedNum !== null && blockNum !== expectedNum)
+    throw new Error("node returned a block for a different height than requested");
   if (evRes === null || evRes === undefined) return;
   if (typeof evRes !== "string" || !/^0x(?:[0-9a-fA-F]{2})+$/.test(evRes))
     throw new Error("node returned malformed System.Events data");
@@ -614,14 +634,18 @@ async function processBlock(blockHash) {
   for (const r of dec.records) {
     if (r.skipped) continue;
     let payloadInfo = null;
-    for (const ex of exts) {
-      if (typeof ex !== "string") continue;
+    // RELATION: the record's ApplyExtrinsic phase index NAMES the
+    // extrinsic that emitted it — the payload is recovered from that
+    // extrinsic alone, not from any same-hash extrinsic in the block
+    // (a copy later in the block did not emit this event). An index
+    // past the block's extrinsic list is inconsistent node data: the
+    // event renders with no recovered payload, never a borrowed one.
+    const idx = (r.phase && r.phase.kind === "ApplyExtrinsic") ? r.phase.index : -1;
+    const ex = (idx >= 0 && idx < exts.length) ? exts[idx] : null;
+    if (typeof ex === "string") {
       const spot = spotRemarkCall(ex);
-      if (!spot) continue;
-      const h = C.bytesToHex(b2b256(spot.payload));
-      if (h === r.hashHex) {
+      if (spot && C.bytesToHex(b2b256(spot.payload)) === r.hashHex) {
         payloadInfo = { parsed: C.parseRemark(spot.payload), call: spot.call };
-        break;
       }
     }
     renderRemarked(blockNum, r.senderHex, r.hashHex, payloadInfo, seenAt);
@@ -675,11 +699,12 @@ $("connBtn").addEventListener("click", () => {
       if (!h || typeof h !== "object") return;
       const hn = C.parseBlockNumber(h.number);
       if (hn === null) return; // a garbage head number anchors nothing
+      if (!C.validChainHeight(hn)) return; // nor does an impossible one
       try {
         // the subscription yields a header (no hash): resolve it to a block hash
         const hash = await rpc("chain_getBlockHash", [hn]);
         if (!C.isHash32(hash)) return;
-        await processBlock(hash);
+        await processBlock(hash, hn);
       } catch (e) { /* one bad block never kills the watch */ }
     }
   };
@@ -715,7 +740,7 @@ $("backBtn").addEventListener("click", async () => {
     const head = await rpc("chain_getHeader", []);
     if (!isCurrent()) return;
     const headNum = (head && typeof head === "object") ? C.parseBlockNumber(head.number) : null;
-    if (headNum === null) throw new Error("node returned a malformed head");
+    if (headNum === null || !C.validChainHeight(headNum)) throw new Error("node returned a malformed head");
     const N = 720, from = Math.max(1, headNum - N + 1);
     let found = 0;
     for (let n = headNum; n >= from; n--) {
@@ -723,7 +748,7 @@ $("backBtn").addEventListener("click", async () => {
       const hash = await rpc("chain_getBlockHash", [n]);
       if (!isCurrent()) return;
       const before = board.seen.size;
-      await processBlock(hash);
+      await processBlock(hash, n);
       if (!isCurrent()) return;
       found += board.seen.size - before;
       const done = headNum - n + 1;

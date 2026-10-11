@@ -534,8 +534,8 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(!app.includes("hexToNum"), "notary: no unchecked parseInt header coercion remains");
   ok(!app.includes("parseInt($(\"nonceInput\")"), "notary: no parseInt nonce coercion remains");
   const html = read("pages/notary-desk/index.html");
-  ok(html.includes("js/app.js?v=1.52.0"), "notary: app.js cache key bumped for the boundary fix");
-  ok(html.includes("js/notary-codec.js?v=1.48.0"), "notary: notary-codec.js cache key bumped for the boundary fix");
+  ok(html.includes("js/app.js?v=1.53.0"), "notary: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/notary-codec.js?v=1.49.0"), "notary: notary-codec.js cache key bumped for the boundary fix");
 }
 
 // Batch 16 (2026-10-09 20:19): watchtower (Tier 2) — its persisted state
@@ -753,7 +753,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("verifyLive = true;"), "notary: a fresh verdict marks itself live for voiding");
   ok((app.match(/voidVerifyResult\(/g) || []).length >= 7, "notary: voidVerifyResult wired at definition + digest edit + verify drop + save + delete + clear + block annotation");
   const html = read("pages/notary-desk/index.html");
-  ok(html.includes("js/app.js?v=1.52.0"), "notary: app.js cache key bumped for the staleness fix");
+  ok(html.includes("js/app.js?v=1.53.0"), "notary: app.js cache key bumped for the staleness fix");
 }
 
 // Batch 23 (2026-10-10 08:19): network-dashboard (Tier 2) — the first
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.16"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.17"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.16"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.17"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.15"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.16"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.14"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.15"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1400,6 +1400,49 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("js/app.js?v=1.45.0"), "extrinsic2: app.js cache key bumped for the round-2 fix");
   ok(html.includes("js/rpc-validate.js?v=1.1.0"), "extrinsic2: rpc-validate.js cache key bumped for the round-2 fix");
   ok(html.includes("js/verify.js?v=1.40.1"), "extrinsic2: verify.js cache key bumped for the round-2 fix");
+}
+
+// Batch 43 (2026-10-11 04:19): Notary Desk round 2 (Tier 1) — validate
+// RELATIONS, not just shapes. Round 1's sanitizeVault checked each
+// vault field alone, so an anchor whose stored call carried a
+// DIFFERENT payload than its envelope (another document, a raw "hi")
+// survived — the vault and verify fingerprint described one document
+// while the broadcastable call anchored another; a call whose compact
+// length prefix lied or which carried a trailing byte survived; a
+// block annotation of 10^23 (or 0) stood as a landing claim. The
+// events decoder accepted trailing bytes after the last record and a
+// Remarked record under the Finalization phase. The board had no
+// fleet height bound (a 99,999,999,999 header painted), never checked
+// the returned block was the height it asked for, recovered payloads
+// from ANY same-hash extrinsic instead of the one the record's
+// ApplyExtrinsic phase names, accepted extrinsics whose length prefix
+// or payload did not end the entry exactly, and deduped board rows by
+// (block, hash) — silently dropping a second sender's anchor of the
+// same bytes. Pin: the codec's call-structure + payload==envelope
+// relations and bounded block annotation, decodeSystemEvents'
+// exact-consumption + ApplyExtrinsic-only Remarked, the app's
+// validChainHeight gates, expected-height check, phase-index payload
+// recovery, exact length/payload ends, and the sender-keyed dedup.
+{
+  const codec = read("pages/notary-desk/js/notary-codec.js");
+  ok(codec.includes("function validChainHeight(v)"), "notary2: validChainHeight() defined in codec");
+  ok(codec.includes("var MAX_CHAIN_HEIGHT = 10000000"), "notary2: fleet 10,000,000 height bound present");
+  ok(codec.includes("cpl.next + cpl.value !== callBytes.length"), "notary2: vault call length prefix must end the call exactly");
+  ok(codec.includes("bytesToHex(payloadBytes) !== envelopeHex"), "notary2: vault call payload must equal the stored envelope");
+  ok(codec.includes("Remarked event outside ApplyExtrinsic phase"), "notary2: a Remarked record outside ApplyExtrinsic is malformed");
+  ok(codec.includes("trailing bytes after the last event record"), "notary2: event records must consume the blob exactly");
+  const app = read("pages/notary-desk/js/app.js");
+  ok(app.includes("C.validChainHeight(blockNum)"), "notary2: board block height bound to the chain");
+  ok(app.includes("node returned a block for a different height than requested"), "notary2: a block answering a different height is an error");
+  ok(app.includes("await processBlock(hash, hn)"), "notary2: live watch passes its head height as the expected height");
+  ok(app.includes("await processBlock(hash, n)"), "notary2: scan passes each requested height as the expected height");
+  ok(app.includes("lc.value !== b.length - o"), "notary2: spotRemarkCall requires the length prefix to cover the entry exactly");
+  ok(app.includes("pl.next + pl.value !== b.length"), "notary2: spotRemarkCall requires the payload to end the entry exactly");
+  ok(app.includes('blockNum + ":" + senderHex + ":" + eventHash'), "notary2: board dedup keys on (block, sender, hash)");
+  ok(app.includes("r.phase.kind === \"ApplyExtrinsic\"") || app.includes("kind === \"ApplyExtrinsic\" ? r.phase.index"), "notary2: payload recovery follows the record's phase index");
+  const html = read("pages/notary-desk/index.html");
+  ok(html.includes("js/app.js?v=1.53.0"), "notary2: app.js cache key bumped for the round-2 fix");
+  ok(html.includes("js/notary-codec.js?v=1.49.0"), "notary2: notary-codec.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

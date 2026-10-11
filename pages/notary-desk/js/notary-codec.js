@@ -251,6 +251,14 @@
       r = { phase: phaseInfo, pallet: pallet, variant: variant,
             senderHex: null, hashHex: null, skipped: true };
       if (pallet === PALLET_SYSTEM && variant === EVENT_REMARKED) {
+        // RELATION: System.Remarked is deposited by remark_with_event
+        // during extrinsic application — under a Finalization or
+        // Initialization phase it cannot exist, so such a record means
+        // the blob is not what it claims to be, not a board row.
+        if (phaseInfo.kind !== "ApplyExtrinsic") {
+          out.error = "Remarked event outside ApplyExtrinsic phase at record " + i;
+          return out;
+        }
         if (o + 64 > bytes.length) { out.error = "truncated Remarked fields"; return out; }
         r.senderHex = bytesToHex(bytes.slice(o, o + 32));
         r.hashHex = bytesToHex(bytes.slice(o + 32, o + 64));
@@ -269,6 +277,10 @@
       o += tc.value * 32;
       out.records.push(r);
     }
+    // RELATION: the compact count headed the vector, so the records must
+    // consume the blob EXACTLY — leftover bytes are a malformed tail the
+    // count never described, not extra data to silently ignore.
+    if (o !== bytes.length) { out.error = "trailing bytes after the last event record"; return out; }
     out.ok = true;
     return out;
   }
@@ -295,6 +307,14 @@
   // A 32-byte hash is exactly 0x + 64 hex digits.
   function isHash32(s) {
     return typeof s === "string" && /^0x[0-9a-fA-F]{64}$/.test(s);
+  }
+  // Fleet chain-height bound (mirrors chain-console / extrinsic-lab
+  // rpc-validate): a height is an integer in [0, 10,000,000] — genesis 0
+  // is valid over RPC. parseBlockNumber alone checks only the SHAPE, so
+  // a height of 99,999,999,999 passed it and painted as chain fact.
+  var MAX_CHAIN_HEIGHT = 10000000;
+  function validChainHeight(v) {
+    return Number.isSafeInteger(v) && v >= 0 && v <= MAX_CHAIN_HEIGHT;
   }
   // A subscription id is a non-empty string or a non-negative integer.
   function validSubscriptionId(v) {
@@ -336,6 +356,13 @@
       if (callBytes[0] !== PALLET_SYSTEM ||
           (callBytes[1] !== CALL_REMARK && callBytes[1] !== CALL_REMARK_WITH_EVENT)) continue;
       if ((callBytes[1] === CALL_REMARK_WITH_EVENT) !== a.withEvent) continue;
+      // RELATION (round 2): the call must be structurally exact — its
+      // compact length prefix must describe a non-empty payload that
+      // ends the call precisely. A lying prefix or a trailing byte
+      // means these bytes are not the call the desk built.
+      var cpl = readCompact(callBytes, 2);
+      if (!cpl || cpl.value === 0 || cpl.next + cpl.value !== callBytes.length) continue;
+      var payloadBytes = callBytes.slice(cpl.next, cpl.next + cpl.value);
       var digestHex = null, algo = null, envelopeHex = null;
       if (a.mode === "document") {
         if (typeof a.digestHex !== "string" || !/^[0-9a-fA-F]{64}$/.test(a.digestHex)) continue;
@@ -350,11 +377,23 @@
         if (parsed.digestHex !== digestHex || parsed.algo !== algo) continue;
         if (parsed.label !== (a.label || "")) continue;
         envelopeHex = a.envelopeHex.toLowerCase();
+        // RELATION (round 2): the stored call must anchor THIS envelope
+        // — a call carrying any other payload (another document, a raw
+        // message) would broadcast an anchor for something else while
+        // the vault and the verify fingerprint describe this document.
+        if (bytesToHex(payloadBytes) !== envelopeHex) continue;
       } else {
         if (a.digestHex !== null || a.algo !== null || a.envelopeHex !== null) continue;
       }
       var block = null;
-      if (typeof a.block === "string" && /^\d+$/.test(a.block)) block = a.block;
+      if (typeof a.block === "string" && /^\d+$/.test(a.block)) {
+        // RELATION (round 2): the annotation claims the anchor LANDED in
+        // this block, so it must be a height the chain can actually
+        // have (1..10,000,000 — genesis holds no remarks). Absurd digit
+        // strings coerce to null like any other non-number annotation.
+        var bn = Number(a.block);
+        if (validChainHeight(bn) && bn >= 1) block = String(bn);
+      }
       out.push({
         id: (typeof a.id === "string" && a.id) ? a.id : "n-sanitized-" + out.length,
         created: a.created, mode: a.mode, algo: algo, digestHex: digestHex,
@@ -424,6 +463,7 @@
     signedLengthEstimate: signedLengthEstimate, formatQTC: formatQTC,
     decodeSystemEvents: decodeSystemEvents,
     parseBlockNumber: parseBlockNumber, isHash32: isHash32,
+    validChainHeight: validChainHeight, MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT,
     validSubscriptionId: validSubscriptionId, sanitizeVault: sanitizeVault,
     ss58Encode32: ss58Encode32, systemEventsKey: systemEventsKey
   };
