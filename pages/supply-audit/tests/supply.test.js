@@ -83,7 +83,10 @@ const fixture = {
     transfers: [{ amount_plancks: S0.toString(), from: A.MINT_SENTINEL, to: POOL_ADDR }] },
   mined: { reward_events: 2, total_plancks: "610000000000" },
   balances_plancks: { free: (S0 + 610000000000n + 50000000000n).toString(), reserved: "0", frozen: "0" },
-  vesting: { schedules: 1, total_plancks: "1000000000000000", claimed_plancks: "0", pool_account: POOL_ADDR, pool_free_plancks: "1000000000000000" },
+  // Relationally consistent with the round-2 boundary: vesting total is
+  // carved out of the pool's genesis allocation (S0, the only transfer),
+  // and pool_free == allocation - claimed to the planck.
+  vesting: { schedules: 1, total_plancks: (S0 - 1000000000n).toString(), claimed_plancks: "100000000000000000", pool_account: POOL_ADDR, pool_free_plancks: (S0 - 100000000000000000n).toString() },
   mint_sentinel: { free_plancks: "0", out_nongenesis_count: 4, out_nongenesis_plancks: "1220000000000" },
 };
 const fa = A.computeAudit(fixture);
@@ -169,10 +172,57 @@ rejects("vesting claimed > total", (d) => { d.vesting.claimed_plancks = (BigInt(
 rejects("vesting malformed pool address", (d) => { d.vesting.pool_account = "x"; });
 rejects("sentinel outflow markup string", (d) => { d.mint_sentinel.out_nongenesis_plancks = "12a3"; });
 ok("sanitize accepts a null pool balance (unavailable != malformed)",
-  A.sanitizeSupply(Object.assign(cloneFixture(), {})).vesting.pool_free_plancks === "1000000000000000" &&
+  A.sanitizeSupply(Object.assign(cloneFixture(), {})).vesting.pool_free_plancks === (S0 - 100000000000000000n).toString() &&
   (() => { const d = cloneFixture(); d.vesting.pool_free_plancks = null; return A.sanitizeSupply(d).vesting.pool_free_plancks === null; })());
 ok("computeAudit rejects a malformed payload (no silent figures)",
   (() => { const d = cloneFixture(); d.mined.total_plancks = "-1"; try { A.computeAudit(d); return false; } catch { return true; } })());
+
+// ---------- sanitizeSupply round 2: relations, not just shapes ----------
+// Every payload below is shape-valid under the round-1 boundary; each
+// breaks exactly one relation between fields.
+const GRANT_ADDR = "qzjpLEi51md3q9FpECBTxRuLQsP31N5NmT9CF3ovVXY2RVKWE"; // real genesis grant #2
+rejects("reward_events != block_height (one MinerRewarded per block)", (d) => { d.mined.reward_events = 1; });
+rejects("fetched_at before the genesis floor", (d) => { d.fetched_at = "2025-01-01T00:00:00.000Z"; });
+rejects("fetched_at in the future", (d) => { d.fetched_at = new Date(Date.now() + 7 * 86400000).toISOString(); });
+rejects("leading-zero string block_height", (d) => { d.block_height = "02"; });
+rejects("genesis transfer not from the mint sentinel", (d) => { d.genesis.transfers[0].from = POOL_ADDR; d.genesis.transfers[0].to = GRANT_ADDR; d.vesting.pool_account = GRANT_ADDR; });
+rejects("vesting pool_account is not the genesis pool recipient", (d) => { d.vesting.pool_account = GRANT_ADDR; });
+rejects("vesting total exceeds the genesis pool allocation", (d) => { d.vesting.total_plancks = (S0 + 1000000000000n).toString(); d.vesting.claimed_plancks = "0"; d.vesting.pool_free_plancks = S0.toString(); });
+rejects("pool_free != genesis allocation - claimed", (d) => { d.vesting.pool_free_plancks = (BigInt(d.vesting.pool_free_plancks) + 1000000000000n).toString(); });
+rejects("vesting total positive with zero schedules", (d) => { d.vesting.schedules = 0; });
+rejects("mined total below the schedule floor for its events", (d) => { d.mined.total_plancks = "10000000000"; });
+rejects("mined total above the schedule sanity ceiling for its events", (d) => { d.mined.total_plancks = "2000000000000"; });
+rejects("total_supply_plancks != free+reserved+frozen", (d) => {
+  d.total_supply_plancks = (BigInt(d.balances_plancks.free) + 1n).toString();
+});
+rejects("sentinel outflows below the recorded rewards", (d) => { d.mint_sentinel.out_nongenesis_plancks = "600000000000"; });
+rejects("sentinel outflow count below the reward event count", (d) => { d.mint_sentinel.out_nongenesis_count = 1; });
+rejects("mint out_count != nongenesis + genesis counts", (d) => { d.mint_sentinel.out_count = 99; });
+rejects("mint out_total != nongenesis + genesis totals", (d) => {
+  d.mint_sentinel.out_count = d.mint_sentinel.out_nongenesis_count + d.genesis.count;
+  d.mint_sentinel.out_total_plancks = (BigInt(d.mint_sentinel.out_nongenesis_plancks) + BigInt(d.genesis.total_plancks) + 1n).toString();
+});
+// Two-transfer genesis variants: ordering / duplicates / account cover.
+function twoTransfer(d, first, second) {
+  d.genesis = { count: 2, total_plancks: S0.toString(), transfers: [
+    { amount_plancks: first.toString(), from: A.MINT_SENTINEL, to: POOL_ADDR },
+    { amount_plancks: second.toString(), from: A.MINT_SENTINEL, to: GRANT_ADDR },
+  ]};
+  d.vesting.pool_account = POOL_ADDR;
+  d.vesting.total_plancks = (first - 1000000000n).toString();
+  d.vesting.claimed_plancks = "0";
+  d.vesting.pool_free_plancks = first.toString();
+}
+ok("sanitize accepts a consistent two-transfer genesis",
+  !!A.sanitizeSupply((() => { const d = cloneFixture(); twoTransfer(d, S0 - 3000000000000n, 3000000000000n); return d; })()));
+rejects("genesis list not amount-descending", (d) => { twoTransfer(d, 3000000000000n, S0 - 3000000000000n); });
+rejects("duplicate genesis recipient", (d) => { twoTransfer(d, S0 - 3000000000000n, 3000000000000n); d.genesis.transfers[1].to = POOL_ADDR; });
+rejects("accounts_total below the genesis recipient count", (d) => { twoTransfer(d, S0 - 3000000000000n, 3000000000000n); d.accounts_total = 1; });
+ok("validBlockHeight shape (fleet)", A.validBlockHeight(203246) === 203246 && A.validBlockHeight("203246") === 203246 &&
+  A.validBlockHeight(0) === null && A.validBlockHeight(2.5) === null && A.validBlockHeight("2.02e5") === null &&
+  A.validBlockHeight(true) === null && A.validBlockHeight(9007199254740991) === null);
+ok("validFetchedAt window", A.validFetchedAt("2026-10-10T00:00:00.000Z") !== null &&
+  A.validFetchedAt("2025-12-31T00:00:00.000Z") === null && A.validFetchedAt("not-a-date") === null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log("FAILURES:\n - " + failures.join("\n - ")); process.exit(1); }

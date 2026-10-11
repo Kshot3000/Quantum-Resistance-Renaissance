@@ -64,7 +64,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok((src.match(/showBootError\(e\)/g) || []).length >= 3, "supply: both boot stages (load + compute/render) are guarded");
   ok(src.includes('"unavailable — audit not run"'), "supply: data-mode reports unavailable instead of loading…");
   const html = read("pages/supply-audit/index.html");
-  ok(html.includes('app.js?v=1.31.0'), "supply: app.js cache key bumped for the boot fix");
+  ok(html.includes('app.js?v=1.32.0'), "supply: app.js cache key bumped for the boot fix");
 }
 
 // ---- 3. Reversal Desk: no stale hard-coded height; quota re-bases on load ----
@@ -798,7 +798,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 // of letting them reach BigInt.
 {
   const core = read("pages/supply-audit/js/audit-core.js");
-  ok(core.includes("function sanitizeSupply(d)"), "supply2: sanitizeSupply() defined in audit-core");
+  ok(core.includes("function sanitizeSupply(d, nowMs)"), "supply2: sanitizeSupply() defined in audit-core (round-2 signature, Batch 37)");
   ok(core.includes("genesis.total_plancks != sum of its transfers"), "supply2: genesis total cross-checked against its transfer list");
   ok(core.includes("d.mint_sentinel_id !== MINT_SENTINEL"), "supply2: mint-sentinel id pinned to the canonical account");
   ok(core.includes("vesting.claimed_plancks exceeds vesting.total_plancks"), "supply2: vesting claimed bounded by vesting total");
@@ -806,11 +806,11 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const app = read("pages/supply-audit/app.js");
   ok(app.includes("return A.sanitizeSupply(toSnapshot(core"), "supply2: live payload sanitized inside loadSupply's try (fallback on malformed)");
   ok(app.includes("var snap = A.sanitizeSupply(await fetchJson("), "supply2: snapshot sanitized on the fallback path");
-  ok(app.includes("function cleanBlocks(blocks)"), "supply2: cleanBlocks() defined for the auxiliary live.json overlay");
-  ok(app.includes("blocks = cleanBlocks(live.data.blocks);"), "supply2: recent blocks cleaned before they reach drawRewards");
+  ok(app.includes("function cleanBlocks(blocks, subsidy, statusHeight)"), "supply2: cleanBlocks() defined for the auxiliary live.json overlay (round-2 signature, Batch 37)");
+  ok(app.includes("blocks = cleanBlocks(live.data.blocks, a.subsidy,"), "supply2: recent blocks cleaned against the audited subsidy before they reach drawRewards");
   const html = read("pages/supply-audit/index.html");
-  ok(html.includes("js/audit-core.js?v=1.29.0"), "supply2: audit-core cache key bumped for the boundary fix");
-  ok(html.includes("app.js?v=1.31.0"), "supply2: app.js cache key bumped for the boundary fix");
+  ok(html.includes("js/audit-core.js?v=1.30.0"), "supply2: audit-core cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.32.0"), "supply2: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 25 (2026-10-10 10:19): mining-observatory (Tier 2) — the third
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.10.10"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.10.11"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.47.10"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.11"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.50.9"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.50.10"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.47.8"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.47.9"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1193,6 +1193,43 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes('if (validFetchedAt(payload.fetched_at) === null) throw new Error("snapshot capture time invalid");'), "netdash2: fetchSnapshot rejects a bogus capture time");
   const html = read("pages/network-dashboard/index.html");
   ok(html.includes("app.js?v=1.10.0"), "netdash2: app.js cache key bumped for the round-2 fix");
+}
+
+// Batch 37 (2026-10-10 22:19): supply-audit round 2 (Tier 2) — round 1
+// (Batch 24) validated each field's shape; the relations between fields
+// were unchecked: reward_events could disagree with block_height, a
+// genesis transfer could come from a non-sentinel account (or the list
+// could run ascending, so a 3 QTC grant posed as the vesting pool, or
+// repeat a recipient), the vesting pool_account could point anywhere
+// and pool_free float free of what the pool received and paid out, a
+// mined total of 0.01 QTC across ~203k reward events painted as fact,
+// the snapshot's redundant totals (total_supply_plancks, sentinel
+// out_count/out_total) were never restated against their components,
+// fetched_at needed only to parse, and the auxiliary live.json overlay
+// capped rewards at a shape-only 10 QTC so a 9 QTC "reward" painted
+// on the chart. Pin: sanitizeSupply validates the relations (all
+// verified exact/plausible in live data at height 203,246 before
+// tightening), and cleanBlocks ties the overlay to the audited
+// subsidy and the snapshot's own status head.
+{
+  const core = read("pages/supply-audit/js/audit-core.js");
+  ok(core.includes("function validBlockHeight(v)"), "supply3: validBlockHeight() defined (fleet height shape)");
+  ok(core.includes("function validFetchedAt(v, nowMs)"), "supply3: validFetchedAt() defined (real capture times only)");
+  ok(core.includes('if (rewardEvents !== h) malformed("mined.reward_events != block_height")'), "supply3: one MinerRewarded per block — events must equal the height");
+  ok(core.includes("is not from the mint sentinel"), "supply3: every genesis transfer flows from the mint sentinel");
+  ok(core.includes("genesis.transfers is not amount-descending"), "supply3: genesis list runs amount-descending (row 0 is the pool)");
+  ok(core.includes("duplicates a genesis recipient"), "supply3: genesis recipients are distinct");
+  ok(core.includes("vesting.pool_account is not the genesis pool recipient"), "supply3: vesting pool identity is genesis row 0");
+  ok(core.includes("vesting.pool_free_plancks != genesis pool allocation - claimed"), "supply3: pool free == received - claimed, to the planck");
+  ok(core.includes("mined.total_plancks below the schedule floor for its event count"), "supply3: mined total floored by the emission schedule");
+  ok(core.includes("total_supply_plancks != free+reserved+frozen"), "supply3: redundant supply total restates its components");
+  ok(core.includes("mint_sentinel outflows below the recorded rewards"), "supply3: sentinel outflows cover the recorded rewards");
+  const app = read("pages/supply-audit/app.js");
+  ok(app.includes("total_supply_plancks: (BigInt(core.totals.aggregate.sum.free) +"), "supply3: live builder restates the supply total for cross-checking");
+  ok(app.includes("if (heights[0] !== head) return null;"), "supply3: aux overlay head must agree with its own status height");
+  const html = read("pages/supply-audit/index.html");
+  ok(html.includes("js/audit-core.js?v=1.30.0"), "supply3: audit-core cache key bumped for the round-2 fix");
+  ok(html.includes("app.js?v=1.32.0"), "supply3: app.js cache key bumped for the round-2 fix");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

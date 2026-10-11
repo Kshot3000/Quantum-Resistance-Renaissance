@@ -39,6 +39,12 @@ function toSnapshot(core, fetchedAt, poolFree){
       reserved: core.totals.aggregate.sum.reserved,
       frozen: core.totals.aggregate.sum.frozen
     },
+    /* Restate the component sum so sanitizeSupply can cross-check it
+     * on the live path exactly like the snapshot's total (a null sum
+     * throws here and falls back to the snapshot, as before). */
+    total_supply_plancks: (BigInt(core.totals.aggregate.sum.free) +
+      BigInt(core.totals.aggregate.sum.reserved) +
+      BigInt(core.totals.aggregate.sum.frozen)).toString(),
     vesting: {
       schedules: core.vestAgg.aggregate.count,
       total_plancks: core.vestAgg.aggregate.sum.total,
@@ -315,18 +321,40 @@ function redrawCharts(a){
 }
 
 /* The recent-blocks overlay is AUXILIARY data: it may refine a chart,
- * it must never be able to kill the audit. Rows whose reward is not a
- * sane planck string (digit-only, <= 10 QTC — current subsidy is
- * ~0.30 QTC, fees included) are dropped, never handed to BigInt in
- * drawRewards, where a throw used to route the whole boot into
- * showBootError and dash figures the supply data had proven good. */
-function cleanBlocks(blocks){
-  if (!Array.isArray(blocks)) return null;
+ * it must never be able to kill the audit. Round 2 ties it to the
+ * chain the audit just proved: the list is a set-level claim (heights
+ * strictly descending from the snapshot's OWN status head — a head
+ * mismatch or an inversion withholds the whole overlay, like
+ * Tokenomics/Network Dashboard), and each reward must fit the
+ * emission schedule around the audited subsidy — floor subsidy minus
+ * the 0.01 QTC leaf-rounding slack, ceiling subsidy + 0.5 QTC of fee
+ * slack (live rewards run 0.30-0.37 against a ~0.305 schedule; the old
+ * shape-only 10 QTC cap let a 9 QTC "reward" paint). A row failing
+ * the reward bound drops alone; nothing here is handed to BigInt in
+ * drawRewards unvalidated, where a throw used to route the whole
+ * boot into showBootError and dash figures the supply data had
+ * proven good. */
+function cleanBlocks(blocks, subsidy, statusHeight){
+  if (!Array.isArray(blocks) || !blocks.length) return null;
+  var head = A.validBlockHeight(statusHeight);
+  if (head === null) return null;
+  var heights = [];
+  for (var i = 0; i < blocks.length; i++){
+    var b = blocks[i];
+    if (!b || typeof b !== "object" || Array.isArray(b)) return null;
+    var bh = A.validBlockHeight(b.height);
+    if (bh === null) return null;
+    if (i > 0 && bh >= heights[i - 1]) return null; // must run newest-first
+    heights.push(bh);
+  }
+  if (heights[0] !== head) return null; // head must agree with the status height
+  var lo = subsidy - 10000000000n, hi = subsidy + 500000000000n;
   var out = [];
   blocks.forEach(function(b){
-    if (!b || typeof b !== "object" || Array.isArray(b)) return;
     var reward = A.validPlancks(b.reward);
-    if (reward === null || BigInt(reward) > 10000000000000n) return;
+    if (reward === null) return;
+    var r = BigInt(reward);
+    if (r < lo || r > hi) return;
     out.push({ reward: reward });
   });
   return out.length ? out : null;
@@ -356,18 +384,22 @@ async function boot(){
   var d;
   try { d = await loadSupply(); }
   catch (e) { showBootError(e); return; }
-  var blocks = null;
-  try {
-    var live = await fetchJson("../../data/live.json", 8000);
-    if (live && live.data && live.data.blocks) blocks = cleanBlocks(live.data.blocks);
-  } catch (e) {}
-  window.__blocks = blocks;
   var t0 = Date.now();
   var a;
   try {
     a = A.computeAudit(d);
     window.__audit = a;
     window.__supplyData = d;
+    /* The aux overlay is cleaned against the AUDITED subsidy, so it
+     * is fetched only after the audit itself has been proven. */
+    var blocks = null;
+    try {
+      var live = await fetchJson("../../data/live.json", 8000);
+      if (live && live.data && live.data.blocks)
+        blocks = cleanBlocks(live.data.blocks, a.subsidy,
+          live.data.status && live.data.status.block_height);
+    } catch (e) {}
+    window.__blocks = blocks;
     renderHero(a, d);
     renderVerdict(a, d);
     renderLedgers(a, d);
