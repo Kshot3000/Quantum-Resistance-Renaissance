@@ -133,6 +133,16 @@
             <option value="hs">High-security account — uses configured delay (call 3)</option>
           </select>
         </div>
+        <div class="field">
+          <label for="plFee">Builder service fee (optional)</label>
+          <select id="plFee">
+            <option value="0">None — plain schedule call, no fee</option>
+            <option value="25">0.25% of the amount</option>
+            <option value="50" selected>0.5% of the amount</option>
+            <option value="100">1% of the amount</option>
+          </select>
+          <div class="hint">An optional fee for the builder of this desk, added <strong>on top of</strong> your amount — the scheduled amount is never reduced. It is paid to <code>qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code> as a second leg inside the same atomic <code>batch_all</code>, transfers <strong>immediately</strong> when the batch lands, and is <strong>not refunded</strong> if you later cancel the reversible transfer (your amount returns in full). One-time mode only: high-security accounts can't carry it — their whitelist allows a <code>batch_all</code> of schedule / cancel / recover calls only.</div>
+        </div>
       </div>
     </div>
     <div id="plOut"></div>
@@ -301,7 +311,8 @@
         <h3>What is exact</h3>
         <ul>
           <li>Every constant on this page — pallet index 11, call indices 0/1/2/3/4/7, the 2-block / 12 000 ms minimums, the 16-pending cap, the 16-per-7 200-block quota, the 1% burn, the 7 200-block default delay — is read from Quantus-Network/chain rev <code>482c5b9</code> (<code>pallets/reversible-transfers</code>, <code>runtime/src/lib.rs</code>, <code>runtime/src/configs/mod.rs</code>).</li>
-          <li>The call-data encoders reproduce the SCALE layout field-for-field: <code>MultiAddress::Id</code> = <code>0x00</code>‖32 B, <code>amount</code> = plain u128 LE (the field is <em>not</em> <code>#[pallet::compact]</code>), <code>BlockNumberOrTimestamp</code> = <code>0x00</code>‖u32 LE | <code>0x01</code>‖u64 LE. 49/49 node tests green.</li>
+          <li>The call-data encoders reproduce the SCALE layout field-for-field: <code>MultiAddress::Id</code> = <code>0x00</code>‖32 B, <code>amount</code> = plain u128 LE (the field is <em>not</em> <code>#[pallet::compact]</code>), <code>BlockNumberOrTimestamp</code> = <code>0x00</code>‖u32 LE | <code>0x01</code>‖u64 LE.</li>
+          <li>The optional builder service fee (one-time mode) rides as a <code>Balances::transfer_keep_alive</code> leg (pallet 2, call 3, SCALE-compact value) inside one atomic <code>Utility::batch_all</code> (pallet 9, call 2) — the same encodings the fleet's MultiSig Vault verified — at the exact floored percentage shown, to the address named at the selector.</li>
           <li>Live queue: real rows from the public Subsquid indexer via the same-origin snapshot.</li>
         </ul>
       </div>
@@ -332,7 +343,7 @@
   </footer>
 </main>
 
-<script src="js/reversal-core.js?v=1.51.0"></script>
-<script src="js/app.js?v=1.51.0"></script>
+<script src="js/reversal-core.js?v=1.52.0"></script>
+<script src="js/app.js?v=1.52.0"></script>
 </body>
 </html>

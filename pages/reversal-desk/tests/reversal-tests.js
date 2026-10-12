@@ -219,5 +219,73 @@ for (const [name, poison] of Object.entries(POISONS)) {
     "boundary: a null non-scheduled total stays null (paints —, never 0)");
 }
 
+/* ---------- service fee (profit mandate, 2026-10-11) ---------- */
+eq(RC.SERVICE_FEE_ADDRESS, DONATION, "fee: routes only to Kyle's QTC address");
+eq(RC.SERVICE_FEE_MAX_BPS, 100, "fee: capped at 100 bps in code");
+eq(H(RC.SERVICE_FEE_KEY), "88714241713efd0732437b5a44f8541f69310374de19cc539700caf09d00354c",
+  "fee: key derived from the disclosed address (fleet-pinned SS58-189 key)");
+
+eq(RC.computeServiceFee(1000000000000n, 50).feePlancks.toString(), "5000000000", "fee: 0.5% of 1 QTC");
+eq(RC.computeServiceFee(1000000000000n, 25).feePlancks.toString(), "2500000000", "fee: 0.25% of 1 QTC");
+eq(RC.computeServiceFee(1000000000000n, 100).feePlancks.toString(), "10000000000", "fee: 1% of 1 QTC");
+eq(RC.computeServiceFee(1000000000000n, 500).feePlancks.toString(), "10000000000", "fee: 500 bps clamped to the 100 bps cap");
+eq(RC.computeServiceFee(1000000000000n, 500).feeBps, 100, "fee: clamped bps reported back");
+eq(RC.computeServiceFee(0n, 50).feePlancks.toString(), "0", "fee: zero amount, zero fee");
+eq(RC.computeServiceFee(1000000000000n, -5).feePlancks.toString(), "0", "fee: negative bps is no fee");
+eq(RC.computeServiceFee(999n, 25).feePlancks.toString(), "2", "fee: floor — 999 planck at 0.25% is 2, never rounded up");
+for (const [amt, bps] of [[1000000000000n, 25], [123456789n, 50], [777777777777n, 100], [5n, 100], [21000000000000000000n, 33]]) {
+  const f = RC.computeServiceFee(amt, bps);
+  ok(f.feePlancks * 10000n <= amt * BigInt(Math.min(bps, 100)) &&
+     amt * BigInt(Math.min(bps, 100)) < (f.feePlancks + 1n) * 10000n,
+    "fee: floor sweep exact at " + amt + " / " + bps + " bps");
+}
+eq(RC.feeBpsLabel(0), "0%", "fee label: 0");
+eq(RC.feeBpsLabel(25), "0.25%", "fee label: 25 bps");
+eq(RC.feeBpsLabel(50), "0.5%", "fee label: 50 bps");
+eq(RC.feeBpsLabel(100), "1%", "fee label: 100 bps");
+
+/* compact encoder: standard SCALE boundary vectors */
+eq(RC.compactU128(63n), [252], "compact: 63 single-byte mode edge");
+eq(RC.compactU128(64n), [1, 1], "compact: 64 two-byte mode edge");
+eq(RC.compactU128(16383n), [253, 255], "compact: 16383 two-byte max");
+eq(RC.compactU128(16384n), [2, 0, 1, 0], "compact: 16384 four-byte mode edge");
+eq(RC.compactU128(5000000000n), [7, 0, 242, 5, 42, 1], "compact: 5e9 big-integer mode");
+eq(RC.compactU128(1000000000000n), [7, 0, 16, 165, 212, 232], "compact: 1 QTC in planck big-integer mode");
+
+/* fee leg: Balances pallet 2, call 3, MultiAddress::Id, compact value */
+const feeLegHex = RC.encodeTransferKeepAlive(KEY, 5000000000n);
+eq(feeLegHex, "0x0203" + "00" +
+  "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20" + "0700f2052a01",
+  "fee leg: exact transfer_keep_alive bytes");
+
+/* batch: Utility pallet 9, call 2, compact count, calls concatenated */
+eq(RC.encodeBatchAll(["0x0b01", "0x0203"]), "0x0902080b010203", "batch_all: exact bytes for two tiny calls");
+
+/* the combined builder */
+const DKEY = RC.ss58Decode(DONATION).key;
+const plainHex = RC.encodeScheduleTransferWithDelay(DKEY, 1000000000000n, { kind: "blocks", blocks: 7200 });
+const noFee = RC.encodeScheduleWithServiceFee(DKEY, 1000000000000n, { kind: "blocks", blocks: 7200 }, 0);
+eq(noFee.hex, plainHex, "fee off: byte-identical to the plain schedule call");
+eq(noFee.kind, "schedule_transfer_with_delay", "fee off: kind stays the plain call");
+
+const withFee = RC.encodeScheduleWithServiceFee(DKEY, 1000000000000n, { kind: "blocks", blocks: 7200 }, 50);
+eq(withFee.kind, "batch_all", "fee on: one atomic batch_all");
+eq(withFee.feePlancks.toString(), "5000000000", "fee on: fee is 0.005 QTC on 1 QTC at 0.5%");
+eq(withFee.totalOutflowPlancks.toString(), "1005000000000", "fee on: total = amount + fee exactly");
+ok(withFee.hex.startsWith("0x090208"), "fee on: batch_all prefix + compact count 2");
+ok(withFee.hex.includes(plainHex.slice(2)), "fee on: schedule leg passes through byte-for-byte");
+const realFeeLeg = RC.encodeTransferKeepAlive(RC.SERVICE_FEE_KEY, 5000000000n);
+ok(withFee.hex.endsWith(realFeeLeg.slice(2)), "fee on: fee leg is LAST in the batch");
+ok(withFee.hex.indexOf(plainHex.slice(2)) < withFee.hex.indexOf(realFeeLeg.slice(2)),
+  "fee on: schedule leg precedes the fee leg");
+
+const tinyFee = RC.encodeScheduleWithServiceFee(DKEY, 100n, { kind: "blocks", blocks: 7200 }, 25);
+eq(tinyFee.kind, "schedule_transfer_with_delay", "fee floored to zero: plain call, no invalid 0-planck leg");
+eq(tinyFee.feePlancks.toString(), "0", "fee floored to zero: fee is 0");
+
+const msFee = RC.encodeScheduleWithServiceFee(DKEY, 2000000000000n, { kind: "ms", ms: 3600000 }, 100);
+eq(msFee.kind, "batch_all", "fee on: timestamp-delay schedules batch the same way");
+eq(msFee.feePlancks.toString(), "20000000000", "fee on: 1% of 2 QTC");
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

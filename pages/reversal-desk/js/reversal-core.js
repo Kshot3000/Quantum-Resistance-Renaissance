@@ -39,7 +39,31 @@
     SS58_PREFIX: 189,
     UNIT: 1000000000000n,      // 10^12 planck per QTC
     PALLET_ID: [0x72, 0x74, 0x70, 0x61, 0x6c, 0x6c, 0x65, 0x74], // b"rtpallet"
+    BALANCES_PALLET_INDEX: 2,  // runtime/src/lib.rs: Balances
+    CALL_TRANSFER_KEEP_ALIVE: 3, // Balances::transfer_keep_alive(dest, #[compact] value)
+    UTILITY_PALLET_INDEX: 9,   // runtime/src/lib.rs: Utility
+    CALL_BATCH_ALL: 2,         // Utility::batch_all — the Quantus fork exposes only batch_all
   };
+
+  /* Optional builder service fee (PROFIT route, added 2026-10-11): the
+   * one-time planner may add a small, plainly disclosed service fee ON TOP
+   * of a schedule_transfer_with_delay — the scheduled amount is NEVER
+   * reduced. The fee is a Balances::transfer_keep_alive to the builder's
+   * QTC address (SERVICE_FEE_ADDRESS, the same address in this page's
+   * footer), wrapped with the schedule call in ONE atomic
+   * Utility.batch_all (schedule first, fee LAST), so the sender pays both
+   * legs or neither. Exact BigInt math: fee = floor(amount * bps /
+   * 10,000), so it never exceeds the quoted percentage; a fee that floors
+   * to zero plancks adds NO leg (a 0-planck transfer is invalid). The fee
+   * leg transfers IMMEDIATELY when the batch lands — it is not held, and
+   * it is NOT refunded if the sender later cancels the reversible
+   * transfer (the scheduled amount itself returns in full). High-security
+   * mode CANNOT carry the fee: the HS transaction whitelist allows a
+   * batch_all only of schedule_transfer / cancel / recover_funds calls,
+   * so a Balances leg inside the batch would be rejected for an enrolled
+   * account — the planner offers the fee in one-time mode only. */
+  var SERVICE_FEE_ADDRESS = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+  var SERVICE_FEE_MAX_BPS = 100;
 
   /* ================= blake2b (RFC 7693) ================= */
   var SIGMA = [
@@ -226,6 +250,24 @@
     if (key32.length !== 32) throw new Error("AccountId must be 32 bytes");
     return [0x00].concat(key32);
   }
+  /* SCALE compact unsigned integer (the encoding Balances uses for its
+   * #[compact] value and Utility for the batch length). Verified
+   * byte-for-byte against the MultiSig Vault core's fleet-verified
+   * compact encoder over a value sweep in the desk's tests. */
+  function compactU128(v) {
+    var x = BigInt(v);
+    if (x < 0n) throw new Error("negative compact");
+    if (x <= 63n) return [Number(x << 2n)];
+    if (x <= 16383n) { var a = Number((x << 2n) | 1n); return [a & 0xff, (a >>> 8) & 0xff]; }
+    if (x <= 1073741823n) {
+      var b = Number((x << 2n) | 2n);
+      return [b & 0xff, (b >>> 8) & 0xff, (b >>> 16) & 0xff, (b >>> 24) & 0xff];
+    }
+    var bytes = [], t = x;
+    while (t > 0n) { bytes.push(Number(t & 0xffn)); t >>= 8n; }
+    while (bytes.length < 4) bytes.push(0);
+    return [((bytes.length - 4) << 2) | 3].concat(bytes);
+  }
   // BlockNumberOrTimestamp: 0x00 || u32 LE | 0x01 || u64 LE
   function delayEnum(delay) {
     if (delay.kind === "blocks") return [0x00].concat(u32LE(delay.blocks));
@@ -268,6 +310,75 @@
   }
   function encodeRecoverFunds(accountKey32) {
     return toHex([C.PALLET_INDEX, C.CALL_RECOVER_FUNDS].concat(accountKey32));
+  }
+
+  /* ================= service fee + batch builder ================= */
+  /* The fee key is DERIVED from the disclosed address with this file's
+   * own SS58 codec, so the encoded leg can never drift from the address
+   * the UI names. */
+  var SERVICE_FEE_KEY = (function () {
+    var d = ss58Decode(SERVICE_FEE_ADDRESS);
+    return (d.ok && d.prefix === C.SS58_PREFIX && d.key.length === 32) ? d.key : null;
+  })();
+  function computeServiceFee(totalPlancks, feeBps) {
+    var total = BigInt(totalPlancks);
+    var bps = Number(feeBps);
+    if (!isFinite(bps) || bps < 0) bps = 0;
+    if (bps > SERVICE_FEE_MAX_BPS) bps = SERVICE_FEE_MAX_BPS;
+    bps = Math.floor(bps);
+    if (total <= 0n || bps === 0) return { feePlancks: 0n, feeBps: bps };
+    return { feePlancks: (total * BigInt(bps)) / 10000n, feeBps: bps };
+  }
+  function feeBpsLabel(bps) {
+    var b = Math.floor(Number(bps) || 0);
+    var whole = Math.floor(b / 100), rem = b % 100;
+    if (rem === 0) return whole + "%";
+    var frac = String(rem).padStart(2, "0").replace(/0+$/, "");
+    return whole + "." + frac + "%";
+  }
+  /* Balances::transfer_keep_alive (pallet 2, call 3): MultiAddress::Id
+   * dest + #[compact] value — the fee leg. */
+  function encodeTransferKeepAlive(destKey32, valuePlanck) {
+    if (!destKey32 || destKey32.length !== 32) throw new Error("AccountId must be 32 bytes");
+    var v = BigInt(valuePlanck);
+    if (v <= 0n) throw new Error("transfer value must be positive");
+    return toHex([C.BALANCES_PALLET_INDEX, C.CALL_TRANSFER_KEEP_ALIVE]
+      .concat(multiAddressId(destKey32))
+      .concat(compactU128(v)));
+  }
+  /* Utility::batch_all (pallet 9, call 2): compact call count + the call
+   * bytes concatenated — the encoding the Extrinsic Lab's fleet-verified
+   * batch sample builds. Atomic: every call in the batch, or none. */
+  function encodeBatchAll(callHexes) {
+    if (!Array.isArray(callHexes) || callHexes.length === 0)
+      throw new Error("batch_all needs at least one call");
+    var bytes = [C.UTILITY_PALLET_INDEX, C.CALL_BATCH_ALL]
+      .concat(compactU128(BigInt(callHexes.length)));
+    callHexes.forEach(function (h) {
+      var b = fromHex(h);
+      if (!b.length) throw new Error("bad call bytes in batch");
+      bytes = bytes.concat(b);
+    });
+    return toHex(bytes);
+  }
+  /* Build the one-time planner's call, optionally with the disclosed
+   * service fee. No fee (or a fee floored to zero) -> the plain
+   * schedule_transfer_with_delay, byte-identical to the encoder above.
+   * Fee on -> one batch_all of [schedule leg untouched and FIRST, fee leg
+   * LAST]; totalOutflow = amount (held) + fee (transferred at once). */
+  function encodeScheduleWithServiceFee(destKey32, amountPlanck, delay, feeBps) {
+    var plain = encodeScheduleTransferWithDelay(destKey32, amountPlanck, delay);
+    var amount = BigInt(amountPlanck);
+    var f = computeServiceFee(amount, feeBps);
+    if (f.feePlancks <= 0n)
+      return { hex: plain, kind: "schedule_transfer_with_delay", feePlancks: 0n,
+               feeBps: f.feeBps, amountPlancks: amount, totalOutflowPlancks: amount };
+    if (!SERVICE_FEE_KEY) throw new Error("Service fee address failed to decode.");
+    var feeLeg = encodeTransferKeepAlive(SERVICE_FEE_KEY, f.feePlancks);
+    var batch = encodeBatchAll([plain, feeLeg]);
+    return { hex: batch, kind: "batch_all", feePlancks: f.feePlancks,
+             feeBps: f.feeBps, amountPlancks: amount,
+             totalOutflowPlancks: amount + f.feePlancks };
   }
 
   /* ================= delay / quota / fee math ================= */
@@ -483,6 +594,15 @@
     encodeSetHighSecurity: encodeSetHighSecurity,
     encodeCancel: encodeCancel,
     encodeRecoverFunds: encodeRecoverFunds,
+    compactU128: compactU128,
+    SERVICE_FEE_ADDRESS: SERVICE_FEE_ADDRESS,
+    SERVICE_FEE_MAX_BPS: SERVICE_FEE_MAX_BPS,
+    SERVICE_FEE_KEY: SERVICE_FEE_KEY,
+    computeServiceFee: computeServiceFee,
+    feeBpsLabel: feeBpsLabel,
+    encodeTransferKeepAlive: encodeTransferKeepAlive,
+    encodeBatchAll: encodeBatchAll,
+    encodeScheduleWithServiceFee: encodeScheduleWithServiceFee,
     validateDelay: validateDelay,
     validBlockHeight: validBlockHeight, nonNegInt: nonNegInt,
     validPlancks: validPlancks, validateSnapshot: validateSnapshot,

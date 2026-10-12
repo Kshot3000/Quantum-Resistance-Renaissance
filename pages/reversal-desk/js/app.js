@@ -101,6 +101,9 @@
   }
   function updatePlanner() {
     var out = $("plOut"), hexBox = $("plHex"), breakdown = $("plBreakdown");
+    /* The service fee can only ride the one-time call (see reversal-core):
+     * in high-security mode the selector is disabled, not silently ignored. */
+    $("plFee").disabled = $("plMode").value === "hs";
     var dres = RC.ss58Decode($("plDest").value || "");
     var amt = parseQTC($("plAmount").value);
     var dl = plannerDelay();
@@ -143,20 +146,31 @@
       rows.push(["Executes at", "<span class='dim'>live height unknown — connect for an exact block</span>"]);
     }
     rows.push(["Hold", "amount frozen under <code>HoldReason::ScheduledTransfer</code> until execution or cancel"]);
-    var hex, callName;
+    var hex, callName, feeNote = "";
     if ($("plMode").value === "hs") {
       hex = RC.encodeScheduleTransfer(dres.key, amt);
       callName = "ReversibleTransfers::schedule_transfer (pallet 11, call 3)";
       rows.push(["Mode", "high-security account — uses your account's configured delay (the custom delay field is ignored by this call)"]);
+      rows.push(["Service fee", "not available in high-security mode — the HS transaction whitelist allows a <code>batch_all</code> only of schedule / cancel / recover calls, so a Balances fee leg inside the batch would be rejected for an enrolled account"]);
     } else {
-      hex = RC.encodeScheduleTransferWithDelay(dres.key, amt, dl.delay);
-      callName = "ReversibleTransfers::schedule_transfer_with_delay (pallet 11, call 4)";
+      var built = RC.encodeScheduleWithServiceFee(dres.key, amt, dl.delay, Number($("plFee").value));
+      hex = built.hex;
       rows.push(["Mode", "one-time — regular accounts only; high-security accounts must use <code>schedule_transfer</code>"]);
+      if (built.kind === "batch_all") {
+        callName = "Utility::batch_all (pallet 9, call 2) — [ReversibleTransfers::schedule_transfer_with_delay, Balances::transfer_keep_alive (service fee)]";
+        rows.push(["Service fee", "<strong>" + RC.formatQTC(built.feePlancks) + " QTC</strong> <span class='dim'>(" + built.feePlancks.toString() + " planck — " + RC.feeBpsLabel(built.feeBps) + " of the amount, added on top)</span> → <code>" + esc(RC.SERVICE_FEE_ADDRESS) + "</code>"]);
+        rows.push(["Total at submit", "<strong>" + RC.formatQTC(built.totalOutflowPlancks) + " QTC</strong> leaves your free balance when the batch lands — the amount as a hold, the fee as an immediate transfer — plus the network fee. Both legs or neither: <code>batch_all</code> is atomic."]);
+        feeNote = "<div class='field-note'>The service fee is paid <strong>immediately</strong> when the batch is included and is <strong>not refunded</strong> if you later cancel the reversible transfer — the scheduled amount itself returns in full. The fee leg's value is SCALE-compact (Balances' <code>#[compact]</code> encoding), unlike the schedule call's plain-u128 amount.</div>";
+      } else {
+        callName = "ReversibleTransfers::schedule_transfer_with_delay (pallet 11, call 4)";
+        if (Number($("plFee").value) > 0)
+          rows.push(["Service fee", "none — the selected " + RC.feeBpsLabel(Number($("plFee").value)) + " fee floors to 0 planck at this amount, and a 0-planck transfer is invalid on chain, so no fee leg is added"]);
+      }
     }
     out.innerHTML = "<table class='kv'>" + rows.map(function (r) {
       return "<tr><th>" + r[0] + "</th><td>" + r[1] + "</td></tr>";
     }).join("") + "</table>";
-    breakdown.innerHTML = "<div class='callname'>" + callName + "</div><div class='field-note'>Unsigned call data — paste the hex into Chain Console or your signer. <code>amount</code> is a plain u128 (16 bytes LE, <em>not</em> compact); <code>dest</code> is <code>MultiAddress::Id</code>.</div>";
+    breakdown.innerHTML = "<div class='callname'>" + callName + "</div><div class='field-note'>Unsigned call data — paste the hex into Chain Console or your signer. <code>amount</code> is a plain u128 (16 bytes LE, <em>not</em> compact); <code>dest</code> is <code>MultiAddress::Id</code>.</div>" + feeNote;
     hexBox.style.display = "block";
     $("plHexText").textContent = hex;
     $("plCopy").onclick = function () { copyText(hex, $("plCopy")); };
@@ -281,7 +295,7 @@
     return ctl.signal;
   }
   function loadSnapshot() {
-    fetch("../../data/reversal.json?v=1.51.0", { cache: "no-store", signal: timeoutSignal(9000) })
+    fetch("../../data/reversal.json?v=1.52.0", { cache: "no-store", signal: timeoutSignal(9000) })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -384,7 +398,7 @@
   /* ============ wire up ============ */
   document.addEventListener("DOMContentLoaded", function () {
     renderLifecycle();
-    ["plDest", "plAmount", "plDelay", "plUnit", "plMode"].forEach(function (id) {
+    ["plDest", "plAmount", "plDelay", "plUnit", "plMode", "plFee"].forEach(function (id) {
       $(id).addEventListener("input", updatePlanner);
       $(id).addEventListener("change", updatePlanner);
     });
