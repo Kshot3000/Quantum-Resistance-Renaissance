@@ -21,9 +21,9 @@ A `txWatch` signal means a transfer was *requested* to your address — not conf
 
 ## Tests
 
-- `node tests/run-tests.mjs` — 11/11 logic tests (planck math, RPC builders, endpoint validation, SS58-189 checks, txWatch notification parsing, pool stats, fee sorting, backoff)
+- `node tests/run-tests.mjs` — 15/15 logic tests (planck math, RPC builders, endpoint validation, SS58-189 checks, txWatch notification parsing incl. round-2 relations — bounded heights, positive/supply-capped native amounts, strict SS58-189 sender — pool stats, fee sorting, backoff)
 - Browser QA: real-browser verification of the offline-first UI, validation flows, tabs, and attribution
 
 ---
 
-Built by [@kshot9000](https://x.com/kshot9000) · Donations (QTC): `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau` · Independent builder work — not affiliated with the Quantus team.
+Built by [@kshot9000](https://x.com/kshot9000) · Donations (QTC): `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau` · Independent builder work — not affiliated with the Quantus team. Built for the Quantus network by [@Quantus-Network](https://github.com/Quantus-Network).

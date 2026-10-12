@@ -84,7 +84,10 @@ test("checkAddress uses prefix 189", () => {
 test("parseTxWatchNotification validates upstream shape", () => {
   const raw = {
     tx_hash: "0x9a3cb7f1" + "ab".repeat(28),
-    from: "qzfromaddress000000000000000000000000000000000000",
+    // Fixture corrected (round 2): the old "qzfromaddress000…" string is
+    // 49 chars but padded with '0', which is not in the base58 alphabet —
+    // no chain payload can contain it as an SS58-189 sender.
+    from: "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa",
     amount: "5000000000000",
     asset_id: null,
   };
@@ -205,10 +208,42 @@ test("decodePartialFee rejects non-integer and negative fees", () => {
   assert.throws(() => C.decodePartialFee({ partialFee: "" }));
 });
 
+test("round 2 relations: bounded heights, positive in-cap amounts, strict SS58-189 from", () => {
+  // Heights: fleet relation 1..10,000,000 in every encoding.
+  assert.equal(C.parseBlockNumber(10000000), 10000000);
+  assert.equal(C.parseBlockNumber(10000001), null);
+  assert.equal(C.parseBlockNumber(99999999999), null);
+  assert.equal(C.parseBlockNumber("99999999999"), null);
+  assert.equal(C.parseBlockNumber("0x174876e7ff"), null); // 99,999,999,999 in hex
+  assert.equal(C.parseBlockNumber(0), null);
+  assert.equal(C.parseBlockNumber("0"), null);
+  assert.equal(C.MAX_CHAIN_HEIGHT, 10000000);
+  assert.equal(C.MAX_SUPPLY_PLANCKS, 21000000n * P);
+  // Amounts: positive always; native capped at the 21M supply.
+  const raw = {
+    tx_hash: "0x9a3cb7f1" + "ab".repeat(28),
+    from: "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa",
+    amount: "5000000000000",
+    asset_id: null,
+  };
+  const cap = (21000000n * P).toString();
+  const over = (21000000n * P + 1n).toString();
+  assert.equal(C.parseTxWatchNotification({ ...raw, amount: cap }).amountPlanck, 21000000n * P);
+  assert.throws(() => C.parseTxWatchNotification({ ...raw, amount: "0" }));
+  assert.throws(() => C.parseTxWatchNotification({ ...raw, amount: over }));
+  assert.throws(() => C.parseTxWatchNotification({ ...raw, amount: "0", asset_id: 7 }));
+  // An asset's supply is not QTC's: over-cap asset amounts still parse.
+  assert.equal(C.parseTxWatchNotification({ ...raw, amount: over, asset_id: 7 }).amountPlanck, 21000000n * P + 1n);
+  // From: strict SS58-189 shape only ('0' is not base58; other chains are not senders here).
+  assert.equal(C.parseTxWatchNotification({ ...raw, from: "qzfromaddress000000000000000000000000000000000000" }).from, "");
+  assert.equal(C.parseTxWatchNotification({ ...raw, from: "aaaaaaaaaaaaaaaaaaaa" }).from, "");
+  assert.equal(C.parseTxWatchNotification({ ...raw, from: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" }).from, "");
+});
+
 test("parseTxWatchNotification sanitizes a garbage from", () => {
   const raw = {
     tx_hash: "0x9a3cb7f1" + "ab".repeat(28),
-    from: "qzfromaddress000000000000000000000000000000000000",
+    from: "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa",
     amount: "5000000000000",
     asset_id: null,
   };

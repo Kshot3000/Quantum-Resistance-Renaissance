@@ -12,6 +12,9 @@
 var PLANCK_PER_QTC = 1000000000000n; // 1e12, per upstream docs (1 UNIT = 10^12 planck)
 var EXPECTED_SS58_PREFIX = 189;     // Quantus, per node/src/chain_spec.rs
 var MAX_PENDING_LISTED = 200;       // UI listing cap; stats always cover the full pool
+var MAX_SUPPLY_PLANCKS = 21000000n * PLANCK_PER_QTC; // 21M QTC hard cap (fleet constant)
+var MAX_CHAIN_HEIGHT = 10000000;    // fleet bound on a plausible height
+var SS58_189_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // strict shape: qz + 47 base58
 
 /* ---------- planck <-> QTC ---------- */
 
@@ -137,12 +140,17 @@ function parseBlockNumber(v) {
   // A block height arrives as a JSON integer, a decimal string, or a
   // 0x-hex string — anything else (floats, objects, "garbage", "0xZZ")
   // is not a height and must never render as one (or as NaN).
-  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
-  if (typeof v === "string") {
-    if (/^\d+$/.test(v)) { var n = Number(v); return Number.isSafeInteger(n) ? n : null; }
-    if (/^0x[0-9a-fA-F]+$/.test(v)) { var h = parseInt(v, 16); return Number.isSafeInteger(h) ? h : null; }
+  // Round 2 (fleet relations): a height is also a chain fact, so it must
+  // be one the chain could actually be at — positive (no new head is the
+  // genesis block) and under the fleet 10,000,000 ceiling. Round 1 let
+  // 99,999,999,999 render as the chain head from a buggy/hostile node.
+  var n = null;
+  if (typeof v === "number") { if (Number.isSafeInteger(v)) n = v; }
+  else if (typeof v === "string") {
+    if (/^\d+$/.test(v)) { var d = Number(v); if (Number.isSafeInteger(d)) n = d; }
+    else if (/^0x[0-9a-fA-F]+$/.test(v)) { var h = parseInt(v, 16); if (Number.isSafeInteger(h)) n = h; }
   }
-  return null;
+  return n !== null && n > 0 && n <= MAX_CHAIN_HEIGHT ? n : null;
 }
 
 function isHash32(s) {
@@ -178,16 +186,29 @@ function parseTxWatchNotification(raw) {
   if (assetId !== null && (!Number.isInteger(assetId) || assetId < 0)) {
     throw new Error("bad asset_id");
   }
-  // `from` is display-only: keep it only when it is shaped like an
-  // address (base58-ish, plausible length). Anything else — markup,
-  // punctuation, an object — becomes "" and renders as the honest
+  // Round 2 (fleet relations): the amount is money, so it must be a
+  // transfer that could exist — strictly positive (a 0-planck
+  // "transfer" painted in the feed and fired a desktop notification),
+  // and for the native asset no larger than the whole 21M QTC supply.
+  // Asset amounts are NOT capped here: an asset's supply is not QTC's.
+  var amountPlanck = BigInt(raw.amount);
+  if (amountPlanck <= 0n) throw new Error("bad amount (zero-planck transfer)");
+  if (assetId === null && amountPlanck > MAX_SUPPLY_PLANCKS) {
+    throw new Error("bad amount (exceeds the 21M QTC supply cap)");
+  }
+  // `from` is display-only: keep it only in the strict SS58-189 shape
+  // (qz + 47 base58 — fleet standard). Round 1's base58-ish shape kept
+  // strings no chain payload can contain (20 a's, a '0'-padded string —
+  // 0 is not in the base58 alphabet, another chain's address) and
+  // rendered them as the sender. Anything else — markup, punctuation,
+  // an object — becomes "" and renders as the honest
   // "unsigned / non-standard" label instead of garbage-as-sender.
   var from = "";
-  if (typeof raw.from === "string" && /^[A-Za-z0-9]{20,70}$/.test(raw.from)) from = raw.from;
+  if (typeof raw.from === "string" && SS58_189_RE.test(raw.from)) from = raw.from;
   return {
     txHash: raw.tx_hash,
     from: from,
-    amountPlanck: BigInt(raw.amount),
+    amountPlanck: amountPlanck,
     assetId: assetId,
     receivedAt: Date.now(),
   };
@@ -311,6 +332,9 @@ var api = {
   PLANCK_PER_QTC: PLANCK_PER_QTC,
   EXPECTED_SS58_PREFIX: EXPECTED_SS58_PREFIX,
   MAX_PENDING_LISTED: MAX_PENDING_LISTED,
+  MAX_SUPPLY_PLANCKS: MAX_SUPPLY_PLANCKS,
+  MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT,
+  SS58_189_RE: SS58_189_RE,
   parseQtcToPlancks: parseQtcToPlancks,
   formatQtc: formatQtc,
   formatCompact: formatCompact,
