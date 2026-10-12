@@ -26,11 +26,68 @@ import {
   ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX,
 } from './lib/quantus-crypto.js';
 import {
-  compactDecode, buildSigningPayload, buildTransferCall, buildExtrinsic, SIGNING_CONTEXT,
+  compactDecode, buildSigningPayload, buildTransferCall, buildBatchAllCall, buildExtrinsic, SIGNING_CONTEXT,
   BALANCES_PALLET_INDEX, TRANSFER_KEEP_ALIVE_CALL_INDEX,
+  UTILITY_PALLET_INDEX, BATCH_ALL_CALL_INDEX,
   DILITHIUM65_VARIANT, DILITHIUM87_VARIANT, EXTRINSIC_VERSION,
   plancksToQtc,
 } from './lib/scale.js';
+
+/* ---------------- optional builder service fee ----------------
+ * PROFIT route (fleet pattern, added 2026-10-12): the cold desk may add a
+ * small, plainly disclosed service fee ON TOP of the amount — the
+ * recipient's amount is NEVER reduced. The fee is a second
+ * Balances::transfer_keep_alive to the builder's QTC address
+ * (SERVICE_FEE_ADDRESS, the same address in this page's footer), wrapped
+ * with the recipient transfer in ONE atomic Utility.batch_all (recipient
+ * leg FIRST, fee leg LAST), so the sender pays both legs or neither and
+ * still signs exactly ONE extrinsic. Exact BigInt math:
+ * fee = floor(amount * bps / 10,000), capped at 100 bps in code, so it
+ * never exceeds the quoted percentage; a fee that floors to zero plancks
+ * adds NO leg (a 0-planck transfer is invalid) and the package stays a
+ * plain transfer, byte-identical to before. */
+export const SERVICE_FEE_ADDRESS = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
+export const SERVICE_FEE_MAX_BPS = 100;
+
+let _serviceFeeAccountId = null;
+/* The fee leg's 32-byte account id, derived from the disclosed address
+ * with this file's own SS58 codec so the leg can never drift from the
+ * address the UI names. */
+export function serviceFeeAccountId() {
+  if (!_serviceFeeAccountId) {
+    const { prefix, accountId } = ss58Decode(SERVICE_FEE_ADDRESS);
+    if (prefix !== QUANTUS_SS58_PREFIX) throw new Error('service fee address has wrong network prefix');
+    _serviceFeeAccountId = accountId;
+  }
+  return _serviceFeeAccountId;
+}
+
+export function computeServiceFee(amountPlancks, feeBps) {
+  const amount = BigInt(amountPlancks);
+  let bps = Number(feeBps);
+  if (!isFinite(bps) || bps < 0) bps = 0;
+  if (bps > SERVICE_FEE_MAX_BPS) bps = SERVICE_FEE_MAX_BPS;
+  bps = Math.floor(bps);
+  if (amount <= 0n || bps === 0) return { feePlancks: 0n, feeBps: bps };
+  return { feePlancks: (amount * BigInt(bps)) / 10000n, feeBps: bps };
+}
+
+export function feeBpsLabel(bps) {
+  const b = Math.floor(Number(bps) || 0);
+  const whole = Math.floor(b / 100), rem = b % 100;
+  if (rem === 0) return whole + '%';
+  const frac = String(rem).padStart(2, '0').replace(/0+$/, '');
+  return whole + '.' + frac + '%';
+}
+
+/* The call the cold side signs: plain transfer when no fee applies, else
+ * one atomic batch_all of [recipient leg untouched and FIRST, fee leg]. */
+export function buildColdCall({ destAccountId, amountPlancks, serviceFeePlancks = 0n }) {
+  const recipient = buildTransferCall(destAccountId, amountPlancks);
+  const fee = BigInt(serviceFeePlancks);
+  if (fee <= 0n) return recipient;
+  return buildBatchAllCall([recipient, buildTransferCall(serviceFeeAccountId(), fee)]);
+}
 
 export const TICKET_MAGIC = 'QAGT1';
 export const CHUNK_MAGIC = 'QAGX';
@@ -251,8 +308,11 @@ export function decodeMortalEra(twoBytes) {
 /* ---------------- signed-extrinsic decode ----------------
  * Parses a signed Quantus extrinsic and extracts everything the hot side
  * needs to re-verify: address, signature wire, era, nonce, tip, and the call.
- * Only Balances::transfer_keep_alive (pallet 2 / call 3) is decoded further;
- * anything else throws an honest "unsupported call" error. */
+ * Balances::transfer_keep_alive (pallet 2 / call 3) is decoded directly,
+ * and a Utility::batch_all (pallet 9 / call 2) of EXACTLY two
+ * transfer_keep_alive legs — the shape buildColdCall produces when the
+ * optional service fee is on — is decoded leg-by-leg; anything else
+ * throws an honest "unsupported call" error. */
 
 export function decodeSignedExtrinsic(hex) {
   const raw = hexDecode(String(hex).replace(/^0x/, ''));
@@ -276,21 +336,60 @@ export function decodeSignedExtrinsic(hex) {
   const metaHashMode = body[o++];
   if (metaHashMode !== 0x00) throw new Error('extrinsic: metadata-hash mode not supported');
   const pallet = body[o++], callIdx = body[o++];
-  if (pallet !== BALANCES_PALLET_INDEX || callIdx !== TRANSFER_KEEP_ALIVE_CALL_INDEX)
-    throw new Error(`extrinsic: unsupported call (pallet ${pallet}, call ${callIdx}) — only Balances.transfer_keep_alive is decoded`);
-  if (body[o++] !== 0x00) throw new Error('extrinsic: only AccountId32 destinations supported');
-  const destAccountId = body.slice(o, o + 32); o += 32;
-  const n3 = compactDecode(body, o); const amountPlancks = n3.value; o = n3.next;
+  /* Parse one Balances::transfer_keep_alive leg starting at offset p.
+   * Returns { destAccountId, amountPlancks, next }. */
+  const parseTransferLeg = (p) => {
+    if (body[p] !== BALANCES_PALLET_INDEX || body[p + 1] !== TRANSFER_KEEP_ALIVE_CALL_INDEX)
+      throw new Error(`extrinsic: unsupported inner call (pallet ${body[p]}, call ${body[p + 1]}) — batch legs must be Balances.transfer_keep_alive`);
+    p += 2;
+    if (body[p++] !== 0x00) throw new Error('extrinsic: only AccountId32 destinations supported');
+    const destAccountId = body.slice(p, p + 32); p += 32;
+    const nn = compactDecode(body, p);
+    return { destAccountId, amountPlancks: nn.value, next: nn.next };
+  };
+  let call;
+  if (pallet === BALANCES_PALLET_INDEX && callIdx === TRANSFER_KEEP_ALIVE_CALL_INDEX) {
+    o -= 2; // parseTransferLeg re-reads the pallet/call bytes
+    const leg = parseTransferLeg(o); o = leg.next;
+    call = {
+      pallet, callIndex: callIdx, batch: false,
+      destAccountId: leg.destAccountId, destAddress: ss58Encode(leg.destAccountId, QUANTUS_PREFIX),
+      amountPlancks: leg.amountPlancks,
+      serviceFeePlancks: 0n, serviceFeeDestAddress: null,
+      totalPlancks: leg.amountPlancks,
+      legs: [{ destAccountId: leg.destAccountId, destAddress: ss58Encode(leg.destAccountId, QUANTUS_PREFIX), amountPlancks: leg.amountPlancks }],
+    };
+  } else if (pallet === UTILITY_PALLET_INDEX && callIdx === BATCH_ALL_CALL_INDEX) {
+    /* The ONLY batch shape this desk decodes: exactly two
+     * transfer_keep_alive legs — the recipient leg and one further
+     * transfer (in packages this desk builds, the disclosed service-fee
+     * leg; the hot side renders BOTH legs verbatim so the signer can see
+     * exactly where every planck goes). Any other batch is refused. */
+    const cnt = compactDecode(body, o); o = cnt.next;
+    if (Number(cnt.value) !== 2)
+      throw new Error(`extrinsic: unsupported batch of ${cnt.value} calls — only a 2-leg transfer batch is decoded`);
+    const legs = [];
+    for (let i = 0; i < 2; i++) {
+      const leg = parseTransferLeg(o); o = leg.next;
+      legs.push({ destAccountId: leg.destAccountId, destAddress: ss58Encode(leg.destAccountId, QUANTUS_PREFIX), amountPlancks: leg.amountPlancks });
+    }
+    call = {
+      pallet, callIndex: callIdx, batch: true,
+      destAccountId: legs[0].destAccountId, destAddress: legs[0].destAddress,
+      amountPlancks: legs[0].amountPlancks,
+      serviceFeePlancks: legs[1].amountPlancks, serviceFeeDestAddress: legs[1].destAddress,
+      totalPlancks: legs[0].amountPlancks + legs[1].amountPlancks,
+      legs,
+    };
+  } else {
+    throw new Error(`extrinsic: unsupported call (pallet ${pallet}, call ${callIdx}) — only Balances.transfer_keep_alive and a 2-leg Utility.batch_all of transfers are decoded`);
+  }
   if (o !== body.length) throw new Error('extrinsic: trailing bytes after call');
   return {
     accountId, address: ss58Encode(accountId, QUANTUS_PREFIX),
     variant, scheme, signature, pubkey,
     era, nonce, tip,
-    call: {
-      pallet, callIndex: callIdx,
-      destAccountId, destAddress: ss58Encode(destAccountId, QUANTUS_PREFIX),
-      amountPlancks,
-    },
+    call,
     rawBody: body,
   };
 }
@@ -300,8 +399,8 @@ export function decodeSignedExtrinsic(hex) {
  * the cold side imported. era is re-encoded from the ticket's period/phase
  * so the payload matches the window the hot side advertised. */
 
-export function buildColdPayload({ ticket, destAccountId, amountPlancks, era, nonce, tip = 0n }) {
-  const call = buildTransferCall(destAccountId, amountPlancks);
+export function buildColdPayload({ ticket, destAccountId, amountPlancks, era, nonce, tip = 0n, serviceFeePlancks = 0n }) {
+  const call = buildColdCall({ destAccountId, amountPlancks, serviceFeePlancks });
   return buildSigningPayload({
     call,
     era,
@@ -316,8 +415,8 @@ export function buildColdPayload({ ticket, destAccountId, amountPlancks, era, no
 
 /* Assemble the final signed extrinsic on the cold side.
  * signResult: { signature (Uint8Array), pubkey (Uint8Array) }; scheme: 65|87. */
-export function buildColdExtrinsic({ ticket, senderAccountId, destAccountId, amountPlancks, era, nonce, tip = 0n, scheme, signResult }) {
-  const payload = buildColdPayload({ ticket, destAccountId, amountPlancks, era, nonce, tip });
+export function buildColdExtrinsic({ ticket, senderAccountId, destAccountId, amountPlancks, era, nonce, tip = 0n, scheme, signResult, serviceFeePlancks = 0n }) {
+  const payload = buildColdPayload({ ticket, destAccountId, amountPlancks, era, nonce, tip, serviceFeePlancks });
   const expectedPub = scheme === 87 ? 2592 : 1952;
   if (signResult.pubkey.length !== expectedPub) throw new Error('signer returned wrong pubkey length');
   const variant = scheme === 87 ? DILITHIUM87_VARIANT : DILITHIUM65_VARIANT;
@@ -325,7 +424,7 @@ export function buildColdExtrinsic({ ticket, senderAccountId, destAccountId, amo
   sigWire[0] = variant;
   sigWire.set(signResult.signature, 1);
   sigWire.set(signResult.pubkey, 1 + signResult.signature.length);
-  const call = buildTransferCall(destAccountId, amountPlancks);
+  const call = buildColdCall({ destAccountId, amountPlancks, serviceFeePlancks });
   return { payload, extrinsicHex: '0x' + hexEncode(buildExtrinsic({ accountId: senderAccountId, signatureWire: sigWire, era, nonce: BigInt(nonce), tip: BigInt(tip), call })) };
 }
 

@@ -13,8 +13,10 @@ import {
   encodeChunks, decodeChunks,
   decodeMortalEra, decodeSignedExtrinsic, decodeForVerify,
   buildColdPayload, buildColdExtrinsic, reverifySigned,
+  computeServiceFee, feeBpsLabel, serviceFeeAccountId,
+  SERVICE_FEE_ADDRESS, SERVICE_FEE_MAX_BPS,
 } from '../js/airgap.js';
-import { encodeMortalEra, qtcToPlancks } from '../js/lib/scale.js';
+import { encodeMortalEra, qtcToPlancks, buildTransferCall, buildBatchAllCall, buildSigningPayload, buildExtrinsic } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
 import { keypairFromSeed } from '../js/lib/mnemonic.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
@@ -182,20 +184,20 @@ test('era: decode mirrors encodeMortalEra', () => {
 
 /* ---------------- full protocol ---------------- */
 
-function coldSign({ scheme = 65, amount = '1.5' } = {}) {
+function coldSign({ scheme = 65, amount = '1.5', serviceFeePlancks = 0n } = {}) {
   const sender = keypairFromSeed(new Uint8Array(32).fill(9), scheme);
   const dest = keypairFromSeed(new Uint8Array(32).fill(7), 65);
   const ticket = fixtureTicket();
   const era = encodeMortalEra(ticket.era.period, ticket.era.phase);
   const amountPlancks = qtcToPlancks(amount);
   const payload = buildColdPayload({
-    ticket, destAccountId: dest.accountId, amountPlancks, era, nonce: ticket.nonce,
+    ticket, destAccountId: dest.accountId, amountPlancks, era, nonce: ticket.nonce, serviceFeePlancks,
   });
   const mod = scheme === 87 ? ml_dsa87 : ml_dsa65;
   const sig = mod.sign(payload, sender.secretKey, { context: te.encode('QUANTUS_EXTRINSIC') });
   const built = buildColdExtrinsic({
     ticket, senderAccountId: sender.accountId, destAccountId: dest.accountId,
-    amountPlancks, era, nonce: ticket.nonce, scheme,
+    amountPlancks, era, nonce: ticket.nonce, scheme, serviceFeePlancks,
     signResult: { signature: sig, pubkey: sender.publicKey },
   });
   return { sender, dest, ticket, era, amountPlancks, payload, sig, built };
@@ -245,6 +247,117 @@ test('protocol: ML-DSA-87 path works end to end', () => {
   assert.equal(d.scheme, 87);
   const { ok } = reverifySigned({ ticket, decoded: d, mlDsa: ml_dsa87 });
   assert.ok(ok);
+});
+
+/* ---------------- service fee (profit route) ---------------- */
+
+test('fee: address pins — fee account id derives from the disclosed address', () => {
+  const { prefix, accountId } = ss58Decode(SERVICE_FEE_ADDRESS);
+  assert.equal(prefix, 189);
+  assert.deepEqual(serviceFeeAccountId(), accountId);
+  assert.equal(hexEncode(accountId).slice(0, 8), '88714241'); // fleet-pinned builder key
+  assert.equal(SERVICE_FEE_MAX_BPS, 100);
+});
+
+test('fee: computeServiceFee is exact floor math, capped at 100 bps', () => {
+  assert.deepEqual(computeServiceFee(1_000_000_000_000n, 50), { feePlancks: 5_000_000_000n, feeBps: 50 });
+  assert.deepEqual(computeServiceFee(1_000_000_000_000n, 0), { feePlancks: 0n, feeBps: 0 });
+  assert.deepEqual(computeServiceFee(1_000_000_000_000n, 10_000), { feePlancks: 10_000_000_000n, feeBps: 100 }); // capped
+  assert.deepEqual(computeServiceFee(199n, 50), { feePlancks: 0n, feeBps: 50 }); // floors to zero
+  assert.deepEqual(computeServiceFee(0n, 50), { feePlancks: 0n, feeBps: 50 });
+  for (let amt = 1n; amt < 100_000n; amt += 977n)
+    for (const bps of [25, 50, 100]) {
+      const { feePlancks } = computeServiceFee(amt, bps);
+      assert.ok(feePlancks * 10000n <= amt * BigInt(bps), 'fee never exceeds the quoted percentage');
+      assert.ok(feePlancks === (amt * BigInt(bps)) / 10000n, 'fee is the exact floor');
+    }
+  assert.equal(feeBpsLabel(0), '0%');
+  assert.equal(feeBpsLabel(25), '0.25%');
+  assert.equal(feeBpsLabel(50), '0.5%');
+  assert.equal(feeBpsLabel(100), '1%');
+});
+
+test('fee: fee-free call is byte-identical to the plain transfer', () => {
+  // ML-DSA signing is hedged, so identity is asserted where it is
+  // deterministic: the signing PAYLOAD (which embeds the call bytes).
+  const ticket = fixtureTicket();
+  const dest = keypairFromSeed(new Uint8Array(32).fill(7), 65);
+  const era = encodeMortalEra(ticket.era.period, ticket.era.phase);
+  const amountPlancks = qtcToPlancks('1.5');
+  const args = { ticket, destAccountId: dest.accountId, amountPlancks, era, nonce: ticket.nonce };
+  const plain = buildColdPayload(args);
+  const zeroFee = buildColdPayload({ ...args, serviceFeePlancks: 0n });
+  assert.deepEqual(zeroFee, plain);
+  const withFee = buildColdPayload({ ...args, serviceFeePlancks: 1n });
+  assert.notDeepEqual(withFee, plain);
+  const d = decodeSignedExtrinsic(coldSign().built.extrinsicHex);
+  assert.equal(d.call.batch, false);
+  assert.equal(d.call.serviceFeePlancks, 0n);
+  assert.equal(d.call.totalPlancks, d.call.amountPlancks);
+});
+
+test('fee: batch package decodes both legs exactly and re-verifies', () => {
+  const amountPlancks = qtcToPlancks('1.5');
+  const { feePlancks } = computeServiceFee(amountPlancks, 50);
+  assert.ok(feePlancks > 0n);
+  const { dest, ticket, built } = coldSign({ serviceFeePlancks: feePlancks });
+  const d = decodeSignedExtrinsic(built.extrinsicHex);
+  assert.equal(d.call.pallet, 9);
+  assert.equal(d.call.callIndex, 2);
+  assert.equal(d.call.batch, true);
+  assert.equal(d.call.legs.length, 2);
+  // recipient leg passes through untouched and FIRST
+  assert.equal(d.call.legs[0].destAddress, dest.address);
+  assert.equal(d.call.legs[0].amountPlancks, amountPlancks);
+  assert.equal(d.call.destAddress, dest.address);
+  assert.equal(d.call.amountPlancks, amountPlancks);
+  // fee leg LAST, to the disclosed builder address, exact sum
+  assert.equal(d.call.legs[1].destAddress, SERVICE_FEE_ADDRESS);
+  assert.equal(d.call.serviceFeePlancks, feePlancks);
+  assert.equal(d.call.serviceFeeDestAddress, SERVICE_FEE_ADDRESS);
+  assert.equal(d.call.totalPlancks, amountPlancks + feePlancks);
+  const dv = decodeForVerify(built.extrinsicHex);
+  const { ok } = reverifySigned({ ticket, decoded: dv, mlDsa: ml_dsa65 });
+  assert.ok(ok, 'batch package must verify against the original ticket');
+});
+
+test('fee: decoder refuses non-transfer batch legs and wrong leg counts', () => {
+  // hand-build signed extrinsics over arbitrary call bytes
+  const sender = keypairFromSeed(new Uint8Array(32).fill(9), 65);
+  const dest = keypairFromSeed(new Uint8Array(32).fill(7), 65);
+  const ticket = fixtureTicket();
+  const era = encodeMortalEra(ticket.era.period, ticket.era.phase);
+  const amountPlancks = qtcToPlancks('1.5');
+  const leg = buildTransferCall(dest.accountId, amountPlancks);
+  const mkHex = (callBytes) => {
+    const payload = buildSigningPayload({
+      call: callBytes, era, nonce: BigInt(ticket.nonce), tip: 0n,
+      specVersion: ticket.spec, txVersion: ticket.txv,
+      genesisHash: hexDecode(ticket.genesis.slice(2)), eraBirthHash: hexDecode(ticket.era.birthHash.slice(2)),
+    });
+    const sig = ml_dsa65.sign(payload, sender.secretKey, { context: te.encode('QUANTUS_EXTRINSIC') });
+    const wire = new Uint8Array(1 + sig.length + sender.publicKey.length);
+    wire[0] = 1; wire.set(sig, 1); wire.set(sender.publicKey, 1 + sig.length);
+    return '0x' + hexEncode(buildExtrinsic({
+      accountId: sender.accountId, signatureWire: wire, era,
+      nonce: BigInt(ticket.nonce), tip: 0n, call: callBytes,
+    }));
+  };
+  // one-leg batch: refused (only the exact 2-leg shape is decoded)
+  assert.throws(() => decodeSignedExtrinsic(mkHex(buildBatchAllCall([leg]))), /unsupported batch of 1/);
+  // three-leg batch: refused
+  assert.throws(() => decodeSignedExtrinsic(mkHex(buildBatchAllCall([leg, leg, leg]))), /unsupported batch of 3/);
+  // second leg not a transfer (pallet 9/call 2 nested batch bytes as a "leg"): refused
+  const notTransfer = new Uint8Array([9, 2, 4, 1, 2, 3]);
+  assert.throws(() => decodeSignedExtrinsic(mkHex(buildBatchAllCall([leg, notTransfer]))), /unsupported inner call/);
+  // a batch whose second leg pays a DIFFERENT address still decodes — and
+  // names that address, so the hot side can warn it is not the builder fee
+  const other = keypairFromSeed(new Uint8Array(32).fill(3), 65);
+  const two = buildBatchAllCall([leg, buildTransferCall(other.accountId, 5n)]);
+  const d = decodeSignedExtrinsic(mkHex(two));
+  assert.equal(d.call.batch, true);
+  assert.equal(d.call.serviceFeeDestAddress, other.address);
+  assert.notEqual(d.call.serviceFeeDestAddress, SERVICE_FEE_ADDRESS);
 });
 
 test('protocol: extrinsic length sane (ML-DSA-65 transfer ~5.7 KB)', () => {

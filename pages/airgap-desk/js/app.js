@@ -8,6 +8,7 @@
 import {
   makeTicket, encodeTicket, decodeTicket, encodeChunks, decodeChunks,
   decodeForVerify, reverifySigned, buildColdPayload, buildColdExtrinsic,
+  computeServiceFee, feeBpsLabel, SERVICE_FEE_ADDRESS,
   DEFAULT_ERA_PERIOD,
 } from './airgap.js';
 import { drawQR, decodeQRImage, mountChunkStepper, startCameraScan } from './qr.js';
@@ -340,17 +341,25 @@ function verifyPackage() {
     : `<span>⛔ SIGNATURE INVALID<span class="sub">The package was tampered with or built against a different ticket. Do NOT broadcast.</span></span>`;
 
   const d = decoded;
-  $('verify-summary').innerHTML = kvHTML([
+  const verifyRows = [
     ['From', shortAddr(d.address)],
     ['To', shortAddr(d.call.destAddress)],
     ['Amount', `<span class="big">${plancksToQtc(d.call.amountPlancks)} QTC</span>`],
+  ];
+  if (d.call.batch) {
+    const feeIsBuilders = d.call.serviceFeeDestAddress === SERVICE_FEE_ADDRESS;
+    verifyRows.push(['Service fee leg', `${plancksToQtc(d.call.serviceFeePlancks)} QTC → ${shortAddr(d.call.serviceFeeDestAddress)}${feeIsBuilders ? ' (the disclosed builder fee address)' : ' — ⚠️ NOT the builder fee address named on this page; check who this second leg pays before broadcasting'}`]);
+    verifyRows.push(['Total debit', `<span class="big">${plancksToQtc(d.call.totalPlancks)} QTC</span> + network fee`]);
+  }
+  verifyRows.push(
     ['Nonce', String(d.nonce)],
     ['Era', d.era.immortal ? 'immortal' : `mortal · period ${d.era.period} · phase ${d.era.phase}`],
     ['Tip', plancksToQtc(d.tip) + ' QTC'],
     ['Scheme', d.scheme === 87 ? 'ML-DSA-87' : 'ML-DSA-65'],
-    ['Call', `Balances.transfer_keep_alive (2/3)`],
+    ['Call', d.call.batch ? 'Utility.batch_all (9/2) — 2× Balances.transfer_keep_alive' : 'Balances.transfer_keep_alive (2/3)'],
     ['Extrinsic', `${(hot.extrinsicHex.length / 2 - 1).toLocaleString()} bytes`],
-  ]);
+  );
+  $('verify-summary').innerHTML = kvHTML(verifyRows);
   $('btn-broadcast').disabled = !ok;
   // A fresh verdict owns the button outright — label included: without this
   // reset the button kept the PREVIOUS package's "Broadcast ✓" (or an
@@ -429,7 +438,7 @@ $('btn-quote-fee').addEventListener('click', async () => {
     const info = await getAccountInfo(hot.rpc, v.decoded.accountId);
     if (stale()) discard();
     const free = info ? info.free : 0n;
-    const total = v.decoded.call.amountPlancks + fee;
+    const total = v.decoded.call.totalPlancks + fee;
     let warn = '';
     if (info && free < total)
       warn = ` ⚠️ Sender holds ${plancksToQtc(free)} QTC — not enough for amount + fee (${plancksToQtc(total)} QTC). Broadcast would fail.`;
@@ -706,6 +715,7 @@ for (const [id, what] of [
   ['cold-amount', 'the amount was edited'],
   ['cold-nonce', 'the nonce was edited'],
   ['cold-scheme', 'the signing scheme was changed'],
+  ['cold-fee', 'the service fee was changed'],
 ]) {
   $(id).addEventListener('input', () => voidSignedPackage(what));
   $(id).addEventListener('change', () => voidSignedPackage(what));
@@ -739,6 +749,8 @@ $('btn-cold-review').addEventListener('click', () => {
       throw new Error('checkphrase mismatch — re-read the five words from the destination address');
     const amount = qtcToPlancks($('cold-amount').value);
     if (amount <= 0n) throw new Error('amount must be greater than zero');
+    const feeBps = Number($('cold-fee').value);
+    const { feePlancks } = computeServiceFee(amount, feeBps);
     const nonceRaw = $('cold-nonce').value.trim();
     if (!/^\d+$/.test(nonceRaw)) throw new Error('nonce must be a non-negative integer');
     const nonce = Number(nonceRaw);
@@ -748,19 +760,29 @@ $('btn-cold-review').addEventListener('click', () => {
     // exact byte length of the final extrinsic (signature length is scheme-fixed)
     const sigLen = scheme === 87 ? 4627 : 3309;
     const wireLen = 1 + sigLen + (scheme === 87 ? 2592 : 1952);
-    $('cold-review-summary').innerHTML = kvHTML([
+    const reviewRows = [
       ['From', shortAddr(cold.ticket.addr)],
       ['To', shortAddr(dest)],
       ['Amount', `<span class="big">${$('cold-amount').value.trim()} QTC</span>`],
+    ];
+    if (feePlancks > 0n) {
+      reviewRows.push(['Service fee', `${plancksToQtc(feePlancks)} QTC (${feeBpsLabel(feeBps)}, added on top) → ${shortAddr(SERVICE_FEE_ADDRESS)}`]);
+      reviewRows.push(['Total debit', `<span class="big">${plancksToQtc(amount + feePlancks)} QTC</span> + network fee`]);
+      reviewRows.push(['Call', 'Utility.batch_all — recipient leg first, fee leg second, one signature']);
+    } else if (feeBps > 0) {
+      reviewRows.push(['Service fee', `none — ${feeBpsLabel(feeBps)} of this amount floors to zero plancks, so no fee leg is added`]);
+    }
+    reviewRows.push(
       ['Nonce', String(nonce)],
       ['Scheme', scheme === 87 ? 'ML-DSA-87' : 'ML-DSA-65'],
       ['Signature wire', `${wireLen.toLocaleString()} bytes (fixed for the scheme)`],
       ['Checkphrase', '✓ read back correctly'],
-    ]);
+    );
+    $('cold-review-summary').innerHTML = kvHTML(reviewRows);
     // pin exactly what was reviewed — signing re-validates against this,
     // scheme included: the review displayed one scheme and wire length, and
     // signing must never silently produce the other scheme's signature.
-    cold.reviewed = { dest, amount: $('cold-amount').value.trim(), nonce: nonceRaw, scheme };
+    cold.reviewed = { dest, amount: $('cold-amount').value.trim(), nonce: nonceRaw, scheme, feeBps };
     $('cold-review').hidden = false;
     $('cold-review').scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'center' });
   } catch (e) { err('cold-build-err', e.message); }
@@ -783,6 +805,9 @@ $('btn-cold-sign').addEventListener('click', async () => {
       throw new Error('destination, amount or nonce changed since review — review again before signing');
     if (scheme !== cold.reviewed.scheme)
       throw new Error(`scheme changed since review — reviewed ML-DSA-${cold.reviewed.scheme}, now ML-DSA-${scheme}. Review again before signing`);
+    const feeBps = Number($('cold-fee').value);
+    if (feeBps !== cold.reviewed.feeBps)
+      throw new Error('service fee changed since review — review again before signing');
     ({ kp } = readColdKey(scheme));
     // the key MUST match the ticket's sender — otherwise the signature is useless
     if (kp.address !== cold.ticket.addr) {
@@ -791,18 +816,19 @@ $('btn-cold-sign').addEventListener('click', async () => {
     const { prefix: destPrefix, accountId: destAccountId } = ss58Decode(dest);
     if (destPrefix !== 189) throw new Error('destination has wrong network prefix');
     const amount = qtcToPlancks($('cold-amount').value);
+    const { feePlancks: serviceFeePlancks } = computeServiceFee(amount, feeBps);
     const nonce = Number($('cold-nonce').value.trim());
     const era = encodeMortalEra(cold.ticket.era.period, cold.ticket.era.phase);
     const mod = scheme === 87 ? ml_dsa87 : ml_dsa65;
     const payload = buildColdPayload({
-      ticket: cold.ticket, destAccountId, amountPlancks: amount, era, nonce,
+      ticket: cold.ticket, destAccountId, amountPlancks: amount, era, nonce, serviceFeePlancks,
     });
     const t0 = performance.now();
     const sig = mod.sign(payload, kp.secretKey, { context: te.encode('QUANTUS_EXTRINSIC') });
     const ms = Math.round(performance.now() - t0);
     const built = buildColdExtrinsic({
       ticket: cold.ticket, senderAccountId: kp.accountId, destAccountId,
-      amountPlancks: amount, era, nonce, scheme,
+      amountPlancks: amount, era, nonce, scheme, serviceFeePlancks,
       signResult: { signature: sig, pubkey: kp.publicKey },
     });
     // local self-check before export: never hand the hot side a bad package

@@ -120,6 +120,8 @@ export function eraBirth(current, period, phase) {
 
 export const BALANCES_PALLET_INDEX = 2;
 export const TRANSFER_KEEP_ALIVE_CALL_INDEX = 3;
+export const UTILITY_PALLET_INDEX = 9;
+export const BATCH_ALL_CALL_INDEX = 2;
 export const EXTRINSIC_VERSION = 0x84; // 0b1000_0100: signed flag + format v4
 export const SIGNING_CONTEXT = 'QUANTUS_EXTRINSIC';
 export const METADATA_HASH_MODE_DISABLED = 0x00;
@@ -136,6 +138,15 @@ export function buildTransferCall(destAccountId, amountPlancks) {
     destAccountId,
     compactEncode(amountPlancks),
   );
+}
+
+/* Utility::batch_all call bytes: [9, 2, compact(count), calls…] — the
+ * encoding verified against the Extrinsic Lab's fleet batch sample and
+ * used by every fleet app that wraps calls atomically. */
+export function buildBatchAllCall(calls) {
+  if (!Array.isArray(calls) || calls.length === 0) throw new Error('batch_all needs at least one call');
+  for (const c of calls) if (!c || c.length === 0) throw new Error('bad call bytes in batch');
+  return concat(Uint8Array.of(UTILITY_PALLET_INDEX, BATCH_ALL_CALL_INDEX), compactEncode(calls.length), ...calls);
 }
 
 /* Build the exact byte payload the runtime signs (SignedPayload.using_encoded).

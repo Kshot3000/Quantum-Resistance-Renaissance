@@ -264,6 +264,15 @@
           </select>
         </label>
       </div>
+      <label class="fld">Builder service fee (optional)
+        <select id="cold-fee">
+          <option value="0">None</option>
+          <option value="25">0.25% of the amount</option>
+          <option value="50" selected>0.5% of the amount (default)</option>
+          <option value="100">1% of the amount</option>
+        </select>
+        <span class="hint">Plainly disclosed and entirely optional: the fee is added ON TOP of the amount — the recipient's amount is never reduced. It travels as a second transfer to the builder's QTC address qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau inside the same atomic batch, so you sign exactly one extrinsic and pay both legs or neither. A fee that rounds down to zero plancks adds no leg. The hot desk shows both legs before broadcast.</span>
+      </label>
       <div class="card sub">
         <h3>Signing key — memory only, wiped after signing</h3>
         <div class="tabs small" role="tablist" aria-label="Key import method">
@@ -350,6 +359,6 @@
      js/vendor/jsqr.js?v=1.35.0 on first scan/upload-decode use. -->
 <script src="js/vendor/checkphrase-core.js?v=1.35.0"></script>
 <script src="js/vendor/checkphrase-wordlist.js?v=1.35.0"></script>
-<script type="module" src="js/app.js?v=1.45.0"></script>
+<script type="module" src="js/app.js?v=1.46.0"></script>
 </body>
 </html>
