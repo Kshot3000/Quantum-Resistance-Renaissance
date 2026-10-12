@@ -130,7 +130,11 @@ renderBudget();
 
 /* ---------- 03 call builder ---------- */
 $("b-kind").addEventListener("change", function(){
-  $("b-keepalive-wrap").style.display = this.value === "transfer_all" ? "" : "none";
+  var sweep = this.value === "transfer_all";
+  $("b-keepalive-wrap").style.display = sweep ? "" : "none";
+  /* A sweep empties the vault by definition — no service fee can be added
+   * on top, so the fee selector leaves with it (explained in its note). */
+  $("b-fee-wrap").style.display = sweep ? "none" : "";
 });
 $("b-keepalive-wrap").style.display = "none";
 function decodeSignerField(el, errEl){
@@ -176,10 +180,16 @@ $("b-build").addEventListener("click", function(){
     return;
   }
   var kind = $("b-kind").value;
-  var inner = kind === "transfer_all"
-    ? C.encodeTransferAll(recipHex, $("b-keepalive").checked)
-    : C.encodeTransferKeepAlive(recipHex, amount);
+  var payout = null;
+  var inner;
+  if (kind === "transfer_all"){
+    inner = C.encodeTransferAll(recipHex, $("b-keepalive").checked);
+  } else {
+    payout = C.encodePayoutWithServiceFee(recipHex, amount, Number($("b-service-fee").value));
+    inner = payout.ok ? payout.inner : payout;
+  }
   if (!inner.ok){ out.innerHTML = '<div class="empty-state">' + esc(inner.error) + "</div>"; return; }
+  var hasFee = !!(payout && payout.feePlancks > 0n);
   var expiry = C.expiryBlockNow(height, window_);
   var propose = C.encodePropose(vaultHex, inner.hex, expiry);
   var approve = C.encodeApprove(vaultHex, pid, inner.hex);
@@ -192,12 +202,25 @@ $("b-build").addEventListener("click", function(){
     out.innerHTML = '<div class="empty-state">' + esc(badEnc.error) + "</div>";
     return;
   }
-  var innerName = kind === "transfer_all" ? "Balances.transfer_all" : "Balances.transfer_keep_alive";
-  var html = payloadCard("Inner call — " + innerName,
-    inner.hex,
-    "pallet 2 · call " + (kind === "transfer_all" ? "4" : "3") + " · MultiAddress::Id · " + (inner.hex.length / 2) + " bytes" +
-      (kind === "transfer_all" ? "" : " · " + C.plancksToQtc(amount) + " QTC"),
-    "The exact bytes the pallet stores and every approver must resubmit <b>byte-equal</b>.");
+  var innerName, innerMeta, innerExplain;
+  if (hasFee){
+    innerName = "Utility.batch_all × 2 transfers";
+    innerMeta = "pallet 9 · call 2 · " + (inner.hex.length / 2) + " bytes · recipient " +
+      C.plancksToQtc(payout.recipientPlancks) + " QTC + service fee " +
+      C.plancksToQtc(payout.feePlancks) + " QTC (" + C.feeBpsLabel(payout.feeBps) +
+      ") · vault pays " + C.plancksToQtc(payout.totalOutflowPlancks) + " QTC total";
+    innerExplain = "Atomic: the recipient leg (<b>full amount, untouched</b>) and the disclosed " +
+      "service-fee leg to <b>" + esc(C.SERVICE_FEE_ADDRESS) + "</b> execute together or not at all. " +
+      "The exact bytes the pallet stores and every approver must resubmit <b>byte-equal</b> — " +
+      "the fee leg is visible to every signer before they approve.";
+  } else {
+    innerName = kind === "transfer_all" ? "Balances.transfer_all" : "Balances.transfer_keep_alive";
+    innerMeta = "pallet 2 · call " + (kind === "transfer_all" ? "4" : "3") + " · MultiAddress::Id · " + (inner.hex.length / 2) + " bytes" +
+      (kind === "transfer_all" ? "" : " · " + C.plancksToQtc(amount) + " QTC") +
+      (payout && payout.feeBps > 0 ? " · service fee floored to 0 plancks at this amount — no fee leg added" : "");
+    innerExplain = "The exact bytes the pallet stores and every approver must resubmit <b>byte-equal</b>.";
+  }
+  var html = payloadCard("Inner call — " + innerName, inner.hex, innerMeta, innerExplain);
   html += payloadCard("1 · Multisig.propose", propose.hex,
     "pallet 19 · call 1 · expiry block " + expiry + " (~" + C.blocksToHuman(window_) + " from height " + height + ")",
     "Signed by a vault <b>signer</b>. Burns the proposal fee, reserves the 0.01 QTC deposit. Proposal id is assigned by the chain's proposal nonce — it increments per vault.");
@@ -214,6 +237,11 @@ $("b-build").addEventListener("click", function(){
     "pallet 19 · calls 4 and 5 · cleanup after expiry",
     "Anyone can remove an <b>expired</b> proposal; the proposer reclaims deposits in bulk with <code>claim_deposits</code>.");
   out.innerHTML = html +
+    (hasFee ? '<p class="note">Service fee disclosure: this payout includes the optional ' +
+      C.feeBpsLabel(payout.feeBps) + " MultiSig Vault service fee — " + C.plancksToQtc(payout.feePlancks) +
+      " QTC added ON TOP of the recipient's " + C.plancksToQtc(payout.recipientPlancks) +
+      " QTC, paid to " + esc(C.SERVICE_FEE_ADDRESS) + " as the second leg of the batch above. " +
+      "Recipient amount is unchanged. Choose \"None\" and rebuild to remove it.</p>" : "") +
     '<p class="note">Unsigned SCALE payloads — sign with <code>quantus-cli</code> or your wallet, then broadcast. Verify the pallet index (19) and call indices against the runtime before mainnet use.</p>';
 });
 

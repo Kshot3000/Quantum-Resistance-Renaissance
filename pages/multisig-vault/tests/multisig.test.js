@@ -166,5 +166,82 @@ eq(C.expiryBlockNow(150000, 7200), 157200, "expiry block math");
 eq(C.MAX_EXPIRY_DURATION, 100800, "max expiry constant");
 eq(C.PALLET_INDEX, 19, "pallet index constant");
 
+/* --- optional vault service fee (disclosed, ON TOP — profit mandate) ---
+ * A vault payout is the recipient's money (a promise), so the fee is never
+ * split out of it: recipient leg passes through untouched, and the fee is a
+ * SECOND transfer_keep_alive to the builder's QTC address, wrapped with the
+ * recipient leg in one atomic Utility.batch_all (pallet 9, call 2 — the
+ * Quantus fork exposes only batch_all; encoding verified against the
+ * Extrinsic Lab's fleet-verified batch sample: [9, 2, compact(n), calls…]). */
+eq(C.SERVICE_FEE_ADDRESS, "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau", "service fee address pin");
+{
+  const fd = C.ss58Decode(C.SERVICE_FEE_ADDRESS);
+  ok(fd.ok && fd.prefix === 189 && fd.key.length === 32, "service fee address is SS58-189, 32-byte key");
+  eq(C.toHex(fd.key), "88714241713efd0732437b5a44f8541f69310374de19cc539700caf09d00354c", "service fee key hex pin");
+  eq(C.SERVICE_FEE_KEY_HEX, "88714241713efd0732437b5a44f8541f69310374de19cc539700caf09d00354c", "core fee key hex matches address");
+}
+eq(C.SERVICE_FEE_MAX_BPS, 100, "service fee capped at 100 bps");
+eq(C.UTILITY_PALLET_INDEX, 9, "utility pallet index 9");
+eq(C.BATCH_ALL_CALL_IDX, 2, "batch_all call index 2");
+
+/* fee math: floor(total * bps / 10,000), never over the quote */
+eq(C.computeServiceFee(1000000000000n, 50).feePlancks.toString(), "5000000000", "fee 0.5% of 1 QTC = 0.005 QTC");
+eq(C.computeServiceFee(1000000000000n, 50).feeBps, 50, "fee bps restated");
+eq(C.computeServiceFee(199n, 50).feePlancks.toString(), "0", "fee floors to zero on a tiny total");
+eq(C.computeServiceFee(1000000000000n, 500).feePlancks.toString(), "10000000000", "fee bps capped at 100 (1%)");
+eq(C.computeServiceFee(1000000000000n, -5).feePlancks.toString(), "0", "negative bps = no fee");
+eq(C.computeServiceFee(0n, 50).feePlancks.toString(), "0", "zero total = no fee");
+for (const [tot, bps] of [[123456789012345n, 25], [999999999999n, 100], [5000000000000n, 50], [7n, 100]]) {
+  const f = C.computeServiceFee(tot, bps);
+  eq(f.feePlancks.toString(), ((tot * BigInt(Math.min(bps, 100))) / 10000n).toString(),
+     "fee sweep floor tot=" + tot + " bps=" + bps);
+  ok(f.feePlancks * 10000n <= tot * BigInt(Math.min(bps, 100)), "fee never exceeds quoted % tot=" + tot);
+}
+eq(C.feeBpsLabel(0), "0%", "label 0");
+eq(C.feeBpsLabel(25), "0.25%", "label 25");
+eq(C.feeBpsLabel(50), "0.5%", "label 50");
+eq(C.feeBpsLabel(100), "1%", "label 100");
+
+/* batch_all encoding: [9, 2, compact(count), call bytes concatenated] */
+{
+  const c1 = C.encodeTransferKeepAlive(DEST, 1000000000000n).hex;
+  const c2 = C.encodeTransferKeepAlive(DEST, 2000000000000n).hex;
+  const b = C.encodeBatchAll([c1, c2]);
+  ok(b.ok, "batch_all ok");
+  eq(b.hex, "0902" + "08" + c1 + c2, "batch_all bytes exact (compact 2 = 0x08)");
+  eq(b.kind, "batch_all", "batch_all kind");
+  ok(!C.encodeBatchAll([]).ok, "batch_all rejects empty");
+  ok(!C.encodeBatchAll(["zz"]).ok, "batch_all rejects bad hex");
+  ok(!C.encodeBatchAll([c1]).ok === false, "batch_all accepts a single call");
+}
+
+/* payout builder: no fee -> the plain single transfer, byte-identical */
+{
+  const plain = C.encodeTransferKeepAlive(DEST, 1000000000000n);
+  const p0 = C.encodePayoutWithServiceFee(DEST, 1000000000000n, 0);
+  ok(p0.ok, "payout no-fee ok");
+  eq(p0.inner.hex, plain.hex, "no-fee payout is the plain transfer_keep_alive");
+  eq(p0.feePlancks.toString(), "0", "no-fee payout fee 0");
+  eq(p0.totalOutflowPlancks.toString(), "1000000000000", "no-fee outflow = amount");
+  const pTiny = C.encodePayoutWithServiceFee(DEST, 100n, 25);
+  ok(pTiny.ok && pTiny.feePlancks === 0n && pTiny.inner.hex === C.encodeTransferKeepAlive(DEST, 100n).hex,
+     "fee floored to zero adds NO second transfer (a 0-planck transfer is invalid)");
+}
+/* payout builder: fee on -> atomic batch of [recipient untouched, fee last] */
+{
+  const p = C.encodePayoutWithServiceFee(DEST, 1000000000000n, 50);
+  ok(p.ok, "payout fee ok");
+  eq(p.feePlancks.toString(), "5000000000", "payout fee 0.005 QTC at 0.5%");
+  eq(p.feeBps, 50, "payout fee bps");
+  eq(p.totalOutflowPlancks.toString(), "1005000000000", "vault outflow = recipient + fee (fee ON TOP)");
+  const recipLeg = C.encodeTransferKeepAlive(DEST, 1000000000000n).hex;
+  const feeLeg = C.encodeTransferKeepAlive(C.SERVICE_FEE_KEY_HEX, 5000000000n).hex;
+  eq(p.inner.hex, "0902" + "08" + recipLeg + feeLeg, "batch = recipient leg untouched, fee leg LAST");
+  eq(p.inner.kind, "batch_all", "fee payout inner kind batch_all");
+  ok(p.inner.hex.indexOf(feeLeg) > p.inner.hex.indexOf(recipLeg), "fee leg follows recipient leg");
+  ok(!C.encodePayoutWithServiceFee("zz", 1000000000000n, 50).ok, "payout rejects bad recipient");
+  ok(!C.encodePayoutWithServiceFee(DEST, 0n, 50).ok, "payout rejects zero amount");
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

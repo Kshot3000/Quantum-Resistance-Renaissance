@@ -55,6 +55,23 @@ var MULTISIG_FEE = 30000000000n;             // 0.03 QTC, burned
 var PROPOSAL_DEPOSIT = 10000000000n;         // 0.01 QTC, reserved -> refunded
 var PROPOSAL_FEE = 50000000000n;             // 0.05 QTC, burned
 var SIGNER_STEP_PERMILL = 10000n;            // Permill::from_percent(1) = 1%
+var UTILITY_PALLET_INDEX = 9;                // Utility in construct_runtime!
+var BATCH_ALL_CALL_IDX = 2;                  // Quantus fork exposes only batch_all
+
+/* Optional vault service fee (PROFIT route, added 2026-10-11): the vault's
+ * signers may add a small, plainly disclosed service fee ON TOP of a
+ * transfer_keep_alive payout — the recipient amount is NEVER reduced.
+ * The fee is a second transfer_keep_alive to the builder's QTC address
+ * (SERVICE_FEE_ADDRESS, the same address in this page's footer), wrapped
+ * with the recipient leg in ONE atomic Utility.batch_all inner call
+ * (recipient first, fee LAST), so the vault pays either both legs or
+ * neither. Exact BigInt math: fee = floor(amount * bps / 10,000), so it
+ * never exceeds the quoted percentage; capped at 100 bps (1%) in code.
+ * A fee that floors to zero plancks adds NO second leg — a 0-planck
+ * transfer is invalid on chain. transfer_all sweeps cannot carry the fee
+ * (the vault is emptied by definition); the UI disables it there. */
+var SERVICE_FEE_ADDRESS = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+var SERVICE_FEE_MAX_BPS = 100;
 
 /* ================= blake2b (RFC 7693, verified vs Python hashlib) ================= */
 var SIGMA = [
@@ -398,6 +415,68 @@ function encodeTransferAll(destHex, keepAlive){
   return { ok: true, hex: toHex(bytes), kind: "transfer_all" };
 }
 
+/* ================= service fee + batch payout ================= */
+/* The fee key is DERIVED from the address with this file's own SS58 codec,
+ * so the encoded leg can never drift from the disclosed address. */
+var SERVICE_FEE_KEY_HEX = (function(){
+  var d = ss58Decode(SERVICE_FEE_ADDRESS);
+  return (d.ok && d.prefix === SS58_PREFIX && d.key.length === 32) ? toHex(d.key) : "";
+})();
+function computeServiceFee(totalPlancks, feeBps){
+  var total = BigInt(totalPlancks);
+  var bps = Number(feeBps);
+  if (!isFinite(bps) || bps < 0) bps = 0;
+  if (bps > SERVICE_FEE_MAX_BPS) bps = SERVICE_FEE_MAX_BPS;
+  bps = Math.floor(bps);
+  if (total <= 0n || bps === 0) return { feePlancks: 0n, feeBps: bps };
+  return { feePlancks: (total * BigInt(bps)) / 10000n, feeBps: bps };
+}
+function feeBpsLabel(bps){
+  var b = Math.floor(Number(bps) || 0);
+  var whole = Math.floor(b / 100), rem = b % 100;
+  if (rem === 0) return whole + "%";
+  var frac = String(rem).padStart(2, "0").replace(/0+$/, "");
+  return whole + "." + frac + "%";
+}
+/* Utility.batch_all (pallet 9, call 2): SCALE Vec<Call> = compact count +
+ * the call bytes concatenated — the encoding the Extrinsic Lab's
+ * fleet-verified batch sample builds. Atomic: every call or none. */
+function encodeBatchAll(callHexes){
+  if (!Array.isArray(callHexes) || callHexes.length === 0)
+    return { ok: false, error: "batch_all needs at least one call." };
+  var parts = [], total = 0;
+  for (var i = 0; i < callHexes.length; i++){
+    var b = fromHex(callHexes[i]);
+    if (!b || b.length === 0) return { ok: false, error: "Bad call bytes in batch." };
+    parts.push(b); total += b.length;
+  }
+  var bytes = [UTILITY_PALLET_INDEX, BATCH_ALL_CALL_IDX]
+    .concat(compactU128(BigInt(callHexes.length)));
+  parts.forEach(function(b){ bytes = bytes.concat(b); });
+  if (bytes.length > MAX_CALL_SIZE) return { ok: false, error: "Call exceeds 10 KB." };
+  return { ok: true, hex: toHex(bytes), kind: "batch_all", callCount: callHexes.length };
+}
+/* Build a payout inner call, optionally with the disclosed service fee.
+ * No fee (or a fee floored to zero) -> the plain transfer_keep_alive,
+ * byte-identical to encodeTransferKeepAlive. Fee on -> one batch_all of
+ * [recipient leg untouched, fee leg last]; totalOutflow = amount + fee. */
+function encodePayoutWithServiceFee(destHex, valuePlancks, feeBps){
+  var recip = encodeTransferKeepAlive(destHex, valuePlancks);
+  if (!recip.ok) return recip;
+  var amount = BigInt(valuePlancks);
+  var f = computeServiceFee(amount, feeBps);
+  if (f.feePlancks <= 0n)
+    return { ok: true, inner: recip, feePlancks: 0n, feeBps: f.feeBps,
+             recipientPlancks: amount, totalOutflowPlancks: amount };
+  if (!SERVICE_FEE_KEY_HEX) return { ok: false, error: "Service fee address failed to decode." };
+  var feeLeg = encodeTransferKeepAlive(SERVICE_FEE_KEY_HEX, f.feePlancks);
+  if (!feeLeg.ok) return feeLeg;
+  var batch = encodeBatchAll([recip.hex, feeLeg.hex]);
+  if (!batch.ok) return batch;
+  return { ok: true, inner: batch, feePlancks: f.feePlancks, feeBps: f.feeBps,
+           recipientPlancks: amount, totalOutflowPlancks: amount + f.feePlancks };
+}
+
 /* ================= multisig extrinsic payloads (unsigned) ================= */
 /* Encoded as the RuntimeCall bytes of pallet 19's dispatchable — the part a
  * signer feeds to quantus-cli / a wallet to sign. */
@@ -492,6 +571,11 @@ var MsigCore = {
   qtcToPlancks: qtcToPlancks, plancksToQtc: plancksToQtc,
   deriveMultisigAddress: deriveMultisigAddress, sortKeyHex: sortKeyHex,
   proposalFeePlancks: proposalFeePlancks, lifecycleBudget: lifecycleBudget,
+  UTILITY_PALLET_INDEX: UTILITY_PALLET_INDEX, BATCH_ALL_CALL_IDX: BATCH_ALL_CALL_IDX,
+  SERVICE_FEE_ADDRESS: SERVICE_FEE_ADDRESS, SERVICE_FEE_MAX_BPS: SERVICE_FEE_MAX_BPS,
+  SERVICE_FEE_KEY_HEX: SERVICE_FEE_KEY_HEX,
+  computeServiceFee: computeServiceFee, feeBpsLabel: feeBpsLabel,
+  encodeBatchAll: encodeBatchAll, encodePayoutWithServiceFee: encodePayoutWithServiceFee,
   encodeTransferKeepAlive: encodeTransferKeepAlive, encodeTransferAll: encodeTransferAll,
   encodeCreateMultisig: encodeCreateMultisig, encodePropose: encodePropose,
   encodeApprove: encodeApprove, encodeCancel: encodeCancel,
