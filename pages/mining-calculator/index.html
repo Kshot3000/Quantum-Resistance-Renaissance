@@ -106,9 +106,9 @@
           <select id="in-user-unit"><option>H/s</option><option>kH/s</option><option selected>MH/s</option><option>GH/s</option><option>TH/s</option></select></div>
         </label>
         <label>Network hashrate
-          <div class="row"><input id="in-net" type="number" min="0" step="any" value="47.156">
+          <div class="row"><input id="in-net" type="number" min="0" step="any" value="47.061">
           <select id="in-net-unit"><option>H/s</option><option>kH/s</option><option>MH/s</option><option>GH/s</option><option selected>TH/s</option></select></div>
-          <span class="hint" id="net-hint">From the builder's chain snapshot (Oct 12, 2026, block 213,754): difficulty-implied network rate &asymp;47.16 TH/s. It refreshes automatically when the latest snapshot loads — edit it and your number wins.</span>
+          <span class="hint" id="net-hint">From the builder's chain snapshot (Oct 12, 2026, block 213,991): difficulty-implied network rate &asymp;47.06 TH/s. It refreshes automatically when the latest snapshot loads — edit it and your number wins.</span>
         </label>
         <label>Rig power draw (watts)
           <input id="in-watts" type="number" min="0" step="any" value="450">
@@ -117,14 +117,14 @@
           <input id="in-kwh" type="number" min="0" step="any" value="0.12">
         </label>
         <label>Assumed QTC price ($)
-          <input id="in-price" type="number" min="0" step="any" placeholder="no public price yet">
-          <span class="hint">QTC has no public market price yet — NEAR Intents was announced as the first venue, no listing date. Leave blank to skip revenue math.</span>
+          <input id="in-price" type="number" min="0" step="any" placeholder="your assumed price">
+          <span class="hint">QTC listed on NEAR Intents (1Click) in October 2026 and the 1Click list carries a reference price — but this calculator deliberately uses <i>your</i> assumed price, not a live feed. Leave blank to skip revenue math.</span>
         </label>
         <details class="adv">
           <summary>Advanced: override chain state</summary>
           <label>Current supply (QTC)
             <input id="in-supply" type="number" min="0" step="any">
-            <span class="hint" id="supply-hint">Defaults to total issuance from the Oct 12, 2026 chain snapshot (5,810,117 QTC — genesis endowments included, as the emission formula requires) and refreshes with it. Override if you know a fresher figure — the block reward recalculates.</span>
+            <span class="hint" id="supply-hint">Defaults to total issuance from the Oct 12, 2026 chain snapshot (5,810,262 QTC — genesis endowments included, as the emission formula requires) and refreshes with it. Override if you know a fresher figure — the block reward recalculates.</span>
           </label>
         </details>
       </div>
@@ -159,7 +159,7 @@
       <div class="stat"><span class="k">Daily emission (observed pace)</span><span class="v" id="s-daily">&mdash;</span></div>
       <div class="stat"><span class="k">Miners' share of cap</span><span class="v">73% &middot; 15.33M QTC</span></div>
     </div>
-    <p class="hint" id="stats-src">Network state from the dated fallback capture (Oct 12, 2026, block 213,754) — refreshes automatically when the latest snapshot loads.</p>
+    <p class="hint" id="stats-src">Network state from the dated fallback capture (Oct 12, 2026, block 213,991) — refreshes automatically when the latest snapshot loads.</p>
   </section>
 
   <section class="card" id="howto">
@@ -181,7 +181,7 @@
     <div class="card-head"><h2>Read before you ape in</h2></div>
     <ul class="caveats">
       <li><strong>Estimates, not income.</strong> Difficulty retargets, luck variance, stale/orphan blocks, and pool fees all move real results away from the math above.</li>
-      <li><strong>No public QTC price exists yet.</strong> NEAR Intents is announced as the first trading venue with no listing date — any revenue figure here uses <i>your</i> assumed price.</li>
+      <li><strong>Revenue uses your price, not the market's.</strong> QTC listed on NEAR Intents (1Click) in October 2026, so a public reference price exists — but solver-market prices move, and any revenue figure here uses <i>your</i> assumed price.</li>
       <li><strong>Defaults come from the chain, not a calendar.</strong> Network hashrate, supply, and block pace default to the builder's hourly chain snapshot — difficulty-implied hashrate, total issuance, and the observed block pace rather than the 12s target. If the snapshot can't load — or a snapshot field fails validation — the page falls back to the dated fallback capture shown in the Emission schedule above (kept in sync with the chain snapshots) and labels it. (Before Oct 2, 2026 this page pre-filled a 10 GH/s example rate that overstated a default rig's estimate roughly 5,500-fold; the snapshot defaults fixed that.)</li>
       <li><strong>Mainnet is real money.</strong> Back up your seed phrase, keep miner auth files private, and never expose the miner port (9833) to the internet.</li>
     </ul>
@@ -194,7 +194,7 @@
   </footer>
 </main>
 
-<script src="app.js?v=1.11.13"></script>
+<script src="app.js?v=1.11.14"></script>
 <script src="../../assets/app-nav.js?v=1.8.0"></script>
 </body>
 </html>

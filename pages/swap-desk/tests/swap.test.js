@@ -127,7 +127,7 @@ t("attribution + endpoint constants", function(){
   var html = fs.readFileSync(__dirname + "/../index.html", "utf8");
   assert.ok(html.indexOf("qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau") !== -1, "donation address");
   assert.ok(html.indexOf("https://x.com/kshot9000") !== -1, "x link");
-  assert.ok(html.indexOf("app.js?v=1.17.0") !== -1, "js cache key");
+  assert.ok(html.indexOf("app.js?v=1.18.0") !== -1, "js cache key");
   // De-pinned (2026-10-02): the a11y contrast pass bumped the css key to
   // 1.17.2 without updating this pin. Assert a keyed css load at >= the
   // 1.17.0 floor instead of an exact version that drifts every release.
@@ -141,6 +141,58 @@ t("honesty labels present", function(){
   assert.ok(/not a quote/i.test(html), "must say the lab is not a quote");
   assert.ok(/illustrative/i.test(html), "must label illustrative figures");
   assert.ok(/Not financial advice/.test(html), "disclaimer");
+});
+
+// 13. Listing reality (verified against the live API 2026-10-12): QTC is on
+// the list as nep141:qtc.omft.near on blockchain "qtc" (NOT "quantus"),
+// plus a 1cs_v1-wrapped NEAR form. Rows below are the real captured entries.
+var LIVE_QTC_ROWS = [
+  { assetId: "nep141:qtc.omft.near", decimals: 12, blockchain: "qtc", symbol: "QTC", price: 132.01297962032564, priceUpdatedAt: "2026-10-12T21:22:00.689Z", coingeckoId: "custom:qtc" },
+  { assetId: "1cs_v1:near:nep141:qtc.omft.near", decimals: 12, blockchain: "near", symbol: "QTC", price: 132.01297962032564, priceUpdatedAt: "2026-10-12T21:22:00.689Z", contractAddress: "qtc.omft.near", coingeckoId: "custom:qtc" }
+];
+t("scanTokensForQTC: the real listed rows are detected, nep141 entry wins", function(){
+  var r = m.scanTokensForQTC(LIVE_QTC_ROWS);
+  assert.strictEqual(r.listed, true);
+  assert.strictEqual(r.asset.assetId, "nep141:qtc.omft.near");
+  assert.strictEqual(r.total, 2);
+});
+t("scanTokensForQTC: the 1cs_v1-wrapped form alone is detected", function(){
+  var r = m.scanTokensForQTC([LIVE_QTC_ROWS[1]]);
+  assert.strictEqual(r.listed, true);
+});
+t("scanTokensForQTC: chain 'qtc' + symbol QTC detected; chain alone is not enough", function(){
+  var byChain = m.scanTokensForQTC([{ assetId: "nep141:other.qtc.near", symbol: "QTC", blockchain: "qtc" }]);
+  assert.strictEqual(byChain.listed, true);
+  var chainOnly = m.scanTokensForQTC([{ assetId: "nep141:weth.qtc.near", symbol: "WETH", blockchain: "qtc" }]);
+  assert.strictEqual(chainOnly.listed, false);
+  var fakeQuantus = m.scanTokensForQTC([{ assetId: "x", symbol: "FAKE", blockchain: "quantus" }]);
+  assert.strictEqual(fakeQuantus.listed, false);
+});
+
+// 14. An empty scan is inconclusive, never a NOT LISTED verdict
+t("isConclusiveScan: zero rows prove nothing", function(){
+  assert.strictEqual(m.isConclusiveScan(m.scanTokensForQTC([])), false);
+  assert.strictEqual(m.isConclusiveScan(m.scanTokensForQTC(LIVE_QTC_ROWS)), true);
+  assert.strictEqual(m.isConclusiveScan(null), false);
+});
+
+// 15. The persisted probe is validated before it paints (load boundary)
+t("sanitizeCachedProbe: valid caches survive, poison does not paint", function(){
+  var now = Date.now();
+  var good = { ok: true, ms: 812, at: now - 60000, result: { listed: true, total: 204, asset: { assetId: "nep141:qtc.omft.near", decimals: 12 } } };
+  var s = m.sanitizeCachedProbe(good, now);
+  assert.ok(s && s.result.listed === true && s.result.total === 204 && s.at === good.at);
+  var goodUnlisted = { ok: true, ms: 100, at: now - 1000, result: { listed: false, total: 204, asset: null } };
+  assert.ok(m.sanitizeCachedProbe(goodUnlisted, now));
+  assert.strictEqual(m.sanitizeCachedProbe(null, now), null);
+  assert.strictEqual(m.sanitizeCachedProbe("junk", now), null);
+  assert.strictEqual(m.sanitizeCachedProbe({ ok: false, ms: 1, at: now, result: { listed: false, total: 5, asset: null } }, now), null, "cached failure");
+  assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: 1, at: now + 3600e3, result: { listed: true, total: 204, asset: {} } }, now), null, "future at");
+  assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: 1, at: Date.UTC(2020, 0, 1), result: { listed: false, total: 5, asset: null } }, now), null, "pre-desk at");
+  assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: "fast", at: now, result: { listed: false, total: 5, asset: null } }, now), null, "ms string");
+  assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: 1, at: now, result: { listed: false, total: 0, asset: null } }, now), null, "total 0");
+  assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: 1, at: now, result: { listed: true, total: 204, asset: null } }, now), null, "listed without asset");
+  assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: 1, at: now, result: { listed: "yes", total: 204, asset: null } }, now), null, "listed non-boolean");
 });
 
 console.log("\n" + passed + " passed, " + failed + " failed");

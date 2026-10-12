@@ -85,7 +85,7 @@
     <div class="sweep" aria-hidden="true"></div>
     <div class="eyebrow">⇄ Exchange venue watch · NEAR Intents 1Click</div>
     <h1>QTC <span class="hl">Swap Desk</span></h1>
-    <p class="lede">NEAR Intents is Quantus's first exchange venue — and the official wallet already ships a two-way swap flow for it. The only missing piece is the <strong>listing itself</strong>: QTC isn't on Intents yet. This desk watches the live 1Click token list for the moment that changes, and meanwhile lays out exactly how the swaps will work — the real steps, the real fee math, the real failure modes — sourced from the wallet team's own integration docs.</p>
+    <p class="lede">NEAR Intents is Quantus's first exchange venue — and the official wallet already ships a two-way swap flow for it. The missing piece landed in October 2026: <strong>QTC is listed on 1Click</strong> (<code>nep141:qtc.omft.near</code>, verified by this desk's live probe on Oct 12, 2026). This desk keeps watching the live 1Click token list — and lays out exactly how the swaps work — the real steps, the real fee math, the real failure modes — sourced from the wallet team's own integration docs.</p>
     <div class="facts">
       <div class="fact"><span class="k">Listing status</span><span class="v" id="stat-status">—</span><span class="s" id="stat-status-sub">live 1Click probe</span></div>
       <div class="fact"><span class="k">Tokens scanned</span><span class="v" id="stat-tokens">—</span><span class="s">on the 1Click list</span></div>
@@ -115,11 +115,11 @@
         </div>
       </div>
       <div class="watch-side">
-        <h3>What flips on listing day</h3>
+        <h3>What the listing changed</h3>
         <ul class="ticks">
-          <li>This card turns green and shows QTC's decimals + live USD price from the listing.</li>
-          <li>The wallet's swap screen (behind its <code>enableSwap</code> flag) starts returning real quotes instead of <code>tokenIn is not valid</code>.</li>
-          <li>Solvers can bid on QTC intents — that is when liquidity actually exists, not before.</li>
+          <li>This card turned green: it shows QTC's decimals + the 1Click reference price from the listing.</li>
+          <li>The wallet's swap screen can return real quotes instead of <code>tokenIn is not valid</code> — the listing was the blocker named in the wallet team's docs.</li>
+          <li>Solvers can bid on QTC intents — that is when liquidity actually exists; depth still depends on how many show up.</li>
         </ul>
         <p class="fine">The watch reads <code>GET https://1click.chaindefuser.com/v0/tokens</code> — the same public list the wallet reads. No API key, no account. A listing appearing here is necessary for swaps, not sufficient for deep liquidity: quotes still come from a solver auction.</p>
       </div>
@@ -128,7 +128,7 @@
 
   <!-- ============ HOW A SWAP WORKS ============ -->
   <section class="card" aria-labelledby="how-h">
-    <div class="card-head"><h2 id="how-h">How a swap will work</h2></div>
+    <div class="card-head"><h2 id="how-h">How a swap works</h2></div>
     <div class="dir-toggle" role="group" aria-label="Swap direction">
       <button id="dir-out" class="on" aria-pressed="true">Swap out of QTC &rarr; other chain</button>
       <button id="dir-in" aria-pressed="false">&larr; Swap into QTC from other chain</button>
@@ -143,7 +143,7 @@
       <h2 id="fee-h">Fee &amp; slippage lab</h2>
       <span class="badge b-estimate">illustrative</span>
     </div>
-    <p class="card-lede">The 1Click platform fee lives <strong>inside</strong> <code>amountOut</code> — nothing is charged on top of what you send. Slippage sets your guaranteed minimum. Plug in a hypothetical solver offer and see what the documented parameters do to it. <strong>This is not a quote.</strong> Real quotes come from the live solver auction, which only runs once QTC is listed.</p>
+    <p class="card-lede">The 1Click platform fee lives <strong>inside</strong> <code>amountOut</code> — nothing is charged on top of what you send. Slippage sets your guaranteed minimum. Plug in a hypothetical solver offer and see what the documented parameters do to it. <strong>This is not a quote.</strong> Real quotes come from the live solver auction in the wallet — QTC is listed now, but this lab only illustrates the documented fee parameters; it never fetches a quote.</p>
     <div class="lab-grid">
       <div class="lab-inputs">
         <label>Payout token
@@ -203,7 +203,7 @@
       <div class="safe"><h3>🔏 Tamper-proof quotes</h3><p>Every quote carries an Ed25519 signature from the 1Click manager key. The wallet verifies it, checks the echoed request repeats your amount, assets, addresses, slippage and deadline, and rejects anything that doesn't match — a <code>SwapQuoteIntegrityException</code>, not a silent accept.</p></div>
       <div class="safe"><h3>📬 Addresses are validated early</h3><p>1Click validates <code>refundTo</code> against the origin chain at quote time, so a bad refund address never reaches the deposit step. Swapping out of QTC, the wallet itself signs the deposit transfer — only transparent accounts whose key lives in the app can swap; encrypted, Keystone and watch-only accounts see the button disabled.</p></div>
       <div class="safe"><h3>🗂 Orders aren't persisted (yet)</h3><p>Close the progress screen and the app forgets the order — a swap-in's deposit address lives on in your other wallet, a swap-out's deposit shows as an ordinary transfer in activity, and 1Click keeps processing regardless. Save the deposit address yourself if you navigate away.</p></div>
-      <div class="safe"><h3>🧪 No testnet for Intents</h3><p>There is no NEAR Intents testnet — the wallet team's docs were verified against the <strong>live</strong> API. Until QTC is listed, every quote attempt fails with <code>tokenIn/tokenOut is not valid</code>, and the swap UI stays behind the <code>enableSwap</code> remote flag.</p></div>
+      <div class="safe"><h3>🧪 No testnet for Intents</h3><p>There is no NEAR Intents testnet — the wallet team's docs were verified against the <strong>live</strong> API. Before the listing, every quote attempt failed with <code>tokenIn/tokenOut is not valid</code>; since October 2026 QTC is on the live list, and any remaining gating is the wallet's own <code>enableSwap</code> rollout flag.</p></div>
     </div>
   </section>
 
@@ -220,7 +220,7 @@
       <a class="mean" href="../mining-studio/"><span class="mi">🔥</span><span><strong>Mine it.</strong> Open mining has no built-in advantage for anyone — the Mining Studio walks through setup, rigs and benchmarks.</span></a>
       <a class="mean" href="../network-dashboard/"><span class="mi">◉</span><span><strong>Watch the chain.</strong> Live mainnet telemetry — height, accounts, transfers — from the public indexer snapshot.</span></a>
       <a class="mean" href="../emission-lab/"><span class="mi">◐</span><span><strong>Know the supply.</strong> The exact reward formula, decay simulator and 80-year supply curve — no halvings, ever.</span></a>
-      <a class="mean" href="#watch-card"><span class="mi">🔔</span><span><strong>Watch this page.</strong> The listing watch above auto-refreshes every 5 minutes and will flip the moment QTC appears on 1Click.</span></a>
+      <a class="mean" href="#watch-card"><span class="mi">🔔</span><span><strong>Watch this page.</strong> The listing watch above auto-refreshes every 5 minutes — it flipped when QTC appeared on 1Click in October 2026 and keeps verifying the listing is still there.</span></a>
     </div>
   </section>
 
@@ -228,7 +228,7 @@
   <section class="card" aria-labelledby="src-h">
     <div class="card-head"><h2 id="src-h">Sources</h2></div>
     <ul class="source-list" id="source-list"></ul>
-    <p class="fine">Figures labeled <span class="badge b-estimate">illustrative</span> are computed from documented parameters, not live quotes. Listing status is probed live from the 1Click API each visit. Last source review: Sept 30, 2026.</p>
+    <p class="fine">Figures labeled <span class="badge b-estimate">illustrative</span> are computed from documented parameters, not live quotes. Listing status is probed live from the 1Click API each visit. Last source review: Oct 12, 2026.</p>
   </section>
 
   <footer>
@@ -239,6 +239,6 @@
 </main>
 
 <script src="../../assets/app-nav.js?v=1.8.0"></script>
-<script src="app.js?v=1.17.0"></script>
+<script src="app.js?v=1.18.0"></script>
 </body>
 </html>

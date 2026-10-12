@@ -3,19 +3,35 @@
  * (verified against the live API 2026-09-20; fee probes 2026-09-26) and PR #675
  * (swap in both directions, merged 2026-09-28).
  * Listing status is probed LIVE from https://1click.chaindefuser.com/v0/tokens
- * (CORS-open, no key). Nothing here is a quote: solver quotes only exist post-listing.
+ * (CORS-open, no key). QTC IS LISTED there (verified 2026-10-12: the list
+ * carries nep141:qtc.omft.near on blockchain "qtc", 12 decimals, plus a
+ * 1cs_v1-wrapped NEAR form). Nothing here is a quote: this desk never
+ * fetches solver quotes — those live in the wallet, post-listing.
  */
 "use strict";
 
 var ONECLICK_TOKENS_URL = "https://1click.chaindefuser.com/v0/tokens";
-var QTC_ASSET_ID = "nep141:qtc.omft.near"; // placeholder in the wallet until listing
+var QTC_ASSET_ID = "nep141:qtc.omft.near"; // the wallet's pre-listing placeholder turned out to be the real listed id (live list, 2026-10-12)
 var PROBE_TIMEOUT_MS = 12000;
 var AUTO_REFRESH_MS = 5 * 60 * 1000;
 var LS_KEY = "qtc-swapdesk-last-probe";
 
 /* ---- Pure logic (unit-tested) ---- */
 
-/* Scan a 1Click token list for QTC. Returns { listed, asset, total }. */
+/* Scan a 1Click token list for QTC. Returns { listed, asset, total }.
+ * A hit is the QTC asset itself, identified three ways (any one suffices):
+ *   - its asset id, raw (nep141:qtc.omft.near) or in the 1cs_v1-wrapped
+ *     form the live list also carries (1cs_v1:near:nep141:qtc.omft.near —
+ *     the wrapped id ENDS with the raw id after a colon);
+ *   - a QTC-symbol token on the Quantus chain. The live API names that
+ *     chain "qtc" (verified 2026-10-12); the wallet docs called it
+ *     "quantus", so both spellings count.
+ * The chain rule requires the QTC symbol: the old chain-only rule painted
+ * LISTED for ANY token on the chain (a wrapped ETH on Quantus would have
+ * flipped this desk's headline). */
+function isQTCAssetId(id) {
+  return id === QTC_ASSET_ID || id.slice(id.length - QTC_ASSET_ID.length - 1) === ":" + QTC_ASSET_ID;
+}
 function scanTokensForQTC(tokens) {
   var list = Array.isArray(tokens) ? tokens : (tokens && tokens.tokens) || [];
   var hit = null;
@@ -24,11 +40,48 @@ function scanTokensForQTC(tokens) {
     var id = String(t.assetId || t.asset_id || "");
     var chain = String(t.blockchain || t.chain || "").toLowerCase();
     var sym = String(t.symbol || "").toUpperCase();
-    if (id === QTC_ASSET_ID || chain === "quantus" || (sym === "QTC" && chain.indexOf("quantus") !== -1)) {
+    if (isQTCAssetId(id) || (sym === "QTC" && (chain === "qtc" || chain.indexOf("quantus") !== -1))) {
       hit = t; break;
     }
   }
   return { listed: !!hit, asset: hit, total: list.length };
+}
+
+/* A scan of an EMPTY list is no evidence either way: the real list carries
+ * ~200 assets, so a 200-response with zero rows is a broken/changed API
+ * answer, not proof QTC is unlisted. The probe treats it as inconclusive. */
+function isConclusiveScan(result) {
+  return !!result && typeof result.total === "number" && result.total > 0;
+}
+
+/* Validate a persisted probe result before it paints as "last known state".
+ * The cache is user-writable storage: without this, a poisoned entry paints
+ * this desk's headline — "QTC IS LISTED" at an invented price, or a future
+ * timestamp masquerading as just-checked. Relations enforced: the probe
+ * time must be a real probe time (the desk's probes began Sept 2026; a
+ * small future skew is tolerated), the latency a plausible duration, the
+ * scanned total a positive count, and `listed` a boolean that agrees with
+ * an asset being present. Returns a normalized copy or null. */
+var PROBE_FLOOR_MS = Date.UTC(2026, 8, 1); // 2026-09-01: no probe predates the desk
+function sanitizeCachedProbe(raw, nowMs) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (raw.ok !== true) return null; // a cached failure is not a last known state
+  var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : Date.now();
+  var at = Number(raw.at);
+  if (!isFinite(at) || at < PROBE_FLOOR_MS || at > now + 5 * 60 * 1000) return null;
+  var ms = Number(raw.ms);
+  if (!isFinite(ms) || ms < 0 || ms > 10 * 60 * 1000) return null;
+  var r = raw.result;
+  if (!r || typeof r !== "object") return null;
+  if (typeof r.listed !== "boolean") return null;
+  var total = Number(r.total);
+  if (!isFinite(total) || Math.floor(total) !== total || total < 1 || total > 1000000) return null;
+  var asset = null;
+  if (r.listed) {
+    if (!r.asset || typeof r.asset !== "object") return null;
+    asset = r.asset;
+  }
+  return { ok: true, result: { listed: r.listed, asset: asset, total: total }, ms: ms, at: at };
 }
 
 /* Platform fee in basis points, per the wallet docs:
@@ -94,13 +147,14 @@ var TIMELINE = [
   ["Sept 20, 2026", "Wallet team documents the integration against the live API", "The near-intents-swaps doc in quantus-apps records the full flow — and the blocker: QTC is not on the 1Click token list, so every quote fails with tokenIn/tokenOut is not valid.", "https://github.com/Quantus-Network/quantus-apps/blob/main/mobile-app/docs/near-intents-swaps.md"],
   ["Sept 26, 2026", "Live fee probes: 20 bps observed", "Probes against the live API show the platform fee echoed as 20 bps (docs say 25 without a partner key). Fees live inside amountOut — nothing on top.", "https://github.com/Quantus-Network/quantus-apps/blob/main/mobile-app/docs/near-intents-swaps.md#fees"],
   ["Sept 28, 2026", "PR #675 merged: swaps in both directions", "The wallet's swap UI now handles QTC → other chains and other chains → QTC: live quotes, re-confirmation on price moves, deposit submission, and a progress screen.", "https://github.com/Quantus-Network/quantus-apps/pull/675"],
-  ["Sept 30, 2026", "This desk's live probe: still unlisted", "The 1Click token list is scanned for the Quantus asset on every visit. Until it appears, the swap flow above is built but cannot execute.", null]
+  ["Sept 30, 2026", "This desk's live probe: still unlisted", "The 1Click token list is scanned for the Quantus asset on every visit. Until it appears, the swap flow above is built but cannot execute.", null],
+  ["Oct 12, 2026", "QTC is live on 1Click — the listing this desk was watching for", "The live token list (204 assets) now carries nep141:qtc.omft.near on blockchain \"qtc\" with 12 decimals, plus its 1cs_v1-wrapped NEAR form — verified by this desk's own probe against the live API. Solver quotes can now exist in the wallet; depth still depends on solver competition, and this desk still fetches no quotes itself.", "https://1click.chaindefuser.com/v0/tokens"]
 ];
 
 var SOURCES = [
   ["Wallet integration doc — near-intents-swaps.md", "https://github.com/Quantus-Network/quantus-apps/blob/main/mobile-app/docs/near-intents-swaps.md", "How swaps work, both directions; actors; fees; refunds; blockers. Verified against the live API Sept 20, 2026."],
   ["quantus-apps PR #675 — swap in both directions through NEAR Intents 1Click", "https://github.com/Quantus-Network/quantus-apps/pull/675", "Merged Sept 28, 2026: one form for both directions, live quotes, deposit submission, progress screen."],
-  ["1Click API token list (live)", "https://1click.chaindefuser.com/v0/tokens", "The public list this desk probes. 202 assets, no Quantus entry, as of Sept 30, 2026."],
+  ["1Click API token list (live)", "https://1click.chaindefuser.com/v0/tokens", "The public list this desk probes. 204 assets including QTC (nep141:qtc.omft.near), as of Oct 12, 2026."],
   ["NEAR Intents docs", "https://docs.near-intents.org", "Intent model, solver auction, 1Click API reference."]
 ];
 
@@ -122,7 +176,11 @@ function probeTokens() {
   var t0 = Date.now();
   var p = fetch(ONECLICK_TOKENS_URL, { cache: "no-store", signal: ctrl ? ctrl.signal : undefined })
     .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(function(j){ return { ok: true, result: scanTokensForQTC(j), ms: Date.now() - t0, at: Date.now() }; })
+    .then(function(j){
+      var scan = scanTokensForQTC(j);
+      if (!isConclusiveScan(scan)) throw new Error("empty token list"); // zero rows prove nothing — never a NOT LISTED verdict
+      return { ok: true, result: scan, ms: Date.now() - t0, at: Date.now() };
+    })
     .catch(function(e){ return { ok: false, error: String((e && e.name === "AbortError") ? "timeout" : (e && e.message) || e), ms: Date.now() - t0, at: Date.now() }; });
   if (timer) p.then(function(){ clearTimeout(timer); });
   return p;
@@ -144,8 +202,10 @@ function renderWatch(res) {
     pill.classList.add("listed");
     txt.textContent = "QTC IS LISTED";
     var a = res.result.asset || {};
-    det.textContent = "Found " + (a.assetId || QTC_ASSET_ID) + " — " + (a.decimals != null ? a.decimals + " decimals" : "decimals n/a") +
-      (a.price ? ", $" + a.price + " USD" : "") + ". Quotes can now exist; depth still depends on solvers.";
+    var dec = Number(a.decimals);
+    var price = Number(a.price);
+    det.textContent = "Found " + (a.assetId || QTC_ASSET_ID) + " — " + (isFinite(dec) && Math.floor(dec) === dec && dec >= 0 && dec <= 255 ? dec + " decimals" : "decimals n/a") +
+      (isFinite(price) && price > 0 ? ", $" + price.toLocaleString("en-US", { maximumFractionDigits: 2 }) + " USD (1Click reference)" : "") + ". Quotes can now exist; depth still depends on solvers.";
     $("stat-status").textContent = "LISTED";
     $("stat-status-sub").textContent = "quotes possible";
   } else {
@@ -278,10 +338,12 @@ function init() {
       document.body.removeChild(ta); done();
     }
   });
-  // Last known state paints instantly; the live probe replaces it.
+  // Last known state paints instantly; the live probe replaces it. The
+  // cache is validated first — a poisoned entry must never paint the
+  // listing headline (see sanitizeCachedProbe).
   try {
-    var cached = JSON.parse(localStorage.getItem(LS_KEY) || "null");
-    if (cached && cached.at) renderWatch(cached);
+    var cached = sanitizeCachedProbe(JSON.parse(localStorage.getItem(LS_KEY) || "null"), Date.now());
+    if (cached) renderWatch(cached);
   } catch (e) {}
   refreshProbe(false);
 }
@@ -293,6 +355,8 @@ else if (typeof document !== "undefined") document.addEventListener("DOMContentL
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     scanTokensForQTC: scanTokensForQTC,
+    isConclusiveScan: isConclusiveScan,
+    sanitizeCachedProbe: sanitizeCachedProbe,
     platformFeeBps: platformFeeBps,
     illustrativeQuote: illustrativeQuote,
     deadlineFor: deadlineFor,

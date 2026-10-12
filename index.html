@@ -423,7 +423,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
       <div class="card"><div class="k">Supply</div><h3>21M QTC cap</h3><p>The native coin <b>$QTC</b> is capped at <b>21 million</b>. Fixed, scarce, and distributed through work.</p></div>
       <div class="card"><div class="k">Engineering</div><h3>7 KB txs, aggregated</h3><p>ML-DSA signatures are big — about <b>7 KB per transaction</b> vs ~100 bytes for Bitcoin. Quantus answers with <b>native transaction aggregation</b>, posting succinct proofs on-chain and getting more efficient as volume grows.</p></div>
       <div class="card"><div class="k">Security</div><h3>Audited in the open</h3><p>Reviewed by <b>Neodyme, Eiger, Hashcloak, and V12</b>, with a public <b>Immunefi</b> audit competition before launch.</p></div>
-      <div class="card"><div class="k">Markets</div><h3>First venue: NEAR Intents</h3><p>Quantus named <b>NEAR Intents</b> as the first exchange venue for $QTC. No listing date confirmed yet — this page will say so when there is one.</p></div>
+      <div class="card"><div class="k">Markets</div><h3>First venue: NEAR Intents</h3><p>Quantus named <b>NEAR Intents</b> as the first exchange venue for $QTC — and the listing is <b>live</b>: the 1Click token list carries <b>nep141:qtc.omft.near</b> (detected Oct 12, 2026). The Swap Desk below watches it live.</p></div>
     </div>
   </section>
 
@@ -565,8 +565,8 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Exchange venue</span>
         </div>
         <h3>QTC Swap Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>NEAR Intents is Quantus's first exchange venue — and the listing itself is the only missing piece. This desk probes the live 1Click token list every 5 minutes for the moment QTC appears, and meanwhile lays out the real swap mechanics from the wallet team's integration docs: both swap directions, fee math (20–25 bps inside amountOut), slippage presets, deposit deadlines, the full order status lifecycle, and the safety rules — no quotes invented, listing status read live.</p>
-        <div class="meta">13/13 logic tests green · 41/41 browser checks green</div>
+        <p>NEAR Intents is Quantus's first exchange venue — and QTC is listed there (nep141:qtc.omft.near, detected on the live 1Click token list Oct 12, 2026). This desk probes that list every 5 minutes to keep verifying the listing, and lays out the real swap mechanics from the wallet team's integration docs: both swap directions, fee math (20–25 bps inside amountOut), slippage presets, deposit deadlines, the full order status lifecycle, and the safety rules — no quotes invented, listing status read live.</p>
+        <div class="meta">18/18 logic tests green · 54/54 browser checks green</div>
       </a>
       <a class="app-card devhub" href="pages/dev-hub/" style="grid-column:1 / -1">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+565,766% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+564,629% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">29/29 consensus tests green · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
