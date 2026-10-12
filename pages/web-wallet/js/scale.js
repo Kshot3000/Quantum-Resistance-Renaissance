@@ -120,6 +120,22 @@ export function eraBirth(current, period, phase) {
 
 export const BALANCES_PALLET_INDEX = 2;
 export const TRANSFER_KEEP_ALIVE_CALL_INDEX = 3;
+export const UTILITY_PALLET_INDEX = 9;   // runtime/src/lib.rs: Utility
+export const BATCH_ALL_CALL_INDEX = 2;   // Utility::batch_all — the Quantus fork exposes only batch_all
+
+/* Optional builder service fee (PROFIT route, added 2026-10-11): the Send
+ * flow may add a small, plainly disclosed service fee ON TOP of the amount
+ * — the recipient's amount is NEVER reduced. The fee is a second
+ * Balances::transfer_keep_alive to the builder's QTC address
+ * (SERVICE_FEE_ADDRESS, the same address in this page's footer), wrapped
+ * with the recipient transfer in ONE atomic Utility.batch_all (recipient
+ * leg FIRST, fee leg LAST), so the sender pays both legs or neither and
+ * signs exactly one extrinsic. Exact BigInt math: fee = floor(amount *
+ * bps / 10,000), so it never exceeds the quoted percentage; a fee that
+ * floors to zero plancks adds NO leg (a 0-planck transfer is invalid) and
+ * the send stays a plain transfer. */
+export const SERVICE_FEE_ADDRESS = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
+export const SERVICE_FEE_MAX_BPS = 100;
 export const EXTRINSIC_VERSION = 0x84; // 0b1000_0100: signed flag + format v4
 export const SIGNING_CONTEXT = 'QUANTUS_EXTRINSIC';
 export const METADATA_HASH_MODE_DISABLED = 0x00;
@@ -136,6 +152,50 @@ export function buildTransferCall(destAccountId, amountPlancks) {
     destAccountId,
     compactEncode(amountPlancks),
   );
+}
+
+export function computeServiceFee(amountPlancks, feeBps) {
+  const amount = BigInt(amountPlancks);
+  let bps = Number(feeBps);
+  if (!isFinite(bps) || bps < 0) bps = 0;
+  if (bps > SERVICE_FEE_MAX_BPS) bps = SERVICE_FEE_MAX_BPS;
+  bps = Math.floor(bps);
+  if (amount <= 0n || bps === 0) return { feePlancks: 0n, feeBps: bps };
+  return { feePlancks: (amount * BigInt(bps)) / 10000n, feeBps: bps };
+}
+
+export function feeBpsLabel(bps) {
+  const b = Math.floor(Number(bps) || 0);
+  const whole = Math.floor(b / 100), rem = b % 100;
+  if (rem === 0) return whole + '%';
+  const frac = String(rem).padStart(2, '0').replace(/0+$/, '');
+  return whole + '.' + frac + '%';
+}
+
+/* Utility::batch_all call bytes: [9, 2, compact(count), calls…] — the
+ * encoding verified against the Extrinsic Lab's fleet batch sample. */
+export function buildBatchAllCall(calls) {
+  if (!Array.isArray(calls) || calls.length === 0) throw new Error('batch_all needs at least one call');
+  for (const c of calls) if (!c || c.length === 0) throw new Error('bad call bytes in batch');
+  return concat(Uint8Array.of(UTILITY_PALLET_INDEX, BATCH_ALL_CALL_INDEX), compactEncode(calls.length), ...calls);
+}
+
+/* Build the Send flow's call, optionally with the disclosed service fee.
+ * No fee (or a fee floored to zero) -> the plain transfer_keep_alive,
+ * byte-identical to buildTransferCall. Fee on -> one batch_all of
+ * [recipient leg untouched and FIRST, fee leg LAST];
+ * totalDebitPlancks = amount + fee (the network fee is quoted separately
+ * by the node and added by the caller). */
+export function buildTransferWithServiceFee(destAccountId, amountPlancks, feeDestAccountId, feeBps) {
+  const amount = BigInt(amountPlancks);
+  const plain = buildTransferCall(destAccountId, amount);
+  const f = computeServiceFee(amount, feeBps);
+  if (f.feePlancks <= 0n) {
+    return { call: plain, kind: 'transfer_keep_alive', feePlancks: 0n, feeBps: f.feeBps, amountPlancks: amount, totalDebitPlancks: amount };
+  }
+  if (!feeDestAccountId || feeDestAccountId.length !== 32) throw new Error('fee account id must be 32 bytes');
+  const feeLeg = buildTransferCall(feeDestAccountId, f.feePlancks);
+  return { call: buildBatchAllCall([plain, feeLeg]), kind: 'batch_all', feePlancks: f.feePlancks, feeBps: f.feeBps, amountPlancks: amount, totalDebitPlancks: amount + f.feePlancks };
 }
 
 /* Build the exact byte payload the runtime signs (SignedPayload.using_encoded).
@@ -228,6 +288,6 @@ export function describeExtrinsicParts(p) {
     ['nonce', `compact ${p.nonce}`],
     ['tip', `compact ${p.tip} plancks`],
     ['metadata hash', '0x00 — CheckMetadataHash disabled'],
-    ['call', `pallet 2 (Balances) · call 3 (transfer_keep_alive) → dest ${p.destShort} · ${p.amountDesc}`],
+    ['call', p.callDesc || `pallet 2 (Balances) · call 3 (transfer_keep_alive) → dest ${p.destShort} · ${p.amountDesc}`],
   ];
 }

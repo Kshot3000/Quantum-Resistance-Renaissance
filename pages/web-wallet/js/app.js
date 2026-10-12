@@ -13,10 +13,10 @@ import {
   RpcClient, DEFAULT_RPC, getRuntimeVersion, getLatestHeader,
   getAccountInfo, getNonce, buildUnsignedTransfer, finalizeTransfer, submitExtrinsic,
   parseRecipient,
-} from './rpc.js';
+} from './rpc.js?v=1.1.0';
 import { sanitizeActivityRows } from './rpc-validate.js?v=1.1.0';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
-import { plancksToQtc, qtcToPlancks, EXISTENTIAL_DEPOSIT, SIGNING_CONTEXT, describeExtrinsicParts } from './scale.js';
+import { plancksToQtc, qtcToPlancks, EXISTENTIAL_DEPOSIT, SIGNING_CONTEXT, describeExtrinsicParts, SERVICE_FEE_ADDRESS, feeBpsLabel, computeServiceFee } from './scale.js?v=1.1.0';
 
 const $ = (id) => document.getElementById(id);
 const te = new TextEncoder();
@@ -98,7 +98,7 @@ function scrubWalletDom() {
   qctx.clearRect(0, 0, qr.width, qr.height);
   for (const id of ['bal-total', 'bal-free', 'bal-reserved', 'bal-frozen', 'bal-nonce', 'bal-source'])
     $(id).textContent = '—';
-  $('send-to').value = ''; $('send-amount').value = '';
+  $('send-to').value = ''; $('send-amount').value = ''; $('send-fee').value = '50';
   err('send-to-err'); err('send-amount-err'); err('send-err');
   $('estimate-box').hidden = true;
   $('ext-payload').value = '';
@@ -402,10 +402,15 @@ function invalidateUnsigned() {
   if (!state.unsigned) return;
   state.unsigned = null;
   $('estimate-box').hidden = true;
-  err('send-err', 'Recipient or amount changed — the estimate was discarded. Build & estimate again to review the new transfer before signing.');
+  err('send-err', 'Send details changed — the estimate was discarded. Build & estimate again to review the new transfer before signing.');
 }
 $('send-to').addEventListener('input', () => { invalidateUnsigned(); if ($('send-to').value.trim()) validateRecipient(); });
 $('send-amount').addEventListener('input', invalidateUnsigned);
+/* The service-fee selector is a determinant of the pinned transfer too:
+ * changing it after an estimate must void that estimate, or Sign &
+ * broadcast would send the OLD fee choice while the form shows the new
+ * one (same review→sign desync as recipient/amount). */
+$('send-fee').addEventListener('change', invalidateUnsigned);
 
 $('btn-max').addEventListener('click', async () => {
   // Fill amount = free balance minus a conservative fee guess (refined at estimate).
@@ -419,8 +424,14 @@ $('btn-max').addEventListener('click', async () => {
       return;
     }
     if (!info || info.free === 0n) { err('send-amount-err', 'Nothing to send — the wallet is empty.'); return; }
-    const guessFee = 5000000000n; // 0.005 QTC headroom; exact fee shown at estimate
-    const max = info.free > guessFee + EXISTENTIAL_DEPOSIT ? info.free - guessFee : 0n;
+    const guessFee = 5000000000n; // 0.005 QTC network-fee headroom; exact fee shown at estimate
+    const spendable = info.free > guessFee + EXISTENTIAL_DEPOSIT ? info.free - guessFee : 0n;
+    /* The service fee is charged ON TOP of the amount, so Max must leave
+     * room for it too. Pricing the fee on the full spendable amount makes
+     * amount + fee(amount) <= spendable always (conservative by <1%) —
+     * Max can never fill an amount the balance check would then refuse. */
+    const { feePlancks: maxSvcFee } = computeServiceFee(spendable, Number($('send-fee').value));
+    const max = spendable - maxSvcFee;
     $('send-amount').value = plancksToQtc(max);
     invalidateUnsigned(); // programmatic set fires no input event
     err('send-amount-err');
@@ -438,7 +449,7 @@ $('btn-estimate').addEventListener('click', async () => {
   catch (e) { err('send-amount-err', e.message); return; }
   if (amount <= 0n) { err('send-amount-err', 'Amount must be greater than zero.'); return; }
   const btn = $('btn-estimate'); btn.disabled = true; btn.textContent = 'Building…';
-  const toRaw = $('send-to').value, amountRaw = $('send-amount').value;
+  const toRaw = $('send-to').value, amountRaw = $('send-amount').value, feeRaw = $('send-fee').value;
   const rpc = state.rpc, kp = state.kp; // pin the node + wallet this estimate is for
   try {
     const unsigned = await buildUnsignedTransfer(rpc, {
@@ -446,12 +457,14 @@ $('btn-estimate').addEventListener('click', async () => {
       fromAccountId: kp.accountId,
       destAddress: rcpt.address,
       amountPlancks: amount,
+      serviceFeeBps: Number(feeRaw),
+      scheme: kp.scheme,
     });
     // Fields edited while the node was building: the result no longer
     // matches the form — discard it instead of pinning a stale transfer.
-    if ($('send-to').value !== toRaw || $('send-amount').value !== amountRaw || state.rpc !== rpc || state.kp !== kp) {
+    if ($('send-to').value !== toRaw || $('send-amount').value !== amountRaw || $('send-fee').value !== feeRaw || state.rpc !== rpc || state.kp !== kp) {
       state.unsigned = null;
-      throw new Error('Recipient or amount changed while building — estimate discarded. Build & estimate again.');
+      throw new Error('Send details changed while building — estimate discarded. Build & estimate again.');
     }
     state.unsigned = unsigned;
     const info = await getAccountInfo(rpc, kp.accountId);
@@ -463,12 +476,13 @@ $('btn-estimate').addEventListener('click', async () => {
      * pin itself: only discard-explain; never null a NEWER estimate's pin
      * and never render over it. */
     if (state.unsigned !== unsigned || state.rpc !== rpc || state.kp !== kp ||
-        $('send-to').value !== toRaw || $('send-amount').value !== amountRaw) {
-      throw new Error('Recipient or amount changed while checking the balance — estimate discarded. Build & estimate again to review the new transfer before signing.');
+        $('send-to').value !== toRaw || $('send-amount').value !== amountRaw || $('send-fee').value !== feeRaw) {
+      throw new Error('Send details changed while checking the balance — estimate discarded. Build & estimate again to review the new transfer before signing.');
     }
     const free = info ? info.free : 0n;
-    const total = amount + (unsigned.fee ?? 0n);
-    if (free < total) throw new Error(`Insufficient balance: need ${plancksToQtc(total)} QTC (amount + fee) but have ${plancksToQtc(free)} QTC.`);
+    const svcFee = unsigned.serviceFeePlancks ?? 0n;
+    const total = amount + svcFee + (unsigned.fee ?? 0n);
+    if (free < total) throw new Error(`Insufficient balance: need ${plancksToQtc(total)} QTC (amount + service fee + network fee) but have ${plancksToQtc(free)} QTC.`);
     // transfer_keep_alive also requires the SENDER to stay above ED
     if (free - total < EXISTENTIAL_DEPOSIT && free - total !== 0n) {
       // keep_alive only fails if sender would drop below ED *and* stay alive; warn honestly
@@ -478,6 +492,23 @@ $('btn-estimate').addEventListener('click', async () => {
     $('est-to').textContent = shortAddr(rcpt.address);
     $('est-to').title = rcpt.address;
     $('est-amount').textContent = plancksToQtc(amount) + ' QTC';
+    /* The service-fee row renders from the PINNED estimate, never the
+     * live form: it names the fee, its rate, and its destination, and it
+     * says plainly when a chosen rate floored to zero (plain transfer). */
+    const svcRow = $('est-service-fee-row');
+    if (svcFee > 0n) {
+      svcRow.hidden = false;
+      $('est-service-fee').textContent = plancksToQtc(svcFee) + ' QTC (' + feeBpsLabel(unsigned.serviceFeeBps) + ' of amount, added on top) → ' + shortAddr(SERVICE_FEE_ADDRESS);
+      $('est-service-fee').title = SERVICE_FEE_ADDRESS;
+    } else if ((unsigned.serviceFeeBps ?? 0) > 0) {
+      svcRow.hidden = false;
+      $('est-service-fee').textContent = '0 QTC — ' + feeBpsLabel(unsigned.serviceFeeBps) + ' of this amount rounds down to zero plancks, so no fee leg is added; this is a plain transfer';
+      $('est-service-fee').title = '';
+    } else {
+      svcRow.hidden = true;
+      $('est-service-fee').textContent = '—';
+      $('est-service-fee').title = '';
+    }
     $('est-fee').textContent = unsigned.fee !== null ? plancksToQtc(unsigned.fee) + ' QTC' : 'node did not quote a fee';
     $('est-total').textContent = plancksToQtc(total) + ' QTC';
     $('est-nonce').textContent = String(unsigned.nonce);
@@ -489,6 +520,9 @@ $('btn-estimate').addEventListener('click', async () => {
       nonce: unsigned.nonce, tip: '0',
       destShort: shortAddr(rcpt.address),
       amountDesc: plancksToQtc(amount) + ' QTC (' + amount.toString() + ' plancks)',
+      callDesc: unsigned.callKind === 'batch_all'
+        ? `pallet 9 (Utility) · call 2 (batch_all) · [1] pallet 2 · call 3 (transfer_keep_alive) → dest ${shortAddr(rcpt.address)} · ${plancksToQtc(amount)} QTC · [2] pallet 2 · call 3 (transfer_keep_alive) → service fee ${shortAddr(SERVICE_FEE_ADDRESS)} · ${plancksToQtc(svcFee)} QTC — both legs execute together or neither does`
+        : undefined,
     });
     $('ext-parts').innerHTML = parts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
     $('ext-payload').value = unsigned.payloadHex;

@@ -8,7 +8,7 @@
 import { hexEncode, hexDecode } from './quantus-crypto.js';
 import { ss58Decode } from './quantus-crypto.js';
 import { SYSTEM_ACCOUNT_KEY } from './xxhash.js?v=1.39.0';
-import { decodeAccountInfo, eraBirth, encodeMortalEra, buildTransferCall, buildSigningPayload, buildExtrinsic, DILITHIUM65_VARIANT, DILITHIUM87_VARIANT } from './scale.js';
+import { decodeAccountInfo, eraBirth, encodeMortalEra, buildTransferWithServiceFee, buildSigningPayload, buildExtrinsic, SERVICE_FEE_ADDRESS, DILITHIUM65_VARIANT, DILITHIUM87_VARIANT } from './scale.js?v=1.1.0';
 import { parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex } from './rpc-validate.js?v=1.1.0';
 
 export const DEFAULT_RPC = 'wss://rpc.quantus.network';
@@ -163,10 +163,19 @@ export async function getNonce(rpc, ss58Address) {
 /* ---- transfer construction ---- */
 
 /* Full extrinsic assembly + fee estimate for a transfer. Returns everything the
- * confirmation screen needs; nothing is signed here. */
-export async function buildUnsignedTransfer(rpc, { fromAddress, fromAccountId, destAddress, amountPlancks, tipPlancks = 0n }) {
+ * confirmation screen needs; nothing is signed here. `serviceFeeBps` adds
+ * the wallet's optional, disclosed builder service fee (see scale.js):
+ * the call becomes one atomic batch_all of [recipient leg, fee leg] and
+ * the returned object pins feePlancks/feeBps so the review screen renders
+ * exactly what will be signed. `scheme` selects the ML-DSA variant so the
+ * fee-estimate placeholder extrinsic is length-accurate for BOTH schemes
+ * (the 87 wire is 1,958 bytes longer than the 65 wire — a 65-sized
+ * placeholder under-quotes the length fee for 87 wallets). */
+export async function buildUnsignedTransfer(rpc, { fromAddress, fromAccountId, destAddress, amountPlancks, tipPlancks = 0n, serviceFeeBps = 0, scheme = 65 }) {
   const destAccountId = parseRecipient(destAddress);
-  const call = buildTransferCall(destAccountId, amountPlancks);
+  const feeDestAccountId = parseRecipient(SERVICE_FEE_ADDRESS);
+  const built = buildTransferWithServiceFee(destAccountId, amountPlancks, feeDestAccountId, serviceFeeBps);
+  const call = built.call;
   const [rt, genesisHash, latest, nonce] = await Promise.all([
     getRuntimeVersion(rpc),
     getGenesisHash(rpc),
@@ -184,7 +193,7 @@ export async function buildUnsignedTransfer(rpc, { fromAddress, fromAccountId, d
   });
   // Fee estimate: build a length-accurate placeholder extrinsic (zero signature
   // is NOT length-accurate — ML-DSA sigs are fixed size, so pad exactly).
-  const sigLen = 1 + 3309 + 1952; // ML-DSA-65 wire length
+  const sigLen = scheme === 87 ? 1 + 4627 + 2592 : 1 + 3309 + 1952; // ML-DSA-87 / ML-DSA-65 wire length
   const placeholder = buildExtrinsic({
     accountId: fromAccountId, signatureWire: new Uint8Array(sigLen),
     era, nonce, tip: tipPlancks, call,
@@ -204,6 +213,8 @@ export async function buildUnsignedTransfer(rpc, { fromAddress, fromAccountId, d
     call, era, nonce, tip: tipPlancks, specVersion, txVersion,
     genesisHash, birthHash, birth, period, phase, latest,
     payload, fee, destAccountId, fromAccountId,
+    callKind: built.kind, serviceFeePlancks: built.feePlancks,
+    serviceFeeBps: built.feeBps, totalDebitPlancks: built.totalDebitPlancks,
     payloadHex: '0x' + hexEncode(payload),
   };
 }

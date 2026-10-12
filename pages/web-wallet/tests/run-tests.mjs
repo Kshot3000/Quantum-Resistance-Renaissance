@@ -10,9 +10,12 @@ import assert from 'node:assert/strict';
 import { xxh64, xxhash128, storageKey } from '../js/xxhash.js';
 import {
   concat, u32le, compactEncode, compactDecode, encodeMortalEra, eraBirth,
-  buildTransferCall, buildSigningPayload, buildExtrinsic,
+  buildTransferCall, buildBatchAllCall, buildTransferWithServiceFee,
+  computeServiceFee, feeBpsLabel, buildSigningPayload, buildExtrinsic,
   decodeAccountInfo, plancksToQtc, qtcToPlancks,
   BALANCES_PALLET_INDEX, TRANSFER_KEEP_ALIVE_CALL_INDEX,
+  UTILITY_PALLET_INDEX, BATCH_ALL_CALL_INDEX,
+  SERVICE_FEE_ADDRESS, SERVICE_FEE_MAX_BPS,
 } from '../js/scale.js';
 import {
   setWordlistForTests, entropyToMnemonic, validateMnemonic, mnemonicToSeed,
@@ -290,6 +293,7 @@ import {
 } from '../js/rpc-validate.js';
 import {
   getRuntimeVersion, getGenesisHash, getLatestHeader, getAccountInfo, getNonce, submitExtrinsic,
+  buildUnsignedTransfer, parseRecipient as parseRecipientDirect,
 } from '../js/rpc.js';
 import { ss58Encode, hexEncode } from '../js/quantus-crypto.js';
 
@@ -447,4 +451,175 @@ test('rpc boundary: nonce and submit hash are validated', async () => {
   await assert.rejects(() => getNonce(stubRpc({ system_accountNextIndex: 'abc' }), addr), /malformed nonce/);
   assert.equal(await submitExtrinsic(stubRpc({ author_submitExtrinsic: HH }), '0x84'), HH);
   await assert.rejects(() => submitExtrinsic(stubRpc({ author_submitExtrinsic: '0x1234' }), '0x84'), /malformed transaction hash/);
+});
+
+/* ---- Optional builder service fee (profit route, 2026-10-11): ON TOP of
+ * the amount, recipient leg untouched and FIRST, fee leg LAST, both in ONE
+ * atomic Utility.batch_all to Kyle's QTC address. Fee-free sends stay
+ * byte-identical plain transfers. ---- */
+const FEE_KEY_HEX = '88714241713efd0732437b5a44f8541f69310374de19cc539700caf09d00354c';
+
+test('service fee: address pins — SS58-189, fleet-pinned key, cap 100 bps', () => {
+  assert.equal(SERVICE_FEE_ADDRESS, 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau');
+  assert.equal(SERVICE_FEE_MAX_BPS, 100);
+  const { prefix, accountId } = ss58Decode(SERVICE_FEE_ADDRESS);
+  assert.equal(prefix, 189);
+  assert.equal(Buffer.from(accountId).toString('hex'), FEE_KEY_HEX);
+  assert.deepEqual(parseRecipientDirect(SERVICE_FEE_ADDRESS), accountId);
+});
+
+test('service fee: exact floor math, never above the quoted rate, capped', () => {
+  assert.deepEqual(computeServiceFee(10000000000000n, 50), { feePlancks: 50000000000n, feeBps: 50 }); // 10 QTC @0.5% = 0.05
+  assert.deepEqual(computeServiceFee(1000000000000n, 25), { feePlancks: 2500000000n, feeBps: 25 });   // 1 QTC @0.25%
+  assert.deepEqual(computeServiceFee(1000000000000n, 100), { feePlancks: 10000000000n, feeBps: 100 }); // 1 QTC @1%
+  for (const amt of [0n, 1n, 99n, 9999n, 10000n, 10001n, 123456789n, 21000000000000000000n]) {
+    for (const bps of [0, 1, 25, 33, 50, 99, 100, 200, 10000]) {
+      const wantBps = Math.min(bps, 100);
+      const want = amt <= 0n || wantBps === 0 ? 0n : (amt * BigInt(wantBps)) / 10000n;
+      const got = computeServiceFee(amt, bps);
+      assert.equal(got.feeBps, wantBps, `bps sanitize ${bps}`);
+      assert.equal(got.feePlancks, want, `fee ${amt} @ ${bps}`);
+      assert.ok(got.feePlancks * 10000n <= amt * BigInt(wantBps), 'fee never exceeds the quoted percentage');
+    }
+  }
+  // garbage rates sanitize to no fee, never to a surprise fee
+  assert.deepEqual(computeServiceFee(1000000000000n, -5), { feePlancks: 0n, feeBps: 0 });
+  assert.deepEqual(computeServiceFee(1000000000000n, NaN), { feePlancks: 0n, feeBps: 0 });
+  assert.deepEqual(computeServiceFee(1000000000000n, 33.9), { feePlancks: 3300000000n, feeBps: 33 });
+});
+
+test('service fee: labels', () => {
+  assert.equal(feeBpsLabel(0), '0%');
+  assert.equal(feeBpsLabel(25), '0.25%');
+  assert.equal(feeBpsLabel(50), '0.5%');
+  assert.equal(feeBpsLabel(100), '1%');
+  assert.equal(feeBpsLabel(33), '0.33%');
+});
+
+test('batch_all: encoding is [9, 2, compact(count), calls…]', () => {
+  const a = buildTransferCall(new Uint8Array(32).fill(7), 1000n);
+  const b = buildTransferCall(new Uint8Array(32).fill(8), 2000n);
+  const batch = buildBatchAllCall([a, b]);
+  assert.equal(batch[0], UTILITY_PALLET_INDEX);
+  assert.equal(batch[1], BATCH_ALL_CALL_INDEX);
+  assert.equal(batch[2], 2 << 2, 'compact count 2');
+  assert.deepEqual(batch.slice(3, 3 + a.length), a);
+  assert.deepEqual(batch.slice(3 + a.length), b);
+  assert.equal(batch.length, 3 + a.length + b.length);
+  assert.throws(() => buildBatchAllCall([]), /at least one call/);
+  assert.throws(() => buildBatchAllCall([new Uint8Array(0)]), /bad call bytes/);
+});
+
+test('transfer with service fee: fee-free and floored-tiny are byte-identical plain transfers', () => {
+  const dest = new Uint8Array(32).fill(7);
+  const feeDest = ss58Decode(SERVICE_FEE_ADDRESS).accountId;
+  const plain = buildTransferCall(dest, 1500000000000n);
+  const off = buildTransferWithServiceFee(dest, 1500000000000n, feeDest, 0);
+  assert.deepEqual(off.call, plain);
+  assert.equal(off.kind, 'transfer_keep_alive');
+  assert.equal(off.feePlancks, 0n);
+  assert.equal(off.totalDebitPlancks, 1500000000000n);
+  // 100 plancks at 0.5% floors to 0 — no invalid 0-planck leg, plain bytes
+  const tiny = buildTransferWithServiceFee(dest, 100n, feeDest, 50);
+  assert.deepEqual(tiny.call, buildTransferCall(dest, 100n));
+  assert.equal(tiny.kind, 'transfer_keep_alive');
+  assert.equal(tiny.feePlancks, 0n);
+  assert.equal(tiny.feeBps, 50, 'the chosen rate is still reported honestly');
+});
+
+test('transfer with service fee: batch wraps recipient leg FIRST (untouched) + fee leg LAST', () => {
+  const dest = new Uint8Array(32).fill(7);
+  const feeDest = ss58Decode(SERVICE_FEE_ADDRESS).accountId;
+  const amount = 10000000000000n; // 10 QTC
+  const built = buildTransferWithServiceFee(dest, amount, feeDest, 50);
+  assert.equal(built.kind, 'batch_all');
+  assert.equal(built.feePlancks, 50000000000n); // 0.05 QTC
+  assert.equal(built.totalDebitPlancks, amount + 50000000000n);
+  const recipientLeg = buildTransferCall(dest, amount);
+  const feeLeg = buildTransferCall(feeDest, 50000000000n);
+  assert.deepEqual(built.call, buildBatchAllCall([recipientLeg, feeLeg]));
+  // leg order + exact sum, decoded back out of the batch bytes
+  assert.deepEqual(built.call.slice(3, 3 + recipientLeg.length), recipientLeg, 'recipient leg passes through byte-for-byte');
+  const feeInBatch = built.call.slice(3 + recipientLeg.length);
+  assert.deepEqual(feeInBatch.slice(3, 35), feeDest, 'fee leg pays the disclosed address key');
+  const { value } = compactDecode(feeInBatch, 35);
+  assert.equal(value, 50000000000n);
+  // cap: 500 bps asked -> 100 bps charged
+  const capped = buildTransferWithServiceFee(dest, amount, feeDest, 500);
+  assert.equal(capped.feeBps, 100);
+  assert.equal(capped.feePlancks, 100000000000n);
+  // a fee with a malformed fee destination is refused, never misdirected
+  assert.throws(() => buildTransferWithServiceFee(dest, amount, new Uint8Array(31), 50), /32 bytes/);
+});
+
+/* buildUnsignedTransfer against a stub node: the fee choice is pinned in
+ * the returned object, the signed call carries it byte-for-byte, and the
+ * fee-quote placeholder is length-accurate per ML-DSA scheme. */
+const stubNode = (captured) => ({
+  call: async (method, params) => {
+    switch (method) {
+      case 'state_getRuntimeVersion': return { specName: 'quantus', specVersion: 153, transactionVersion: 6 };
+      case 'chain_getBlockHash':
+        if (params && params[0] === 0) return '0x' + 'aa'.repeat(32);       // genesis
+        if (!params || params.length === 0) return '0x' + 'bb'.repeat(32);  // latest
+        return '0x' + 'cc'.repeat(32);                                       // era birth
+      case 'chain_getHeader': return { number: '0x2fca4' };
+      case 'system_accountNextIndex': return 7;
+      case 'payment_queryFeeDetails':
+        captured.placeholderHex = params[0];
+        return { inclusionFee: { baseFee: '100', lenFee: '200', adjustedWeightFee: '300' } };
+      default: throw new Error('no stub for ' + method);
+    }
+  },
+});
+
+test('buildUnsignedTransfer: fee off is the plain transfer, pinned as such', async () => {
+  const captured = {};
+  const dest = ss58Encode(new Uint8Array(32).fill(7), 189);
+  const from = ss58Encode(new Uint8Array(32).fill(1), 189);
+  const u = await buildUnsignedTransfer(stubNode(captured), {
+    fromAddress: from, fromAccountId: new Uint8Array(32).fill(1),
+    destAddress: dest, amountPlancks: 10000000000000n,
+  });
+  assert.deepEqual(u.call, buildTransferCall(new Uint8Array(32).fill(7), 10000000000000n));
+  assert.equal(u.callKind, 'transfer_keep_alive');
+  assert.equal(u.serviceFeePlancks, 0n);
+  assert.equal(u.serviceFeeBps, 0);
+  assert.equal(u.totalDebitPlancks, 10000000000000n);
+  assert.equal(u.fee, 600n, 'node fee quote still sums the three validated fields');
+  assert.deepEqual(u.payload.slice(0, u.call.length), u.call, 'the signing payload signs the pinned call');
+});
+
+test('buildUnsignedTransfer: fee on pins the batch call + fee figures', async () => {
+  const captured = {};
+  const dest = ss58Encode(new Uint8Array(32).fill(7), 189);
+  const from = ss58Encode(new Uint8Array(32).fill(1), 189);
+  const u = await buildUnsignedTransfer(stubNode(captured), {
+    fromAddress: from, fromAccountId: new Uint8Array(32).fill(1),
+    destAddress: dest, amountPlancks: 10000000000000n, serviceFeeBps: 50,
+  });
+  assert.equal(u.callKind, 'batch_all');
+  assert.equal(u.serviceFeePlancks, 50000000000n);
+  assert.equal(u.serviceFeeBps, 50);
+  assert.equal(u.totalDebitPlancks, 10050000000000n);
+  const feeDest = ss58Decode(SERVICE_FEE_ADDRESS).accountId;
+  assert.deepEqual(u.call, buildBatchAllCall([
+    buildTransferCall(new Uint8Array(32).fill(7), 10000000000000n),
+    buildTransferCall(feeDest, 50000000000n),
+  ]));
+  assert.deepEqual(u.payload.slice(0, u.call.length), u.call);
+});
+
+test('buildUnsignedTransfer: fee-quote placeholder is length-accurate per scheme and per call', async () => {
+  const dest = ss58Encode(new Uint8Array(32).fill(7), 189);
+  const from = ss58Encode(new Uint8Array(32).fill(1), 189);
+  const base = { fromAddress: from, fromAccountId: new Uint8Array(32).fill(1), destAddress: dest, amountPlancks: 10000000000000n };
+  const c65 = {}; await buildUnsignedTransfer(stubNode(c65), { ...base });
+  const c87 = {}; await buildUnsignedTransfer(stubNode(c87), { ...base, scheme: 87 });
+  // ML-DSA-87 wire (1+4627+2592) is 1958 bytes longer than ML-DSA-65 (1+3309+1952)
+  assert.equal((c87.placeholderHex.length - c65.placeholderHex.length) / 2, 1958);
+  const cFee = {}; const uFee = await buildUnsignedTransfer(stubNode(cFee), { ...base, serviceFeeBps: 50 });
+  const cPlain = {}; const uPlain = await buildUnsignedTransfer(stubNode(cPlain), { ...base });
+  assert.equal((cFee.placeholderHex.length - cPlain.placeholderHex.length) / 2, uFee.call.length - uPlain.call.length,
+    'the batch call length is fully reflected in the quoted placeholder');
 });

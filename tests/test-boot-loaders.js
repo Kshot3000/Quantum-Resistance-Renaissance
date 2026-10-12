@@ -397,7 +397,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sanitizeActivityRows(rawRows, addr, Date.now())"), "wallet: activity rows validated before rendering (round-1 shape check, superseded by the round-2 relational sanitize in Batch 38)");
   ok(app.includes("indexer returned malformed activity data"), "wallet: non-list activity payload is malformed, never a fake empty history");
   const html = read("pages/web-wallet/index.html");
-  ok(html.includes("js/app.js?v=1.41.0"), "wallet: app.js cache key bumped for the boundary fix (1.39.0, superseded by the 1.40.0 lock-scrub bump and the 1.41.0 activity round-2 bump)");
+  ok(html.includes("js/app.js?v=1.42.0"), "wallet: app.js cache key bumped for the boundary fix (1.39.0, superseded by the 1.40.0 lock-scrub bump, the 1.41.0 activity round-2 bump and the 1.42.0 service-fee bump)");
   // Lock scrub (2026-10-10): lock() zeroed the in-memory key but left the
   // revealed phrase words, Security-tab keys, address and send form rendered
   // in the DOM behind the unlock screen; fillSecurity was { once: true },
@@ -869,7 +869,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("sample != null && sample >= 100"), "miningcalc: observed pace requires the fetch sample (>= 100 blocks)");
   ok(app.includes("Math.abs(sHeight - out.height) > 100) out.supplyQtc = null;"), "miningcalc: cross-capture supply rejected (one-capture rule)");
   const html = read("pages/mining-calculator/index.html");
-  ok(html.includes("app.js?v=1.11.10"), "miningcalc: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.11.11"), "miningcalc: app.js cache key bumped for the boundary fix");
   ok(!html.includes("falls back to the dated Oct 2, 2026 capture"), "miningcalc: honesty bullet no longer pins the fallback to the stale Oct 2 capture");
 }
 
@@ -902,7 +902,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("Math.abs(supHeight - consHeight) > 100) supplyPlancks = null;"), "pooldesk: cross-capture supply rejected (one-capture rule)");
   ok(app.includes("q > 0 && q <= MAX_SUPPLY_QTC / EMISSION_DENOM"), "pooldesk: block-avg rewards validated per row against the emission range");
   const html = read("pages/pool-desk/index.html");
-  ok(html.includes("app.js?v=1.48.10"), "pooldesk: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.11"), "pooldesk: app.js cache key bumped for the boundary fix");
 }
 
 // Batch 28 (2026-10-10 13:19): energy-observatory (Tier 2) — the sixth
@@ -937,7 +937,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("function cleanTrend(trend)"), "energy: cleanTrend() defined (poisoned points drop individually)");
   ok(app.includes("new Date(state.fetchedAt).toISOString()"), "energy: provenance date re-serialized, never raw payload text in innerHTML");
   const html = read("pages/energy-observatory/index.html");
-  ok(html.includes("app.js?v=1.51.10"), "energy: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.51.11"), "energy: app.js cache key bumped for the boundary fix");
   ok(!html.includes("97/97 node tests green"), "energy: methodology no longer pins a stale hard-coded test count");
 }
 
@@ -975,7 +975,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("h !== prevH + 1"), "lucklab: pace requires consecutive heights (span cannot overcount blocks)");
   ok(app.includes("var liveHead = validHeight(rawHead);"), "lucklab: live head validated before it can promote the snapshot");
   const html = read("pages/luck-lab/index.html");
-  ok(html.includes("app.js?v=1.48.10"), "lucklab: app.js cache key bumped for the boundary fix");
+  ok(html.includes("app.js?v=1.48.11"), "lucklab: app.js cache key bumped for the boundary fix");
   ok(!html.includes("(refreshed 2026-10-02)"), "lucklab: footer no longer pins the snapshot refresh to the stale Oct 2 date");
 }
 
@@ -1259,7 +1259,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes("from './rpc-validate.js?v=1.1.0'"), "wallet2: app.js imports the sanitizer from the bumped module");
   ok(!app.includes("function validActivityRow(t)"), "wallet2: the round-1 shape-only row check is gone");
   const html = read("pages/web-wallet/index.html");
-  ok(html.includes("js/app.js?v=1.41.0"), "wallet2: app.js cache key bumped for the round-2 fix");
+  ok(html.includes("js/app.js?v=1.42.0"), "wallet2: app.js cache key bumped for the round-2 fix");
 }
 
 // Batch 39 (2026-10-11 00:19): Key Forge verdict staleness (Tier 1) —
@@ -1618,19 +1618,19 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const mc = read("pages/mining-calculator/app.js");
   ok(mc.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: miningcalc rejects a pre-genesis capture time");
   ok(mc.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: miningcalc rejects a future capture time");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.10"), "fetchedat: miningcalc cache key bumped");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.11"), "fetchedat: miningcalc cache key bumped");
   const pd = read("pages/pool-desk/js/app.js");
   ok(pd.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: pooldesk rejects a pre-genesis capture time");
   ok(pd.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: pooldesk rejects a future capture time");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.10"), "fetchedat: pooldesk cache key bumped");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.11"), "fetchedat: pooldesk cache key bumped");
   const en = read("pages/energy-observatory/js/app.js");
   ok(en.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: energy rejects a pre-genesis capture time");
   ok(en.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: energy rejects a future capture time");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.10"), "fetchedat: energy cache key bumped");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.11"), "fetchedat: energy cache key bumped");
   const lk = read("pages/luck-lab/js/app.js");
   ok(lk.includes('if (t < Date.parse("2026-09-01T00:00:00Z")) return null;'), "fetchedat: lucklab rejects a pre-genesis capture time");
   ok(lk.includes("if (t > Date.now() + 3600000) return null;"), "fetchedat: lucklab rejects a future capture time");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.10"), "fetchedat: lucklab cache key bumped");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.11"), "fetchedat: lucklab cache key bumped");
 }
 
 // Batch 50 (2026-10-11 12:19): fleet capture-time alignment, round 2 —
@@ -1714,10 +1714,10 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const html = read("pages/flow-tracer/index.html");
   ok(html.includes("js/flow-core.js?v=1.32.0"), "flowtracer2: flow-core.js cache key bumped for round 2");
   ok(html.includes("app.js?v=1.34.0"), "flowtracer2: app.js cache key bumped for round 2");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.10"), "flowtracer2: miningcalc sync patch-bump pin");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.10"), "flowtracer2: pooldesk sync patch-bump pin");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.10"), "flowtracer2: energy sync patch-bump pin");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.10"), "flowtracer2: lucklab sync patch-bump pin");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.11"), "flowtracer2: miningcalc sync patch-bump pin");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.11"), "flowtracer2: pooldesk sync patch-bump pin");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.11"), "flowtracer2: energy sync patch-bump pin");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.11"), "flowtracer2: lucklab sync patch-bump pin");
 }
 
 // Batch 53 (2026-10-11 15:19): portfolio-desk snapshot-boundary hardening
@@ -1747,10 +1747,10 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(core.includes("if (seenIds[id]) return;"), "portfolio2: transfer ids dedupe after validation");
   const html = read("pages/portfolio-desk/index.html");
   ok(html.includes("js/desk-core.js?v=1.33.0"), "portfolio2: desk-core.js cache key bumped for round 2");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.10"), "portfolio2: miningcalc sync patch-bump pin");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.10"), "portfolio2: pooldesk sync patch-bump pin");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.10"), "portfolio2: energy sync patch-bump pin");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.10"), "portfolio2: lucklab sync patch-bump pin");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.11"), "portfolio2: miningcalc sync patch-bump pin");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.11"), "portfolio2: pooldesk sync patch-bump pin");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.11"), "portfolio2: energy sync patch-bump pin");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.11"), "portfolio2: lucklab sync patch-bump pin");
 }
 
 // Batch 54 (2026-10-11 16:19): watchtower snapshot-boundary hardening
@@ -1787,10 +1787,10 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   const html = read("pages/watchtower/index.html");
   ok(html.includes("js/watch-core.js?v=1.32.0"), "watchtower2: watch-core.js cache key bumped for round 2");
   ok(html.includes("js/app.js?v=1.35.0"), "watchtower2: app.js cache key bumped for round 2");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.10"), "watchtower2: miningcalc sync patch-bump pin");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.10"), "watchtower2: pooldesk sync patch-bump pin");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.10"), "watchtower2: energy sync patch-bump pin");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.10"), "watchtower2: lucklab sync patch-bump pin");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.11"), "watchtower2: miningcalc sync patch-bump pin");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.11"), "watchtower2: pooldesk sync patch-bump pin");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.11"), "watchtower2: energy sync patch-bump pin");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.11"), "watchtower2: lucklab sync patch-bump pin");
 }
 
 // Batch 55 (2026-10-11 17:19): Pay Desk gains an OPTIONAL, disclosed
@@ -1866,10 +1866,10 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("added <strong>on top</strong>"), "msig-fee: on-top semantics disclosed at the selector");
   ok(html.includes("js/msig-core.js?v=1.24.0"), "msig-fee: msig-core.js cache key bumped for the service fee");
   ok(html.includes("js/app.js?v=1.24.0"), "msig-fee: app.js cache key bumped for the service fee");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.10"), "msig-fee: miningcalc sync patch-bump pin");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.10"), "msig-fee: pooldesk sync patch-bump pin");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.10"), "msig-fee: energy sync patch-bump pin");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.10"), "msig-fee: lucklab sync patch-bump pin");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.11"), "msig-fee: miningcalc sync patch-bump pin");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.11"), "msig-fee: pooldesk sync patch-bump pin");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.11"), "msig-fee: energy sync patch-bump pin");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.11"), "msig-fee: lucklab sync patch-bump pin");
 }
 
 // Batch 58 (2026-10-11 20:19): Reversal Desk's one-time delay planner
@@ -1908,10 +1908,62 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(html.includes("not refunded"), "rev-fee: non-refundable fee disclosed at the selector");
   ok(html.includes("js/reversal-core.js?v=1.52.0"), "rev-fee: reversal-core.js cache key bumped for the service fee");
   ok(html.includes("js/app.js?v=1.52.0"), "rev-fee: app.js cache key bumped for the service fee");
-  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.10"), "rev-fee: miningcalc sync patch-bump pin");
-  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.10"), "rev-fee: pooldesk sync patch-bump pin");
-  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.10"), "rev-fee: energy sync patch-bump pin");
-  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.10"), "rev-fee: lucklab sync patch-bump pin");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.11"), "rev-fee: miningcalc sync patch-bump pin");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.11"), "rev-fee: pooldesk sync patch-bump pin");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.11"), "rev-fee: energy sync patch-bump pin");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.11"), "rev-fee: lucklab sync patch-bump pin");
+}
+
+// Batch 59 (2026-10-11 21:19): Web Wallet (Tier 1 signer) gains an
+// OPTIONAL, disclosed builder service fee (profit mandate, fifth port
+// of the pattern — the first inside a live signing flow): ON TOP of
+// the amount, never deducted — the recipient leg passes through
+// byte-for-byte and FIRST, the fee is a second transfer_keep_alive to
+// Kyle's QTC address, and both legs ride in ONE atomic
+// Utility.batch_all (pallet 9, call 2), so the wallet still signs
+// exactly ONE extrinsic and the sender pays both legs or neither. The
+// fee choice is a determinant of the pinned estimate (changing the
+// selector voids it, like recipient/amount), the review renders the
+// fee from the PINNED estimate (rate + address + floored-to-zero
+// honesty), the balance check and Max both count the fee, and
+// fee-free sends are byte-identical plain transfers. Same run fixes
+// the fee-quote placeholder: it hard-coded the ML-DSA-65 wire length,
+// under-quoting the length fee for ML-DSA-87 wallets by 1,958 bytes —
+// the placeholder is now length-accurate per scheme. Floored so it
+// never exceeds the quoted percentage, capped at 100 bps in code; a
+// fee floored to zero adds NO leg. Pins: the scale math + batch
+// encoder + address + rpc pinning + scheme placeholder + app wiring +
+// disclosure surfaces + new keys + sync bumps.
+{
+  const scale = read("pages/web-wallet/js/scale.js");
+  ok(scale.includes("export function computeServiceFee(amountPlancks, feeBps)"), "wallet-fee: computeServiceFee() defined");
+  ok(scale.includes("export function buildTransferWithServiceFee(destAccountId, amountPlancks, feeDestAccountId, feeBps)"), "wallet-fee: buildTransferWithServiceFee() defined");
+  ok(scale.includes("export function buildBatchAllCall(calls)"), "wallet-fee: buildBatchAllCall() defined");
+  ok(scale.includes("export const UTILITY_PALLET_INDEX = 9;"), "wallet-fee: Utility pallet index 9 pinned");
+  ok(scale.includes("export const BATCH_ALL_CALL_INDEX = 2;"), "wallet-fee: batch_all call index 2 pinned");
+  ok(scale.includes("export const SERVICE_FEE_ADDRESS = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';"), "wallet-fee: fee routes only to Kyle's QTC address");
+  ok(scale.includes("export const SERVICE_FEE_MAX_BPS = 100;"), "wallet-fee: fee capped at 100 bps in code");
+  const rpc = read("pages/web-wallet/js/rpc.js");
+  ok(rpc.includes("const built = buildTransferWithServiceFee(destAccountId, amountPlancks, feeDestAccountId, serviceFeeBps);"), "wallet-fee: buildUnsignedTransfer builds through buildTransferWithServiceFee");
+  ok(rpc.includes("serviceFeePlancks: built.feePlancks"), "wallet-fee: the fee is pinned in the unsigned estimate");
+  ok(rpc.includes("scheme === 87 ? 1 + 4627 + 2592 : 1 + 3309 + 1952"), "wallet-fee: fee-quote placeholder is length-accurate per ML-DSA scheme (87 under-quote fixed)");
+  ok(rpc.includes("from './scale.js?v=1.1.0'"), "wallet-fee: rpc.js pins the bumped scale module");
+  const app = read("pages/web-wallet/js/app.js");
+  ok(app.includes("from './rpc.js?v=1.1.0'"), "wallet-fee: app.js pins the bumped rpc module");
+  ok(app.includes("$('send-fee').addEventListener('change', invalidateUnsigned);"), "wallet-fee: changing the fee selector voids the pinned estimate");
+  ok(app.includes("serviceFeeBps: Number(feeRaw)"), "wallet-fee: estimate builds with the selector's rate, pinned as feeRaw");
+  ok(app.includes("const svcFee = unsigned.serviceFeePlancks ?? 0n;"), "wallet-fee: review renders the fee from the pinned estimate, never the live form");
+  ok(app.includes("$('send-fee').value = '50';"), "wallet-fee: lock scrub resets the fee selector to the default");
+  const html = read("pages/web-wallet/index.html");
+  ok(html.includes('id="send-fee"'), "wallet-fee: send form offers the fee selector with a None option");
+  ok(html.includes("added <strong>on top of</strong>"), "wallet-fee: on-top semantics disclosed at the selector");
+  ok(html.includes("inside the same atomic"), "wallet-fee: atomic batch_all transport disclosed at the selector");
+  ok(html.includes('id="est-service-fee"'), "wallet-fee: review carries a dedicated service-fee row");
+  ok(html.includes("js/app.js?v=1.42.0"), "wallet-fee: app.js cache key bumped for the service fee");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.11"), "wallet-fee: miningcalc sync patch-bump pin");
+  ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.11"), "wallet-fee: pooldesk sync patch-bump pin");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.11"), "wallet-fee: energy sync patch-bump pin");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.11"), "wallet-fee: lucklab sync patch-bump pin");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -208,12 +208,22 @@
           <button id="btn-max" class="btn ghost">Max − fee</button>
         </div>
         <div id="send-amount-err" class="err" role="alert" hidden></div>
+        <label class="fld">Builder service fee (optional)
+          <select id="send-fee">
+            <option value="0">None — plain transfer, no fee</option>
+            <option value="25">0.25% of the amount</option>
+            <option value="50" selected>0.5% of the amount</option>
+            <option value="100">1% of the amount</option>
+          </select>
+        </label>
+        <p class="muted small">An optional fee for the builder of this wallet, added <strong>on top of</strong> your amount — the recipient always receives the full amount you entered. It is paid to <code class="mono">qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau</code> as a second <code>transfer_keep_alive</code> leg inside the same atomic <code>Utility.batch_all</code> — one signature, and both legs execute together or neither does. The exact fee appears in the review below before you sign; choose None for a plain transfer. A fee that rounds down to zero plancks adds no leg.</p>
         <button id="btn-estimate" class="btn primary">1 · Build &amp; estimate fee</button>
         <div id="estimate-box" hidden>
           <h3>Review the transfer</h3>
           <dl class="kv">
             <div><dt>To</dt><dd id="est-to" class="mono small">—</dd></div>
             <div><dt>Amount</dt><dd id="est-amount">—</dd></div>
+            <div id="est-service-fee-row" hidden><dt>Service fee</dt><dd id="est-service-fee">—</dd></div>
             <div><dt>Network fee (est.)</dt><dd id="est-fee">—</dd></div>
             <div><dt>Total debit</dt><dd id="est-total">—</dd></div>
             <div><dt>Nonce</dt><dd id="est-nonce">—</dd></div>
@@ -311,6 +321,6 @@
 </footer>
 
 <script src="../../assets/vendor/qrcode.js?v=1.0.0"></script>
-<script type="module" src="js/app.js?v=1.41.0"></script>
+<script type="module" src="js/app.js?v=1.42.0"></script>
 </body>
 </html>
