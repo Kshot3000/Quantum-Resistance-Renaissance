@@ -50,5 +50,38 @@ check("fromHex rejects odd length", C.fromHex("abc") === null);
 check("empty address rejected", C.ss58Decode("").ok === false);
 check("whitespace-only rejected", C.ss58Decode("   ").ok === false);
 
+/* Quantus verdict is a relation: prefix 189 AND exactly a 32-byte key.
+ * A generic SS58 string can carry prefix 189 over any key size with a
+ * valid checksum — it decodes generically, but it is NOT a QTC account. */
+real.forEach(function(a){
+  check("isQuantusAddress(real) " + a.slice(0, 10) + "...",
+        C.isQuantusAddress(C.ss58Decode(a)) === true);
+});
+[1, 2, 4, 8, 33].forEach(function(n){
+  var kk = []; for (var i = 0; i < n; i++) kk.push((i * 37 + 11) & 0xff);
+  var aa = C.ss58Encode(kk, 189);
+  var dd = C.ss58Decode(aa);
+  check("prefix-189 " + n + "B key decodes generically but is not a Quantus account",
+        dd.ok === true && dd.prefix === 189 && dd.key.length === n &&
+        C.isQuantusAddress(dd) === false, aa);
+});
+check("isQuantusAddress(round-trip 32B, 189) is true",
+      C.isQuantusAddress(C.ss58Decode(C.ss58Encode(k, 189))) === true);
+check("isQuantusAddress(prefix 0, 32B) is false",
+      C.isQuantusAddress(C.ss58Decode(C.ss58Encode(k, 0))) === false);
+check("isQuantusAddress(null/garbage) is false",
+      C.isQuantusAddress(null) === false && C.isQuantusAddress(C.ss58Decode("nope!")) === false);
+
+/* Reserved prefix framing: first byte top bits 10/11 are not a valid
+ * SS58 prefix encoding and must not decode as a fabricated 1-byte prefix. */
+[0x80, 0xc0].forEach(function(fb){
+  var body = [fb]; for (var i = 0; i < 32; i++) body.push(i & 0xff);
+  var hh = C.blake2b(bytes("SS58PRE").concat(body));
+  var ra = C.b58encode(body.concat([hh[0], hh[1]]));
+  var rd = C.ss58Decode(ra);
+  check("reserved first byte 0x" + fb.toString(16) + " rejected as format",
+        rd.ok === false && rd.kind === "format", ra);
+});
+
 console.log(fails === 0 ? "ALL GREEN" : fails + " FAILURES");
 process.exit(fails ? 1 : 0);

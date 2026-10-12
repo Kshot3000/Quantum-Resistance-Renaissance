@@ -174,6 +174,13 @@ function ss58Decode(addr){
   }
   if (raw.length < 4)
     return { ok: false, kind: "length", error: "Too short (" + raw.length + " bytes) to be an SS58 address." };
+  // SS58 prefix framing: top bits 00 = 1-byte prefix, 01 = 2-byte prefix.
+  // 10/11 are reserved — a payload starting that way is not valid SS58 at
+  // all, and must not be misread as a 1-byte prefix (it previously decoded
+  // "ok" with a fabricated prefix such as 192).
+  if ((raw[0] & 0xc0) !== 0 && (raw[0] & 0xc0) !== 0x40)
+    return { ok: false, kind: "format",
+             error: "Reserved SS58 prefix form — the first byte's top bits (10/11) are not a valid SS58 prefix encoding." };
   var prefixLen = ((raw[0] & 0xc0) === 0x40) ? 2 : 1;
   var prefix = prefixLen === 1 ? raw[0]
     : (((raw[0] & 0x3f) << 2) | (raw[1] >>> 6) | ((raw[1] & 0x3f) << 8));
@@ -198,6 +205,17 @@ function fromHex(s){
 }
 
 var QUANTUS_PREFIX = 189;
+var QUANTUS_KEY_LEN = 32;
+/* A Quantus account address is a RELATION, not just a checksum: prefix 189
+ * AND an exactly 32-byte account key (36-byte payload, 49 base58 chars —
+ * the shape of every real on-chain address). A generic SS58 string can
+ * carry prefix 189 over a 1/2/4/8/33-byte key with a perfectly valid
+ * checksum; that string is not a QTC account address and must never be
+ * painted as one. */
+function isQuantusAddress(d){
+  return !!d && d.ok === true && d.prefix === QUANTUS_PREFIX &&
+         !!d.key && d.key.length === QUANTUS_KEY_LEN;
+}
 
 /* ---------- UI ---------- */
 function esc(s){
@@ -251,6 +269,15 @@ function init(){
         : "";
       setVerdict(verdict, "err", "&#10007; Invalid address",
         esc(d.error) + esc(extra));
+      return;
+    }
+    if (d.prefix === QUANTUS_PREFIX && d.key.length !== QUANTUS_KEY_LEN){
+      setVerdict(verdict, "err", "&#10007; Not a Quantus account address",
+        "Checksum is fine and the prefix is <strong>189</strong>, but the payload key is <strong>" +
+        d.key.length + " bytes</strong> — Quantus accounts are exactly <strong>32-byte</strong> keys " +
+        "(36-byte payload, 49 characters). This string was most likely produced by a generic SS58 " +
+        "encoder set to prefix 189 with the wrong key size. Do not send QTC to it.");
+      renderTable(d, false);
       return;
     }
     if (d.prefix !== QUANTUS_PREFIX){
@@ -309,11 +336,17 @@ function init(){
       return;
     }
     var addr = ss58Encode(key, prefix);
-    var note = prefix === QUANTUS_PREFIX
+    var quantusOk = prefix === QUANTUS_PREFIX && key.length === QUANTUS_KEY_LEN;
+    var wrongSize189 = prefix === QUANTUS_PREFIX && key.length !== QUANTUS_KEY_LEN;
+    var note = quantusOk
       ? "Prefix 189 — a mainnet QTC address."
-      : "Prefix " + prefix + " — not a Quantus mainnet address.";
-    setVerdict(encOut, prefix === QUANTUS_PREFIX ? "ok" : "warn",
-      (prefix === QUANTUS_PREFIX ? "&#10003; Encoded" : "&#9888; Encoded (custom prefix)"),
+      : wrongSize189
+        ? "Prefix 189 with a " + key.length + "-byte key — Quantus accounts are exactly 32-byte keys, " +
+          "so this is not a usable QTC account address even though its checksum is valid. " +
+          "Use a 64-hex-character (32-byte) key for a mainnet address."
+        : "Prefix " + prefix + " — not a Quantus mainnet address.";
+    setVerdict(encOut, quantusOk ? "ok" : "warn",
+      (quantusOk ? "&#10003; Encoded" : wrongSize189 ? "&#9888; Encoded (not a QTC account)" : "&#9888; Encoded (custom prefix)"),
       esc(note) + '<div class="v-key" id="e-key" title="Click to copy">' + esc(addr) + "</div>");
     $("e-key").addEventListener("click", function(){ copyText(addr, $("e-key")); });
   }
@@ -353,6 +386,8 @@ if (typeof document !== "undefined" && typeof window !== "undefined"){
 if (typeof module !== "undefined" && module.exports){
   module.exports = { blake2b: blake2b, b58encode: b58encode, b58decode: b58decode,
                      ss58Encode: ss58Encode, ss58Decode: ss58Decode,
+                     isQuantusAddress: isQuantusAddress,
+                     QUANTUS_PREFIX: QUANTUS_PREFIX, QUANTUS_KEY_LEN: QUANTUS_KEY_LEN,
                      toHex: toHex, fromHex: fromHex };
 }
 })();
