@@ -5,7 +5,7 @@ import {
   validatePattern, variantsForChar, expectedAttempts,
   probFoundBy, attemptsForQuantile, medianAttempts,
   expectedSeconds, fmtInt, fmtDuration, difficultyLadder,
-  addressMatches,
+  addressMatches, SS58_189_RE, sanitizeVault, sanitizeBench,
 } from '../js/vanity.js';
 
 test('base58 alphabet has 58 chars and excludes 0/O/I/l', () => {
@@ -44,12 +44,27 @@ test('validatePattern: rejects impossible pinned first char (prefix only)', () =
   const bad = validatePattern('AX', 'prefix'); // 'a' not in jkmnopq
   assert.ok(!bad.ok);
   assert.ok(bad.error.includes('pins that position'), bad.error);
-  // 'K' folds to 'k' which IS in the set — accepted (case-insensitive grind finds it)
-  const folded = validatePattern('K5', 'prefix');
-  assert.ok(folded.ok, folded.error);
   // suffix mode has no pinned position
   assert.ok(validatePattern('AX', 'suffix').ok);
   assert.ok(validatePattern('A0', 'suffix').ok === false); // 0 still not base58
+});
+
+test('validatePattern: the pinned position is case-aware', () => {
+  // Case-sensitive (the page default): position 3 is ALWAYS lowercase
+  // j/k/m/n/o/p/q, so an uppercase twin can never match — grinding for it
+  // would run forever. It must be rejected, not folded.
+  const cs = validatePattern('K5', 'prefix', true);
+  assert.ok(!cs.ok);
+  assert.ok(/case-sensitive/i.test(cs.error), cs.error);
+  assert.ok(!validatePattern('KNET', 'prefix', true).ok);
+  assert.ok(!validatePattern('Q', 'prefix', true).ok);
+  assert.ok(validatePattern('k5', 'prefix', true).ok);
+  assert.ok(validatePattern('mSHT', 'prefix', true).ok); // only char 1 is pinned
+  // Case-insensitive: 'K' folds to 'k', which IS in the set — accepted.
+  assert.ok(validatePattern('K5', 'prefix', false).ok);
+  assert.ok(validatePattern('KNET', 'prefix', false).ok);
+  // Suffix mode has no pinned position in either case mode.
+  assert.ok(validatePattern('K5', 'suffix', true).ok);
 });
 
 test('variantsForChar: case-sensitive always 1', () => {
@@ -74,6 +89,9 @@ test('expectedAttempts prefix: pinned first char × 58^(k-1)', () => {
   assert.ok(Math.abs(expectedAttempts('K', I) - 1 / 0.172794) < 1e-9);
   assert.ok(Math.abs(expectedAttempts('K5', I) - (1 / 0.172794) * 58) < 1e-9); // digit 58
   assert.ok(Math.abs(expectedAttempts('Ka', I) - (1 / 0.172794) * 29) < 1e-9); // letter folds: 29
+  // case-sensitive uppercase at the pinned position: probability exactly 0
+  assert.equal(expectedAttempts('K', P), Infinity);
+  assert.equal(expectedAttempts('KNET', P), Infinity);
 });
 
 test('expectedAttempts suffix: 58^k (approximate, checksum-coupled)', () => {
@@ -139,6 +157,43 @@ test('addressMatches: prefix mode', () => {
   assert.ok(addressMatches(addr, 'kshot', { caseSensitive: false, position: 'prefix' }));
   assert.ok(!addressMatches(addr, 'SHOT', { caseSensitive: true, position: 'prefix' }));
   assert.ok(!addressMatches('abKSHOTxx', 'KSHOT', { caseSensitive: true, position: 'prefix' }));
+});
+
+test('SS58_189_RE: qz + 47 base58, fleet-shaped addresses only', () => {
+  assert.ok(SS58_189_RE.test('qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv'));
+  assert.ok(SS58_189_RE.test('qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau'));
+  assert.ok(!SS58_189_RE.test('qzshort'));
+  assert.ok(!SS58_189_RE.test('qz0sbEcAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv')); // 0 not base58
+});
+
+const GOOD_REC = {
+  address: 'qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv',
+  scheme: '65', pattern: 'msb', caseSensitive: false, position: 'prefix',
+  attempts: 1234, ms: 5678, date: '2026-10-01T00:00:00.000Z', secretHex: 'abcd',
+};
+
+test('sanitizeVault: well-formed records survive, poison is dropped', () => {
+  assert.equal(sanitizeVault([GOOD_REC]).length, 1);
+  assert.equal(sanitizeVault('junk').length, 0);
+  assert.equal(sanitizeVault(null).length, 0);
+  assert.equal(sanitizeVault([{ ...GOOD_REC, scheme: '99' }]).length, 0); // was a boot crash
+  assert.equal(sanitizeVault([{ ...GOOD_REC, address: '<img src=x>' }]).length, 0);
+  assert.equal(sanitizeVault([{ ...GOOD_REC, pattern: '<b>x</b>' }]).length, 0);
+  assert.equal(sanitizeVault([{ ...GOOD_REC, attempts: -1 }]).length, 0);
+  assert.equal(sanitizeVault([{ ...GOOD_REC, date: 'whenever' }]).length, 0);
+  assert.equal(sanitizeVault([{ ...GOOD_REC, secretHex: 'zz' }]).length, 0);
+  assert.equal(sanitizeVault([{ ...GOOD_REC, secretHex: null }]).length, 1);
+  assert.equal(sanitizeVault([GOOD_REC, null, 42, GOOD_REC]).length, 2);
+  assert.ok(sanitizeVault(Array.from({ length: 500 }, () => GOOD_REC)).length <= 200);
+});
+
+test('sanitizeBench: only plausible measured rates survive', () => {
+  assert.equal(sanitizeBench({ '65': 42.5 })['65'], 42.5);
+  assert.equal(sanitizeBench({ '65': 1e15 })['65'], undefined);
+  assert.equal(sanitizeBench({ '65': 'fast' })['65'], undefined);
+  assert.equal(sanitizeBench({ '65': -3 })['65'], undefined);
+  assert.deepEqual(sanitizeBench('junk'), {});
+  assert.equal(sanitizeBench({ '87': 12, evil: 5 }).evil, undefined);
 });
 
 test('addressMatches: suffix mode', () => {

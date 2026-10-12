@@ -32,8 +32,14 @@ export const FIRST_CHAR_PROB = {
 };
 export const WORST_FIRST_FACTOR = 1 / Math.min(...Object.values(FIRST_CHAR_PROB)); // ≈24.157 ('q')
 
-/** Normalize + validate a raw pattern string. */
-export function validatePattern(raw, position = 'prefix') {
+/** Normalize + validate a raw pattern string.
+ * Case matters at the pinned position: the character right after "qz" is
+ * ALWAYS one of the seven LOWERCASE symbols in FIRST_CHAR_SET. A
+ * case-insensitive pattern may be typed in either case (the lowercase twin
+ * is what matches), but a case-sensitive pattern starting with the
+ * uppercase twin ("K…") can never match any real address — accepting it
+ * would grind forever while quoting a finite difficulty. */
+export function validatePattern(raw, position = 'prefix', caseSensitive = true) {
   const clean = String(raw || '').trim().replace(/\s+/g, '');
   if (!clean) return { ok: false, error: 'Type the characters you want in your address.' };
   // A leading "qz" is the automatic SS58-189 lead, not part of the grind.
@@ -47,12 +53,24 @@ export function validatePattern(raw, position = 'prefix') {
       return { ok: false, error: `"${ch}" is not a base58 character (no 0, O, I, l).` };
   }
   if (position === 'prefix') {
-    const first = p[0].toLowerCase();
-    if (!FIRST_CHAR_SET.includes(first))
+    if (caseSensitive) {
+      if (!FIRST_CHAR_SET.includes(p[0])) {
+        if (FIRST_CHAR_SET.includes(p[0].toLowerCase()))
+          return {
+            ok: false,
+            error: `Case-sensitive matching can never find "${p[0]}" right after "qz" — the SS58-189 lead pins that position to LOWERCASE ${FIRST_CHAR_SET.split('').join(' ')} only. Use "${p[0].toLowerCase()}" there, or uncheck case-sensitive.`,
+          };
+        return {
+          ok: false,
+          error: `No Quantus address can have "${p[0]}" right after "qz" — the SS58-189 lead pins that position to one of: ${FIRST_CHAR_SET.split('').join(' ')}.`,
+        };
+      }
+    } else if (!FIRST_CHAR_SET.includes(p[0].toLowerCase())) {
       return {
         ok: false,
         error: `No Quantus address can have "${p[0]}" right after "qz" — the SS58-189 lead pins that position to one of: ${FIRST_CHAR_SET.split('').join(' ')} (case-insensitive).`,
       };
+    }
   }
   return { ok: true, pattern: p, leadNote };
 }
@@ -76,8 +94,11 @@ export function expectedAttempts(pattern, { caseSensitive, position }) {
     for (const ch of pattern) e *= 58 / variantsForChar(ch, caseSensitive);
     return e;
   }
-  const first = pattern[0].toLowerCase();
-  const pFirst = FIRST_CHAR_PROB[first] || 0;
+  // Case-sensitive: the pinned position holds ONLY the lowercase symbols,
+  // so an uppercase first character has probability exactly 0 (Infinity).
+  const pFirst = caseSensitive
+    ? (FIRST_CHAR_PROB[pattern[0]] || 0)
+    : (FIRST_CHAR_PROB[pattern[0].toLowerCase()] || 0);
   if (!(pFirst > 0)) return Infinity;
   let e = 1 / pFirst;
   for (const ch of pattern.slice(1)) e *= 58 / variantsForChar(ch, caseSensitive);
@@ -140,6 +161,61 @@ export function difficultyLadder(keysPerSec) {
     });
   }
   return rows;
+}
+
+/* ---------- persisted-state boundary ----------
+ * The vault and benchmark live in localStorage, which any same-origin
+ * script (or a hand-edited / corrupted entry) can poison. Records are
+ * rendered with innerHTML and indexed into SCHEMES, so an unsanitized
+ * record could inject markup or crash the page at boot
+ * (SCHEMES[rec.scheme].label on an unknown scheme). Validate every field
+ * against what a real find can contain; drop anything else. */
+export const SS58_189_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
+export const MAX_VAULT_RECORDS = 200;
+const HEX_RE = /^[0-9a-fA-F]+$/;
+/* No ML-DSA keygen on any real machine exceeds this; a "rate" above it is
+ * poison, and quoting ETAs from it would be fiction. */
+export const MAX_PLAUSIBLE_RATE = 1_000_000;
+
+export function sanitizeVault(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const rec of raw) {
+    if (!rec || typeof rec !== 'object') continue;
+    if (typeof rec.address !== 'string' || !SS58_189_RE.test(rec.address)) continue;
+    if (rec.scheme !== '65' && rec.scheme !== '87') continue;
+    if (typeof rec.pattern !== 'string' || rec.pattern.length < 1 ||
+        rec.pattern.length > MAX_PATTERN || ![...rec.pattern].every((c) => B58.includes(c))) continue;
+    if (rec.position !== 'prefix' && rec.position !== 'suffix') continue;
+    if (!Number.isFinite(rec.attempts) || rec.attempts < 1) continue;
+    if (!Number.isFinite(rec.ms) || rec.ms < 0) continue;
+    if (typeof rec.date !== 'string' || !Number.isFinite(Date.parse(rec.date))) continue;
+    if (rec.secretHex !== null && rec.secretHex !== undefined &&
+        (typeof rec.secretHex !== 'string' || rec.secretHex.length % 2 !== 0 || !HEX_RE.test(rec.secretHex))) continue;
+    out.push({
+      address: rec.address,
+      scheme: rec.scheme,
+      pattern: rec.pattern,
+      caseSensitive: rec.caseSensitive === true,
+      position: rec.position,
+      attempts: Math.floor(rec.attempts),
+      ms: Math.floor(rec.ms),
+      date: rec.date,
+      secretHex: rec.secretHex ?? null,
+    });
+    if (out.length >= MAX_VAULT_RECORDS) break;
+  }
+  return out;
+}
+
+export function sanitizeBench(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  for (const scheme of ['65', '87']) {
+    const r = raw[scheme];
+    if (Number.isFinite(r) && r > 0 && r <= MAX_PLAUSIBLE_RATE) out[scheme] = r;
+  }
+  return out;
 }
 
 /** Does an address satisfy the pattern (prefix or suffix mode)? */

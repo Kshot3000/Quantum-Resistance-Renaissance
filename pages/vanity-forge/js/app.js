@@ -10,6 +10,7 @@ import {
   validatePattern, expectedAttempts, probFoundBy,
   attemptsForQuantile, medianAttempts, expectedSeconds,
   fmtInt, fmtDuration, difficultyLadder, addressMatches,
+  sanitizeVault, sanitizeBench,
 } from './vanity.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { pubkeyToAddress, hexEncode } from '../../key-forge/js/quantus-crypto.js';
@@ -59,9 +60,9 @@ const CHUNK = 30; // keygens per UI yield
 
 /* ---------- state ---------- */
 let bench = {};
-try { bench = JSON.parse(localStorage.getItem(BENCH_KEY) || '{}'); } catch { bench = {}; }
+try { bench = sanitizeBench(JSON.parse(localStorage.getItem(BENCH_KEY) || '{}')); } catch { bench = {}; }
 let vault = [];
-try { vault = JSON.parse(localStorage.getItem(VAULT_KEY) || '[]'); } catch { vault = []; }
+try { vault = sanitizeVault(JSON.parse(localStorage.getItem(VAULT_KEY) || '[]')); } catch { vault = []; }
 const saveBench = () => { try { localStorage.setItem(BENCH_KEY, JSON.stringify(bench)); } catch {} };
 const saveVault = () => { try { localStorage.setItem(VAULT_KEY, JSON.stringify(vault)); } catch {} };
 
@@ -80,7 +81,7 @@ function currentPos() {
 }
 function readConfig() {
   const pos = currentPos();
-  const v = validatePattern($('pattern').value, pos);
+  const v = validatePattern($('pattern').value, pos, currentCase());
   if (!v.ok) return { ok: false, error: v.error };
   return {
     ok: true, pattern: v.pattern, leadNote: v.leadNote,
@@ -284,8 +285,10 @@ function renderGrindStats(exp) {
 
 /* ---------- found cards + vault ---------- */
 function highlight(address, cfg) {
+  const hay = cfg.caseSensitive ? address : address.toLowerCase();
+  const needle = cfg.caseSensitive ? cfg.pattern : cfg.pattern.toLowerCase();
   const i = cfg.position === 'suffix'
-    ? address.toLowerCase().lastIndexOf(cfg.caseSensitive ? cfg.pattern : cfg.pattern.toLowerCase())
+    ? hay.lastIndexOf(needle)
     : address.indexOf(LEAD) + LEAD.length;
   const len = cfg.pattern.length;
   return `${address.slice(0, i)}<b class="hl">${address.slice(i, i + len)}</b>${address.slice(i + len)}`;
