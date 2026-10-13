@@ -33,10 +33,14 @@ plan a non-crypto person can follow, and print the letter your heirs will need.
 - `tests/vectors/shamir-vectors.json` — 45 known-answer vectors from
   `tests/gen-vectors.py`, an **independent Python implementation**; the JS
   `combine()` recovers every vector from first-*t* and last-*t* subsets.
-- `tests/run-tests.mjs` — 81/81 green: field axioms, split validation,
+- `tests/run-tests.mjs` — 87/87 green: field axioms, split validation,
   deterministic round-trips (n up to 16, secrets to 300 bytes, UTF-8/emoji),
   tamper/duplication/mixed-share rejection, plan validation, readiness math,
-  letter XSS escaping.
+  letter XSS escaping, and the stored-plan producer relations (a share
+  string must be one the number input itself could hold — the HTML float
+  grammar — and a dead-man choice must be one of the four radio values;
+  anything else is coerced to the empty neutral at load and the clean
+  plan is persisted back).
 - Browser QA: `~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-legacyvault-browser.mjs`
   (headless Chromium 152, file:// + CDP) — split → recover → tamper demo →
   plan → letter → print sheet, zero console errors.

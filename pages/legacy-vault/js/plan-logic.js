@@ -31,9 +31,28 @@
   function str(v, cap) {
     return typeof v === "string" ? v.slice(0, cap) : "";
   }
+  // Producer relations (round 2): sharePct is written ONLY from the
+  // plan form's <input type="number">, whose .value is always "" or a
+  // string in the HTML valid-floating-point-number grammar — the
+  // browser itself refuses to hold "abc", "1.2.3", " 50", "50%",
+  // "0x10", "+50", "1e" or "-". A stored share in any other form was
+  // never typed into the form, yet it painted in the row, exported,
+  // and reached the letter's share table. Fall to "" — the empty
+  // input's own neutral (unassigned), never a fabricated number.
+  const FLOAT_STR_RE = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
   function pctStr(v) {
-    if (typeof v === "number" && Number.isFinite(v)) return String(v);
-    return str(v, 32);
+    let s = "";
+    if (typeof v === "number" && Number.isFinite(v)) s = String(v);
+    else if (typeof v === "string") s = v.slice(0, 32);
+    return FLOAT_STR_RE.test(s) ? s : "";
+  }
+  // deadmanChoice is written ONLY by the #deadman-radios radios, whose
+  // values are exactly these four ("" before the owner picks one). Any
+  // other stored string is not a dead-man design the vault offers —
+  // drop it to "" instead of carrying it into exports.
+  const DEADMAN_CHOICES = ["trusted", "lawyer", "checkin", "shares"];
+  function deadmanChoiceStr(v) {
+    return DEADMAN_CHOICES.includes(v) ? v : "";
   }
   function isEntry(v) {
     return !!v && typeof v === "object" && !Array.isArray(v);
@@ -69,7 +88,7 @@
     return {
       beneficiaries,
       holdings,
-      deadmanChoice: str(p.deadmanChoice, 64),
+      deadmanChoice: deadmanChoiceStr(p.deadmanChoice),
       deadmanText: str(p.deadmanText, 20000),
       checks,
       owner: str(p.owner, 500),

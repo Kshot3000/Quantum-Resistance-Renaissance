@@ -169,8 +169,15 @@
   let plan = loadPlan();
   function loadPlan() {
     try {
-      const p = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
-      return LOGIC.sanitizePlan(p);
+      const raw = localStorage.getItem(LS_KEY);
+      const p = JSON.parse(raw || "{}");
+      const clean = LOGIC.sanitizePlan(p);
+      // Persist the clean copy (byte-compared) so values the sanitizer
+      // dropped do not survive in storage to the next visit.
+      if (raw && JSON.stringify(clean) !== raw) {
+        try { localStorage.setItem(LS_KEY, JSON.stringify(clean)); } catch (e) {}
+      }
+      return clean;
     } catch (e) { return LOGIC.sanitizePlan(null); }
   }
   function savePlan() {

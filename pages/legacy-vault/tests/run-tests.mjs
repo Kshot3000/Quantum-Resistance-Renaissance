@@ -231,5 +231,24 @@ for (const [n, t, len] of combos) {
   ok("sanitized plan flows through validate + letter cleanly", !threw2);
 }
 
+{
+  // sanitizePlan producer relations (round 2): sharePct is written only
+  // from the form's <input type="number">, whose .value is "" or an HTML
+  // float-grammar string; deadmanChoice only from the four radios.
+  const pct = (v) => LOGIC.sanitizePlan({ beneficiaries: [{ name: "A", sharePct: v }] }).beneficiaries[0].sharePct;
+  ok("relations: producer share strings survive verbatim",
+    pct("60") === "60" && pct("33.5") === "33.5" && pct(".5") === ".5" && pct("5.") === "5." && pct("1e2") === "1e2" && pct("") === "");
+  ok("relations: finite number share coerces to its float string", pct(60) === "60" && pct(0.5) === "0.5");
+  ok("relations: non-float share strings fall to '' (unassigned)",
+    ["abc", "1.2.3", " 50", "50%", "0x10", "+50", "1e", "-", "NaN", "Infinity", "1,5"].every((v) => pct(v) === ""));
+  ok("relations: non-finite / non-scalar shares fall to ''",
+    pct(NaN) === "" && pct(Infinity) === "" && pct({}) === "" && pct([]) === "" && pct(null) === "");
+  const dm = (v) => LOGIC.sanitizePlan({ deadmanChoice: v }).deadmanChoice;
+  ok("relations: the four radio dead-man choices survive",
+    ["trusted", "lawyer", "checkin", "shares"].every((v) => dm(v) === v) && dm("") === "");
+  ok("relations: non-radio dead-man choices fall to ''",
+    ["bogus", "LAWYER", " trusted", 42, null, {}].every((v) => dm(v) === ""));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log("FAILURES:\n" + failures.join("\n")); process.exit(1); }
