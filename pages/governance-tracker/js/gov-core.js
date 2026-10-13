@@ -218,6 +218,196 @@ function parseProposalCalls(json) {
   } catch (e) { return []; }
 }
 
+/* --- snapshot load boundary (moved from app.js in the relations round) -----
+ * The renderers dereference event fields blindly (e.type.toLowerCase() in
+ * the timeline, parseFloat tallies, new Date on fetched_at), so one poisoned
+ * row used to wipe the whole board, render "NaN ayes", or print
+ * "Invalid Date". Core corruption — an unparseable fetched_at, a non-array
+ * collection, or a snapshot whose referendum events are ALL invalid — fails
+ * the load honestly; malformed rows drop individually and the board renders
+ * from the survivors, re-sorted into chronological order so status/tally
+ * derivation sees the true sequence. The fetched_at must also be a REAL
+ * capture time (fleet bounds: genesis floor 2026-09-01, now+1h ceiling) —
+ * a parseable 2020 or 2999 stamp used to be rendered verbatim as the
+ * board's snapshot provenance.
+ *
+ * Round 2 (relations): shapes per field are not a boundary — the values
+ * must also satisfy the relations the producer (fetch-governance-data.mjs
+ * over the indexer's tech_referendum_event / extrinsic / runtime_upgrade
+ * tables, themselves mirrors of the runtime) guarantees:
+ *  - every row timestamp is a chain time INSIDE the capture: at/after the
+ *    genesis floor and no later than fetched_at + 60s of indexer/clock
+ *    slack — an event dated after the snapshot that contains it, or before
+ *    the chain existed, is not that snapshot's event;
+ *  - tallies are TechCollective MEMBER counts (the runtime Tally struct is
+ *    all-or-none per event): each field <= GOV.max_member_count, ayes+nays
+ *    <= max_member_count (one vote per member), bare_ayes <= ayes (the bare
+ *    count is the no-conviction subset of ayes);
+ *  - one referendum lives on ONE track and each lifecycle type occurs ONCE
+ *    per referendum: later events claiming another track, and duplicate
+ *    (index, type) rows, drop — the earliest event defines the group;
+ *  - track_name is a DERIVED field of track (the TRACKS table) and origin
+ *    is pinned per track in the same table: the stored name is re-derived,
+ *    a disagreeing origin is nulled, never painted as the lane's origin;
+ *  - proposal_preimage_hash is a 32-byte hash or null; block_id must carry
+ *    a plausible height (1..10,000,000, the fleet ceiling) or it is nulled;
+ *  - extrinsic success is a boolean (a string "false" is neither), its
+ *    index_in_block a count, its args capped; exact duplicate extrinsic
+ *    and upgrade rows dedupe first-wins (a vote painted twice is a voter
+ *    invented). */
+var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // prefix-189 shape (qz + 47 base58), as in Vesting Desk
+var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain exists from Sept 2026
+var MAX_CHAIN_HEIGHT = 10000000; // fleet plausible-height ceiling
+var MAX_REFERENDUM_INDEX = 1000000; // fleet governance-count ceiling (Watchtower MAX_GOV_COUNT)
+var MAX_ARGS_CHARS = 16384;
+
+function nonNegInt(v) {
+  if (typeof v === "number") return Number.isInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v.trim())) {
+    var n = parseInt(v, 10);
+    return isFinite(n) ? n : null;
+  }
+  return null;
+}
+function strOrNull(v) { return typeof v === "string" ? v : null; }
+function chainTimeMs(v, fetchedMs) {
+  if (typeof v !== "string") return null;
+  var ms = Date.parse(v);
+  if (!isFinite(ms)) return null;
+  if (ms < GENESIS_FLOOR_MS || ms > fetchedMs + 60000) return null;
+  return ms;
+}
+function cleanBlockId(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "string" || !/^0*\d+-[0-9a-fA-F]+$/.test(v)) return null;
+  var h = heightOfBlockId(v);
+  return h !== null && h >= 1 && h <= MAX_CHAIN_HEIGHT ? v : null;
+}
+
+function cleanRefEvent(raw, fetchedMs) {
+  if (!raw || typeof raw !== "object") return null;
+  var idx = nonNegInt(raw.referendum_index);
+  if (idx === null || idx > MAX_REFERENDUM_INDEX) return null;
+  if (typeof raw.type !== "string" || !STATUS_META[raw.type]) return null;
+  if (chainTimeMs(raw.timestamp, fetchedMs) === null) return null;
+  var track = nonNegInt(raw.track);
+  var trackObj = track === null ? null : trackById(track);
+  if (!trackObj) return null; // unknown track: no honest thresholds exist for it
+  // Tally relation: the runtime Tally is one struct — its fields arrive
+  // all-or-none — and its counts are member counts under the runtime cap.
+  var tallyFields = ["tally_ayes", "tally_nays", "tally_bare_ayes"];
+  var tally = {}, present = 0;
+  for (var i = 0; i < tallyFields.length; i++) {
+    var f = tallyFields[i];
+    if (raw[f] === null || raw[f] === undefined) { tally[f] = null; continue; }
+    var tv = nonNegInt(raw[f]);
+    if (tv === null || tv > GOV.max_member_count) return null;
+    tally[f] = tv; present++;
+  }
+  if (present && present !== tallyFields.length) return null; // partial tally: not a producer row
+  if (present && tally.tally_ayes + tally.tally_nays > GOV.max_member_count) return null;
+  if (present && tally.tally_bare_ayes > tally.tally_ayes) return null;
+  var size = nonNegInt(raw.proposal_size_bytes);
+  if (size !== null && size > GOV.max_proposal_size_bytes) size = null; // implausible size: show "—", never a fabricated deposit
+  var origin = strOrNull(raw.origin);
+  if (origin !== null && origin !== trackObj.origin) origin = null; // origin is pinned per track
+  return {
+    referendum_index: idx, track: track,
+    track_name: trackObj.name, type: raw.type, // track_name re-derived from track
+    title: strOrNull(raw.title), description: strOrNull(raw.description),
+    origin: origin,
+    is_runtime_upgrade: raw.is_runtime_upgrade === true,
+    tally_ayes: raw.tally_ayes == null ? null : raw.tally_ayes,
+    tally_nays: raw.tally_nays == null ? null : raw.tally_nays,
+    tally_bare_ayes: raw.tally_bare_ayes == null ? null : raw.tally_bare_ayes,
+    proposal_preimage_hash: raw.proposal_preimage_hash == null ? null :
+      (isPreimageHash(raw.proposal_preimage_hash) ? raw.proposal_preimage_hash : null),
+    proposal_size_bytes: size,
+    proposal_calls: strOrNull(raw.proposal_calls),
+    proposal_summary: strOrNull(raw.proposal_summary),
+    proposal_storage: strOrNull(raw.proposal_storage),
+    timestamp: raw.timestamp,
+    actor_id: typeof raw.actor_id === "string" && ADDR_RE.test(raw.actor_id) ? raw.actor_id : null,
+    block_id: cleanBlockId(raw.block_id),
+    extrinsic_id: strOrNull(raw.extrinsic_id)
+  };
+}
+
+function cleanExtrinsic(raw, fetchedMs) {
+  if (!raw || typeof raw !== "object") return null;
+  if (typeof raw.pallet !== "string" || !raw.pallet || raw.pallet.length > 64) return null;
+  if (typeof raw.call !== "string" || !raw.call || raw.call.length > 64) return null;
+  if (chainTimeMs(raw.timestamp, fetchedMs) === null) return null;
+  var args = raw.args === undefined ? null : raw.args;
+  if (typeof args === "string" && args.length > MAX_ARGS_CHARS) args = null;
+  else if (args !== null && typeof args !== "string" && typeof args !== "object") args = null;
+  return {
+    pallet: raw.pallet, call: raw.call, timestamp: raw.timestamp,
+    signer_id: typeof raw.signer_id === "string" && ADDR_RE.test(raw.signer_id) ? raw.signer_id : null,
+    block_id: cleanBlockId(raw.block_id),
+    success: raw.success === true ? true : raw.success === false ? false : null,
+    args: args,
+    index_in_block: raw.index_in_block === undefined ? null : nonNegInt(raw.index_in_block)
+  };
+}
+
+function cleanUpgrade(raw, fetchedMs) {
+  if (!raw || typeof raw !== "object") return null;
+  if (chainTimeMs(raw.timestamp, fetchedMs) === null) return null;
+  return { id: strOrNull(raw.id), block_id: cleanBlockId(raw.block_id), timestamp: raw.timestamp };
+}
+
+function byTimestamp(a, b) { return Date.parse(a.timestamp) - Date.parse(b.timestamp); }
+
+function validateSnapshot(raw, nowMs) {
+  if (!raw || typeof raw !== "object") return null;
+  if (raw.ok !== undefined && raw.ok !== true) return null;
+  var now = typeof nowMs === "number" && isFinite(nowMs) ? nowMs : Date.now();
+  var d = raw.data && typeof raw.data === "object" ? raw.data : raw;
+  var fetched = d.fetched_at || raw.fetched_at;
+  if (typeof fetched !== "string" || !isFinite(Date.parse(fetched))) return null;
+  var fetchedMs = Date.parse(fetched);
+  if (fetchedMs < GENESIS_FLOOR_MS || fetchedMs > now + 3600000) return null;
+  if (!Array.isArray(d.referenda)) return null;
+  if (d.extrinsics !== undefined && !Array.isArray(d.extrinsics)) return null;
+  if (d.upgrades !== undefined && !Array.isArray(d.upgrades)) return null;
+  var refs = [];
+  d.referenda.forEach(function (r) { var c = cleanRefEvent(r, fetchedMs); if (c) refs.push(c); });
+  if (d.referenda.length && !refs.length) return null; // claimed referenda, none valid — fail honestly, never an empty-board lie
+  refs.sort(byTimestamp);
+  // Referendum identity: one track per referendum, one row per lifecycle
+  // type — the earliest surviving event defines both, later violators drop.
+  var groupTrack = {}, seenType = {}, keptRefs = [];
+  refs.forEach(function (r) {
+    var k = String(r.referendum_index);
+    if (seenType[k + "|" + r.type]) return;
+    if (groupTrack[k] !== undefined && groupTrack[k] !== r.track) return;
+    seenType[k + "|" + r.type] = true;
+    if (groupTrack[k] === undefined) groupTrack[k] = r.track;
+    keptRefs.push(r);
+  });
+  refs = keptRefs;
+  var exts = [], seenExt = {};
+  (d.extrinsics || []).forEach(function (x) {
+    var c = cleanExtrinsic(x, fetchedMs); if (!c) return;
+    var k = JSON.stringify([c.timestamp, c.pallet, c.call, c.signer_id, c.block_id, c.index_in_block]);
+    if (seenExt[k]) return;
+    seenExt[k] = true;
+    exts.push(c);
+  });
+  exts.sort(byTimestamp);
+  var ups = [], seenUp = {};
+  (d.upgrades || []).forEach(function (u) {
+    var c = cleanUpgrade(u, fetchedMs); if (!c) return;
+    var k = c.id !== null ? "id|" + c.id : JSON.stringify([c.timestamp, c.block_id]);
+    if (seenUp[k]) return;
+    seenUp[k] = true;
+    ups.push(c);
+  });
+  ups.sort(byTimestamp);
+  return { referenda: refs, extrinsics: exts, upgrades: ups, fetched_at: fetched };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PLANCKS_PER_QTC: PLANCKS_PER_QTC, BLOCK_TIME_MS: BLOCK_TIME_MS,
@@ -229,6 +419,9 @@ if (typeof module !== "undefined" && module.exports) {
     preimageDepositPlancks: preimageDepositPlancks,
     fmtQTC: fmtQTC, fmtDuration: fmtDuration, fmtDateTime: fmtDateTime,
     shortAddr: shortAddr, heightOfBlockId: heightOfBlockId,
-    isPreimageHash: isPreimageHash, parseVoteArgs: parseVoteArgs, parseProposalCalls: parseProposalCalls
+    isPreimageHash: isPreimageHash, parseVoteArgs: parseVoteArgs, parseProposalCalls: parseProposalCalls,
+    validateSnapshot: validateSnapshot, cleanRefEvent: cleanRefEvent,
+    cleanExtrinsic: cleanExtrinsic, cleanUpgrade: cleanUpgrade,
+    GENESIS_FLOOR_MS: GENESIS_FLOOR_MS, ADDR_RE: ADDR_RE
   };
 }

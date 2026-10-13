@@ -162,4 +162,102 @@ t("latestTally picks the newest event carrying a tally", () => {
   assert.equal(tl.bare_ayes, 8);
 });
 
+// --- snapshot boundary relations (round 2) ---------------------------------------
+// Producer relations (fetch-governance-data.mjs over the indexer tables):
+// tallies are member counts under the runtime cap with bare <= ayes and the
+// Tally struct all-or-none; every row timestamp is a chain time inside the
+// capture; one referendum = one track + one row per lifecycle type;
+// track_name is derived from track; origin is pinned per track.
+const fs = require("node:fs");
+const path = require("node:path");
+const REAL = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "data", "governance.json"), "utf8"));
+const NOW = Date.parse(REAL.fetched_at);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const V = (raw) => C.validateSnapshot(raw, NOW);
+
+t("validateSnapshot: the real snapshot passes its own boundary unchanged", () => {
+  const v = V(clone(REAL));
+  assert.ok(v);
+  assert.equal(v.referenda.length, 4);
+  assert.equal(v.extrinsics.length, 13);
+  assert.equal(v.upgrades.length, 1);
+  assert.equal(String(v.referenda[3].tally_ayes), "8");
+  assert.equal(v.referenda[0].track_name, "fast_upgrade");
+  assert.equal(v.referenda[0].origin, "FastUpgrade");
+  assert.equal(v.referenda[0].block_id, "0000095606-92d35");
+});
+t("validateSnapshot: tally above the 13-member cap drops the event", () => {
+  const s = clone(REAL); s.data.referenda[3].tally_ayes = 1000;
+  const v = V(s);
+  assert.equal(v.referenda.length, 3);
+  assert.equal(C.latestTally(v.referenda).ayes, 1);
+});
+t("validateSnapshot: ayes+nays above the member cap drops the event", () => {
+  const s = clone(REAL); s.data.referenda[3].tally_nays = 6; // 8 + 6 = 14 > 13
+  assert.equal(V(s).referenda.length, 3);
+});
+t("validateSnapshot: bare_ayes above ayes drops the event; the cap edge survives", () => {
+  const s = clone(REAL); s.data.referenda[3].tally_bare_ayes = 9; // > 8 ayes
+  assert.equal(V(s).referenda.length, 3);
+  const s2 = clone(REAL); s2.data.referenda[3].tally_ayes = 13; s2.data.referenda[3].tally_bare_ayes = 13;
+  assert.equal(V(s2).referenda.length, 4);
+});
+t("validateSnapshot: a partial tally (one field of three) drops the event", () => {
+  const s = clone(REAL); s.data.referenda[3].tally_nays = null;
+  assert.equal(V(s).referenda.length, 3);
+});
+t("validateSnapshot: row timestamps must be chain times inside the capture", () => {
+  const s = clone(REAL); const f = clone(s.data.referenda[3]); f.timestamp = "2999-01-01T00:00:00.000Z"; s.data.referenda.push(f);
+  const v = V(s);
+  assert.equal(v.referenda.length, 4);
+  assert.equal(C.statusOf(v.referenda), "CONFIRMED");
+  const s2 = clone(REAL); s2.data.referenda[0].timestamp = "2020-01-01T00:00:00.000Z";
+  assert.equal(V(s2).referenda.length, 3);
+  const s3 = clone(REAL); s3.data.extrinsics[0].timestamp = "2999-01-01T00:00:00.000Z";
+  assert.equal(V(s3).extrinsics.length, 12);
+  const s4 = clone(REAL); s4.data.upgrades[0].timestamp = "2020-06-01T00:00:00.000Z";
+  assert.equal(V(s4).upgrades.length, 0);
+  const s5 = clone(REAL); s5.data.referenda[3].timestamp = new Date(NOW + 30000).toISOString();
+  assert.equal(V(s5).referenda.length, 4); // +30s indexer slack survives
+  const s6 = clone(REAL); s6.data.referenda[3].timestamp = new Date(NOW + 3600000).toISOString();
+  assert.equal(V(s6).referenda.length, 3); // +1h drops
+});
+t("validateSnapshot: one track per referendum — a later track-flip drops", () => {
+  const s = clone(REAL); const flip = clone(s.data.referenda[3]);
+  flip.track = 0; flip.type = "KILLED"; flip.timestamp = "2026-09-24T00:00:00.000Z";
+  s.data.referenda.push(flip);
+  const v = V(s);
+  assert.equal(v.referenda.length, 4);
+  assert.equal(C.statusOf(v.referenda), "CONFIRMED");
+});
+t("validateSnapshot: duplicate lifecycle type per referendum drops", () => {
+  const s = clone(REAL); const dup = clone(s.data.referenda[0]); dup.timestamp = "2026-09-23T09:00:00.000Z";
+  s.data.referenda.push(dup);
+  assert.equal(V(s).referenda.length, 4);
+});
+t("validateSnapshot: track_name is re-derived and a foreign origin is nulled", () => {
+  const s = clone(REAL); s.data.referenda.forEach((r) => { r.track_name = "invented_lane"; });
+  s.data.referenda[0].origin = "Root";
+  const v = V(s);
+  assert.ok(v.referenda.every((r) => r.track_name === "fast_upgrade"));
+  assert.equal(v.referenda[0].origin, null);
+  assert.equal(v.referenda.length, 4);
+});
+t("validateSnapshot: invented preimage hash and malformed/over-ceiling block ids null", () => {
+  const s = clone(REAL); s.data.referenda[0].proposal_preimage_hash = "invented-hash"; s.data.referenda[0].block_id = "garbage";
+  const v = V(s);
+  assert.equal(v.referenda[0].proposal_preimage_hash, null);
+  assert.equal(v.referenda[0].block_id, null);
+  const s2 = clone(REAL); s2.data.referenda[0].block_id = "0999999999-abcde";
+  assert.equal(V(s2).referenda[0].block_id, null);
+});
+t("validateSnapshot: duplicate extrinsics dedupe; string success/index neutralize", () => {
+  const s = clone(REAL); s.data.extrinsics.push(clone(s.data.extrinsics[3]));
+  s.data.extrinsics[0].success = "false"; s.data.extrinsics[0].index_in_block = "oops";
+  const v = V(s);
+  assert.equal(v.extrinsics.length, 13);
+  assert.equal(v.extrinsics[0].success, null);
+  assert.equal(v.extrinsics[0].index_in_block, null);
+});
+
 console.log("\n" + passed + " tests passed");
