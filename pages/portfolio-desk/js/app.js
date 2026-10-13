@@ -74,12 +74,16 @@ function loadVault() {
   try {
     var raw = localStorage.getItem(QPORT.VAULT_KEY);
     if (!raw) return;
-    var v = QPORT.parseVaultJson(raw);
     // Stored addresses were SS58-validated when they entered the vault;
     // one that no longer validates was never written by this desk —
     // drop it rather than let it anchor balances or checkphrases.
-    v.addresses = v.addresses.filter(function (e) { return validateQuantusAddress(e.address).ok; });
+    var v = QPORT.parseVaultJson(raw, {
+      validateAddress: function (a) { return validateQuantusAddress(a).ok; },
+    });
     vault = v;
+    // Persist the clean copy so dropped poison does not survive to the
+    // next visit (fleet rule); a byte-identical vault is left untouched.
+    if (JSON.stringify(v) !== raw) saveVault();
   } catch (e) { /* corrupted storage: start clean */ }
 }
 function saveVault() {
@@ -600,14 +604,20 @@ function importJson(file) {
   rd.onload = function () {
     try {
       var v = QPORT.parseVaultJson(String(rd.result));
-      // validate every address before accepting
+      // Validate every address before accepting; a row that fails was
+      // never written by this desk — skip it and say so, rather than
+      // rejecting the whole backup over one poisoned row (the load
+      // path drops the same rows silently).
+      var kept = [], dropped = 0;
       v.addresses.forEach(function (e) {
-        var r = validateQuantusAddress(e.address);
-        if (!r.ok) throw new Error("bad address in file: " + QPORT.shortAddr(e.address));
+        if (validateQuantusAddress(e.address).ok) kept.push(e); else dropped++;
       });
+      v.addresses = kept;
       vault = v;
       saveVault();
-      toast("Imported " + v.addresses.length + " addresses. Refreshing…", "ok");
+      toast("Imported " + v.addresses.length + " addresses." +
+        (dropped ? " " + dropped + " dropped — not valid Quantus addresses." : "") +
+        " Refreshing…", "ok");
       refreshAll();
     } catch (e) { toast("Import failed: " + e.message, "err"); }
   };

@@ -422,31 +422,45 @@ function removeFromVault(vault, address) {
   return vault;
 }
 
-function sanitizeVaultEntries(rows) {
+function sanitizeVaultEntries(rows, opts) {
   // One bad entry must not brick (or empty) the whole vault, and a
   // duplicated address must never survive: rollupPortfolio sums per
   // entry, so a duplicate silently double-counted every total.
+  // Producer relations: the only writer (addToVault, fed by the app's
+  // add form) stores an address that passed full SS58 validation and
+  // addedAt = Date.now() at add time. The core enforces the strict
+  // SS58-189 shape floor every other sanitizer here uses, plus the
+  // app-supplied full validator when given (opts.validateAddress —
+  // checksum + prefix + 32-byte key), and holds addedAt to the window
+  // a real add can produce: not before the chain existed, not in the
+  // future. An out-of-window stamp is replaced with now — the entry is
+  // real, only its claimed date is not a producer value.
+  var validate = opts && typeof opts.validateAddress === "function" ? opts.validateAddress : null;
+  var nowCeil = Date.now() + 5 * 60 * 1000; // producer clock skew, fleet standard
   var seen = {}, out = [];
   if (!Array.isArray(rows)) return out;
   rows.forEach(function (e) {
     if (!e || typeof e !== "object" || Array.isArray(e)) return;
     if (typeof e.address !== "string") return;
     var address = e.address.trim();
-    if (!address || seen[address]) return;
+    if (!SS58_189_RE.test(address) || seen[address]) return;
+    if (validate && !validate(address)) return;
     seen[address] = 1;
+    var addedAt = nonNegInt(e.addedAt);
+    if (addedAt === null || addedAt < GENESIS_FLOOR_MS || addedAt > nowCeil) addedAt = Date.now();
     out.push({
       address: address,
       nick: typeof e.nick === "string" ? e.nick.slice(0, 40) : "",
-      addedAt: nonNegInt(e.addedAt) || Date.now(),
+      addedAt: addedAt,
     });
   });
   return out.slice(0, MAX_ADDRESSES);
 }
 
-function parseVaultJson(text) {
+function parseVaultJson(text, opts) {
   var v = JSON.parse(text);
   if (!v || typeof v !== "object" || !Array.isArray(v.addresses)) throw new Error("not a Portfolio Desk vault file");
-  return { version: 1, addresses: sanitizeVaultEntries(v.addresses) };
+  return { version: 1, addresses: sanitizeVaultEntries(v.addresses, opts) };
 }
 
 function csvExport(portfolio) {

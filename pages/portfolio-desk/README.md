@@ -4,7 +4,7 @@ Command your whole QTC estate from one desk: add every Quantus address you contr
 
 ## What it does
 
-- **Multi-address vault** — add SS58-189 addresses with nicknames. Every address is checksum-validated before it joins, and each gets its five-word human checkphrase (the upstream `qp-human-checkphrase` algorithm), which you read back from your wallet before confirming. The vault lives in this browser's `localStorage` only.
+- **Multi-address vault** — add SS58-189 addresses with nicknames. Every address is checksum-validated before it joins, and each gets its five-word human checkphrase (the upstream `qp-human-checkphrase` algorithm), which you read back from your wallet before confirming. The vault lives in this browser's `localStorage` only. Stored entries are held to the same producer relations on every load — strict SS58-189 shape, the full checksum/prefix/key validation, and an add-time stamp inside the chain's lifetime — and the cleaned vault is written back, so a hand-edited or corrupted entry can never anchor balances or checkphrases; vault import skips invalid rows and reports how many were dropped instead of rejecting the whole backup.
 - **Live-first balances** — per-address `account_by_pk` balance queries batched into one indexer call. When the indexer is unreachable (browser CORS), the desk falls back to the top-200 snapshot balances and says so honestly; addresses outside the snapshot show "balance unknown".
 - **Liquid vs locked** — vesting schedules matched to your addresses (all 48 real schedules from the chain indexer). Vested amounts are recomputed with the pallet's exact linear formula; "Controlled" = on-chain balance + claimable vesting (vested-but-unclaimed still sits in the genesis vesting-pool account until claimed).
 - **Allocation donut** — canvas-rendered, no external libraries.
@@ -23,9 +23,9 @@ Read-only by design. The desk never asks for keys, seeds, or signatures and neve
 
 ## Tests
 
-- `node tests/run-tests.mjs` — 16/16 logic tests (vesting math, rollups, vault, CSV export, boundary sanitizers)
+- `node tests/run-tests.mjs` — 19/19 logic tests (vesting math, rollups, vault, CSV export, boundary sanitizers, vault producer relations)
 - Browser QA: real-browser verification of the add/validate/checkphrase flow, donut render, and live-first data load
 
 ---
 
-Built by [@kshot9000](https://x.com/kshot9000) · Donations (QTC): `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau` · Independent builder work — not affiliated with the Quantus team.
+Built by [@kshot9000](https://x.com/kshot9000) · Donations (QTC): `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau` · Independent builder work — not affiliated with the Quantus team ([@Quantus-Network](https://github.com/Quantus-Network)).

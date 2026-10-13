@@ -10,6 +10,10 @@ const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const P = require(join(here, "..", "js", "desk-core.js"));
 const U = 1000000000000n;
+// Real SS58-189 addresses (vault sanitizer enforces the strict shape floor):
+const ADDR_A = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+const ADDR_B = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7";
+const PLAUSIBLE_TS = Date.UTC(2026, 9, 1); // 2026-10-01, a real add time
 
 test("planck math round-trips", () => {
   assert.equal(P.parseQtcToPlancks("1"), U);
@@ -111,8 +115,9 @@ test("vault add/remove/duplicate/import round-trips", () => {
   assert.equal(vault.addresses.length, 1);
   P.removeFromVault(vault, "qzA");
   assert.equal(vault.addresses.length, 0);
-  const parsed = P.parseVaultJson(JSON.stringify({ version: 1, addresses: [{ address: "qzX", nick: "X", addedAt: 1 }] }));
-  assert.equal(parsed.addresses[0].address, "qzX");
+  const parsed = P.parseVaultJson(JSON.stringify({ version: 1, addresses: [{ address: ADDR_A, nick: "X", addedAt: PLAUSIBLE_TS }] }));
+  assert.equal(parsed.addresses[0].address, ADDR_A);
+  assert.equal(parsed.addresses[0].addedAt, PLAUSIBLE_TS);
   assert.throws(() => P.parseVaultJson("{}"), /not a Portfolio Desk vault/);
 });
 
@@ -210,20 +215,54 @@ test("sanitizeTopBalances and sanitizeMinedCounts reject garbage without NaN", (
 
 test("parseVaultJson drops poison entries and duplicates instead of throwing or double-counting", () => {
   const parsed = P.parseVaultJson(JSON.stringify({ version: 1, addresses: [
-    { address: "qzA", nick: "Cold", addedAt: 5 },
+    { address: ADDR_A, nick: "Cold", addedAt: PLAUSIBLE_TS },
     null,
     { nick: "no address" },
     { address: 42 },
-    { address: " qzA ", nick: "duplicate with spaces" },
-    { address: "qzB", nick: { evil: 1 }, addedAt: "garbage" },
+    { address: " " + ADDR_A + " ", nick: "duplicate with spaces" },
+    { address: ADDR_B, nick: { evil: 1 }, addedAt: "garbage" },
   ] }));
   assert.equal(parsed.addresses.length, 2);
-  assert.equal(parsed.addresses[0].address, "qzA");
-  assert.equal(parsed.addresses[0].addedAt, 5);
+  assert.equal(parsed.addresses[0].address, ADDR_A);
+  assert.equal(parsed.addresses[0].addedAt, PLAUSIBLE_TS);
   assert.equal(parsed.addresses[1].nick, "");
   assert.ok(parsed.addresses[1].addedAt > 0);
   assert.throws(() => P.parseVaultJson("{}"), /not a Portfolio Desk vault/);
   assert.throws(() => P.parseVaultJson('{"addresses":{}}'), /not a Portfolio Desk vault/);
+});
+
+test("vault sanitizer enforces producer relations (shape floor, validator gate, addedAt window)", () => {
+  // Shape floor: strings no producer could write (the add form requires a
+  // full SS58 decode) never survive, even though they are non-empty strings.
+  const shaped = P.parseVaultJson(JSON.stringify({ version: 1, addresses: [
+    { address: "qzA", nick: "short", addedAt: PLAUSIBLE_TS },
+    { address: "notanaddress", nick: "junk", addedAt: PLAUSIBLE_TS },
+    { address: ADDR_A, nick: "real", addedAt: PLAUSIBLE_TS },
+  ] }));
+  assert.deepEqual(shaped.addresses.map((e) => e.address), [ADDR_A]);
+  // Validator gate: a shape-valid but checksum-broken address is dropped
+  // only when the app supplies its full validator; the shape floor alone
+  // keeps it (a core-only consumer cannot decode checksums).
+  const badSum = ADDR_A.slice(0, -1) + (ADDR_A.endsWith("u") ? "v" : "u");
+  const gated = P.parseVaultJson(JSON.stringify({ version: 1, addresses: [
+    { address: badSum, nick: "bad", addedAt: PLAUSIBLE_TS },
+  ] }), { validateAddress: (a) => a !== badSum });
+  assert.equal(gated.addresses.length, 0);
+  const ungated = P.parseVaultJson(JSON.stringify({ version: 1, addresses: [
+    { address: badSum, nick: "bad", addedAt: PLAUSIBLE_TS },
+  ] }));
+  assert.equal(ungated.addresses.length, 1);
+  // addedAt window: the producer writes Date.now() at add time, so a
+  // pre-genesis (1970) or future (2999) stamp is replaced with ~now,
+  // never painted/exported as the date the address was added.
+  const now0 = Date.now();
+  for (const badTs of [5, Date.UTC(2999, 0, 1)]) {
+    const p = P.parseVaultJson(JSON.stringify({ version: 1, addresses: [
+      { address: ADDR_A, nick: "t", addedAt: badTs },
+    ] }));
+    assert.ok(p.addresses[0].addedAt >= now0 && p.addresses[0].addedAt <= Date.now(),
+      "addedAt " + badTs + " replaced with ~now");
+  }
 });
 
 test("rollupPortfolio survives poisoned ctx values (unknown, never a throw)", () => {
