@@ -14,6 +14,10 @@ var MINING_EMISSIONS = 15330000;  // 73% emitted to miners (21M - 5.67M)
 var EMISSION_DIVISOR = 50000000;  // mainnet constant
 var PLANCKS = 1e12;               // 1 QTC = 10^12 planck
 var LEAF_QUANTUM_QTC = 0.01;      // wormhole leaf quantum; rewards quantized to this
+var LEAF_PLANCKS = 10000000000;   // 0.01 QTC in plancks (10^12 / 100)
+var MAX_CHAIN_HEIGHT = 10000000;  // fleet plausible-height ceiling
+var MAX_REWARD_SPREAD_QTC = 0.03; // anchor window reward cluster bound (3 quanta)
+var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // pre-launch floor
 
 // ---- Closed-form decay model ----------------------------------------------
 // Anchored at a live observation: R0 = implied remaining mining supply (QTC)
@@ -78,15 +82,93 @@ function milestones(R0, blocksPerDay){
   }).sort(function(a, b){ return a.blocks - b.blocks; });
 }
 
+// ---- Snapshot anchor ---------------------------------------------------------
+// Round 2 (2026-10-13): validate RELATIONS, not just shapes. Round 1 (below,
+// previously inline) shape-checked each block alone and FILTERED the bad
+// ones out, so a snapshot that mixed two different chain moments — heights
+// with a gap or a duplicate, timestamps out of order in the middle, one
+// reward far from the cluster — still anchored the page on whatever rows
+// survived, and fetched_at from 2999 painted as the snapshot time. The
+// producer (scripts/fetch-chain-data.mjs) guarantees a precise shape: the
+// latest <=15 blocks ordered by height desc (chain heights are sequential,
+// so the window is strictly descending and consecutive), every reward the
+// pallet minted — hence quantized to the 0.01 QTC leaf quantum pre-mint —
+// and a status.block_height from the SAME query as the block list. This
+// anchor enforces exactly those relations and rejects (null -> fail():
+// no figures rather than invented ones) anything that breaks them:
+//   * 2..15 blocks (fewer than 2 leaves the block time unobserved — the old
+//     code silently defaulted it to a hard-coded 13.7 s);
+//   * every height an integer in [1, MAX_CHAIN_HEIGHT], steps of exactly 1;
+//   * every timestamp a real chain-era time (genesis floor, now+1h cap),
+//     strictly descending with its height, each step <= 600 s;
+//   * every reward a positive integer planck count that is an exact
+//     multiple of the leaf quantum, and the whole window's rewards within
+//     MAX_REWARD_SPREAD_QTC of each other (the true reward moves by a
+//     factor of (1 - 1/50M) per block — over 15 blocks the cluster is the
+//     quantization oscillation, observed spread exactly 1 quantum);
+//   * status.block_height, when the payload carries one, equals the top
+//     block's height (a disagreement is a mixed-date snapshot);
+//   * the newest block is not newer than the fetched_at that claims to
+//     contain it (+60 s clock slack), and fetched_at itself must be a real
+//     capture time (fleet bounds) or it is dropped to null — a label, never
+//     painted from an out-of-bounds value.
+function anchorFromSnapshot(data, nowMs){
+  var now = isFinite(nowMs) ? nowMs : Date.now();
+  if (!data || !Array.isArray(data.blocks)) return null;
+  var blocks = data.blocks;
+  if (blocks.length < 2 || blocks.length > 15) return null;
+  var fetchedAt = data.fetched_at;
+  var fetchedMs = null;
+  if (typeof fetchedAt === "string" && isFinite(Date.parse(fetchedAt))){
+    var fm = Date.parse(fetchedAt);
+    if (fm >= GENESIS_FLOOR_MS && fm <= now + 3600000) fetchedMs = fm;
+  }
+  if (fetchedMs === null) fetchedAt = null; // never render "Invalid Date" or a 2999 label
+  var heights = [], times = [], rewards = [];
+  for (var i = 0; i < blocks.length; i++){
+    var b = blocks[i];
+    if (!b) return null;
+    var rw = Number(b.reward), h = Number(b.height);
+    if (!isFinite(h) || Math.floor(h) !== h || h < 1 || h > MAX_CHAIN_HEIGHT) return null;
+    if (!isFinite(rw) || Math.floor(rw) !== rw || rw <= 0 || rw % LEAF_PLANCKS !== 0) return null;
+    if (!isFinite(Date.parse(b.timestamp))) return null;
+    var t = Date.parse(b.timestamp);
+    if (t < GENESIS_FLOOR_MS || t > now + 3600000) return null;
+    heights.push(h); times.push(t); rewards.push(rw / PLANCKS);
+  }
+  for (var j = 1; j < blocks.length; j++){
+    if (heights[j - 1] - heights[j] !== 1) return null; // descending, consecutive
+    var dt = times[j - 1] - times[j];
+    if (!(dt > 0) || dt > 600000) return null; // strictly descending, <= 10 min apart
+  }
+  var rMax = Math.max.apply(null, rewards), rMin = Math.min.apply(null, rewards);
+  if (rMax - rMin > MAX_REWARD_SPREAD_QTC + 1e-9) return null; // one quantized cluster
+  if (data.status != null){
+    var sh = Number(data.status && data.status.block_height);
+    if (!isFinite(sh) || sh !== heights[0]) return null; // status and blocks: same moment
+  }
+  if (fetchedMs !== null && times[0] > fetchedMs + 60000) return null; // block newer than its snapshot
+  var mean = rewards.reduce(function(a, x){ return a + x; }, 0) / rewards.length;
+  var R0 = mean * EMISSION_DIVISOR;
+  if (!isFinite(mean) || mean <= 0 || !isFinite(R0) || R0 <= 0 || R0 >= MAX_SUPPLY) return null;
+  var bt = (times[0] - times[times.length - 1]) / 1000 / (heights[0] - heights[heights.length - 1]);
+  if (!isFinite(bt) || bt < 1 || bt > 600) return null; // internally inconsistent snapshot
+  return { R0: R0, meanReward: mean, rewards: rewards, heights: heights,
+           height: heights[0], time: times[0], blockTime: bt,
+           fetchedAt: fetchedAt };
+}
+
 // Node export for tests
 if (typeof module !== "undefined" && module.exports){
   module.exports = {
     MAX_SUPPLY: MAX_SUPPLY, GENESIS_MINT: GENESIS_MINT, MINING_EMISSIONS: MINING_EMISSIONS,
     EMISSION_DIVISOR: EMISSION_DIVISOR, PLANCKS: PLANCKS, LEAF_QUANTUM_QTC: LEAF_QUANTUM_QTC,
+    LEAF_PLANCKS: LEAF_PLANCKS, MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT,
+    MAX_REWARD_SPREAD_QTC: MAX_REWARD_SPREAD_QTC, GENESIS_FLOOR_MS: GENESIS_FLOOR_MS,
     decayFactor: decayFactor, remainingQtc: remainingQtc, supplyQtc: supplyQtc,
     rewardQtc: rewardQtc, blocksToRemaining: blocksToRemaining, issuanceOver: issuanceOver,
     annualInflation: annualInflation, halvingBlocks: halvingBlocks,
-    quantizeQuantum: quantizeQuantum, milestones: milestones,
+    quantizeQuantum: quantizeQuantum, milestones: milestones, anchorFromSnapshot: anchorFromSnapshot,
     fmtQTC: fmtQTC, fmtInt: fmtInt, fmtCompact: fmtCompact, fmtDate: fmtDate, fmtDays: fmtDays,
   };
 }
@@ -99,45 +181,11 @@ if (typeof window !== "undefined"){
   var el = function(id){ return document.getElementById(id); };
   var state = { anchor: null, blockTime: 13.7, simYears: 10 };
 
-  function anchorFromSnapshot(data){
-    // Anchor R0 on live indexer rewards: R0 = mean(reward) * DIVISOR (the pallet formula, inverted).
-    // Validate BEFORE anchoring (the Consensus Lab lesson, 2026-10-09): the old
-    // filter only required a truthy `reward`, so a partially-malformed snapshot
-    // (non-numeric rewards, unparseable timestamps, all-zero rewards) built a
-    // poisoned anchor — mean/R0/blockTime NaN or 0 — and every renderer ran on
-    // it: hero "NaN%", simulator NaN heights/dates, zero rewards claiming the
-    // full 21M cap as supply. The page only reached fail() by luck, when a
-    // canvas call happened to throw on the NaN coordinates. Now: keep only
-    // blocks whose reward, height AND timestamp all parse to sane values,
-    // require a finite R0 inside (0, MAX_SUPPLY), and require the observed
-    // block time to be finite and plausible — otherwise return null and the
-    // boot routes to fail(): no figures rather than invented ones.
-    if (!data || !Array.isArray(data.blocks)) return null;
-    var blocks = data.blocks.filter(function(b){
-      if (!b) return false;
-      var rw = Number(b.reward), h = Number(b.height);
-      return isFinite(rw) && rw > 0 && isFinite(h) && h > 0 && Math.floor(h) === h &&
-             isFinite(Date.parse(b.timestamp));
-    });
-    if (!blocks.length) return null;
-    var rewards = blocks.map(function(b){ return Number(b.reward) / PLANCKS; });
-    var mean = rewards.reduce(function(a, b){ return a + b; }, 0) / rewards.length;
-    var R0 = mean * EMISSION_DIVISOR;
-    if (!isFinite(mean) || mean <= 0 || !isFinite(R0) || R0 <= 0 || R0 >= MAX_SUPPLY) return null;
-    var t0 = Date.parse(blocks[0].timestamp);
-    var tN = Date.parse(blocks[blocks.length - 1].timestamp);
-    var dh = blocks[0].height - blocks[blocks.length - 1].height;
-    var bt = 13.7;
-    if (dh > 0){
-      bt = (t0 - tN) / 1000 / dh;
-      if (!isFinite(bt) || bt < 1 || bt > 600) return null; // internally inconsistent snapshot
-    }
-    var fetchedAt = data.fetched_at;
-    if (!fetchedAt || !isFinite(Date.parse(fetchedAt))) fetchedAt = null; // never render "Invalid Date"
-    return { R0: R0, meanReward: mean, rewards: rewards, heights: blocks.map(function(b){ return b.height; }),
-             height: blocks[0].height, time: t0, blockTime: bt,
-             fetchedAt: fetchedAt };
-  }
+  // The anchor itself (anchorFromSnapshot) is defined above the browser UI
+  // as pure, node-testable logic: it validates the snapshot's RELATIONS
+  // (round 2, 2026-10-13 — see its header comment) and returns null for
+  // anything that is not one coherent producer-shaped window, so the boot
+  // below routes to fail(): no figures rather than invented ones.
 
   /* Abort a fetch that never settles: a hung request must fall through to
    * the app's error/fallback path, not strand the page on "Loading…" forever. */

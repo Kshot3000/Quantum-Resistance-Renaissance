@@ -117,5 +117,82 @@ t("formatters", function(){
   assert.ok(/2026|2027/.test(m.fmtDate(Date.UTC(2026, 8, 30))));
 });
 
+// 13. Snapshot anchor (round 2): a producer-shaped window anchors, with the
+// observed block time and the pallet formula inverted for R0.
+var NOW = Date.parse("2026-10-13T12:20:00Z");
+function validData(){
+  var blocks = [];
+  for (var i = 0; i < 15; i++){
+    blocks.push({ height: 217568 - i, hash: "0x" + "ab".repeat(32),
+      timestamp: new Date(NOW - 18000 - i * 13700).toISOString(),
+      reward: String(i % 2 ? 300000000000 : 310000000000) });
+  }
+  return { status: { block_height: 217568 }, blocks: blocks,
+           fetched_at: new Date(NOW).toISOString() };
+}
+t("anchor accepts a producer-shaped snapshot", function(){
+  var a = m.anchorFromSnapshot(validData(), NOW);
+  assert.ok(a, "anchors");
+  approx(a.meanReward, (0.31 * 8 + 0.30 * 7) / 15, 1e-9);
+  approx(a.R0, a.meanReward * m.EMISSION_DIVISOR, 1e-6);
+  approx(a.blockTime, 13.7, 0.01);
+  assert.strictEqual(a.height, 217568);
+  assert.strictEqual(a.fetchedAt, new Date(NOW).toISOString());
+});
+
+// 14. Anchor relations: heights must be descending + consecutive, in range
+t("anchor rejects broken height relations", function(){
+  var d = validData(); d.blocks[5].height -= 1;
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "gap");
+  d = validData(); d.blocks.reverse();
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "ascending");
+  d = validData(); d.blocks[3].height = d.blocks[2].height;
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "duplicate");
+  d = validData(); d.blocks.forEach(function(b){ b.height += 10000000; }); d.status.block_height += 10000000;
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "above fleet ceiling");
+  d = validData(); d.blocks = d.blocks.slice(0, 1);
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "single block: block time unobserved");
+  d = validData(); d.blocks.push({ height: 217553, hash: "0x" + "ab".repeat(32),
+    timestamp: new Date(NOW - 18000 - 15 * 13700).toISOString(), reward: "300000000000" });
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "16 blocks: not producer-shaped");
+});
+
+// 15. Anchor relations: status must agree with the block list (same moment)
+t("anchor rejects a status that disagrees with the blocks", function(){
+  var d = validData(); d.status.block_height += 1;
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null);
+  d = validData(); delete d.status;
+  assert.ok(m.anchorFromSnapshot(d, NOW), "status absent is fine (older snapshots)");
+});
+
+// 16. Anchor relations: rewards are leaf-quantized and clustered
+t("anchor rejects unquantized or out-of-cluster rewards", function(){
+  var d = validData(); d.blocks[0].reward = "305000000000";
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "0.305 QTC is not a minted reward");
+  d = validData(); d.blocks[0].reward = "410000000000";
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "0.41 QTC breaks the cluster");
+  d = validData(); d.blocks[0].reward = "0";
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "zero reward");
+});
+
+// 17. Anchor relations: timestamps descend with heights, chain-era only
+t("anchor rejects broken timestamp relations", function(){
+  var d = validData(); d.blocks[7].timestamp = d.blocks[0].timestamp;
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "interior non-monotonic");
+  d = validData(); d.blocks[7].timestamp = "2999-01-01T00:00:00.000Z";
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "future block");
+  d = validData(); d.blocks[14].timestamp = "2020-01-01T00:00:00.000Z";
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "pre-genesis block");
+});
+
+// 18. fetched_at: capture-time bounds; a block newer than its snapshot is poison
+t("anchor bounds fetched_at and rejects mixed-date snapshots", function(){
+  var d = validData(); d.fetched_at = "2999-01-01T00:00:00.000Z";
+  var a = m.anchorFromSnapshot(d, NOW);
+  assert.ok(a && a.fetchedAt === null, "future fetched_at dropped, never painted");
+  d = validData(); d.fetched_at = new Date(NOW - 3600000).toISOString();
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "newest block after fetched_at");
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

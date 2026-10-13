@@ -55,7 +55,12 @@ const V = {
   SUP_INT: Math.round(supQtc), SUP_INT_FMT: fmtInt(supQtc),
   SUP_M_FMT: (supQtc / 1e6).toFixed(3),
   REWARD_7DP: rewardExact.toFixed(7),
-  REWARD_4DP: rewardExact.toFixed(4),
+  // The 4dp label must round the STORED 7dp literal, not the unrounded
+  // reward: at a 4dp half-boundary (reward 0.30374999… -> literal 0.3037500,
+  // capture 2026-10-13 12:20Z) the two round differently (0.3037 vs 0.3038)
+  // and the pool-desk fallback guard (label startsWith value.toFixed(4))
+  // fails on a bundle the sync itself generated.
+  REWARD_4DP: Number(rewardExact.toFixed(7)).toFixed(4),
   FETCHED_AT,
   DATE_ISO: FETCHED_AT.slice(0, 10),
   DATE_LONG: `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`,
