@@ -243,5 +243,49 @@ eq(C.feeBpsLabel(100), "1%", "label 100");
   ok(!C.encodePayoutWithServiceFee(DEST, 0n, 50).ok, "payout rejects zero amount");
 }
 
+/* board sanitizer: shape floor + producer relations (2026-10-13).
+ * sanitizeBoard moved from app.js into the core so it is testable here;
+ * app.js loadBoard routes through it and persists the clean copy. */
+{
+  const VAULT1 = C.deriveMultisigAddress(V1_SIGNERS, 2, 0).ss58;
+  const VAULT2 = C.deriveMultisigAddress(V2_SIGNERS, 2, 7).ss58;
+  const good = { vault: VAULT1, id: 3, callHex: "0x0400", expiry: 300000, threshold: 2, approvals: 1, status: "active" };
+  const S = C.sanitizeBoard;
+  eq(typeof S, "function", "board: sanitizeBoard exported from core");
+  eq(C.MAX_BOARD_ENTRIES, 500, "board: entry cap constant");
+  eq(C.MAX_BOARD_BLOCK, 10000000, "board: plausible-height ceiling constant");
+  eq(S(null).length, 0, "board: non-array -> []");
+  eq(S("nope").length, 0, "board: string -> []");
+  eq(S([good]).length, 1, "board: good entry survives");
+  eq(S([good])[0].callHex, "0400", "board: callHex normalized (0x stripped, lowercase)");
+  eq(S([null, 42, "x", [good]]).length, 0, "board: non-plain-object entries dropped");
+  eq(S([{ ...good, vault: "not-an-address" }]).length, 0, "board: garbage vault dropped");
+  eq(S([{ ...good, vault: VAULT2 }]).length, 1, "board: second real vault kept");
+  eq(S([{ ...good, callHex: "zz" }]).length, 0, "board: non-hex call dropped");
+  eq(S([{ ...good, callHex: "" }]).length, 0, "board: empty call dropped");
+  eq(S([{ ...good, callHex: "ab".repeat(C.MAX_CALL_SIZE + 1) }]).length, 0, "board: call > MAX_CALL_SIZE dropped (no builder produces one)");
+  eq(S([{ ...good, callHex: "ab".repeat(C.MAX_CALL_SIZE) }]).length, 1, "board: call == MAX_CALL_SIZE kept");
+  eq(S([{ ...good, threshold: C.MAX_SIGNERS + 1 }]).length, 0, "board: threshold > MAX_SIGNERS dropped (no such vault exists)");
+  eq(S([{ ...good, threshold: C.MAX_SIGNERS }]).length, 1, "board: threshold == MAX_SIGNERS kept");
+  eq(S([{ ...good, threshold: 2.9 }])[0].threshold, 2, "board: fractional threshold floored (the form can write one)");
+  eq(S([{ ...good, expiry: 0 }]).length, 0, "board: expiry 0 dropped");
+  eq(S([{ ...good, expiry: C.MAX_BOARD_BLOCK + 1 }]).length, 0, "board: expiry beyond height ceiling dropped");
+  eq(S([{ ...good, expiry: C.MAX_BOARD_BLOCK }]).length, 1, "board: expiry == ceiling kept");
+  eq(S([{ ...good, expiry: 300000.7 }])[0].expiry, 300000, "board: fractional expiry floored (the form can write one)");
+  eq(S([{ ...good, id: 4294967295 }]).length, 1, "board: u32-max proposal id kept");
+  eq(S([{ ...good, id: 4294967296 }]).length, 0, "board: proposal id beyond u32 dropped (encodeApprove rejects it)");
+  eq(S([{ ...good, id: -4 }])[0].id, 0, "board: negative id coerced to 0");
+  const dup = S([good, { ...good, callHex: "0x9999", status: "executed" }]);
+  eq(dup.length, 1, "board: duplicate (vault,id) dropped");
+  eq(dup[0].callHex, "0400", "board: dedupe is first-wins (the first call stands)");
+  eq(S([good, { ...good, vault: VAULT2 }]).length, 2, "board: same id on a different vault is a different proposal");
+  eq(S([{ ...good, approvals: 99 }])[0].approvals, 2, "board: approvals clamped to threshold");
+  eq(S([{ ...good, approvals: -1 }])[0].approvals, 0, "board: negative approvals coerced to 0");
+  eq(S([{ ...good, status: "bogus" }])[0].status, "active", "board: unknown status -> active");
+  eq(S([{ ...good, status: "executed" }])[0].status, "executed", "board: known status kept");
+  const many = Array.from({ length: 600 }, (_, i) => ({ ...good, id: i }));
+  eq(S(many).length, C.MAX_BOARD_ENTRIES, "board: capped at MAX_BOARD_ENTRIES");
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

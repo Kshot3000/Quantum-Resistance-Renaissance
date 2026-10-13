@@ -50,6 +50,9 @@ var CALL_IDX = {
 var MAX_SIGNERS = 100;
 var MAX_CALL_SIZE = 10240;
 var MAX_EXPIRY_DURATION = 100800;            // blocks (~14 days at 12s)
+var MAX_BOARD_ENTRIES = 500;                 // proposal-board cap (renderBoard paints + hashes every entry at boot)
+var MAX_BOARD_BLOCK = 10000000;              // plausible chain-height ceiling for a stored expiry (fleet bound)
+var BOARD_STATUSES = ["active", "approved", "executed", "expired"];
 var BLOCK_MS = 12000;
 var MULTISIG_FEE = 30000000000n;             // 0.03 QTC, burned
 var PROPOSAL_DEPOSIT = 10000000000n;         // 0.01 QTC, reserved -> refunded
@@ -558,11 +561,74 @@ function expiryBlockNow(chainHeight, blocksAhead){
   return Number(chainHeight) + Number(blocksAhead);
 }
 
+/* ---------- proposal board (persisted state) ---------- */
+/* The board is localStorage state with more than one possible writer (the
+ * form, older app versions, a hand-edited store). Shape checks alone let
+ * through entries no producer in this module could ever have made — and
+ * renderBoard dereferences, renders, and blake2b-hashes every one of them
+ * at boot. Enforce the producers' own relations:
+ *  - the vault must SS58-decode with prefix 189 and a 32-byte key (the
+ *    add form's check, via ss58Decode);
+ *  - the inner call must fit MAX_CALL_SIZE — every encode* builder here
+ *    rejects a larger call, so a bigger stored call is not a proposal
+ *    this pallet would ever carry;
+ *  - threshold lands in 1..MAX_SIGNERS (deriveMultisigAddress caps the
+ *    signer count at MAX_SIGNERS and threshold at the count, so a stored
+ *    threshold above MAX_SIGNERS names no vault that can exist);
+ *  - the proposal id must fit a u32 (encodeApprove's isU32 check) and the
+ *    expiry must be a plausible block height, 1..MAX_BOARD_BLOCK
+ *    (encodePropose's u32 bound, tightened to the fleet height ceiling);
+ *  - a (vault, id) pair identifies ONE on-chain proposal with ONE call —
+ *    duplicates are dropped first-wins, so two stored rows can never
+ *    describe the same proposal with different calls or statuses;
+ *  - approvals is a local counter: coerced to a whole number >= 0 and
+ *    clamped to the threshold, as the board's own approve button does;
+ *  - the board is capped at MAX_BOARD_ENTRIES.
+ * Anything else is dropped; the caller persists the clean copy. */
+function sanitizeBoard(raw){
+  if (!Array.isArray(raw)) return [];
+  var out = [], seen = {};
+  for (var i = 0; i < raw.length && out.length < MAX_BOARD_ENTRIES; i++){
+    var p = raw[i];
+    if (!p || typeof p !== "object" || Array.isArray(p)) continue;
+    if (typeof p.vault !== "string") continue;
+    var d = ss58Decode(p.vault);
+    if (!d.ok || d.prefix !== SS58_PREFIX || d.key.length !== 32) continue;
+    if (typeof p.callHex !== "string") continue;
+    var callBytes = fromHex(p.callHex.replace(/^0x/i, ""));
+    if (!callBytes || callBytes.length === 0 || callBytes.length > MAX_CALL_SIZE) continue;
+    var expiry = Math.floor(Number(p.expiry));
+    if (!isFinite(expiry) || expiry < 1 || expiry > MAX_BOARD_BLOCK) continue;
+    var threshold = Math.max(1, Math.floor(Number(p.threshold)) || 1);
+    if (threshold > MAX_SIGNERS) continue;
+    var id = Math.floor(Number(p.id));
+    if (!isFinite(id) || id < 0) id = 0;
+    if (id > 4294967295) continue;
+    var key = p.vault + "|" + id;
+    if (seen[key]) continue;
+    seen[key] = 1;
+    var approvals = Math.floor(Number(p.approvals));
+    if (!isFinite(approvals) || approvals < 0) approvals = 0;
+    out.push({
+      vault: p.vault,
+      id: id,
+      callHex: toHex(callBytes),
+      expiry: expiry,
+      threshold: threshold,
+      approvals: Math.min(threshold, approvals),
+      status: BOARD_STATUSES.indexOf(p.status) >= 0 ? p.status : "active"
+    });
+  }
+  return out;
+}
+
 var MsigCore = {
   SS58_PREFIX: SS58_PREFIX, DECIMALS: DECIMALS,
   PALLET_INDEX: PALLET_INDEX, BALANCES_PALLET_INDEX: BALANCES_PALLET_INDEX,
   CALL_IDX: CALL_IDX, MAX_SIGNERS: MAX_SIGNERS, MAX_CALL_SIZE: MAX_CALL_SIZE,
   MAX_EXPIRY_DURATION: MAX_EXPIRY_DURATION, BLOCK_MS: BLOCK_MS,
+  MAX_BOARD_ENTRIES: MAX_BOARD_ENTRIES, MAX_BOARD_BLOCK: MAX_BOARD_BLOCK,
+  BOARD_STATUSES: BOARD_STATUSES, sanitizeBoard: sanitizeBoard,
   MULTISIG_FEE: MULTISIG_FEE, PROPOSAL_DEPOSIT: PROPOSAL_DEPOSIT,
   PROPOSAL_FEE: PROPOSAL_FEE, SIGNER_STEP_PERMILL: SIGNER_STEP_PERMILL,
   blake2b: blake2b, ss58Encode: ss58Encode, ss58Decode: ss58Decode,

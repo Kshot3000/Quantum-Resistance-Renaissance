@@ -247,46 +247,20 @@ $("b-build").addEventListener("click", function(){
 
 /* ---------- 04 proposal board (local only) ---------- */
 var LS_KEY = "msig-board-v1";
-var BOARD_STATUSES = ["active", "approved", "executed", "expired"];
 /* The board is persisted state with more than one possible writer (the form,
  * older app versions, a hand-edited store). Validate at the store boundary:
  * one malformed entry used to wedge renderBoard forever — p.vault.slice on a
  * non-string, or callFingerprint's blake2b on a null fromHex — so loadBoard
- * drops/coerces anything the renderer cannot safely dereference and repairs
- * the stored copy when it changed anything. */
-function sanitizeBoard(raw){
-  if (!Array.isArray(raw)) return [];
-  var out = [];
-  raw.forEach(function(p){
-    if (!p || typeof p !== "object") return;
-    if (typeof p.vault !== "string") return;
-    var d = C.ss58Decode(p.vault);
-    if (!d.ok || d.prefix !== C.SS58_PREFIX || d.key.length !== 32) return;
-    if (typeof p.callHex !== "string") return;
-    var callBytes = C.fromHex(p.callHex.replace(/^0x/i, ""));
-    if (!callBytes || callBytes.length === 0) return;
-    var expiry = Number(p.expiry);
-    if (!isFinite(expiry) || expiry < 1) return;
-    var threshold = Math.max(1, Math.floor(Number(p.threshold)) || 1);
-    var approvals = Math.floor(Number(p.approvals));
-    if (!isFinite(approvals) || approvals < 0) approvals = 0;
-    out.push({
-      vault: p.vault,
-      id: Math.max(0, Math.floor(Number(p.id)) || 0),
-      callHex: C.toHex(callBytes),
-      expiry: Math.floor(expiry),
-      threshold: threshold,
-      approvals: Math.min(threshold, approvals),
-      status: BOARD_STATUSES.indexOf(p.status) >= 0 ? p.status : "active"
-    });
-  });
-  return out;
-}
+ * routes through the core's sanitizeBoard (shape + producer relations:
+ * MAX_CALL_SIZE inner calls, threshold <= MAX_SIGNERS, u32 proposal ids,
+ * plausible expiry heights, (vault, id) dedupe, 500-entry cap), drops/coerces
+ * anything the renderer cannot safely dereference, and repairs the stored
+ * copy when it changed anything. */
 function loadBoard(){
   var raw;
   try { raw = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
   catch (e){ return []; }
-  var clean = sanitizeBoard(raw);
+  var clean = C.sanitizeBoard(raw);
   if (JSON.stringify(clean) !== JSON.stringify(raw)){
     try { saveBoard(clean); } catch (e){ /* store full/blocked — render the clean copy anyway */ }
   }
