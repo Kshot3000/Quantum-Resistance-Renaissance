@@ -184,6 +184,76 @@ eq("csv quotes doubled", P.csvEscape('a"b'), '"a""b"');
   eq("service fee cap", P.SERVICE_FEE_MAX_BPS, 100);
 })();
 
+/* ---- persisted register boundary (2026-10-12) ----
+ * The register loads from localStorage, an untrusted source. Only
+ * entries whose derived fields recompute exactly may survive: qtc from
+ * (usdCents, rate), the fee split from (plancks, bps), and the fee
+ * address, which may only ever be SERVICE_FEE_ADDRESS — a stored entry
+ * pointing the fee at another address is the redirection attack this
+ * boundary exists to stop. Pre-fee-era invoices (no fee fields at all)
+ * normalize to fee-less instead of dropping. */
+(function () {
+  global.window = global.window || {};
+  require("../js/ss58.js");
+  const SS58 = global.window.QTC_SS58;
+  const valid = (a) => { const d = SS58.ss58Decode(a); return d.ok && d.prefix === 189 && d.key.length === 32; };
+  const KYLE = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+  const OTHER = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7";
+  const CREATED = 1791000000000;
+  const good = (over) => Object.assign({
+    id: "INV-20261001-040506-ABC", ref: "good", address: KYLE,
+    usdCents: "1250", qtc: "1", plancks: "1000000000000",
+    serviceFeeBps: 50, serviceFeeQtc: "0.005", serviceFeePlancks: "5000000000",
+    serviceFeeAddress: KYLE, merchantQtc: "0.995", merchantPlancks: "995000000000",
+    rate: "12.50", rateTs: CREATED, created: CREATED, expiresAt: CREATED + 1800000,
+    status: "pending",
+  }, over || {});
+  const S = (raw) => P.sanitizeRegister(raw, valid);
+
+  t("non-array -> empty", Array.isArray(S({ a: 1 })) && S({ a: 1 }).length === 0 && S(null).length === 0 && S("x").length === 0);
+  eq("good invoice survives", S([good()]).length, 1);
+  eq("non-objects dropped", S([null, 42, "x", [1], good()]).length, 1);
+  eq("garbage usdCents dropped (BigInt crash)", S([good({ usdCents: "abc" })]).length, 0);
+  eq("numeric usdCents dropped (creation writes strings)", S([good({ usdCents: 1250 })]).length, 0);
+  eq("zero plancks dropped", S([good({ plancks: "0" })]).length, 0);
+  eq("fee redirection dropped", S([good({ serviceFeeAddress: OTHER })]).length, 0);
+  eq("split mismatch dropped", S([good({ serviceFeePlancks: "999", serviceFeeQtc: "0.000000000999" })]).length, 0);
+  eq("merchant mismatch dropped", S([good({ merchantPlancks: "1" })]).length, 0);
+  eq("bps over the code cap dropped", S([good({ serviceFeeBps: 5000, serviceFeeQtc: "0.5", serviceFeePlancks: "500000000000", merchantQtc: "0.5", merchantPlancks: "500000000000" })]).length, 0);
+  eq("fractional bps dropped", S([good({ serviceFeeBps: 50.5 })]).length, 0);
+  eq("qtc/rate relation mismatch dropped", S([good({ qtc: "2", plancks: "2000000000000", serviceFeePlancks: "10000000000", serviceFeeQtc: "0.01", merchantPlancks: "1990000000000", merchantQtc: "1.99" })]).length, 0);
+  eq("bad address dropped", S([good({ address: "not-an-address" })]).length, 0);
+  eq("wrong-prefix address dropped", S([good({ address: SS58.ss58Encode(new Array(32).fill(7), 42) })]).length, 0);
+  eq("short-key address dropped", S([good({ address: SS58.ss58Encode(new Array(20).fill(7), 189) })]).length, 0);
+  eq("garbage created dropped (toISOString crash)", S([good({ created: "garbage" })]).length, 0);
+  eq("unknown status dropped", S([good({ status: "evil-status" })]).length, 0);
+  eq("duplicate ids deduped", S([good(), good({ ref: "dupe" })]).length, 1);
+  eq("bad id charset dropped", S([good({ id: 'x"><svg>' })]).length, 0);
+  (function () {
+    const legacy = {
+      id: "INV-20260930-120000-XYZ", ref: "legacy", address: OTHER,
+      usdCents: "2500", qtc: "2", plancks: "2000000000000",
+      rate: "12.50", rateTs: CREATED, created: CREATED, expiresAt: CREATED + 1800000, status: "paid",
+    };
+    const out = S([legacy]);
+    eq("legacy invoice survives", out.length, 1);
+    t("legacy normalized fee-less", out.length === 1 && out[0].serviceFeeBps === 0 && out[0].serviceFeePlancks === "0" && out[0].serviceFeeAddress === "" && out[0].merchantPlancks === "2000000000000");
+    const noFee = S([good({ serviceFeeBps: 0, serviceFeeQtc: "0", serviceFeePlancks: "0", serviceFeeAddress: "", merchantQtc: "1", merchantPlancks: "1000000000000" })]);
+    eq("explicit no-fee invoice survives", noFee.length, 1);
+    const capped = [];
+    for (let i = 0; i < 600; i++) capped.push(good({ id: "INV-20261001-040506-" + String(i).padStart(3, "0") }));
+    eq("register capped at 500", S(capped).length, 500);
+    const shaped = P.sanitizeRegister([good({ address: "not-an-address" })], null);
+    eq("no-validator fallback still rejects malformed address shape", shaped.length, 0);
+    const shapedOk = P.sanitizeRegister([good()], null);
+    eq("no-validator fallback keeps well-shaped entries", shapedOk.length, 1);
+    const refCap = S([good({ ref: "x".repeat(500) })]);
+    t("ref capped at 120 chars", refCap.length === 1 && refCap[0].ref.length === 120);
+    const badExpiry = S([good({ expiresAt: "never" })]);
+    t("bad expiresAt clamps to created (already expired, never live)", badExpiry.length === 1 && badExpiry[0].expiresAt === CREATED);
+  })();
+})();
+
 /* ---- constants ---- */
 eq("plancks per QTC", P.PLANCKS_PER_QTC, 1000000000000n);
 

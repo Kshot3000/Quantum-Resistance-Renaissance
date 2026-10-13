@@ -159,6 +159,91 @@ function splitServiceFee(totalPlancks, feeBps) {
   return { feePlancks: fee, merchantPlancks: total - fee, feeBps: bps };
 }
 
+/* ---------------- persisted-register boundary ----------------
+ * The invoice register loads from localStorage — an untrusted source:
+ * another tool, a hand edit, an older build, or a poisoned backup can
+ * put anything under REG_KEY, and every render path trusted it. A
+ * garbage usdCents threw inside BigInt() in renderRegister and bricked
+ * init (no buttons wired); a garbage created threw in exportCsv's
+ * toISOString; worst, renderRequest paints inv.serviceFeeAddress and
+ * draws the payment QR from inv.address verbatim, so a stored entry
+ * could redirect the disclosed service fee — or the whole payment —
+ * to an address the merchant never entered. sanitizeRegister is the
+ * single boundary: plain objects only; the receiving address must pass
+ * the same SS58 validation as the invoice form (when the validator is
+ * loaded); money fields must be canonical integer strings; and every
+ * DERIVED field is recomputed and must match — qtc from (usdCents,
+ * rate), the fee split from (plancks, bps) via splitServiceFee, and
+ * the fee address, which may only ever be SERVICE_FEE_ADDRESS. A
+ * mismatch is not a label error: it is an invoice whose painted
+ * amounts cannot be trusted, so the entry is dropped (the Proposal
+ * Studio rule for derived-field relations). Pre-fee-era invoices (no
+ * fee fields at all) are normalized to a fee-less invoice instead of
+ * dropped. Ids dedupe (setStatus/View match on id); cap 500 entries. */
+var REGISTER_STATUSES = ["pending", "paid", "expired", "cancelled"];
+var REGISTER_CAP = 500;
+
+function sanitizeRegister(raw, isValidAddress) {
+  if (!Array.isArray(raw)) return [];
+  var out = [], seenIds = {};
+  for (var i = 0; i < raw.length && out.length < REGISTER_CAP; i++) {
+    var inv = raw[i];
+    if (!inv || typeof inv !== "object" || Array.isArray(inv)) continue;
+    if (typeof inv.id !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(inv.id)) continue;
+    if (seenIds[inv.id]) continue;
+    if (typeof inv.address !== "string") continue;
+    var addr = inv.address.trim();
+    if (isValidAddress) { if (!isValidAddress(addr)) continue; }
+    else if (!/^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(addr)) continue;
+    if (typeof inv.usdCents !== "string" || !/^\d+$/.test(inv.usdCents)) continue;
+    if (typeof inv.plancks !== "string" || !/^\d+$/.test(inv.plancks)) continue;
+    var plancks = BigInt(inv.plancks), usdCents = BigInt(inv.usdCents);
+    if (plancks <= 0n || usdCents <= 0n) continue;
+    var rateR = parseDecimalRational(inv.rate == null ? "" : String(inv.rate));
+    if (!rateR || rateR.num <= 0n) continue;
+    if (typeof inv.qtc !== "string" || inv.qtc !== centsToQtcString(usdCents, inv.rate)) continue;
+    if (plancks !== parseQtcToPlancks(inv.qtc)) continue;
+    var hasFeeFields = inv.serviceFeeBps !== undefined || inv.serviceFeePlancks !== undefined ||
+      inv.serviceFeeQtc !== undefined || inv.serviceFeeAddress !== undefined ||
+      inv.merchantPlancks !== undefined || inv.merchantQtc !== undefined;
+    var bps = 0, feePlancks = 0n, merchantPlancks = plancks;
+    if (hasFeeFields) {
+      if (!Number.isInteger(inv.serviceFeeBps) || inv.serviceFeeBps < 0 || inv.serviceFeeBps > SERVICE_FEE_MAX_BPS) continue;
+      bps = inv.serviceFeeBps;
+      var split = splitServiceFee(plancks, bps);
+      feePlancks = split.feePlancks; merchantPlancks = split.merchantPlancks;
+      if (inv.serviceFeePlancks !== feePlancks.toString()) continue;
+      if (inv.serviceFeeQtc !== plancksToQtcString(feePlancks)) continue;
+      if (inv.merchantPlancks !== merchantPlancks.toString()) continue;
+      if (inv.merchantQtc !== plancksToQtcString(merchantPlancks)) continue;
+      if (inv.serviceFeeAddress !== (feePlancks > 0n ? SERVICE_FEE_ADDRESS : "")) continue;
+    }
+    if (REGISTER_STATUSES.indexOf(inv.status) < 0) continue;
+    if (!Number.isFinite(inv.created) || inv.created <= 0) continue;
+    seenIds[inv.id] = 1;
+    out.push({
+      id: inv.id,
+      ref: typeof inv.ref === "string" ? inv.ref.slice(0, 120) : "",
+      address: addr,
+      usdCents: inv.usdCents,
+      qtc: inv.qtc,
+      plancks: inv.plancks,
+      serviceFeeBps: bps,
+      serviceFeeQtc: plancksToQtcString(feePlancks),
+      serviceFeePlancks: feePlancks.toString(),
+      serviceFeeAddress: feePlancks > 0n ? SERVICE_FEE_ADDRESS : "",
+      merchantQtc: plancksToQtcString(merchantPlancks),
+      merchantPlancks: merchantPlancks.toString(),
+      rate: inv.rate,
+      rateTs: Number.isFinite(inv.rateTs) && inv.rateTs > 0 ? inv.rateTs : inv.created,
+      created: inv.created,
+      expiresAt: Number.isFinite(inv.expiresAt) && inv.expiresAt >= inv.created ? inv.expiresAt : inv.created,
+      status: inv.status,
+    });
+  }
+  return out;
+}
+
 function feeBpsLabel(bps) {
   var b = Math.floor(Number(bps) || 0);
   var whole = Math.floor(b / 100), rem = b % 100;
@@ -210,7 +295,11 @@ function tipSnippet(address, label, style) {
 function loadRate() {
   try {
     var r = JSON.parse(localStorage.getItem(RATE_KEY) || "null");
-    if (r && Number(r.usdPerQtc) > 0) return r;
+    if (!r || typeof r !== "object" || Array.isArray(r)) return null;
+    var rr = parseDecimalRational(r.usdPerQtc == null ? "" : String(r.usdPerQtc));
+    if (!rr || rr.num <= 0n) return null;
+    if (!Number.isFinite(r.ts) || r.ts <= 0) return null;
+    return { usdPerQtc: r.usdPerQtc, ts: r.ts };
   } catch (e) { /* ignore */ }
   return null;
 }
@@ -220,10 +309,16 @@ function saveRate(usdPerQtc) {
 function clearRate() { localStorage.removeItem(RATE_KEY); }
 
 function loadRegister() {
-  try {
-    var r = JSON.parse(localStorage.getItem(REG_KEY) || "[]");
-    return Array.isArray(r) ? r : [];
-  } catch (e) { return []; }
+  var raw;
+  try { raw = JSON.parse(localStorage.getItem(REG_KEY) || "[]"); }
+  catch (e) { return []; }
+  var validator = (typeof window !== "undefined" && window.QTC_SS58)
+    ? function (a) { return validateAddress(a).ok; } : null;
+  var clean = sanitizeRegister(raw, validator);
+  if (JSON.stringify(clean) !== JSON.stringify(raw)) {
+    try { saveRegister(clean); } catch (e) { /* store full/blocked — render the clean copy anyway */ }
+  }
+  return clean;
 }
 function saveRegister(list) {
   localStorage.setItem(REG_KEY, JSON.stringify(list));
@@ -726,6 +821,7 @@ if (typeof module !== "undefined" && module.exports) {
     csvEscape: csvEscape,
     tipSnippet: tipSnippet,
     splitServiceFee: splitServiceFee,
+    sanitizeRegister: sanitizeRegister,
     feeBpsLabel: feeBpsLabel,
     SERVICE_FEE_ADDRESS: SERVICE_FEE_ADDRESS,
     SERVICE_FEE_MAX_BPS: SERVICE_FEE_MAX_BPS,
