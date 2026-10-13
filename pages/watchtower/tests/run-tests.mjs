@@ -61,7 +61,7 @@ test("buildBalanceMap reads free plancks", () => {
   assert.equal(m.has(ADDR_B), false);
 });
 
-const ADDR = "qzTESTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+const ADDR = ADDR_A; // a real SS58-189 address: stored baselines are keyed by validated addresses only (round 3)
 function fixtureData(over = {}) {
   const now = 1_800_000_000_000;
   const tx = { id: "TX1", amount: (2000n * P).toString(), from_id: "SENDER", to_id: ADDR, block_height: 100, timestamp: "x" };
@@ -275,31 +275,84 @@ test("sanitizeGovernance: malformed counts are unknown (null), never 0", () => {
 
 test("sanitizeBaselines coerces poison instead of wedging every scan", () => {
   const b = W.sanitizeBaselines({
-    addresses: { A: { balance: "abc", seenIn: "nope", seenOut: [123, "TX1", "TX1"] }, B: null, C: { balance: "500", seenIn: [], seenOut: [] } },
+    addresses: { [ADDR_A]: { balance: "abc", seenIn: "nope", seenOut: [123, "TX1", "TX1"] }, [ADDR_B]: null, GARBAGEKEY: { balance: "500", seenIn: [], seenOut: [] } },
     chain: { referenda: "oops", upgrades: -3, stallFiredHead: "x", seenWhale: 42 },
   });
-  assert.equal(b.addresses.A.balance, null); // re-baselines next scan, never throws
-  assert.deepEqual(b.addresses.A.seenIn, []);
-  assert.deepEqual(b.addresses.A.seenOut, ["TX1"]);
-  assert.equal(b.addresses.B, undefined);
-  assert.equal(b.addresses.C.balance, "500");
+  assert.equal(b.addresses[ADDR_A].balance, null); // re-baselines next scan, never throws
+  assert.deepEqual(b.addresses[ADDR_A].seenIn, []);
+  assert.deepEqual(b.addresses[ADDR_A].seenOut, ["TX1"]);
+  assert.equal(b.addresses[ADDR_B], undefined);
+  assert.equal(b.addresses.GARBAGEKEY, undefined); // round 3: keys must be real Quantus addresses
   assert.deepEqual(b.chain, { referenda: null, upgrades: null, stallFiredHead: null, seenWhale: [] });
   assert.deepEqual(W.sanitizeBaselines("junk").chain, { referenda: null, upgrades: null, stallFiredHead: null, seenWhale: [] });
 });
 
 test("sanitizeAlerts drops brick-rows, coerces annotation fields", () => {
   const out = W.sanitizeAlerts([
-    { id: "a1", ruleId: "r", address: "A", severity: "warn", title: "T", detail: "D", ts: "2026-01-01T00:00:00Z", read: false },
+    { id: "a1", ruleId: "r", address: ADDR_A, severity: "warn", title: "T", detail: "D", ts: "2026-10-01T00:00:00Z", read: false },
     null,
     { id: "a2", title: "T", detail: "D", ts: "garbage" },
-    { id: "a3", title: "T", detail: "D", ts: "2026-01-01T00:00:00Z", address: 12345, severity: "catastrophic" },
-    { title: "no id", detail: "D", ts: "2026-01-01T00:00:00Z" },
+    { id: "a3", title: "T", detail: "D", ts: "2026-10-01T00:00:00Z", address: 12345, severity: "catastrophic" },
+    { title: "no id", detail: "D", ts: "2026-10-01T00:00:00Z" },
   ]);
   assert.equal(out.length, 2);
   assert.equal(out[0].id, "a1");
+  assert.equal(out[0].address, ADDR_A);
   assert.equal(out[1].address, null);
   assert.equal(out[1].severity, "info");
   assert.deepEqual(W.sanitizeAlerts("junk"), []);
+});
+
+test("round 3: sanitizeWatchlist enforces producer relations", () => {
+  const wl = W.sanitizeWatchlist([
+    { address: ADDR_A, nick: "Cold", note: "keep", addedAt: "2026-10-01T00:00:00Z", checkphrase: ["a", "b", "c", "d", "e"] },
+    { address: ADDR_A, nick: "dup" },
+    { address: ADDR_B, nick: "x".repeat(80), note: "y".repeat(300), checkphrase: ["only", "three", "words"] },
+    { address: "not-an-address", checkphrase: ["a", "b", "c", "d", "e"] },
+    null, "junk",
+    { address: ADDR_B, checkphrase: "not-an-array" },
+  ]);
+  assert.equal(wl.length, 2); // dedupe + invalid dropped (fallback: strict SS58-189 shape)
+  assert.deepEqual(wl[0].checkphrase, ["a", "b", "c", "d", "e"]); // exactly-5 kept
+  assert.equal(wl[1].nick.length, 40); // form maxlength
+  assert.equal(wl[1].note.length, 140);
+  assert.equal(wl[1].checkphrase, null); // wrong-length phrase nulls -> re-derived, never painted
+  // a supplied full-grade validator gates instead of the shape fallback
+  const gated = W.sanitizeWatchlist([{ address: ADDR_A }, { address: ADDR_B }], (a) => a === ADDR_A ? { ok: true, address: a } : { ok: false });
+  assert.deepEqual(gated.map((x) => x.address), [ADDR_A]);
+  assert.deepEqual(W.sanitizeWatchlist("junk"), []);
+});
+
+test("round 3: sanitizeAlerts relations — dedupe, era window, caps", () => {
+  const TS = "2026-10-12T00:00:00Z";
+  const out = W.sanitizeAlerts([
+    { id: "a1", title: "first", detail: "D", ts: TS },
+    { id: "a1", title: "duplicate id", detail: "D", ts: TS },
+    { id: "a2", title: "pre-genesis", detail: "D", ts: "2020-01-01T00:00:00Z" },
+    { id: "a3", title: "far future", detail: "D", ts: "2999-01-01T00:00:00Z" },
+    { id: "a4", title: "bad addr", detail: "D", ts: TS, address: "not-an-address" },
+    { id: "a5", title: "x".repeat(500), detail: "y".repeat(5000), ts: TS },
+  ]);
+  assert.deepEqual(out.map((a) => a.id), ["a1", "a4", "a5"]); // dup + impossible-era dropped
+  assert.equal(out[0].title, "first"); // first wins
+  assert.equal(out[1].address, null); // non-Quantus address coerces to null
+  assert.equal(out[2].title.length, 200);
+  assert.equal(out[2].detail.length, 1000);
+  const flood = W.sanitizeAlerts(Array.from({ length: 600 }, (_, i) => ({ id: "m" + i, title: "T", detail: "D", ts: TS })));
+  assert.equal(flood.length, 500); // the scan path's own cap
+});
+
+test("round 3: sanitizeBaselines relations — supply cap, bounded stall head, gov counts", () => {
+  const b = W.sanitizeBaselines({
+    addresses: { [ADDR_A]: { balance: "99999999999999999999999999", seenIn: [], seenOut: [] } },
+    chain: { referenda: 5, upgrades: 999999999, stallFiredHead: 99999999999, seenWhale: [] },
+  });
+  assert.equal(b.addresses[ADDR_A].balance, null); // over the 21M supply: re-baseline, never fact
+  assert.equal(b.chain.referenda, 5);
+  assert.equal(b.chain.upgrades, null); // implausible count reads unknown
+  assert.equal(b.chain.stallFiredHead, null); // bounded by the fleet height ceiling
+  const ok = W.sanitizeBaselines({ chain: { referenda: 12, upgrades: 3, stallFiredHead: 216000, seenWhale: ["TX"] } });
+  assert.deepEqual(ok.chain, { referenda: 12, upgrades: 3, stallFiredHead: 216000, seenWhale: ["TX"] });
 });
 
 test("buildBalanceMap rejects negative and non-string-address rows", () => {

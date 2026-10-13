@@ -308,18 +308,33 @@ function sanitizeIdList(v) {
   return out.length > MAX_SEEN_IDS ? out.slice(out.length - MAX_SEEN_IDS) : out;
 }
 
+var MAX_GOV_COUNT = 1000000; // plausible ceiling for referenda/upgrade counts
+
+function govCount(v) {
+  if (v == null) return null;
+  var n = nonNegInt(v);
+  return n !== null && n <= MAX_GOV_COUNT ? n : null;
+}
+
 function sanitizeBaselines(raw) {
   var out = { addresses: {}, chain: blankChainBaseline() };
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
   if (raw.addresses && typeof raw.addresses === "object" && !Array.isArray(raw.addresses)) {
     Object.keys(raw.addresses).forEach(function (addr) {
+      // Round 3 relations: a baseline is keyed by a real Quantus
+      // account — a garbage key is not an address baseline at all and
+      // would persist forever, since evaluateRules only ever advances
+      // baselines for ruled (watched, validated) addresses.
+      if (!SS58_189_RE.test(addr)) return;
       var b = raw.addresses[addr];
       if (!b || typeof b !== "object") return;
       // A poisoned balance coerces to null (unknown): the next scan
       // re-baselines instead of throwing BigInt() on every scan forever.
+      // A balance above the whole 21M supply is poison of the same
+      // kind, not a balance the chain could ever report.
       var bal = b.balance == null ? null : validPlancks(b.balance);
       out.addresses[addr] = {
-        balance: bal !== null ? bal.toString() : null,
+        balance: bal !== null && bal <= MAX_SUPPLY_PLANCKS ? bal.toString() : null,
         seenIn: sanitizeIdList(b.seenIn),
         seenOut: sanitizeIdList(b.seenOut),
       };
@@ -327,39 +342,99 @@ function sanitizeBaselines(raw) {
   }
   if (raw.chain && typeof raw.chain === "object" && !Array.isArray(raw.chain)) {
     out.chain = {
-      referenda: raw.chain.referenda == null ? null : nonNegInt(raw.chain.referenda),
-      upgrades: raw.chain.upgrades == null ? null : nonNegInt(raw.chain.upgrades),
-      stallFiredHead: raw.chain.stallFiredHead == null ? null : parseHeight(raw.chain.stallFiredHead),
+      referenda: govCount(raw.chain.referenda),
+      upgrades: govCount(raw.chain.upgrades),
+      // The stall head is a chain height, held to the same fleet
+      // ceiling as every other height (parseHeight alone admitted
+      // 99,999,999,999, which no scan could ever re-arm against).
+      stallFiredHead: raw.chain.stallFiredHead == null ? null : validChainHeight(raw.chain.stallFiredHead),
       seenWhale: sanitizeIdList(raw.chain.seenWhale),
     };
   }
   return out;
 }
 
+var MAX_ALERTS = 500; // scanNow slices the live feed to the same cap
+
 function sanitizeAlerts(raw) {
   // Stored alerts are rendered and counted: an entry survives only with
   // a string id and a parseable timestamp (its age is displayed). A bad
   // severity is recoverable (coerce to info) and a non-string address is
   // an annotation (coerce to null) — neither may brick the feed.
+  // Round 3 relations: alert ids are the feed's identity (read toggles
+  // and scan dedupe match on id), so duplicates count once, first
+  // wins; the timestamp is a scan time, so it must be a real chain-era
+  // time (chainTimeMs) — a parseable 2020 or 2999 stamp is not an
+  // alert this tower could have produced; a present address must be a
+  // Quantus address (producers only ever alert on watched addresses or
+  // null), anything else coerces to null; title/detail are capped at
+  // generous multiples of anything the producers write; and the feed
+  // is capped at MAX_ALERTS, the same cap the scan path applies.
   if (!Array.isArray(raw)) return [];
-  var out = [];
+  var out = [], seen = {};
   raw.forEach(function (a) {
     if (!a || typeof a !== "object") return;
     if (typeof a.id !== "string" || !a.id) return;
+    if (seen[a.id]) return;
     if (typeof a.title !== "string" || typeof a.detail !== "string") return;
-    var ts = parseableTs(a.ts);
-    if (ts === null) return;
+    if (chainTimeMs(a.ts) === null) return;
+    seen[a.id] = true;
     out.push({
       id: a.id,
-      ruleId: typeof a.ruleId === "string" ? a.ruleId : null,
-      address: typeof a.address === "string" ? a.address : null,
+      ruleId: typeof a.ruleId === "string" ? a.ruleId.slice(0, 100) : null,
+      address: typeof a.address === "string" && SS58_189_RE.test(a.address) ? a.address : null,
       severity: ["info", "warn", "crit"].indexOf(a.severity) !== -1 ? a.severity : "info",
-      title: a.title, detail: a.detail, ts: ts,
+      title: a.title.slice(0, 200), detail: a.detail.slice(0, 1000), ts: a.ts,
       read: a.read === true,
       synthetic: a.synthetic === true ? true : undefined,
     });
   });
-  return out;
+  return out.slice(0, MAX_ALERTS);
+}
+
+var MAX_WATCHLIST = 500;
+
+function sanitizeWatchlist(rows, validateFn) {
+  // The watchlist is persisted state with a producer relation per
+  // field (round 3): the add form validates the address at full grade
+  // (SS58 checksum + prefix 189 + 32-byte key, via the validateFn the
+  // app supplies; the strict SS58-189 shape is the fallback when no
+  // validator is available), caps nick at the form's maxlength 40 and
+  // note at 140, and the checkphrase is a DERIVED field of exactly 5
+  // words — any other shape is not a phrase the derivation could have
+  // produced, so it nulls and the app re-derives it (a wrong-length
+  // stored phrase used to paint forever, since only null backfilled).
+  // Addresses dedupe first-wins (the form refuses duplicates) and the
+  // list is capped, since every entry renders and scans.
+  if (!Array.isArray(rows)) return [];
+  var out = [], seen = {};
+  rows.forEach(function (x) {
+    if (!x || typeof x !== "object" || Array.isArray(x)) return;
+    var addr = null;
+    if (typeof validateFn === "function") {
+      var v = validateFn(x.address);
+      if (!v || !v.ok) return;
+      addr = v.address;
+    } else {
+      if (typeof x.address !== "string" || !SS58_189_RE.test(x.address)) return;
+      addr = x.address;
+    }
+    if (seen[addr]) return;
+    seen[addr] = true;
+    var phrase = null;
+    if (Array.isArray(x.checkphrase) && x.checkphrase.length === 5 &&
+        x.checkphrase.every(function (w) { return typeof w === "string" && w; })) {
+      phrase = x.checkphrase.slice();
+    }
+    out.push({
+      address: addr,
+      nick: typeof x.nick === "string" ? x.nick.slice(0, 40) : "",
+      note: typeof x.note === "string" ? x.note.slice(0, 140) : "",
+      addedAt: parseableTs(x.addedAt),
+      checkphrase: phrase, // null -> re-derived at init
+    });
+  });
+  return out.slice(0, MAX_WATCHLIST);
 }
 
 /* ---------- rules ---------- */
@@ -717,6 +792,7 @@ var api = {
   sanitizeGovernance: sanitizeGovernance,
   sanitizeBaselines: sanitizeBaselines,
   sanitizeAlerts: sanitizeAlerts,
+  sanitizeWatchlist: sanitizeWatchlist,
   advanceAddressBaseline: advanceAddressBaseline,
   blankChainBaseline: blankChainBaseline,
   blankAddressBaseline: blankAddressBaseline,

@@ -21,10 +21,12 @@ Reads the builder repo's shared snapshots: `data/live.json` (head blocks), `data
 
 Everything lives in `localStorage` under `qtc-watchtower-v1`: watchlist, rules, scan baselines, alert history, settings. Export/import as JSON from the Data sources tab. Clearing site data wipes the tower — keep an export.
 
+Stored state is treated as an untrusted boundary and sanitized against what the app's own producers can write: watchlist checkphrases must be exactly the 5 derived words (stored phrases are re-verified against a fresh derivation at boot and corrected if they disagree), alert ids dedupe and timestamps must be real scan times, baseline keys must be real Quantus addresses with balances inside the 21M supply, and duplicate rule ids are reassigned rather than left to collide. The sanitized copy is persisted, so poison does not survive to the next visit.
+
 ## Tests
 
-`node tests/run-tests.mjs` — 17 logic tests (planck math, rule transitions, per-transfer dedupe, self-test fixtures).
+`node tests/run-tests.mjs` — 32 logic tests (planck math, rule transitions, per-transfer dedupe, self-test fixtures, stored-state boundary + relations rounds 1–3).
 
 ## Built by
 
-[@kshot9000](https://x.com/kshot9000) · QTC donations: `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`
+[@kshot9000](https://x.com/kshot9000) · QTC donations: `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau` · Upstream: [@Quantus-Network](https://github.com/Quantus-Network)

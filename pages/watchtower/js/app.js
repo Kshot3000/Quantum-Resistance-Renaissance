@@ -58,36 +58,15 @@ function blankState() {
  * alert entry threw inside renderAll; a garbage baseline balance made
  * every scan throw). Valid entries survive verbatim; poison is dropped
  * or coerced per field by the sanitizers. */
-function sanitizeWatchlist(rows) {
-  if (!Array.isArray(rows)) return [];
-  var out = [], seen = {};
-  rows.forEach(function (x) {
-    if (!x || typeof x !== "object") return;
-    var v = validateQuantusAddress(x.address);
-    if (!v.ok || seen[v.address]) return;
-    seen[v.address] = true;
-    var phrase = null;
-    if (Array.isArray(x.checkphrase) && x.checkphrase.length &&
-        x.checkphrase.every(function (w) { return typeof w === "string" && w; })) {
-      phrase = x.checkphrase.slice();
-    }
-    out.push({
-      address: v.address,
-      nick: typeof x.nick === "string" ? x.nick : "",
-      note: typeof x.note === "string" ? x.note : "",
-      addedAt: QWATCH.parseableTs(x.addedAt),
-      checkphrase: phrase, // null -> re-derived at init
-    });
-  });
-  return out;
-}
 var state = blankState();
+var storedLoaded = false;
 try {
   var raw = localStorage.getItem(LS_KEY);
   if (raw) {
     var parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      state.watchlist = sanitizeWatchlist(parsed.watchlist);
+      storedLoaded = true;
+      state.watchlist = QWATCH.sanitizeWatchlist(parsed.watchlist, validateQuantusAddress);
       state.rules = Array.isArray(parsed.rules) ? parsed.rules : [];
       state.baselines = QWATCH.sanitizeBaselines(parsed.baselines);
       state.alerts = QWATCH.sanitizeAlerts(parsed.alerts);
@@ -104,6 +83,9 @@ try {
 function save() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* quota */ }
 }
+// Persist the sanitized copy so dropped poison does not survive to the
+// next visit (the repair pass below re-saves if it changes the rules).
+if (storedLoaded) save();
 function nextRuleId() { return "rule-" + (state.ruleSeq++) + "-" + Date.now().toString(36); }
 
 /* ---------- validation ---------- */
@@ -169,14 +151,27 @@ function sanitizeRule(r) {
  * from a pre-validation import or a hand-edited backup), keeping its id. */
 (function repairStoredRules() {
   if (!state.rules.length) return;
-  var kept = [];
+  var before = JSON.stringify(state.rules);
+  var kept = [], seenIds = {}, seenSig = {};
   state.rules.forEach(function (r) {
     var clean = sanitizeRule(r);
     if (!clean) return;
-    clean.id = typeof r.id === "string" && r.id ? r.id : nextRuleId();
+    // Rule ids are identity: alert ids derive from them and the row
+    // buttons match on them, so a duplicated stored id made the second
+    // rule untoggleable and its alerts collide with the first's.
+    // Duplicated ids are reassigned, never dropped. Content-identical
+    // rules (the import path dedupes these; the load path did not)
+    // count once — two copies would fire every alert twice.
+    clean.id = typeof r.id === "string" && r.id && !seenIds[r.id] ? r.id : nextRuleId();
+    seenIds[clean.id] = true;
+    var sig = [clean.type, clean.address || "", clean.threshold || "",
+      clean.changeMode || "", clean.severity, clean.enabled].join("|");
+    if (seenSig[sig]) return;
+    seenSig[sig] = true;
     kept.push(clean);
   });
-  if (kept.length !== state.rules.length) { state.rules = kept; save(); }
+  state.rules = kept;
+  if (JSON.stringify(state.rules) !== before) save();
 })();
 
 /* ---------- data loading (live-first, snapshot fallback) ---------- */
@@ -693,10 +688,11 @@ $("file-import").addEventListener("change", function (ev) {
       if (!p || p.app !== "qtc-watchtower" || !Array.isArray(p.watchlist)) throw new Error("not a Watchtower backup");
       var added = 0;
       p.watchlist.forEach(function (x) {
+        if (!x || typeof x !== "object") return; // one poisoned row must not fail the whole import
         var v = validateQuantusAddress(x.address);
         if (!v.ok) return;
         if (!state.watchlist.some(function (y) { return y.address === v.address; })) {
-          state.watchlist.push({ address: v.address, nick: String(x.nick || ""), note: String(x.note || ""), addedAt: new Date().toISOString(), checkphrase: null });
+          state.watchlist.push({ address: v.address, nick: typeof x.nick === "string" ? x.nick.slice(0, 40) : "", note: typeof x.note === "string" ? x.note.slice(0, 140) : "", addedAt: new Date().toISOString(), checkphrase: null });
           added++;
         }
       });
@@ -790,9 +786,21 @@ document.querySelectorAll("[data-copy]").forEach(function (btn) {
   updateNotifyBtn();
   renderAll();
   if (state.settings.pollMinutes > 0) armPolling();
-  // backfill checkphrases quietly
-  state.watchlist.filter(function (x) { return !x.checkphrase; }).forEach(function (x) {
-    derivePhrase(x.address).then(function (w) { x.checkphrase = w; save(); renderWatchlist(); });
+  // The checkphrase is a DERIVED field: backfill missing ones, and
+  // verify every stored one against a fresh derivation — a mismatch is
+  // replaced with the derived words, persisted and announced, never
+  // painted as the address's phrase (the Ledger/Contact rule).
+  var correctedPhrases = 0;
+  state.watchlist.forEach(function (x) {
+    derivePhrase(x.address).then(function (w) {
+      if (!w) return;
+      if (!x.checkphrase) { x.checkphrase = w; save(); renderWatchlist(); return; }
+      if (x.checkphrase.join(" ") !== w.join(" ")) {
+        x.checkphrase = w; correctedPhrases++;
+        save(); renderWatchlist();
+        toast("Corrected a stored checkphrase that did not match its address — the derived words are shown now.", "err");
+      }
+    });
   });
   var startTab = (location.hash || "").replace("#", "");
   if (["dash", "watch", "rules", "alerts", "data"].indexOf(startTab) >= 0) {
