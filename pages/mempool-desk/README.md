@@ -21,7 +21,7 @@ A `txWatch` signal means a transfer was *requested* to your address — not conf
 
 ## Tests
 
-- `node tests/run-tests.mjs` — 15/15 logic tests (planck math, RPC builders, endpoint validation, SS58-189 checks, txWatch notification parsing incl. round-2 relations — bounded heights, positive/supply-capped native amounts, strict SS58-189 sender — pool stats, fee sorting, backoff)
+- `node tests/run-tests.mjs` — 17/17 logic tests (planck math, RPC builders, endpoint validation, SS58-189 checks, txWatch notification parsing incl. round-2 relations — bounded heights, positive/supply-capped native amounts, strict SS58-189 sender — persisted-watcher sanitizing, pool stats, fee sorting, backoff)
 - Browser QA: real-browser verification of the offline-first UI, validation flows, tabs, and attribution
 
 ---

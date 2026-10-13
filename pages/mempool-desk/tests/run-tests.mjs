@@ -81,6 +81,34 @@ test("checkAddress uses prefix 189", () => {
   assert.match(polkadotish.reason, /prefix 0/);
 });
 
+test("sanitizeWatchers enforces the add form's rules at load", () => {
+  const good = "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa";
+  const dec = (a) => S.ss58Decode(a);
+  const out = C.sanitizeWatchers([
+    { address: good, label: "treasury" },
+    { address: good, label: "duplicate dropped" },
+    { address: "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYb", label: "bad checksum" },
+    { address: "not-an-address", label: "garbage" },
+    { address: 42, label: "numeric" },
+    null, "string entry", { label: "no address" },
+    { address: " " + good + " ", label: 7 },
+  ], dec);
+  assert.equal(out.length, 1);
+  assert.deepEqual(out[0], { address: good, label: "treasury" });
+});
+
+test("sanitizeWatchers caps label and list, tolerates non-arrays", () => {
+  const good = "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa";
+  const dec = (a) => S.ss58Decode(a);
+  const one = C.sanitizeWatchers([{ address: good, label: "y".repeat(200) }], dec);
+  assert.equal(one[0].label.length, 40);
+  assert.deepEqual(C.sanitizeWatchers("nope", dec), []);
+  assert.deepEqual(C.sanitizeWatchers(null, dec), []);
+  assert.deepEqual(C.sanitizeWatchers(undefined, dec), []);
+  // No decoder -> nothing can be checksum-verified, so nothing survives.
+  assert.deepEqual(C.sanitizeWatchers([{ address: good, label: "x" }], null), []);
+});
+
 test("parseTxWatchNotification validates upstream shape", () => {
   const raw = {
     tx_hash: "0x9a3cb7f1" + "ab".repeat(28),

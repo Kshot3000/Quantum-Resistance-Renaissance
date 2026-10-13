@@ -130,6 +130,39 @@ function checkAddress(addr, decodeFn) {
   }
 }
 
+/* ---------- persisted watchers (localStorage is an untrusted boundary) ---------- */
+
+var MAX_WATCHERS = 50;      // each watcher is a live node subscription
+var WATCH_LABEL_MAX = 40;   // the add form's own cap, re-enforced at load
+
+/* The add form validates an address with checkAddress (checksum + prefix
+ * 189) before a watcher exists, caps the label at 40 chars, and refuses
+ * duplicates. The load path must enforce the SAME rules: an entry that
+ * bypassed the form (hand-edited storage, an older build, a restored
+ * backup) was previously kept on `typeof address === "string"` alone, so
+ * a bad-checksum or another chain's address got subscribed and rendered
+ * as a watched Quantus address, and duplicates double-subscribed.
+ * Keep only plain-object entries whose address passes checkAddress AND
+ * the strict SS58-189 shape (49 chars = 32-byte key), dedupe by address,
+ * cap the label, and cap the list. Returns [{address, label}]. */
+function sanitizeWatchers(raw, decodeFn) {
+  if (!Array.isArray(raw)) return [];
+  var out = [];
+  var seen = {};
+  for (var i = 0; i < raw.length && out.length < MAX_WATCHERS; i++) {
+    var x = raw[i];
+    if (!x || typeof x !== "object" || Array.isArray(x)) continue;
+    if (typeof x.address !== "string") continue;
+    var addr = x.address.trim();
+    if (!SS58_189_RE.test(addr)) continue;
+    if (!checkAddress(addr, decodeFn).ok) continue;
+    if (seen[addr]) continue;
+    seen[addr] = true;
+    out.push({ address: addr, label: String(x.label == null ? "" : x.label).slice(0, WATCH_LABEL_MAX) });
+  }
+  return out;
+}
+
 /* ---------- txWatch notifications ---------- */
 
 var HEX_RE = /^0x[0-9a-fA-F]+$/;
@@ -350,6 +383,8 @@ var api = {
   isWsUrl: isWsUrl,
   normalizeEndpoint: normalizeEndpoint,
   checkAddress: checkAddress,
+  sanitizeWatchers: sanitizeWatchers,
+  MAX_WATCHERS: MAX_WATCHERS,
   parseBlockNumber: parseBlockNumber,
   isHash32: isHash32,
   validSubscriptionId: validSubscriptionId,

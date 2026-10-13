@@ -72,11 +72,14 @@ function loadSaved() {
     if (ep && C.isWsUrl(ep)) state.endpoint = ep;
     var w = JSON.parse(localStorage.getItem(LS.watchers) || "[]");
     if (Array.isArray(w)) {
-      state.watchers = w.filter(function (x) {
-        return x && typeof x.address === "string";
-      }).map(function (x) {
-        return { address: x.address, label: String(x.label || ""), status: "waiting", subId: null, note: "" };
+      // Persisted watchers pass the add form's own rules at load
+      // (sanitizeWatchers in rpc-core): checksum + prefix 189 + strict
+      // 32-byte-key shape, deduped, label capped — anything else is
+      // dropped, never subscribed or rendered as a watched address.
+      state.watchers = C.sanitizeWatchers(w, decodeAddr).map(function (x) {
+        return { address: x.address, label: x.label, status: "waiting", subId: null, note: "" };
       });
+      saveWatchers(); // persist the clean copy so the poison does not reload
     }
     state.notifyWanted = localStorage.getItem(LS.notify) === "1";
   } catch (e) { /* storage unavailable — run session-only */ }
