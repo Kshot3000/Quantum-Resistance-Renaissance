@@ -8,7 +8,7 @@ import {
   validateEndpoint, parseParamsJson, explainError, shortHex, formatMs, formatNumber,
   parseAddressInput, decodeBalanceStorage, buildMapKeyHex, accountStorageKeyHex,
   summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion, summarizeSyncState,
-  historyEntry, loadHistory, saveHistory, normalizeHex, isHex, formatPartialFeeQtc,
+  historyEntry, loadHistory, saveHistory, BROADCAST_METHODS, normalizeHex, isHex, formatPartialFeeQtc,
   parseBlockNumber, isHash32, validPlanckField, validChainHeight,
 } from './core.js';
 import { ConsoleRpc } from './rpc-client.js';
@@ -394,6 +394,13 @@ function renderHistory() {
   el.querySelectorAll('[data-rerun]').forEach((b) => b.addEventListener('click', () => {
     const h = history[Number(b.dataset.rerun)];
     if (!h) return;
+    // A broadcast never re-runs from history — not even a same-session
+    // entry the sanitizer has not seen yet. The gated submit recipe
+    // (review + acknowledgement) is the only broadcast route.
+    if (BROADCAST_METHODS.includes(h.method)) {
+      toast('Broadcasts are not re-run from history — use the gated submit recipe so the extrinsic gets its review and acknowledgement first.', 'err');
+      return;
+    }
     // Restore the entry's EXACT params, not just its method — restoring
     // only the method silently re-ran the call with whatever stale params
     // were sitting in the Custom tab's textarea.

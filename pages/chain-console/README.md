@@ -30,7 +30,7 @@ Talk to the Quantus chain directly: connect to any Substrate WebSocket RPC (defa
 
 ## Tests
 
-- `node tests/run-tests.mjs` — 75/75 (endpoint validation, request envelopes, params parsing, error explainer, address/storage-key derivation incl. the canonical twox_128 vector, balance decode, recipe builders, summarizers, history, and the WS client with a mock socket: connect, call round-trip, error propagation, timeouts, subscription routing).
+- `node tests/run-tests.mjs` — 137/137 (endpoint validation, request envelopes, params parsing, error explainer, address/storage-key derivation incl. the canonical twox_128 vector, balance decode, recipe builders, summarizers, history incl. the persisted-state sanitizer — stored previews are recomputed from the params re-run would execute, and stored broadcast entries are demoted to non-rerunnable so a broadcast only ever leaves via the gated review — and the WS client with a mock socket: connect, call round-trip, error propagation, timeouts, subscription routing).
 - Browser QA (`~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-chainconsole-browser.mjs`): headless Chromium + CDP with an injected `MockWebSocket` — full connect→handshake→recipe→custom→subscription→gated-broadcast flow, validation errors, and the unreachable-endpoint path; zero console errors.
 
 100% client-side. Built by [@kshot9000](https://x.com/kshot9000) · QTC donations: `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`

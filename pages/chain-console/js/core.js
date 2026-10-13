@@ -381,12 +381,67 @@ export function historyEntry(method, params, ms, ok, errorTitle) {
   };
 }
 
+/* The history is persisted state with more than one possible writer
+ * (this app, an older build, a hand edit, an extension), so storage is
+ * an untrusted boundary — the same standard the fleet applies to every
+ * localStorage load. The old loader returned the parsed array as-is:
+ * a null entry crashed renderHistory at h.ok and blanked the panel, a
+ * garbage ms painted "NaN ms", and — worst — paramsPreview is only a
+ * DISPLAY string while re-run executes params: a stored entry whose
+ * preview read "[]" could carry author_submitExtrinsic params, and one
+ * click on re-run broadcast a signed extrinsic with none of the gated
+ * recipe path's review + acknowledgement. sanitizeHistory therefore:
+ * plain objects only; method a bounded string in the charset real
+ * entries use (RPC names plus the one composite 'system_* (×5)');
+ * ms a finite non-negative number (else the entry drops — it is a
+ * core displayed field); ok strictly boolean; error present only on
+ * failures, capped; t normalized to 0 when not a finite positive time;
+ * params kept only as an array whose JSON fits the SAME 8192-char cap
+ * historyEntry enforces, anything else demoted to null
+ * (non-rerunnable, never truncated); broadcast methods
+ * (author_submitExtrinsic / author_submitAndWatchExtrinsic) ALWAYS
+ * demoted to null — a broadcast may only ever leave via the gated
+ * review, never a one-click history re-run; and paramsPreview — a
+ * DERIVED field — recomputed from the kept params, never trusted
+ * from storage (null-params entries show '(params not stored)'). */
+export const HISTORY_CAP = 200;
+export const BROADCAST_METHODS = ['author_submitExtrinsic', 'author_submitAndWatchExtrinsic'];
+
+export function sanitizeHistory(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const h of raw) {
+    if (!h || typeof h !== 'object' || Array.isArray(h)) continue;
+    if (typeof h.method !== 'string' || h.method.length < 1 || h.method.length > 80) continue;
+    if (!/^[A-Za-z0-9_ *()×]+$/.test(h.method)) continue;
+    if (typeof h.ms !== 'number' || !Number.isFinite(h.ms) || h.ms < 0) continue;
+    const ok = h.ok === true;
+    let params = null;
+    if (Array.isArray(h.params) && !BROADCAST_METHODS.includes(h.method)) {
+      try { if (JSON.stringify(h.params).length <= 8192) params = h.params; } catch { params = null; }
+    }
+    out.push({
+      t: (typeof h.t === 'number' && Number.isFinite(h.t) && h.t > 0) ? Math.floor(h.t) : 0,
+      method: h.method,
+      params,
+      paramsPreview: params ? shortHex(JSON.stringify(params), 40) : '(params not stored)',
+      ms: Math.round(h.ms),
+      ok,
+      error: ok ? null : (typeof h.error === 'string' && h.error ? h.error.slice(0, 200) : 'failed'),
+    });
+    if (out.length >= HISTORY_CAP) break;
+  }
+  return out;
+}
+
 export function loadHistory(store) {
-  try {
-    const raw = store.getItem('qtc-console-history');
-    const arr = JSON.parse(raw || '[]');
-    return Array.isArray(arr) ? arr.slice(0, 200) : [];
-  } catch { return []; }
+  let parsed = null;
+  try { parsed = JSON.parse(store.getItem('qtc-console-history') || '[]'); } catch { return []; }
+  const clean = sanitizeHistory(parsed);
+  if (JSON.stringify(clean) !== JSON.stringify(parsed)) {
+    try { saveHistory(store, clean); } catch { /* store full/blocked — render the clean copy anyway */ }
+  }
+  return clean;
 }
 
 export function saveHistory(store, arr) {

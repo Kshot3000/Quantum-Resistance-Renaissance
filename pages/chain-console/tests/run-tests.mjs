@@ -4,7 +4,7 @@ import {
   isHex, normalizeHex, shortHex, formatMs,
   parseAddressInput, accountStorageKeyHex, buildMapKeyHex, decodeBalanceStorage,
   summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion, summarizeSyncState,
-  RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory, formatPartialFeeQtc,
+  RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory, sanitizeHistory, BROADCAST_METHODS, formatPartialFeeQtc,
   parseBlockNumber, isHash32, validPlanckField, validChainHeight, validExtrinsicHex, MAX_CHAIN_HEIGHT,
 } from '../js/core.js';
 import { ConsoleRpc } from '../js/rpc-client.js';
@@ -256,6 +256,38 @@ t('recipes: gated broadcast', RECIPES.find((r) => r.id === 'submit').gated === t
   t('history: oversized params -> null', big.params === null);
   const exact = historyEntry('system_chain', [], 1, true);
   t('history: empty params rerunnable', Array.isArray(exact.params) && exact.params.length === 0);
+}
+{
+  // Persisted-state boundary: storage is untrusted (older builds, hand
+  // edits, extensions). A null entry crashed renderHistory at h.ok; a
+  // stored preview could lie about the params re-run would execute; a
+  // stored author_submitExtrinsic entry was one-click broadcastable
+  // with none of the gated recipe path's review + acknowledgement.
+  const good = { t: 1700000000000, method: 'state_getStorage', params: ['0x26aa'], paramsPreview: 'LIE', ms: 9.6, ok: true, error: 'stale' };
+  const s = sanitizeHistory([null, 42, 'x', [], good]);
+  t('sanitize: non-objects dropped, good entry kept', s.length === 1 && s[0].method === 'state_getStorage');
+  t('sanitize: preview recomputed, never trusted', s[0].paramsPreview.includes('0x26aa') && s[0].paramsPreview !== 'LIE');
+  t('sanitize: ok entry carries no error, ms rounded', s[0].error === null && s[0].ms === 10);
+  const b = sanitizeHistory([{ t: 1, method: 'author_submitExtrinsic', params: ['0x' + 'ab'.repeat(2000)], paramsPreview: '[]', ms: 5, ok: true }]);
+  t('sanitize: broadcast params demoted to null', b.length === 1 && b[0].params === null && b[0].paramsPreview === '(params not stored)');
+  t('sanitize: broadcast list pins both submit methods', BROADCAST_METHODS.includes('author_submitExtrinsic') && BROADCAST_METHODS.includes('author_submitAndWatchExtrinsic'));
+  const big = sanitizeHistory([{ t: 1, method: 'payment_queryInfo', params: ['0x' + 'cd'.repeat(6000)], paramsPreview: 'x', ms: 1, ok: true }]);
+  t('sanitize: oversized params demoted, not truncated', big.length === 1 && big[0].params === null);
+  const badMs = sanitizeHistory([{ t: 1, method: 'system_chain', params: [], paramsPreview: '[]', ms: 'fast', ok: true }]);
+  t('sanitize: garbage ms drops the entry', badMs.length === 0);
+  const badMethod = sanitizeHistory([{ t: 1, method: { x: 1 }, params: [], ms: 1, ok: true }, { t: 1, method: 'a'.repeat(81), params: [], ms: 1, ok: true }, { t: 1, method: 'bad method!', params: [], ms: 1, ok: true }]);
+  t('sanitize: non-string/overlong/bad-charset methods dropped', badMethod.length === 0);
+  const comp = sanitizeHistory([{ t: 1, method: 'system_* (×5)', params: ['system_chain'], paramsPreview: 'x', ms: 3, ok: true }]);
+  t('sanitize: composite recipe entry survives', comp.length === 1 && comp[0].method === 'system_* (×5)');
+  const fail = sanitizeHistory([{ t: 'now', method: 'system_chain', params: 'nope', paramsPreview: 42, ms: 1, ok: 'yes', error: 7 }]);
+  t('sanitize: failure entry normalized', fail.length === 1 && fail[0].t === 0 && fail[0].params === null && fail[0].ok === false && fail[0].error === 'failed');
+  const many = sanitizeHistory(Array.from({ length: 250 }, () => ({ t: 1, method: 'system_chain', params: [], ms: 1, ok: true })));
+  t('sanitize: 200 cap', many.length === 200);
+  t('sanitize: non-array -> []', sanitizeHistory('junk').length === 0 && sanitizeHistory(null).length === 0);
+  // loadHistory routes through the sanitizer AND persists the clean copy.
+  const store = { d: { 'qtc-console-history': JSON.stringify([null, good]) }, getItem(k) { return this.d[k] || null; }, setItem(k, v) { this.d[k] = v; } };
+  const back = loadHistory(store);
+  t('sanitize: loadHistory cleans + persists', back.length === 1 && JSON.parse(store.d['qtc-console-history']).length === 1);
 }
 
 /* ---- fee formatting (payment_queryInfo summarizer) ---- */
