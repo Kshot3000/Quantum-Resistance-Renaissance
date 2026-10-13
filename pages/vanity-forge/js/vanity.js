@@ -176,10 +176,46 @@ const HEX_RE = /^[0-9a-fA-F]+$/;
 /* No ML-DSA keygen on any real machine exceeds this; a "rate" above it is
  * poison, and quoting ETAs from it would be fiction. */
 export const MAX_PLAUSIBLE_RATE = 1_000_000;
+/* A stored secret is the noble ML-DSA secret key hex-encoded, and its
+ * length is pinned by the scheme (FIPS 204: ML-DSA-65 secret key 4032
+ * bytes, ML-DSA-87 4896 bytes). Any other length is not a key this forge
+ * ever wrote — painting it as a find's secret would strand funds. */
+export const SECRET_HEX_LEN = { '65': 8064, '87': 9792 };
+/* Finds are stamped with Date.now() at grind time; the forge (and the
+ * chain) did not exist before Sept 2026, and no find is from the future. */
+export const VAULT_DATE_FLOOR_MS = Date.parse('2026-09-01T00:00:00.000Z');
 
-export function sanitizeVault(raw) {
+/* Stored-state relations round (2026-10-13): the shape checks alone were
+ * not enough — a record exists ONLY because onFound wrote it, and that
+ * producer guarantees relations a poisoned row can violate while staying
+ * perfectly shaped:
+ *  - the pattern passed validatePattern for the record's own position and
+ *    case mode, and is stored in its NORMALIZED form (leading "qz" and
+ *    whitespace already stripped by readConfig) — an impossible pinned
+ *    first character or an unnormalized pattern is not a grind the forge
+ *    ever ran;
+ *  - the address actually MATCHES the pattern under the record's own
+ *    mode (grindLoop calls onFound only when addressMatches passes) —
+ *    without this, any address could be painted as a find for any
+ *    pattern;
+ *  - when the app supplies opts.validateAddress (the full SS58 decoder),
+ *    the address must decode with prefix 189 and a 32-byte key — the
+ *    regex shape alone admits bad-checksum strings; without the opt the
+ *    strict shape remains the floor;
+ *  - secretHex is exactly SECRET_HEX_LEN[scheme] characters (above);
+ *  - date lies in [2026-09-01, now + 5 min skew];
+ *  - attempts/ms imply a grind rate of at most MAX_PLAUSIBLE_RATE
+ *    keys/s (the bench cap) — a billion attempts in 5 ms is fiction;
+ *  - one row per address, first (newest — the vault is unshift-ordered)
+ *    wins: the same keypair cannot be found twice.
+ * Load persists the clean copy (app.js), so poison does not survive to
+ * the next visit. */
+export function sanitizeVault(raw, opts = {}) {
   if (!Array.isArray(raw)) return [];
+  const now = Number.isFinite(opts.nowMs) ? opts.nowMs : Date.now();
+  const validateAddress = typeof opts.validateAddress === 'function' ? opts.validateAddress : null;
   const out = [];
+  const seen = new Set();
   for (const rec of raw) {
     if (!rec || typeof rec !== 'object') continue;
     if (typeof rec.address !== 'string' || !SS58_189_RE.test(rec.address)) continue;
@@ -192,14 +228,28 @@ export function sanitizeVault(raw) {
     if (typeof rec.date !== 'string' || !Number.isFinite(Date.parse(rec.date))) continue;
     if (rec.secretHex !== null && rec.secretHex !== undefined &&
         (typeof rec.secretHex !== 'string' || rec.secretHex.length % 2 !== 0 || !HEX_RE.test(rec.secretHex))) continue;
+    const caseSensitive = rec.caseSensitive === true;
+    const v = validatePattern(rec.pattern, rec.position, caseSensitive);
+    if (!v.ok || v.pattern !== rec.pattern) continue;
+    if (!addressMatches(rec.address, rec.pattern, { caseSensitive, position: rec.position })) continue;
+    if (validateAddress && !validateAddress(rec.address)) continue;
+    if (seen.has(rec.address)) continue;
+    const t = Date.parse(rec.date);
+    if (t < VAULT_DATE_FLOOR_MS || t > now + 5 * 60 * 1000) continue;
+    if (rec.secretHex !== null && rec.secretHex !== undefined &&
+        rec.secretHex.length !== SECRET_HEX_LEN[rec.scheme]) continue;
+    const attempts = Math.floor(rec.attempts);
+    const ms = Math.floor(rec.ms);
+    if (attempts * 1000 > MAX_PLAUSIBLE_RATE * (ms + 1)) continue;
+    seen.add(rec.address);
     out.push({
       address: rec.address,
       scheme: rec.scheme,
       pattern: rec.pattern,
-      caseSensitive: rec.caseSensitive === true,
+      caseSensitive,
       position: rec.position,
-      attempts: Math.floor(rec.attempts),
-      ms: Math.floor(rec.ms),
+      attempts,
+      ms,
       date: rec.date,
       secretHex: rec.secretHex ?? null,
     });

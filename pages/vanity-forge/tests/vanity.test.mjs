@@ -166,10 +166,14 @@ test('SS58_189_RE: qz + 47 base58, fleet-shaped addresses only', () => {
   assert.ok(!SS58_189_RE.test('qz0sbEcAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv')); // 0 not base58
 });
 
+/* Producer-exact fixture: pattern 'msb' case-insensitively matches the
+ * address after the qz lead, and the secret is a full ML-DSA-65 secret
+ * key hex-encoded (4032 bytes -> 8064 chars) — the old 4-char 'abcd'
+ * fixture was a secret no forge run could ever have written. */
 const GOOD_REC = {
   address: 'qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv',
   scheme: '65', pattern: 'msb', caseSensitive: false, position: 'prefix',
-  attempts: 1234, ms: 5678, date: '2026-10-01T00:00:00.000Z', secretHex: 'abcd',
+  attempts: 1234, ms: 5678, date: '2026-10-01T00:00:00.000Z', secretHex: 'ab'.repeat(4032),
 };
 
 test('sanitizeVault: well-formed records survive, poison is dropped', () => {
@@ -183,8 +187,37 @@ test('sanitizeVault: well-formed records survive, poison is dropped', () => {
   assert.equal(sanitizeVault([{ ...GOOD_REC, date: 'whenever' }]).length, 0);
   assert.equal(sanitizeVault([{ ...GOOD_REC, secretHex: 'zz' }]).length, 0);
   assert.equal(sanitizeVault([{ ...GOOD_REC, secretHex: null }]).length, 1);
-  assert.equal(sanitizeVault([GOOD_REC, null, 42, GOOD_REC]).length, 2);
+  assert.equal(sanitizeVault([GOOD_REC, null, 42, GOOD_REC]).length, 1); // dup address: first wins
   assert.ok(sanitizeVault(Array.from({ length: 500 }, () => GOOD_REC)).length <= 200);
+});
+
+test('sanitizeVault relations: a record must be a find the forge could have written', () => {
+  const NOW = Date.parse('2026-10-13T12:00:00.000Z');
+  const n = (recs, opts) => sanitizeVault(recs, { nowMs: NOW, ...opts }).length;
+  // The address must actually match the pattern it claims (onFound only
+  // fires when addressMatches passes).
+  assert.equal(n([{ ...GOOD_REC, address: 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau' }]), 0);
+  assert.equal(n([{ ...GOOD_REC, position: 'suffix' }]), 0); // address does not END with msb
+  // The pattern must be one the forge itself would run, in stored
+  // (normalized) form: impossible pinned char, case-sensitive uppercase
+  // pinned char, and an unstripped leading qz are all non-producer.
+  assert.equal(n([{ ...GOOD_REC, pattern: 'asb' }]), 0);
+  assert.equal(n([{ ...GOOD_REC, pattern: 'Msb', caseSensitive: true }]), 0);
+  assert.equal(n([{ ...GOOD_REC, pattern: 'qzmsb' }]), 0);
+  // Dates are Date.now() at find time: chain-era window only.
+  assert.equal(n([{ ...GOOD_REC, date: '2020-06-01T00:00:00.000Z' }]), 0);
+  assert.equal(n([{ ...GOOD_REC, date: '2999-01-01T00:00:00.000Z' }]), 0);
+  assert.equal(n([{ ...GOOD_REC, date: '2026-10-13T11:59:00.000Z' }]), 1);
+  // Secret length is pinned by scheme (ML-DSA-65 4032 B, ML-DSA-87 4896 B).
+  assert.equal(n([{ ...GOOD_REC, secretHex: 'abcd' }]), 0);
+  assert.equal(n([{ ...GOOD_REC, scheme: '87' }]), 0); // 65-length secret on an 87 record
+  assert.equal(n([{ ...GOOD_REC, scheme: '87', secretHex: 'cd'.repeat(4896) }]), 1);
+  // attempts/ms may not imply a grind rate above the bench plausibility cap.
+  assert.equal(n([{ ...GOOD_REC, attempts: 1e9, ms: 5 }]), 0);
+  assert.equal(n([{ ...GOOD_REC, attempts: 3, ms: 0 }]), 1);
+  // The app-supplied full decoder gates bad-checksum shape-valid strings.
+  assert.equal(n([GOOD_REC], { validateAddress: () => false }), 0);
+  assert.equal(n([GOOD_REC], { validateAddress: () => true }), 1);
 });
 
 test('sanitizeBench: only plausible measured rates survive', () => {

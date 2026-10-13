@@ -13,7 +13,7 @@ import {
   sanitizeVault, sanitizeBench,
 } from './vanity.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
-import { pubkeyToAddress, hexEncode } from '../../key-forge/js/quantus-crypto.js';
+import { pubkeyToAddress, hexEncode, ss58Decode } from '../../key-forge/js/quantus-crypto.js';
 
 const $ = (id) => document.getElementById(id);
 const SCHEMES = {
@@ -62,9 +62,22 @@ const CHUNK = 30; // keygens per UI yield
 let bench = {};
 try { bench = sanitizeBench(JSON.parse(localStorage.getItem(BENCH_KEY) || '{}')); } catch { bench = {}; }
 let vault = [];
-try { vault = sanitizeVault(JSON.parse(localStorage.getItem(VAULT_KEY) || '[]')); } catch { vault = []; }
+/* Full-grade address check for the vault sanitizer: the stored address
+ * must SS58-decode with a valid checksum, prefix 189, and a 32-byte key
+ * (the shape regex alone admits bad-checksum strings). */
+const validQuantusAddress = (a) => {
+  try { const d = ss58Decode(a); return d.prefix === 189 && d.accountId.length === 32; }
+  catch { return false; }
+};
+try { vault = sanitizeVault(JSON.parse(localStorage.getItem(VAULT_KEY) || '[]'), { validateAddress: validQuantusAddress }); } catch { vault = []; }
 const saveBench = () => { try { localStorage.setItem(BENCH_KEY, JSON.stringify(bench)); } catch {} };
 const saveVault = () => { try { localStorage.setItem(VAULT_KEY, JSON.stringify(vault)); } catch {} };
+/* Persist the sanitized vault so dropped poison does not survive to the
+ * next visit (byte-identical compare keeps a valid vault untouched). */
+try {
+  const rawVault = localStorage.getItem(VAULT_KEY);
+  if (rawVault !== null && rawVault !== JSON.stringify(vault)) saveVault();
+} catch {}
 
 const grind = {
   running: false, attempts: 0, t0: 0, timer: null,
