@@ -185,5 +185,76 @@ ok("deterministic", JSON.stringify(CHECK.addressToChecksum(KYLE, WORDS)) === JSO
   ok("one-char avalanche (" + diffN + "/5 words differ)", diffN >= 4, wMut.join("-"));
 }
 
+/* 8. persisted-vault boundary (sanitizeVault) + import/export field hygiene */
+{
+  const ADDR2 = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7";
+  const ISO = "2026-10-01T00:00:00.000Z";
+  const PHRASE = ["exit", "until", "obtain", "enchant", "toddler"];
+  const good = { id: "good1", label: "Kyle", address: KYLE, note: "builder",
+                 trusted: true, addedAt: ISO, checkphrase: PHRASE };
+  ok("sanitizeVault non-array -> []",
+    Array.isArray(LOGIC.sanitizeVault(null)) && LOGIC.sanitizeVault({ a: 1 }).length === 0 &&
+    LOGIC.sanitizeVault("x").length === 0);
+  const poison = [
+    null, 42, "x", [1, 2],
+    { id: "numaddr", label: "Num Addr", address: 12345, addedAt: ISO, checkphrase: null },
+    { id: "fakeaddr", label: "Fake Addr", address: "not-an-address", addedAt: ISO, checkphrase: null },
+    { id: "wrongprefix", label: "Wrong Prefix", address: SS58.ss58Encode(new Array(32).fill(7), 0), addedAt: ISO, checkphrase: null },
+    { id: "nolabel", address: KYLE, addedAt: ISO, checkphrase: null },
+    { id: "numlabel", label: 42, address: KYLE, addedAt: ISO, checkphrase: null },
+    good,
+    { id: "good1", label: "Dupe Id", address: ADDR2, addedAt: ISO, checkphrase: null },
+    { id: "dupeaddr", label: "Dupe Addr", address: KYLE, addedAt: ISO, checkphrase: null },
+    { id: 'evil"><svg onload="x">', label: "Evil Id",
+      address: "qzjpLEi51md3q9FpECBTxRuLQsP31N5NmT9CF3ovVXY2RVKWE", note: 42,
+      trusted: "yes", addedAt: 12345, checkphrase: "exit-until" },
+  ];
+  const clean = LOGIC.sanitizeVault(poison);
+  ok("sanitizeVault keeps only the survivable entries", clean.length === 3,
+    JSON.stringify(clean.map((c) => c.label)));
+  const keptGood = clean.find((c) => c.label === "Kyle");
+  ok("sanitizeVault keeps the good entry intact",
+    !!keptGood && keptGood.id === "good1" && keptGood.trusted === true &&
+    keptGood.addedAt === ISO && JSON.stringify(keptGood.checkphrase) === JSON.stringify(PHRASE));
+  const dupeId = clean.find((c) => c.label === "Dupe Id");
+  ok("sanitizeVault reassigns a duplicated id instead of colliding",
+    !!dupeId && dupeId.id !== "good1" && /^vault-sanitized-\d+$/.test(dupeId.id), dupeId && dupeId.id);
+  const evil = clean.find((c) => c.label === "Evil Id");
+  ok("sanitizeVault neutralizes an injection-shaped id",
+    !!evil && /^[A-Za-z0-9_-]{1,64}$/.test(evil.id), evil && evil.id);
+  ok("sanitizeVault field hygiene (note/trusted/addedAt/checkphrase)",
+    !!evil && evil.note === "" && evil.trusted === false && evil.addedAt === null && evil.checkphrase === null,
+    JSON.stringify(evil));
+  ok("sanitizeVault checkphrase shape (4 words / object words -> null)",
+    LOGIC.sanitizeVault([{ id: "a", label: "A", address: KYLE, checkphrase: ["a", "b", "c", "d"] }])[0].checkphrase === null &&
+    LOGIC.sanitizeVault([{ id: "a", label: "A", address: KYLE, checkphrase: [{}, {}, {}, {}, {}] }])[0].checkphrase === null);
+  ok("sanitizeVault caps the label at 80 and the vault at MAX_CONTACTS",
+    LOGIC.sanitizeVault([{ id: "a", label: "L".repeat(200), address: KYLE }])[0].label.length === 80 &&
+    LOGIC.sanitizeVault(Array.from({ length: 600 }, (_, i) => ({
+      id: "c" + i, label: "C" + i,
+      address: SS58.ss58Encode(Array.from({ length: 32 }, (_, j) => (j < 4 ? (i >> (8 * j)) & 255 : j)), 189),
+    }))).length === LOGIC.MAX_CONTACTS);
+  // import-path hygiene: a poisoned addedAt / checkphrase must not lose the
+  // contact or persist in a shape the renderers cannot read.
+  const imp = LOGIC.parseImportPayload({ app: "qtc-contact-vault", version: 1, contacts: [
+    { label: "Three", address: ADDR2, note: "n", trusted: true, addedAt: 12345, checkphrase: [{}, {}, {}, {}, {}] },
+  ] });
+  ok("import keeps the contact but nulls a numeric addedAt and object checkphrase",
+    imp.ok && imp.contacts.length === 1 && imp.contacts[0].addedAt === null && imp.contacts[0].checkphrase === null,
+    JSON.stringify(imp.contacts));
+  const imp2 = LOGIC.parseImportPayload({ app: "qtc-contact-vault", version: 1, contacts: [
+    { label: "Three", address: ADDR2, addedAt: ISO, checkphrase: PHRASE },
+  ] });
+  ok("import keeps a valid addedAt and checkphrase",
+    imp2.contacts.length === 1 && imp2.contacts[0].addedAt === ISO &&
+    JSON.stringify(imp2.contacts[0].checkphrase) === JSON.stringify(PHRASE));
+  // export-path hygiene: cleanContacts drops non-objects and unshapeable fields.
+  const exp = LOGIC.buildExportPayload([null, 42,
+    { label: "Kyle", address: KYLE, note: "", trusted: false, checkphrase: "nope", addedAt: 12345 }]);
+  ok("export drops non-object rows and unshapeable fields",
+    exp.contacts.length === 1 && exp.contacts[0].checkphrase === null && exp.contacts[0].addedAt === null,
+    JSON.stringify(exp.contacts));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

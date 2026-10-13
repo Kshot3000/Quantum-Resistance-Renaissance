@@ -87,6 +87,58 @@ function mutateMiddleChar(addr) {
            from: a[idx], to: next };
 }
 
+/* ---------- persisted-vault boundary ---------- */
+/* The vault loads from localStorage, which any earlier bug, extension, or
+ * hand-edited backup can poison. sanitizeVault is the single gate for that
+ * load (the backup-import path has its own gate, parseImportPayload):
+ *  - plain-object entries only, at most MAX_CONTACTS kept;
+ *  - the address must pass the same validation the add form enforces
+ *    (SS58 checksum, prefix 189, 32-byte key) — a stored string that is
+ *    not a real Quantus address is not a contact, however it got there;
+ *  - addresses and ids are deduped (find/delete/edit match on them);
+ *    an id outside the safe charset (it is interpolated into HTML
+ *    attributes and selectors) is replaced with a generated one;
+ *  - string fields are type-checked and capped, trusted is a strict
+ *    boolean, addedAt must be a parseable date string;
+ *  - checkphrase is shape-checked only (exactly 5 strings) — the phrase
+ *    is a DERIVED field of the address, and enforcing that relation
+ *    costs a 40k-iteration PBKDF2, so the app re-derives and corrects
+ *    mismatches asynchronously at boot (see app.js backfill). */
+var MAX_CONTACTS = 500;
+function cleanAddedAt(v) {
+  return (typeof v === "string" && isFinite(Date.parse(v))) ? v.slice(0, 40) : null;
+}
+function cleanCheckphrase(v) {
+  if (!Array.isArray(v) || v.length !== 5) return null;
+  for (var i = 0; i < 5; i++)
+    if (typeof v[i] !== "string" || !v[i] || v[i].length > 32) return null;
+  return v.slice(0, 5);
+}
+function sanitizeVault(raw) {
+  if (!Array.isArray(raw)) return [];
+  var out = [], seenIds = {}, seenAddrs = {};
+  for (var i = 0; i < raw.length && out.length < MAX_CONTACTS; i++) {
+    var x = raw[i];
+    if (!x || typeof x !== "object" || Array.isArray(x)) continue;
+    if (typeof x.label !== "string" || !x.label.trim()) continue;
+    if (typeof x.address !== "string") continue;
+    var v = validateQuantusAddress(x.address);
+    if (!v.ok) continue;
+    if (seenAddrs[v.address]) continue;
+    seenAddrs[v.address] = true;
+    var id = (typeof x.id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(x.id)) ? x.id : null;
+    if (!id || seenIds[id]) id = "vault-sanitized-" + out.length;
+    if (seenIds[id]) continue;
+    seenIds[id] = true;
+    out.push({ id: id, label: x.label.slice(0, 80), address: v.address,
+               note: typeof x.note === "string" ? x.note.slice(0, 500) : "",
+               trusted: x.trusted === true,
+               addedAt: cleanAddedAt(x.addedAt),
+               checkphrase: cleanCheckphrase(x.checkphrase) });
+  }
+  return out;
+}
+
 /* ---------- export / import ---------- */
 var EXPORT_APP = "qtc-contact-vault";
 var ENC_APP = "qtc-contact-vault-enc";
@@ -94,12 +146,16 @@ var EXPORT_VERSION = 1;
 var PBKDF2_ITERATIONS = 200000;
 
 function cleanContacts(contacts) {
-  return (contacts || []).map(function (c) {
-    return { label: String(c.label || ""), address: String(c.address || ""),
-             note: String(c.note || ""), trusted: !!c.trusted,
-             checkphrase: Array.isArray(c.checkphrase) ? c.checkphrase.slice(0, 5) : null,
-             addedAt: c.addedAt || null };
+  if (!Array.isArray(contacts)) return [];
+  var out = [];
+  contacts.forEach(function (c) {
+    if (!c || typeof c !== "object" || Array.isArray(c)) return;
+    out.push({ label: String(c.label || ""), address: String(c.address || ""),
+               note: String(c.note || ""), trusted: !!c.trusted,
+               checkphrase: cleanCheckphrase(c.checkphrase),
+               addedAt: cleanAddedAt(c.addedAt) });
   });
+  return out;
 }
 function buildExportPayload(contacts) {
   return { app: EXPORT_APP, version: EXPORT_VERSION,
@@ -128,9 +184,8 @@ function parseImportPayload(obj) {
     if (!v.ok) { errors.push("Row " + (i + 1) + " (" + c.label + "): " + v.message + " — skipped."); return; }
     contacts.push({ label: c.label.slice(0, 80), address: v.address,
                     note: String(c.note || "").slice(0, 500), trusted: !!c.trusted,
-                    checkphrase: Array.isArray(c.checkphrase) && c.checkphrase.length === 5
-                      ? c.checkphrase.map(String) : null,
-                    addedAt: c.addedAt || null });
+                    checkphrase: cleanCheckphrase(c.checkphrase),
+                    addedAt: cleanAddedAt(c.addedAt) });
   });
   return { ok: true, contacts: contacts, errors: errors };
 }
@@ -203,6 +258,8 @@ var api = {
   sharedSuffixLen: sharedSuffixLen,
   closestContact: closestContact,
   mutateMiddleChar: mutateMiddleChar,
+  sanitizeVault: sanitizeVault, MAX_CONTACTS: MAX_CONTACTS,
+  cleanAddedAt: cleanAddedAt, cleanCheckphrase: cleanCheckphrase,
   buildExportPayload: buildExportPayload,
   parseImportPayload: parseImportPayload,
   encryptBackup: encryptBackup,

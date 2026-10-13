@@ -125,8 +125,15 @@ function loadVault() {
   try {
     var raw = localStorage.getItem(STORE_KEY);
     if (!raw) return [];
-    var arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter(function (c) { return c && c.address; }) : [];
+    var parsed = JSON.parse(raw);
+    var clean = LOGIC.sanitizeVault(parsed);
+    // Persist the clean copy when the sanitizer changed anything, so the
+    // poison does not survive to crash (or mislead) the next visit.
+    if (JSON.stringify(clean) !== JSON.stringify(parsed)) {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(clean)); }
+      catch (e) { /* storage full/blocked — render the clean copy anyway */ }
+    }
+    return clean;
   } catch (e) { return []; }
 }
 function saveVault() {
@@ -158,7 +165,7 @@ function renderVaultList() {
   var html = list.map(function (c) {
     var chips = c.checkphrase ? chipsHTML(c.checkphrase)
       : '<div class="chips"><span class="chip"><span class="spinner"></span>deriving checkphrase…</span></div>';
-    return '<div class="contact' + (c.trusted ? " trusted" : "") + '" data-id="' + c.id + '">' +
+    return '<div class="contact' + (c.trusted ? " trusted" : "") + '" data-id="' + esc(c.id) + '">' +
       '<div class="c-head"><span class="c-label">' + (c.trusted ? '<span class="star">★</span>' : "") +
       esc(c.label) + '</span><span class="c-added">' + esc(c.addedAt ? c.addedAt.slice(0, 10) : "") + "</span></div>" +
       '<div class="c-addr" data-copy-addr title="Click to copy">' + esc(c.address) + "</div>" +
@@ -189,7 +196,7 @@ function refreshContactSelects() {
     var sel = $(id), cur = sel.value;
     sel.innerHTML = vault.length
       ? sortedVault().map(function (c) {
-          return '<option value="' + c.id + '">' + esc(c.label) + " · " + esc(c.address.slice(0, 12)) + "…</option>";
+          return '<option value="' + esc(c.id) + '">' + esc(c.label) + " · " + esc(c.address.slice(0, 12)) + "…</option>";
         }).join("")
       : '<option value="">— vault is empty —</option>';
     if (cur) sel.value = cur;
@@ -695,12 +702,26 @@ document.querySelectorAll("[data-copy]").forEach(function (btn) {
 /* ---------- init ---------- */
 renderVaultList();
 (function backfill() {
-  // recompute any checkphrases missing from storage, quietly, in the background
-  var missing = vault.filter(function (c) { return !c.checkphrase; });
+  // Verify EVERY stored checkphrase against a fresh derivation, quietly,
+  // in the background. The phrase is a derived field of the address, so a
+  // stored phrase that disagrees with its address is poison, not data:
+  // sanitizeVault can only shape-check it at load (the relation costs a
+  // 40k-iteration PBKDF2), so here — async, one contact at a time — a
+  // mismatched phrase is replaced with the derived words, persisted,
+  // re-rendered, and announced. Missing phrases are filled as before.
+  var queue = vault.slice();
   (function next(i) {
-    if (i >= missing.length) return;
-    derivePhrase(missing[i].address).then(function (w) {
-      missing[i].checkphrase = w; saveVault(); next(i + 1);
+    if (i >= queue.length) return;
+    var c = queue[i];
+    if (vault.indexOf(c) === -1) return next(i + 1); // deleted meanwhile
+    derivePhrase(c.address).then(function (w) {
+      if (vault.indexOf(c) === -1) return next(i + 1);
+      if (!c.checkphrase) { c.checkphrase = w; saveVault(); }
+      else if (JSON.stringify(c.checkphrase) !== JSON.stringify(w)) {
+        c.checkphrase = w; saveVault(); renderVaultList();
+        toast("Corrected a saved checkphrase that did not match its address.", "err");
+      }
+      next(i + 1);
     }).catch(function () { next(i + 1); });
   })(0);
 })();
