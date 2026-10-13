@@ -127,7 +127,7 @@ t("attribution + endpoint constants", function(){
   var html = fs.readFileSync(__dirname + "/../index.html", "utf8");
   assert.ok(html.indexOf("qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau") !== -1, "donation address");
   assert.ok(html.indexOf("https://x.com/kshot9000") !== -1, "x link");
-  assert.ok(html.indexOf("app.js?v=1.18.0") !== -1, "js cache key");
+  assert.ok(html.indexOf("app.js?v=1.19.0") !== -1, "js cache key");
   // De-pinned (2026-10-02): the a11y contrast pass bumped the css key to
   // 1.17.2 without updating this pin. Assert a keyed css load at >= the
   // 1.17.0 floor instead of an exact version that drifts every release.
@@ -193,6 +193,27 @@ t("sanitizeCachedProbe: valid caches survive, poison does not paint", function()
   assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: 1, at: now, result: { listed: false, total: 0, asset: null } }, now), null, "total 0");
   assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: 1, at: now, result: { listed: true, total: 204, asset: null } }, now), null, "listed without asset");
   assert.strictEqual(m.sanitizeCachedProbe({ ok: true, ms: 1, at: now, result: { listed: "yes", total: 204, asset: null } }, now), null, "listed non-boolean");
+});
+
+// 16. The cached asset must BE the QTC asset under the scan's own rule —
+// `listed: true` beside an arbitrary object painted an invented listing at
+// an invented price; and the asset is rebuilt from validated fields only.
+t("sanitizeCachedProbe: listed requires the QTC asset, fields normalized", function(){
+  var now = Date.now();
+  var base = function(asset){ return { ok: true, ms: 100, at: now - 1000, result: { listed: true, total: 204, asset: asset } }; };
+  var wrapped = m.sanitizeCachedProbe(base({ assetId: "1cs_v1:near:nep141:qtc.omft.near", symbol: "QTC", blockchain: "near", decimals: 12, price: 132.01 }), now);
+  assert.ok(wrapped && wrapped.result.asset.price === 132.01, "wrapped genuine survives");
+  var byChain = m.sanitizeCachedProbe(base({ assetId: "nep141:other.qtc.near", symbol: "QTC", blockchain: "qtc" }), now);
+  assert.ok(byChain, "symbol+chain genuine survives");
+  assert.strictEqual(m.sanitizeCachedProbe(base({ assetId: "nep141:fake.near", symbol: "FAKE", blockchain: "near", decimals: 12, price: 999999 }), now), null, "invented asset");
+  assert.strictEqual(m.sanitizeCachedProbe(base({}), now), null, "empty asset");
+  assert.strictEqual(m.sanitizeCachedProbe(base({ assetId: "nep141:weth.qtc.near", symbol: "WETH", blockchain: "qtc", price: 3000 }), now), null, "chain alone is not QTC");
+  assert.strictEqual(m.sanitizeCachedProbe(base({ assetId: "spl:abc", symbol: "QTC", blockchain: "sol" }), now), null, "QTC symbol on wrong chain");
+  var dropped = m.sanitizeCachedProbe(base({ assetId: "nep141:qtc.omft.near", decimals: 999, price: -5, evil: "x" }), now);
+  assert.ok(dropped, "genuine asset with bad fields survives");
+  assert.ok(!("decimals" in dropped.result.asset) && !("price" in dropped.result.asset) && !("evil" in dropped.result.asset), "bad/unknown fields dropped");
+  var frac = m.sanitizeCachedProbe(base({ assetId: "nep141:qtc.omft.near", decimals: 12.5, price: "abc" }), now);
+  assert.ok(frac && !("decimals" in frac.result.asset) && !("price" in frac.result.asset), "fractional decimals / string price dropped");
 });
 
 console.log("\n" + passed + " passed, " + failed + " failed");

@@ -54,14 +54,43 @@ function isConclusiveScan(result) {
   return !!result && typeof result.total === "number" && result.total > 0;
 }
 
+/* The asset half of a cached probe. `listed: true` is a claim about ONE
+ * specific asset, so the stored asset must be identifiable as QTC by the
+ * SAME rule the live scan uses (its asset id, raw or 1cs_v1-wrapped, or a
+ * QTC-symbol token on the Quantus chain) — an arbitrary object beside
+ * `listed: true` is a claim the probe could never have made, and the whole
+ * cache is void, not a headline with a caveat. A genuine asset is rebuilt
+ * from the fields the render reads, each validated: decimals an integer
+ * in byte range, price a finite positive reference figure (the live list
+ * carried ~132 USD at listing; 1e6 — some 7,500x that — is a sanity
+ * ceiling against invented figures, not a forecast).
+ * Implausible fields are dropped, never painted. */
+function sanitizeCachedAsset(a) {
+  if (!a || typeof a !== "object" || Array.isArray(a)) return null;
+  var id = String(a.assetId || a.asset_id || "");
+  var chain = String(a.blockchain || a.chain || "").toLowerCase();
+  var sym = String(a.symbol || "").toUpperCase();
+  if (id.length > 256) return null;
+  if (!(isQTCAssetId(id) || (sym === "QTC" && (chain === "qtc" || chain.indexOf("quantus") !== -1)))) return null;
+  var out = { assetId: id };
+  if (sym) out.symbol = sym.slice(0, 32);
+  if (chain) out.blockchain = chain.slice(0, 64);
+  var dec = Number(a.decimals);
+  if (isFinite(dec) && Math.floor(dec) === dec && dec >= 0 && dec <= 255) out.decimals = dec;
+  var price = Number(a.price);
+  if (isFinite(price) && price > 0 && price <= 1e6) out.price = price;
+  return out;
+}
+
 /* Validate a persisted probe result before it paints as "last known state".
  * The cache is user-writable storage: without this, a poisoned entry paints
  * this desk's headline — "QTC IS LISTED" at an invented price, or a future
  * timestamp masquerading as just-checked. Relations enforced: the probe
  * time must be a real probe time (the desk's probes began Sept 2026; a
  * small future skew is tolerated), the latency a plausible duration, the
- * scanned total a positive count, and `listed` a boolean that agrees with
- * an asset being present. Returns a normalized copy or null. */
+ * scanned total a positive count, `listed` a boolean, and — when listed —
+ * the asset the QTC asset itself (see sanitizeCachedAsset). Returns a
+ * normalized copy or null. */
 var PROBE_FLOOR_MS = Date.UTC(2026, 8, 1); // 2026-09-01: no probe predates the desk
 function sanitizeCachedProbe(raw, nowMs) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -78,8 +107,8 @@ function sanitizeCachedProbe(raw, nowMs) {
   if (!isFinite(total) || Math.floor(total) !== total || total < 1 || total > 1000000) return null;
   var asset = null;
   if (r.listed) {
-    if (!r.asset || typeof r.asset !== "object") return null;
-    asset = r.asset;
+    asset = sanitizeCachedAsset(r.asset);
+    if (!asset) return null;
   }
   return { ok: true, result: { listed: r.listed, asset: asset, total: total }, ms: ms, at: at };
 }
@@ -357,6 +386,7 @@ if (typeof module !== "undefined" && module.exports) {
     scanTokensForQTC: scanTokensForQTC,
     isConclusiveScan: isConclusiveScan,
     sanitizeCachedProbe: sanitizeCachedProbe,
+    sanitizeCachedAsset: sanitizeCachedAsset,
     platformFeeBps: platformFeeBps,
     illustrativeQuote: illustrativeQuote,
     deadlineFor: deadlineFor,
