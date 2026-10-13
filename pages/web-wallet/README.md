@@ -45,15 +45,26 @@ Live: https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/web-walle
 
 ```bash
 cd pages/web-wallet
-node --test tests/run-tests.mjs        # 21/21 offline: xxhash vectors, SCALE codec,
+node --test tests/run-tests.mjs        # 54/54 offline: xxhash vectors, SCALE codec,
                                        # era math, BIP-39, keygen, sign/verify,
-                                       # exact payload/extrinsic layouts
+                                       # exact payload/extrinsic layouts, keystore
+                                       # vault-blob boundary (validateVaultBlob
+                                       # matrix, import-overwrite protection)
 node tests/live-rpc-check.mjs          # live: needs WS egress to rpc.quantus.network
 ```
 
-Browser QA (headless Chromium, CDP-driven): 22/22 checks green — full
-create → reveal → encrypt → dashboard → send-validation → lock/unlock flow, zero console
-errors, honest offline states where the sandbox has no network.
+The encrypted vault blob is validated at the storage/import boundary
+(`validateVaultBlob` in `js/keystore.js`): a shaped-but-garbage backup file
+is rejected before it can overwrite the stored vault, and a corrupt stored
+blob reports "vault data is corrupted" instead of the misleading
+"wrong password".
+
+Browser QA (headless Chromium, CDP-driven): full suite 14/14 checks green —
+create → reveal → encrypt → dashboard → send-validation → lock/unlock flow —
+plus the keystore boundary probe 12/12 (garbage import rejected with the
+stored vault byte-identical, poisoned salt reports corrupted, genuine vault
+reopens), zero console errors, honest offline states where the sandbox has
+no network.
 
 ## Honest caveats
 
@@ -62,9 +73,11 @@ errors, honest offline states where the sandbox has no network.
 - The end-to-end node submission probe (signed extrinsic from a throwaway unfunded key,
   expecting a funds-only rejection) could not run from the builder's sandbox (no WebSocket
   egress); the wire format is instead verified byte-for-byte against chain and
-  `sp-runtime` source, plus 21 offline assertions on the exact layout.
+  `sp-runtime` source, plus 54 offline assertions on the exact layout.
 - Reversible transfers / checkphrase flows live in the SafeSend app; this wallet sends
   plain `transfer_keep_alive` (final on inclusion — the UI warns before broadcast).
 
 Built by [@kshot9000](https://x.com/kshot9000) · QTC tips
 `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`
+
+Team: [@Quantus-Network](https://github.com/Quantus-Network)

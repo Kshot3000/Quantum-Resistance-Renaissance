@@ -623,3 +623,103 @@ test('buildUnsignedTransfer: fee-quote placeholder is length-accurate per scheme
   assert.equal((cFee.placeholderHex.length - cPlain.placeholderHex.length) / 2, uFee.call.length - uPlain.call.length,
     'the batch call length is fully reflected in the quoted placeholder');
 });
+
+/* ---------- keystore vault-blob boundary ----------
+ * The vault blob is untrusted (localStorage / user-supplied backup file).
+ * Before the fix, importVaultFile checked only v + field presence and
+ * wrote a shaped-but-garbage blob straight over the existing vault, and
+ * openVault fed unvalidated hex to the decryptor: parseInt NaN silently
+ * became 0 bytes, so a corrupt vault reported "wrong password". */
+const vaultStore = new Map();
+globalThis.localStorage = {
+  getItem: (k) => (vaultStore.has(k) ? vaultStore.get(k) : null),
+  setItem: (k, v) => vaultStore.set(k, String(v)),
+  removeItem: (k) => vaultStore.delete(k),
+};
+const VAULT_KEY = 'qtc-web-wallet-vault-v1';
+const ks = await import('../js/keystore.js');
+
+function genuineBlob() {
+  return {
+    v: 1, scheme: 65, kdf: 'PBKDF2-HMAC-SHA256', iterations: 250000,
+    cipher: 'AES-GCM-256', salt: 'ab'.repeat(16), iv: 'cd'.repeat(12),
+    ciphertext: 'ef'.repeat(64),
+  };
+}
+
+test('keystore: validateVaultBlob accepts genuine shapes (65 and 87)', () => {
+  assert.equal(ks.validateVaultBlob(genuineBlob()).ok, true);
+  assert.equal(ks.validateVaultBlob({ ...genuineBlob(), scheme: 87 }).ok, true);
+});
+
+test('keystore: validateVaultBlob rejects the poison matrix', () => {
+  const bad = [
+    null, undefined, 42, 'vault', [],
+    { ...genuineBlob(), v: 2 },
+    { ...genuineBlob(), scheme: 99 },
+    { ...genuineBlob(), scheme: '65' },
+    { ...genuineBlob(), kdf: 'argon2' },
+    { ...genuineBlob(), cipher: 'AES-CBC' },
+    { ...genuineBlob(), iterations: 1 },
+    { ...genuineBlob(), salt: 'ab'.repeat(15) },
+    { ...genuineBlob(), salt: 'zz'.repeat(16) },
+    { ...genuineBlob(), salt: 1234 },
+    { ...genuineBlob(), iv: 'cd'.repeat(11) },
+    { ...genuineBlob(), iv: 'not-hex-at-all!!' },
+    { ...genuineBlob(), ciphertext: '' },
+    { ...genuineBlob(), ciphertext: 'abc' },
+    { ...genuineBlob(), ciphertext: 'zz'.repeat(32) },
+    { ...genuineBlob(), ciphertext: 'ef'.repeat(70000) },
+    { v: 1, scheme: 65 },
+  ];
+  for (const b of bad) assert.equal(ks.validateVaultBlob(b).ok, false, String(JSON.stringify(b)).slice(0, 60));
+});
+
+test('keystore: save/open round-trip preserves keys, scheme and mnemonic', async () => {
+  vaultStore.clear();
+  const secretKey = new Uint8Array(64); for (let i = 0; i < 64; i++) secretKey[i] = i;
+  const publicKey = new Uint8Array(32).fill(9);
+  await ks.saveVault({ scheme: 87, secretKey, publicKey, mnemonic: 'legal winner thank year wave sausage worth useful legal winner thank yellow' }, 'correct horse battery');
+  const data = await ks.openVault('correct horse battery');
+  assert.equal(data.scheme, 87);
+  assert.deepEqual(data.secretKey, secretKey);
+  assert.deepEqual(data.publicKey, publicKey);
+  assert.match(data.mnemonic, /^legal winner/);
+});
+
+test('keystore: wrong password on a well-formed vault says wrong password', async () => {
+  await assert.rejects(() => ks.openVault('wrong horse'), /wrong password/);
+});
+
+test('keystore: corrupt stored blob says corrupted, never wrong password / TypeError', async () => {
+  const good = vaultStore.get(VAULT_KEY);
+  const blob = JSON.parse(good);
+  vaultStore.set(VAULT_KEY, JSON.stringify({ ...blob, salt: 'z'.repeat(32) }));
+  await assert.rejects(() => ks.openVault('correct horse battery'), (e) => /corrupted/.test(e.message) && !/wrong password/.test(e.message));
+  vaultStore.set(VAULT_KEY, JSON.stringify({ v: 1, scheme: 65 }));
+  await assert.rejects(() => ks.openVault('correct horse battery'), (e) => !(e instanceof TypeError) && /vault/.test(e.message));
+  vaultStore.set(VAULT_KEY, 'this is not json');
+  await assert.rejects(() => ks.openVault('correct horse battery'), /not a QTC web-wallet vault file/);
+  vaultStore.set(VAULT_KEY, good);
+});
+
+test('keystore: garbage import is rejected and the existing vault survives', async () => {
+  const before = vaultStore.get(VAULT_KEY);
+  const garbage = { v: 1, scheme: 99, salt: 'zzzz', iv: 'nope', ciphertext: 'abc' };
+  await assert.rejects(() => ks.importVaultFile({ text: async () => JSON.stringify(garbage) }));
+  await assert.rejects(() => ks.importVaultFile({ text: async () => 'not json' }), /not a QTC web-wallet vault file/);
+  assert.equal(vaultStore.get(VAULT_KEY), before, 'a rejected import must not touch the stored vault');
+  const data = await ks.openVault('correct horse battery');
+  assert.equal(data.scheme, 87, 'the surviving vault still opens');
+});
+
+test('keystore: valid import round-trips and persists only the known fields', async () => {
+  const exported = vaultStore.get(VAULT_KEY);
+  const withStray = JSON.stringify({ ...JSON.parse(exported), stray: 'drop me', nested: { x: 1 } });
+  vaultStore.clear();
+  await ks.importVaultFile({ text: async () => withStray });
+  const persisted = JSON.parse(vaultStore.get(VAULT_KEY));
+  assert.deepEqual(Object.keys(persisted).sort(), ['cipher', 'ciphertext', 'iterations', 'iv', 'kdf', 'salt', 'scheme', 'v']);
+  const data = await ks.openVault('correct horse battery');
+  assert.equal(data.scheme, 87);
+});
