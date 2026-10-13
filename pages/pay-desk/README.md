@@ -6,10 +6,10 @@ confirmation guidance, and an embeddable tip-button generator.
 
 ## What it does
 
-- **Rate card** — manual QTC/USD rate with a quoted-at timestamp. There is no
-  listed QTC spot market yet (NEAR Intents was announced as the first venue;
-  no listing date as of 2026-10-01), so every invoice records the rate it was
-  quoted at and never silently re-prices.
+- **Rate card** — manual QTC/USD rate with a quoted-at timestamp. QTC listed
+  on NEAR Intents 1Click in October 2026, but its solver-fed reference price
+  is thin and this desk fetches no feed by design, so every invoice records
+  the rate it was quoted at and never silently re-prices.
 - **Invoice builder** — line items, quantities, discount, tax; receiving
   address checksum-validated locally (SS58, prefix 189) before an invoice can
   be created. Totals computed in integer cents, converted to exact plancks

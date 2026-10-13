@@ -72,7 +72,7 @@ var METRICS = [
       erg:{ v:"No TPS figure published in official docs", n:"Checked ergodocs + papers Sept 29, 2026; the \u2018weak blocks\u2019 scaling proposal is paper-only.", b:"unverified", s:"https://github.com/ergoplatform/ergodocs/blob/HEAD/docs/faq.md" } } },
   { id:"mkcap", label:"Price & market cap (Sept 29, 2026)",
     rows:{
-      qtc:{ v:"No public price — pre-listing", n:"NEAR Intents announced as first venue; no listing date as of Sept 29, 2026.", b:"measured", s:"https://docs.quantus.com" },
+      qtc:{ v:"Listed on NEAR Intents 1Click (Oct 2026) · ≈ $123.73 on Oct 13, 2026", n:"nep141:qtc.omft.near, 12 decimals — price read from the live 1Click token list on Oct 13, 2026. A thin solver-fed reference quote, not a deep-market spot price; no market-cap figure is published.", b:"measured", s:"https://1click.chaindefuser.com/v0/tokens" },
       btc:{ v:"≈ $84.5K · ≈ $1.67T mcap (~57% dominance)", b:"measured", s:"https://www.tradingview.com/news/DJN_DN20260929004943:0/" },
       eth:{ v:"≈ $2.7K · ≈ $328B mcap", b:"measured", s:"https://cryptoonic.com/market-cap-comparison-2026-bitcoin-vs-ethereum-vs-solana-7-powerful-insights/" },
       sol:{ v:"≈ $120 · ≈ $63–72B mcap (varies by source/day)", b:"measured", s:"https://www.americanbankingnews.com/2026/09/29/solana-24-hour-trading-volume-tops-3-41-billion-sol.html" },

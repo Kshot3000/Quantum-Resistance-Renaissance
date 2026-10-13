@@ -43,8 +43,9 @@ downloadable `.sh` script.
 The forge builds commands — it does not run them, watch the chain, or hold
 funds. Validation covers formats, ranges, conflicts, and required flags
 against the flag map; it cannot check chain state (balances, collective
-membership, whether a proposal ID exists). No price data: NEAR Intents was
-announced as the first exchange venue with no listing date as of 2026-10-01.
+membership, whether a proposal ID exists). No price data: the forge fetches
+nothing — QTC listed on NEAR Intents 1Click in October 2026, but prices are
+out of scope here.
 
 ## Files
 
