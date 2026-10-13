@@ -386,8 +386,15 @@
   var VKEY = "qps_drafts_v1";
   function draftHashOf(bytes) { return CR.toHex(blake256(bytes)); }
   function loadDrafts() {
-    try { return C.sanitizeDrafts(JSON.parse(localStorage.getItem(VKEY) || "[]"), draftHashOf); }
-    catch (e) { return []; }
+    try {
+      var clean = C.sanitizeDrafts(JSON.parse(localStorage.getItem(VKEY) || "[]"), draftHashOf);
+      // Persist the clean copy so dropped/repaired poison does not
+      // survive to the next visit (fleet rule); a byte-identical vault
+      // is left untouched.
+      var raw = localStorage.getItem(VKEY);
+      if (raw && JSON.stringify(clean) !== raw) saveDrafts(clean);
+      return clean;
+    } catch (e) { return []; }
   }
   function saveDrafts(d) { localStorage.setItem(VKEY, JSON.stringify(d)); }
   $("dv-save").addEventListener("click", function () {

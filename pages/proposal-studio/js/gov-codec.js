@@ -303,8 +303,22 @@
    *    disagrees with its call can never be submitted (submit looks the
    *    preimage up by that hash), so the entry is dropped, not repaired;
    *  - ids are deduped (delete/load match on id), string fields are
-   *    type-checked and capped, checks becomes exactly 5 booleans.      */
+   *    type-checked and capped, checks becomes exactly 5 booleans.
+   * Relations round (2026-10-13): shape alone still admitted values the
+   * only producer (dv-save, fed by the composer) could never write —
+   *  - callName is a DERIVED field: the composer sets it from the built
+   *    template / inspectCall(callHex), so a stored name that disagrees
+   *    with the call painted (and loaded into the pack) a false label
+   *    for the proposal. It is now always re-derived from the bytes.
+   *  - the composer locks track 1 (fast_upgrade) to authorize_upgrade —
+   *    the runtime honors the FastUpgrade origin for no other call — so
+   *    a track-1 draft carrying any other call can never execute and
+   *    is dropped, not repaired.
+   *  - created is stamped new Date().toISOString() at save time, so a
+   *    stamp before the chain's Sept-2026 launch or in the future is
+   *    not a save time; it becomes "" (rendered "date unknown").      */
   var MAX_DRAFTS = 100;
+  var CREATED_FLOOR_MS = Date.UTC(2026, 8, 1); // chain launch era (Sept 2026)
   function sanitizeDrafts(raw, hashOf) {
     if (!Array.isArray(raw)) return [];
     var out = [], seenIds = {};
@@ -324,11 +338,17 @@
       if (seenIds[id]) continue;
       seenIds[id] = true;
       var insp = inspectCall(x.callHex);
-      var callName = (typeof x.callName === "string" && x.callName.trim())
-        ? x.callName.slice(0, 120)
-        : (insp.ok ? insp.palletName + "." + insp.callName : "call");
+      // Track relation: fast_upgrade (track 1) is honored ONLY by
+      // System.authorize_upgrade (pallet 0, call 9) — see the composer
+      // lock in app.js and the sources table. Any other call on track 1
+      // is a draft that can never execute.
+      if (x.trackId === 1 && !(insp.ok && insp.palletIndex === 0 && insp.callIndex === 9)) continue;
+      // callName is derived from the call bytes, never stored truth.
+      var callName = insp.ok ? insp.palletName + "." + insp.callName : "call";
       var name = (typeof x.name === "string" && x.name.trim()) ? x.name.slice(0, 120) : callName;
-      var created = (typeof x.created === "string" && isFinite(Date.parse(x.created)))
+      var createdMs = typeof x.created === "string" ? Date.parse(x.created) : NaN;
+      var created = (isFinite(createdMs) && createdMs >= CREATED_FLOOR_MS
+        && createdMs <= Date.now() + 5 * 60 * 1000)
         ? x.created.slice(0, 40) : "";
       var checks = [];
       for (var k = 0; k < 5; k++) checks.push(Array.isArray(x.checks) ? x.checks[k] === true : false);

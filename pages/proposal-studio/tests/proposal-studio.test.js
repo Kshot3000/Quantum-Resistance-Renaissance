@@ -144,10 +144,10 @@ t("sanitizer drops bad-hex call", C.sanitizeDrafts([Object.assign({}, goodDraft,
 t("sanitizer drops 1-byte call", C.sanitizeDrafts([Object.assign({}, goodDraft, { callHex: "00", hash: hashOf([0]) })], hashOf).length === 0);
 const bigCall = new Array(4097).fill(0);
 t("sanitizer drops over-cap (4097B) call",
-  C.sanitizeDrafts([Object.assign({}, goodDraft, { callHex: C.bytesToHex(bigCall), hash: hashOf(bigCall) })], hashOf).length === 0);
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { trackId: 0, callHex: C.bytesToHex(bigCall), hash: hashOf(bigCall) })], hashOf).length === 0);
 const maxCall = new Array(4096).fill(0);
 eq("sanitizer keeps exactly-4KiB call",
-  C.sanitizeDrafts([Object.assign({}, goodDraft, { callHex: C.bytesToHex(maxCall), hash: hashOf(maxCall) })], hashOf).length, 1);
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { trackId: 0, callHex: C.bytesToHex(maxCall), hash: hashOf(maxCall) })], hashOf).length, 1);
 // track relation: lifecycle/buildSubmit index TRACKS[trackId]
 t("sanitizer drops unknown/string track",
   [99, -1, "1", null].every((tr) => C.sanitizeDrafts([Object.assign({}, goodDraft, { trackId: tr })], hashOf).length === 0));
@@ -166,6 +166,31 @@ eq("sanitizer: only strict true survives in checks", JSON.stringify(partialCheck
 // id dedupe: delete/load match on id, so duplicates must not survive
 const dupes = C.sanitizeDrafts([goodDraft, Object.assign({}, goodDraft, { name: "copy" })], hashOf);
 eq("sanitizer dedupes ids", new Set(dupes.map((d) => d.id)).size, 2);
+// --- draft vault relations round (2026-10-13): values no producer writes
+// callName is DERIVED from callHex (the composer sets it from the built
+// template / inspectCall); a stored name that disagrees is replaced.
+const relabeled = C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "r1", callName: "TreasuryPallet.set_treasury_account" })], hashOf);
+eq("relations: stored callName re-derived from the call bytes", relabeled[0].callName, "System.authorize_upgrade");
+const relabeledFallback = C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "r2", callName: "Evil.fake", name: 42 })], hashOf);
+eq("relations: name fallback uses the derived callName", relabeledFallback[0].name, "System.authorize_upgrade");
+// track relation: track 1 (fast_upgrade) honors authorize_upgrade only —
+// the composer locks the template; any other call on track 1 never executes.
+const remarkCall = C.tplRemark("hello quantus");
+eq("relations: track-1 remark draft dropped",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "r3", trackId: 1, callHex: remarkCall.hex, callName: remarkCall.name, hash: hashOf(remarkCall.bytes) })], hashOf).length, 0);
+eq("relations: track-0 remark draft kept",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "r4", trackId: 0, callHex: remarkCall.hex, callName: remarkCall.name, hash: hashOf(remarkCall.bytes) })], hashOf).length, 1);
+const upgCall = C.tplAuthorizeUpgrade(new Array(32).fill(7));
+eq("relations: track-1 upgrade draft kept",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "r5", trackId: 1, callHex: upgCall.hex, callName: upgCall.name, hash: hashOf(upgCall.bytes) })], hashOf).length, 1);
+// created window: dv-save stamps new Date().toISOString()
+eq("relations: pre-launch created -> empty",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "r6", created: "2020-01-01T00:00:00.000Z" })], hashOf)[0].created, "");
+eq("relations: future created -> empty",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "r7", created: "2999-01-01T00:00:00.000Z" })], hashOf)[0].created, "");
+eq("relations: plausible created kept verbatim",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "r8" })], hashOf)[0].created, "2026-10-01T00:00:00.000Z");
+
 // cap
 const many = Array.from({ length: 150 }, (_, i) => Object.assign({}, goodDraft, { id: "m" + i }));
 eq("sanitizer caps at MAX_DRAFTS", C.sanitizeDrafts(many, hashOf).length, C.MAX_DRAFTS);
