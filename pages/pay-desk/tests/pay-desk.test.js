@@ -199,7 +199,7 @@ eq("csv quotes doubled", P.csvEscape('a"b'), '"a""b"');
   const valid = (a) => { const d = SS58.ss58Decode(a); return d.ok && d.prefix === 189 && d.key.length === 32; };
   const KYLE = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
   const OTHER = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7";
-  const CREATED = 1791000000000;
+  const CREATED = Date.UTC(2026, 9, 1, 4, 5, 6); // == the INV-20261001-040506 id stamp below (id is derived from created)
   const good = (over) => Object.assign({
     id: "INV-20261001-040506-ABC", ref: "good", address: KYLE,
     usdCents: "1250", qtc: "1", plancks: "1000000000000",
@@ -232,10 +232,11 @@ eq("csv quotes doubled", P.csvEscape('a"b'), '"a""b"');
   eq("duplicate ids deduped", S([good(), good({ ref: "dupe" })]).length, 1);
   eq("bad id charset dropped", S([good({ id: 'x"><svg>' })]).length, 0);
   (function () {
+    const LEGACY_CREATED = Date.UTC(2026, 8, 30, 12, 0, 0); // == INV-20260930-120000
     const legacy = {
       id: "INV-20260930-120000-XYZ", ref: "legacy", address: OTHER,
       usdCents: "2500", qtc: "2", plancks: "2000000000000",
-      rate: "12.50", rateTs: CREATED, created: CREATED, expiresAt: CREATED + 1800000, status: "paid",
+      rate: "12.50", rateTs: LEGACY_CREATED, created: LEGACY_CREATED, expiresAt: LEGACY_CREATED + 1800000, status: "paid",
     };
     const out = S([legacy]);
     eq("legacy invoice survives", out.length, 1);
@@ -253,6 +254,71 @@ eq("csv quotes doubled", P.csvEscape('a"b'), '"a""b"');
     t("ref capped at 120 chars", refCap.length === 1 && refCap[0].ref.length === 120);
     const badExpiry = S([good({ expiresAt: "never" })]);
     t("bad expiresAt clamps to created (already expired, never live)", badExpiry.length === 1 && badExpiry[0].expiresAt === CREATED);
+  })();
+})();
+
+/* ---- register time/id relations (2026-10-13) ----
+ * createInvoice stamps created = Date.now() and derives the id from
+ * that same instant (makeInvoiceId), sets expiresAt to created plus
+ * one of the expiry select's offsets (15/30/60/1440 min), and copies
+ * rateTs from the rate saved BEFORE the invoice existed. The 2026-10-12
+ * boundary recomputed the money relations but let any positive created
+ * through: a 2020/2999 invoice painted and CSV-exported as fact, an id
+ * could disagree with its own created, a 7-day "expiry" no producer
+ * writes stayed live, and a future rateTs painted a quote time after
+ * the invoice it priced. */
+(function () {
+  global.window = global.window || {};
+  require("../js/ss58.js");
+  const SS58 = global.window.QTC_SS58;
+  const valid = (a) => { const d = SS58.ss58Decode(a); return d.ok && d.prefix === 189 && d.key.length === 32; };
+  const KYLE = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+  const CREATED = Date.UTC(2026, 9, 1, 4, 5, 6);
+  const NOW = Date.UTC(2026, 9, 13, 17, 0, 0);
+  const good = (over) => Object.assign({
+    id: "INV-20261001-040506-ABC", ref: "good", address: KYLE,
+    usdCents: "1250", qtc: "1", plancks: "1000000000000",
+    serviceFeeBps: 50, serviceFeeQtc: "0.005", serviceFeePlancks: "5000000000",
+    serviceFeeAddress: KYLE, merchantQtc: "0.995", merchantPlancks: "995000000000",
+    rate: "12.50", rateTs: CREATED, created: CREATED, expiresAt: CREATED + 1800000,
+    status: "pending",
+  }, over || {});
+  const S = (raw) => P.sanitizeRegister(raw, valid, NOW);
+
+  eq("relations: well-formed invoice kept", S([good()]).length, 1);
+  eq("relations: created in 2020 dropped", S([good({ created: Date.UTC(2020, 0, 1), id: "INV-20200101-000000-ABC", rateTs: Date.UTC(2020, 0, 1), expiresAt: Date.UTC(2020, 0, 1) + 1800000 })]).length, 0);
+  eq("relations: created in 2999 dropped", S([good({ created: Date.UTC(2999, 0, 1), id: "INV-29990101-000000-ABC", expiresAt: Date.UTC(2999, 0, 1) + 1800000 })]).length, 0);
+  eq("relations: id date disagreeing with created dropped", S([good({ id: "INV-20261002-040506-ABC" })]).length, 0);
+  eq("relations: id clock disagreeing with created dropped", S([good({ id: "INV-20261001-040507-ABC" })]).length, 0);
+  eq("relations: non-producer id format dropped", S([good({ id: "invoice-20261001" })]).length, 0);
+  eq("relations: lowercase id suffix dropped", S([good({ id: "INV-20261001-040506-abc" })]).length, 0);
+  (function () {
+    const o17 = S([good({ expiresAt: CREATED + 17 * 60000 })]);
+    t("relations: 17-minute expiry coerced to created", o17.length === 1 && o17[0].expiresAt === CREATED);
+    const o7d = S([good({ expiresAt: CREATED + 7 * 86400000 })]);
+    t("relations: 7-day expiry coerced to created", o7d.length === 1 && o7d[0].expiresAt === CREATED);
+    const o24 = S([good({ expiresAt: CREATED + 86400000 })]);
+    t("relations: 24h producer expiry kept verbatim", o24.length === 1 && o24[0].expiresAt === CREATED + 86400000);
+    const oRate = S([good({ rateTs: CREATED + 86400000 })]);
+    t("relations: rateTs after created falls back to created", oRate.length === 1 && oRate[0].rateTs === CREATED);
+    const oRateOld = S([good({ rateTs: Date.UTC(2020, 0, 1) })]);
+    t("relations: rateTs in 2020 falls back to created", oRateOld.length === 1 && oRateOld[0].rateTs === CREATED);
+    const oRateOk = S([good({ rateTs: CREATED - 3600000 })]);
+    t("relations: rateTs an hour before the invoice kept verbatim", oRateOk.length === 1 && oRateOk[0].rateTs === CREATED - 3600000);
+  })();
+  (function () {
+    global.localStorage = {
+      _v: null,
+      getItem() { return this._v; }, setItem(k, v) { this._v = v; }, removeItem() { this._v = null; },
+    };
+    global.localStorage._v = JSON.stringify({ usdPerQtc: "12.50", ts: Date.UTC(2999, 0, 1) });
+    eq("relations: stored rate from 2999 rejected", P.loadRate(NOW), null);
+    global.localStorage._v = JSON.stringify({ usdPerQtc: "12.50", ts: Date.UTC(2020, 0, 1) });
+    eq("relations: stored rate from 2020 rejected", P.loadRate(NOW), null);
+    global.localStorage._v = JSON.stringify({ usdPerQtc: "12.50", ts: NOW - 60000 });
+    const r = P.loadRate(NOW);
+    t("relations: stored rate from a minute ago kept", !!r && r.ts === NOW - 60000 && r.usdPerQtc === "12.50");
+    delete global.localStorage;
   })();
 })();
 

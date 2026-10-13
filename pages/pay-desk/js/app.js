@@ -179,17 +179,34 @@ function splitServiceFee(totalPlancks, feeBps) {
  * amounts cannot be trusted, so the entry is dropped (the Proposal
  * Studio rule for derived-field relations). Pre-fee-era invoices (no
  * fee fields at all) are normalized to a fee-less invoice instead of
- * dropped. Ids dedupe (setStatus/View match on id); cap 500 entries. */
+ * dropped. Ids dedupe (setStatus/View match on id); cap 500 entries.
+ * Time/id relations (2026-10-13): the producer (createInvoice) stamps
+ * created = Date.now() and derives the id from that SAME instant via
+ * makeInvoiceId — the id's UTC stamp is a derived field of created, so
+ * an id that disagrees with created (or is not in the producer's exact
+ * INV-YYYYMMDD-HHMMSS-XXX form) is not an invoice this desk wrote, and
+ * a created outside [REGISTER_FLOOR_MS, now + 5m] is dropped with it.
+ * expiresAt is created plus one of the expiry select's offsets ONLY
+ * (15/30/60/1440 minutes); any other offset coerces to created — the
+ * already-expired, never-live neutral the bad-type path already used.
+ * rateTs is the saveRate stamp from BEFORE the invoice existed, so it
+ * must land in [REGISTER_FLOOR_MS, created + 5m]; out-of-window falls
+ * back to created (the field's existing fallback for bad values). */
 var REGISTER_STATUSES = ["pending", "paid", "expired", "cancelled"];
 var REGISTER_CAP = 500;
+var REGISTER_FLOOR_MS = Date.UTC(2026, 8, 1); // 2026-09-01: no desk stamp predates the desk era
+var REGISTER_EXPIRY_OFFSETS_MS = [15, 30, 60, 1440].map(function (m) { return m * 60000; });
 
-function sanitizeRegister(raw, isValidAddress) {
+function sanitizeRegister(raw, isValidAddress, nowMs) {
   if (!Array.isArray(raw)) return [];
+  var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : Date.now();
   var out = [], seenIds = {};
   for (var i = 0; i < raw.length && out.length < REGISTER_CAP; i++) {
     var inv = raw[i];
     if (!inv || typeof inv !== "object" || Array.isArray(inv)) continue;
-    if (typeof inv.id !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(inv.id)) continue;
+    if (!Number.isFinite(inv.created) || inv.created < REGISTER_FLOOR_MS || inv.created > now + 5 * 60 * 1000) continue;
+    if (typeof inv.id !== "string" || !/^INV-\d{8}-\d{6}-[0-9A-Z]{3}$/.test(inv.id)) continue;
+    if (inv.id.slice(0, 20) !== makeInvoiceId(inv.created).slice(0, 20)) continue; // id stamp is derived from created
     if (seenIds[inv.id]) continue;
     if (typeof inv.address !== "string") continue;
     var addr = inv.address.trim();
@@ -219,7 +236,6 @@ function sanitizeRegister(raw, isValidAddress) {
       if (inv.serviceFeeAddress !== (feePlancks > 0n ? SERVICE_FEE_ADDRESS : "")) continue;
     }
     if (REGISTER_STATUSES.indexOf(inv.status) < 0) continue;
-    if (!Number.isFinite(inv.created) || inv.created <= 0) continue;
     seenIds[inv.id] = 1;
     out.push({
       id: inv.id,
@@ -235,9 +251,9 @@ function sanitizeRegister(raw, isValidAddress) {
       merchantQtc: plancksToQtcString(merchantPlancks),
       merchantPlancks: merchantPlancks.toString(),
       rate: inv.rate,
-      rateTs: Number.isFinite(inv.rateTs) && inv.rateTs > 0 ? inv.rateTs : inv.created,
+      rateTs: Number.isFinite(inv.rateTs) && inv.rateTs >= REGISTER_FLOOR_MS && inv.rateTs <= inv.created + 5 * 60 * 1000 ? inv.rateTs : inv.created,
       created: inv.created,
-      expiresAt: Number.isFinite(inv.expiresAt) && inv.expiresAt >= inv.created ? inv.expiresAt : inv.created,
+      expiresAt: Number.isFinite(inv.expiresAt) && REGISTER_EXPIRY_OFFSETS_MS.indexOf(inv.expiresAt - inv.created) >= 0 ? inv.expiresAt : inv.created,
       status: inv.status,
     });
   }
@@ -292,13 +308,16 @@ function tipSnippet(address, label, style) {
 
 /* ---------------- storage ---------------- */
 
-function loadRate() {
+function loadRate(nowMs) {
   try {
     var r = JSON.parse(localStorage.getItem(RATE_KEY) || "null");
     if (!r || typeof r !== "object" || Array.isArray(r)) return null;
     var rr = parseDecimalRational(r.usdPerQtc == null ? "" : String(r.usdPerQtc));
     if (!rr || rr.num <= 0n) return null;
-    if (!Number.isFinite(r.ts) || r.ts <= 0) return null;
+    /* saveRate stamps Date.now(): a stored ts outside the desk era or in
+     * the future is not a rate this desk saved — reject it like a bad rate. */
+    var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : Date.now();
+    if (!Number.isFinite(r.ts) || r.ts < REGISTER_FLOOR_MS || r.ts > now + 5 * 60 * 1000) return null;
     return { usdPerQtc: r.usdPerQtc, ts: r.ts };
   } catch (e) { /* ignore */ }
   return null;
@@ -822,6 +841,7 @@ if (typeof module !== "undefined" && module.exports) {
     tipSnippet: tipSnippet,
     splitServiceFee: splitServiceFee,
     sanitizeRegister: sanitizeRegister,
+    loadRate: loadRate,
     feeBpsLabel: feeBpsLabel,
     SERVICE_FEE_ADDRESS: SERVICE_FEE_ADDRESS,
     SERVICE_FEE_MAX_BPS: SERVICE_FEE_MAX_BPS,
