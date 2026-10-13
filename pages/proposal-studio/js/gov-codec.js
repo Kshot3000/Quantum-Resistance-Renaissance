@@ -286,6 +286,66 @@
       { n: 5, title: "Enactment", detail: "On approval the scheduler dispatches the proposal no earlier than " + t.minEnactment + " blocks (~" + blocksToClock(t.minEnactment) + ") after approval. Cancel/kill is Root-only; slashed deposits are burned." }
     ];
   }
+  /* ---------------- draft vault sanitizer ----------------------------- */
+  /* Drafts reach the vault from TWO untrusted sources — localStorage and
+   * a user-imported JSON file — and the vault/pack renderers dereference
+   * their fields directly (created.slice, checks[i], lifecycle(trackId),
+   * hexToBytes(callHex) into the extrinsic builders). A single poisoned
+   * entry therefore crashed the Vault tab, and because the import path
+   * persisted what it parsed, one bad import crashed every later visit.
+   * sanitizeDrafts is the single gate for both load paths:
+   *  - plain-object entries only, at most MAX_DRAFTS kept;
+   *  - the call must be valid hex of 2..MAX_PROPOSAL bytes (the chain's
+   *    own proposal cap — the composer enforces it, the vault must too);
+   *  - trackId must name a real track (lifecycle/buildSubmit index it);
+   *  - RELATION: when hashOf (bytes -> blake2b-256 hex) is supplied, the
+   *    stored hash must equal hashOf(callBytes) — a draft whose hash
+   *    disagrees with its call can never be submitted (submit looks the
+   *    preimage up by that hash), so the entry is dropped, not repaired;
+   *  - ids are deduped (delete/load match on id), string fields are
+   *    type-checked and capped, checks becomes exactly 5 booleans.      */
+  var MAX_DRAFTS = 100;
+  function sanitizeDrafts(raw, hashOf) {
+    if (!Array.isArray(raw)) return [];
+    var out = [], seenIds = {};
+    for (var i = 0; i < raw.length && out.length < MAX_DRAFTS; i++) {
+      var x = raw[i];
+      if (!x || typeof x !== "object" || Array.isArray(x)) continue;
+      if (!Number.isInteger(x.trackId) || x.trackId < 0 || x.trackId >= TRACKS.length) continue;
+      if (typeof x.callHex !== "string") continue;
+      var bytes = hexToBytes(x.callHex);
+      if (!bytes || bytes.length < 2 || bytes.length > MAX_PROPOSAL) continue;
+      if (typeof x.hash !== "string") continue;
+      var hash = x.hash.replace(/^0x/i, "").replace(/\s+/g, "").toLowerCase();
+      if (!/^[0-9a-f]{64}$/.test(hash)) continue;
+      if (typeof hashOf === "function" && hashOf(bytes) !== hash) continue;
+      var id = (typeof x.id === "string" && x.id.length >= 1 && x.id.length <= 64) ? x.id : null;
+      if (!id || seenIds[id]) id = "draft-sanitized-" + out.length;
+      if (seenIds[id]) continue;
+      seenIds[id] = true;
+      var insp = inspectCall(x.callHex);
+      var callName = (typeof x.callName === "string" && x.callName.trim())
+        ? x.callName.slice(0, 120)
+        : (insp.ok ? insp.palletName + "." + insp.callName : "call");
+      var name = (typeof x.name === "string" && x.name.trim()) ? x.name.slice(0, 120) : callName;
+      var created = (typeof x.created === "string" && isFinite(Date.parse(x.created)))
+        ? x.created.slice(0, 40) : "";
+      var checks = [];
+      for (var k = 0; k < 5; k++) checks.push(Array.isArray(x.checks) ? x.checks[k] === true : false);
+      var enactVal = (typeof x.enactVal === "number" && isFinite(x.enactVal)
+        && Math.floor(x.enactVal) === x.enactVal && x.enactVal >= 0 && x.enactVal <= 4294967295)
+        ? x.enactVal : 0;
+      out.push({
+        id: id, name: name,
+        notes: typeof x.notes === "string" ? x.notes.slice(0, 2000) : "",
+        trackId: x.trackId, callHex: bytesToHex(bytes), callName: callName,
+        hash: hash, enactKind: x.enactKind === "at" ? "at" : "after",
+        enactVal: enactVal, created: created, checks: checks
+      });
+    }
+    return out;
+  }
+
   function blocksToClock(b) {
     var s = b * 12;
     if (s < 90) return s + "s";
@@ -312,6 +372,6 @@
     buildCollectiveVote: buildCollectiveVote,
     tplAuthorizeUpgrade: tplAuthorizeUpgrade, tplRemark: tplRemark,
     tplSetTreasuryAccount: tplSetTreasuryAccount, tplAddMember: tplAddMember,
-    lifecycle: lifecycle
+    lifecycle: lifecycle, sanitizeDrafts: sanitizeDrafts, MAX_DRAFTS: MAX_DRAFTS
   };
 }));

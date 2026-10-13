@@ -113,5 +113,62 @@ eq("600 blocks ~ 2h", C.blocksToClock(600), "2h");
 eq("50 blocks ~ 10m", C.blocksToClock(50), "10m");
 eq("7200 blocks ~ 24h", C.blocksToClock(7200), "24h");
 
+// --- draft vault sanitizer: both load paths (localStorage + JSON import)
+// are untrusted. A poisoned entry used to crash renderVault (numeric
+// created.slice, null checks[i], lifecycle(unknown track)) and the pack
+// builders (hexToBytes(bad callHex) -> null.length), and the import path
+// persisted the poison so every later visit crashed the same way.
+const hashOf = (bytes) => CR.toHex(Array.from(CR.blake2b(new Uint8Array(bytes), 32)));
+const goodDraft = {
+  id: "d1", name: "Ref0 replay", notes: "note", trackId: 1,
+  callHex: C.REF0.noteBytes, callName: "System.authorize_upgrade",
+  hash: C.REF0.preimageHash, enactKind: "after", enactVal: 0,
+  created: "2026-10-01T00:00:00.000Z", checks: [true, false, true, false, false]
+};
+const kept = C.sanitizeDrafts([goodDraft], hashOf);
+eq("sanitizer keeps a well-formed draft (hash relation holds)", kept.length, 1);
+eq("sanitizer preserves checks", JSON.stringify(kept[0].checks), "[true,false,true,false,false]");
+eq("sanitizer preserves id/track", kept[0].id + "/" + kept[0].trackId, "d1/1");
+t("sanitizer: non-array inputs -> []",
+  [null, undefined, {}, "x", 42].every((v) => Array.isArray(C.sanitizeDrafts(v, hashOf)) && C.sanitizeDrafts(v, hashOf).length === 0));
+t("sanitizer: non-object entries dropped",
+  C.sanitizeDrafts([null, 42, "x", [1], goodDraft], hashOf).length === 1);
+// hash relation: hash must be blake2b-256 of the call bytes
+const wrongHash = Object.assign({}, goodDraft, { id: "d2", hash: "0".repeat(64) });
+eq("sanitizer drops hash/call mismatch", C.sanitizeDrafts([wrongHash], hashOf).length, 0);
+eq("sanitizer without hashOf keeps shape-valid hash", C.sanitizeDrafts([wrongHash]).length, 1);
+t("sanitizer drops non-hex / short hash",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { hash: "zz" })], hashOf).length === 0);
+// call shape: valid hex, 2..4096 bytes
+t("sanitizer drops bad-hex call", C.sanitizeDrafts([Object.assign({}, goodDraft, { callHex: "zzzz" })], hashOf).length === 0);
+t("sanitizer drops 1-byte call", C.sanitizeDrafts([Object.assign({}, goodDraft, { callHex: "00", hash: hashOf([0]) })], hashOf).length === 0);
+const bigCall = new Array(4097).fill(0);
+t("sanitizer drops over-cap (4097B) call",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { callHex: C.bytesToHex(bigCall), hash: hashOf(bigCall) })], hashOf).length === 0);
+const maxCall = new Array(4096).fill(0);
+eq("sanitizer keeps exactly-4KiB call",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { callHex: C.bytesToHex(maxCall), hash: hashOf(maxCall) })], hashOf).length, 1);
+// track relation: lifecycle/buildSubmit index TRACKS[trackId]
+t("sanitizer drops unknown/string track",
+  [99, -1, "1", null].every((tr) => C.sanitizeDrafts([Object.assign({}, goodDraft, { trackId: tr })], hashOf).length === 0));
+// field hardening on a kept entry
+const messy = C.sanitizeDrafts([Object.assign({}, goodDraft, {
+  id: "d3", name: 42, notes: 7, created: 12345, checks: null, enactKind: "whenever", enactVal: -5
+})], hashOf);
+eq("sanitizer: numeric name falls back to callName", messy[0].name, "System.authorize_upgrade");
+eq("sanitizer: numeric notes -> empty", messy[0].notes, "");
+eq("sanitizer: numeric created -> empty (render prints 'date unknown')", messy[0].created, "");
+eq("sanitizer: null checks -> 5 falses", JSON.stringify(messy[0].checks), "[false,false,false,false,false]");
+eq("sanitizer: garbage enactKind -> after", messy[0].enactKind, "after");
+eq("sanitizer: negative enactVal -> 0", messy[0].enactVal, 0);
+const partialChecks = C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "d4", checks: [true, "yes", 1] })], hashOf);
+eq("sanitizer: only strict true survives in checks", JSON.stringify(partialChecks[0].checks), "[true,false,false,false,false]");
+// id dedupe: delete/load match on id, so duplicates must not survive
+const dupes = C.sanitizeDrafts([goodDraft, Object.assign({}, goodDraft, { name: "copy" })], hashOf);
+eq("sanitizer dedupes ids", new Set(dupes.map((d) => d.id)).size, 2);
+// cap
+const many = Array.from({ length: 150 }, (_, i) => Object.assign({}, goodDraft, { id: "m" + i }));
+eq("sanitizer caps at MAX_DRAFTS", C.sanitizeDrafts(many, hashOf).length, C.MAX_DRAFTS);
+
 console.log(pass + "/" + (pass + fail) + " proposal-studio tests green");
 process.exit(fail ? 1 : 0);

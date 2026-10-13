@@ -384,8 +384,9 @@
 
   /* ---------------- draft vault ---------------- */
   var VKEY = "qps_drafts_v1";
+  function draftHashOf(bytes) { return CR.toHex(blake256(bytes)); }
   function loadDrafts() {
-    try { return JSON.parse(localStorage.getItem(VKEY) || "[]"); }
+    try { return C.sanitizeDrafts(JSON.parse(localStorage.getItem(VKEY) || "[]"), draftHashOf); }
     catch (e) { return []; }
   }
   function saveDrafts(d) { localStorage.setItem(VKEY, JSON.stringify(d)); }
@@ -418,8 +419,11 @@
       try {
         var arr = JSON.parse(r.result);
         if (!Array.isArray(arr)) throw new Error("not an array");
-        saveDrafts(arr.concat(loadDrafts()));
-        renderVault(); toast("Imported " + arr.length + " draft(s)");
+        // Sanitize BEFORE persisting: an import that saves what it parsed
+        // turns one malformed file into a permanently crashing vault.
+        var clean = C.sanitizeDrafts(arr, draftHashOf);
+        saveDrafts(clean.concat(loadDrafts()));
+        renderVault(); toast("Imported " + clean.length + " of " + arr.length + " draft(s)");
       } catch (err) { toast("Import failed: " + err.message); }
     };
     r.readAsText(f);
@@ -433,7 +437,7 @@
         return "<label class='" + (on ? "done" : "") + "'><input type='checkbox' data-did='" + x.id + "' data-step='" + i + "'" + (on ? " checked" : "") + "><span><strong>" + s.n + ". " + esc(s.title) + "</strong> — " + esc(s.detail.split(".")[0]) + ".</span></label>";
       }).join("");
       return "<div class='draft'><div class='draft-head'><h4>" + esc(x.name) + "</h4>" +
-        "<span class='when'>" + esc(x.created.slice(0, 10)) + " · track " + x.trackId + "</span><span class='spacer'></span>" +
+        "<span class='when'>" + esc(x.created ? x.created.slice(0, 10) : "date unknown") + " · track " + x.trackId + "</span><span class='spacer'></span>" +
         "<button class='btn sm' data-load='" + x.id + "'>Load into pack</button>" +
         "<button class='btn sm' data-del='" + x.id + "'>Delete</button></div>" +
         (x.notes ? "<p class='fine'>" + esc(x.notes) + "</p>" : "") +
