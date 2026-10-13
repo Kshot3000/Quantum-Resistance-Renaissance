@@ -27,18 +27,71 @@ function save() {
     }));
   } catch (e) { /* storage full/blocked: session-only */ }
 }
+/* The add form's address gate, shared by every untrusted boundary (stored
+ * state, CSV import): SS58 decodes, checksum valid, prefix 189, and the
+ * key is exactly 32 bytes — a prefix-189 string over a shorter key is a
+ * valid generic SS58 string but not a Quantus account. */
+function validVaultAddress(a) {
+  if (typeof a !== "string" || !window.QSS58) return false;
+  var dec;
+  try { dec = window.QSS58.ss58Decode(a); } catch (e) { return false; }
+  return !!(dec && dec.ok && dec.prefix === 189 && dec.key && dec.key.length === 32);
+}
 function load() {
-  var parsed = null;
+  var parsed = null, raw = null;
   try {
-    var raw = localStorage.getItem(LS_KEY);
+    raw = localStorage.getItem(LS_KEY);
     if (raw) parsed = JSON.parse(raw);
   } catch (e) { parsed = null; }
   /* Sanitize at the storage boundary (L.sanitizeState): the old reviver
    * converted "bigint:..." strings inline, so ONE corrupt value aborted
    * the whole parse and silently reset the entire vault; a plain garbage
    * quantity survived the reviver and then threw inside normEvent on
-   * every render, bricking the app until the user cleared site data. */
-  state = L.sanitizeState(parsed);
+   * every render, bricking the app until the user cleared site data.
+   * Round 3: the sanitizer also enforces the form's relations (real
+   * Quantus addresses only, deduped; unique event ids; amounts within
+   * the 21M supply; real calendar price days), and the clean copy is
+   * persisted back so the poison does not survive to the next visit. */
+  state = L.sanitizeState(parsed, { validateAddress: validVaultAddress });
+  if (raw !== null) {
+    try {
+      var cleanRaw = JSON.stringify(state, function (k, v) {
+        return typeof v === "bigint" ? "bigint:" + v.toString() : v;
+      });
+      if (cleanRaw !== raw) save();
+    } catch (e) { /* storage full/blocked: render the clean copy anyway */ }
+  }
+}
+/* The stored checkphrase is a derived field of the address: at boot every
+ * stored word set is verified against a fresh derivation, and a mismatch
+ * is replaced with the derived words, persisted, re-rendered, and
+ * announced — never painted as truth (the Contact Vault rule, applied to
+ * the tax desk whose vault rows print the words beside each address). */
+function verifyStoredWords() {
+  if (!window.QTC_CHECK || !window.QTC_WORDLIST || !state.addresses.length) return;
+  var chain = Promise.resolve(), corrected = 0, filled = false;
+  state.addresses.forEach(function (a) {
+    chain = chain.then(function () {
+      return window.QTC_CHECK.addressToChecksumAsync(a.address, window.QTC_WORDLIST)
+        .then(function (words) {
+          var stored = (a.words || []).join(" ");
+          if (stored !== words.join(" ")) {
+            if (stored) corrected++; else filled = true;
+            a.words = words;
+          }
+        }).catch(function () { /* derivation unavailable: keep stored */ });
+    });
+  });
+  chain.then(function () {
+    if (corrected || filled) {
+      save(); renderVault();
+    }
+    if (corrected) {
+      $("addrCheck").innerHTML = '<span class="bad">Corrected the stored checkphrase for ' +
+        corrected + (corrected === 1 ? " address" : " addresses") +
+        " \u2014 the saved words did not match the address, so the derived words are shown instead.</span>";
+    }
+  });
 }
 
 function priceLookup(ms) {
@@ -522,20 +575,23 @@ function importEventsCsv(file) {
       try {
         var r = rows[i];
         var qty = L.parseQtcToPlanck(r[idx("amount_qtc")] || "");
-        if (qty === null || qty <= 0n) { bad++; continue; }
+        if (qty === null || qty <= 0n || qty > L.MAX_SUPPLY_PLANCKS) { bad++; continue; }
         var dm = Date.parse(r[idx("date")] || "");
         if (!isFinite(dm)) { bad++; continue; }
+        var csvAddr = String(r[idx("address")] || "").trim();
+        if (csvAddr && !validVaultAddress(csvAddr)) { bad++; continue; }
         var t = (r[idx("type")] || "").trim();
         if (!L.INFLOW[t] && !L.OUTFLOW[t]) { bad++; continue; }
         var csvId = idx("id") >= 0 ? String(r[idx("id")] || "").trim() : "";
         var csvRef = idx("ref") >= 0 ? String(r[idx("ref")] || "").trim() : "";
         if ((csvId && existingIds[csvId]) || (csvRef && existingRefs[csvRef])) { dup++; continue; }
         var fee = L.parseQtcToPlanck(r[idx("fee_qtc")] || "") || 0n;
+        if (fee > L.MAX_SUPPLY_PLANCKS) fee = 0n;
         var newId = csvId || uid();
         state.events.push({ id: newId, dateMs: dm, type: t,
-          address: r[idx("address")] || "", qtyPlanck: qty,
+          address: csvAddr, qtyPlanck: qty,
           priceMicro: L.parseUsdPerQtcToMicro(r[idx("price_usd_per_qtc")] || ""),
-          feePlanck: fee, note: r[idx("note")] || "",
+          feePlanck: fee, note: String(r[idx("note")] || "").slice(0, 500),
           source: (idx("source") >= 0 && String(r[idx("source")] || "").trim()) || "csv-import",
           ref: csvRef, internal: /^y/i.test(r[idx("internal")] || ""), flags: [] });
         existingIds[newId] = 1;
@@ -805,6 +861,7 @@ function init() {
   $("btnExportAll").addEventListener("click", exportVault);
   $("btnWipe").addEventListener("click", wipeVault);
   renderAll();
+  verifyStoredWords();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();

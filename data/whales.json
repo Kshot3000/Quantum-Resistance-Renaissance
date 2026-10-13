@@ -1,16 +1,16 @@
 {
   "ok": true,
   "source": "https://sqm.quantus.com/v1/graphql",
-  "fetched_at": "2026-10-13T06:21:11.744Z",
-  "block_height": 216182,
-  "accounts_total": 14468,
+  "fetched_at": "2026-10-13T07:23:45.882Z",
+  "block_height": 216418,
+  "accounts_total": 14508,
   "supply_plancks": {
-    "free": "5811599911771767181",
+    "free": "5811730290955474871",
     "reserved": "103500000000",
     "frozen": "0"
   },
-  "mined_plancks": "66533660000000000",
-  "transfers_total": 559108,
+  "mined_plancks": "66606110000000000",
+  "transfers_total": 560022,
   "vesting": {
     "schedules": 48,
     "total_plancks": "5669940000000000000",
@@ -44,37 +44,37 @@
       "key": "whale",
       "label": "Whales ≥ 1,000 QTC",
       "count": 18,
-      "sum_plancks": "5765816930467262280"
+      "sum_plancks": "5765970492746375565"
     },
     {
       "key": "shark",
       "label": "Sharks 100 – 1,000",
       "count": 104,
-      "sum_plancks": "24279881261203359"
+      "sum_plancks": "24253402388750942"
     },
     {
       "key": "dolphin",
       "label": "Dolphins 10 – 100",
-      "count": 533,
-      "sum_plancks": "16701187548981952"
+      "count": 534,
+      "sum_plancks": "16710853024785630"
     },
     {
       "key": "fish",
       "label": "Fish 1 – 10",
-      "count": 1286,
-      "sum_plancks": "3933169255388742"
+      "count": 1287,
+      "sum_plancks": "3949326106301121"
     },
     {
       "key": "shrimp",
       "label": "Shrimp 0.1 – 1",
-      "count": 2461,
-      "sum_plancks": "831504186213891"
+      "count": 2342,
+      "sum_plancks": "808636911562633"
     },
     {
       "key": "dust",
       "label": "Dust < 0.1",
-      "count": 10066,
-      "sum_plancks": "37239052716957"
+      "count": 10223,
+      "sum_plancks": "37579777698980"
     }
   ],
   "top": [
@@ -96,11 +96,11 @@
     {
       "rank": 2,
       "address": "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk",
-      "free_plancks": "196240481429217322",
+      "free_plancks": "196307641655371408",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "196240481429217322",
+      "liquid_plancks": "196307641655371408",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -111,41 +111,41 @@
     {
       "rank": 3,
       "address": "qzmsbecAqfvgBYAtxKwSkbLTvsUrwPGykaVFvZpAf9Zj3SErv",
-      "free_plancks": "27639710000000000",
+      "free_plancks": "27686700000000000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "27639710000000000",
+      "liquid_plancks": "27686700000000000",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
       "is_multisig": false,
       "is_high_security": false,
-      "blocks_mined": 89762
+      "blocks_mined": 89915
     },
     {
       "rank": 4,
       "address": "qzowWAgbzjc2XfHY4vyEo2eVLKbknTESUFoXnisQuUh1x1koo",
-      "free_plancks": "23892760000000000",
+      "free_plancks": "23898620000000000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "23892760000000000",
+      "liquid_plancks": "23898620000000000",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
       "is_multisig": false,
       "is_high_security": false,
-      "blocks_mined": 76271
+      "blocks_mined": 76290
     },
     {
       "rank": 5,
       "address": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
-      "free_plancks": "21044153800852888",
+      "free_plancks": "21059505853812087",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "21044153800852888",
+      "liquid_plancks": "21059505853812087",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -156,17 +156,17 @@
     {
       "rank": 6,
       "address": "qzmb4MVgBfg1fhcH6uf4uyqgrsLeCaDfUucrVPpnfGubJHTSR",
-      "free_plancks": "9949530000000000",
+      "free_plancks": "9961920000000000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "9949530000000000",
+      "liquid_plancks": "9961920000000000",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
       "is_multisig": false,
       "is_high_security": false,
-      "blocks_mined": 32209
+      "blocks_mined": 32249
     },
     {
       "rank": 7,
@@ -306,17 +306,17 @@
     {
       "rank": 16,
       "address": "qzpueEjdvcRyjgo5NVqURZv9keqjC2PL9FRctc4wJoRcmyP91",
-      "free_plancks": "1209240000000000",
+      "free_plancks": "1215050000000000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "1209240000000000",
+      "liquid_plancks": "1215050000000000",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
       "is_multisig": false,
       "is_high_security": false,
-      "blocks_mined": 3932
+      "blocks_mined": 3951
     },
     {
       "rank": 17,
@@ -381,11 +381,11 @@
     {
       "rank": 21,
       "address": "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa",
-      "free_plancks": "716179077390001",
+      "free_plancks": "719843442613782",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "716179077390001",
+      "liquid_plancks": "719843442613782",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -921,11 +921,11 @@
     {
       "rank": 57,
       "address": "qzmTCYuJniLxBJ7vgcG6aTutuQ4TLiuV183PvtKap46qLtVLU",
-      "free_plancks": "214695552804230",
+      "free_plancks": "214790314980432",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "214695552804230",
+      "liquid_plancks": "214790314980432",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -1116,11 +1116,11 @@
     {
       "rank": 70,
       "address": "qznAChFswaaJdY7vaPebqbofhSMCuSvkqp2ak13hg981sTU55",
-      "free_plancks": "173632305418736",
+      "free_plancks": "173740237511992",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "173632305418736",
+      "liquid_plancks": "173740237511992",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -1175,12 +1175,12 @@
     },
     {
       "rank": 74,
-      "address": "qzkg8WrSNhwgs5TwKktGAgkCvk4DWeJvgF2qW4gtCMqK7jsjf",
-      "free_plancks": "163327305947219",
+      "address": "qzpvNLi4pnh2p9Mfpd4y3CfEQdUz8153j6Vt2pP8TLSy8bE7v",
+      "free_plancks": "163631115018146",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "163327305947219",
+      "liquid_plancks": "163631115018146",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -1190,12 +1190,12 @@
     },
     {
       "rank": 75,
-      "address": "qzpvNLi4pnh2p9Mfpd4y3CfEQdUz8153j6Vt2pP8TLSy8bE7v",
-      "free_plancks": "162296964100086",
+      "address": "qzkg8WrSNhwgs5TwKktGAgkCvk4DWeJvgF2qW4gtCMqK7jsjf",
+      "free_plancks": "163327305947219",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "162296964100086",
+      "liquid_plancks": "163327305947219",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -1385,6 +1385,21 @@
     },
     {
       "rank": 88,
+      "address": "qzo4QjZzBFC4gL72EjtG7kQkemGmP67wWmruLLN9sgMNAQSzb",
+      "free_plancks": "136136808964346",
+      "reserved_plancks": "0",
+      "frozen_plancks": "0",
+      "locked_plancks": "0",
+      "liquid_plancks": "136136808964346",
+      "is_vesting_pool": false,
+      "is_genesis_recipient": false,
+      "is_guardian": false,
+      "is_multisig": false,
+      "is_high_security": false,
+      "blocks_mined": 0
+    },
+    {
+      "rank": 89,
       "address": "qzjwoYNiSyCrXuBfhrdRvF3mMUU3yyH6vLr3Zh96oPvyYtMkT",
       "free_plancks": "135983865000000",
       "reserved_plancks": "0",
@@ -1399,7 +1414,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 89,
+      "rank": 90,
       "address": "qzkuqnzWYzKRat8FMtTKARBZo6cMP39tCTMintvDNwL7WrFJU",
       "free_plancks": "135448918146012",
       "reserved_plancks": "0",
@@ -1414,28 +1429,13 @@
       "blocks_mined": 0
     },
     {
-      "rank": 90,
+      "rank": 91,
       "address": "qzpBwFsyNDVqmLZKBBbLS18fAAGMgctQdnVHC8eQsn1zShjzb",
       "free_plancks": "135300000000000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
       "liquid_plancks": "135300000000000",
-      "is_vesting_pool": false,
-      "is_genesis_recipient": false,
-      "is_guardian": false,
-      "is_multisig": false,
-      "is_high_security": false,
-      "blocks_mined": 0
-    },
-    {
-      "rank": 91,
-      "address": "qzo4QjZzBFC4gL72EjtG7kQkemGmP67wWmruLLN9sgMNAQSzb",
-      "free_plancks": "134731746725848",
-      "reserved_plancks": "0",
-      "frozen_plancks": "0",
-      "locked_plancks": "0",
-      "liquid_plancks": "134731746725848",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -1460,21 +1460,6 @@
     },
     {
       "rank": 93,
-      "address": "qzpfaBqjx2j4XheiiBhFGAVVs4BD9N9NFBw7gZX4WZtdnT4jn",
-      "free_plancks": "133573870954787",
-      "reserved_plancks": "0",
-      "frozen_plancks": "0",
-      "locked_plancks": "0",
-      "liquid_plancks": "133573870954787",
-      "is_vesting_pool": false,
-      "is_genesis_recipient": false,
-      "is_guardian": false,
-      "is_multisig": false,
-      "is_high_security": false,
-      "blocks_mined": 0
-    },
-    {
-      "rank": 94,
       "address": "qznHBs3AHEbVxkMJ6LzCbEHGaDdA6MoTPfcZX7a4JpHxMT7N9",
       "free_plancks": "132517749874242",
       "reserved_plancks": "0",
@@ -1489,22 +1474,22 @@
       "blocks_mined": 0
     },
     {
-      "rank": 95,
+      "rank": 94,
       "address": "qzjj4JaBxwYjo8UYgWfQGCqL5xsYZcqjm3JxZM14nRgrNYQKz",
-      "free_plancks": "130490000000000",
+      "free_plancks": "130790000000000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "130490000000000",
+      "liquid_plancks": "130790000000000",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
       "is_multisig": false,
       "is_high_security": false,
-      "blocks_mined": 423
+      "blocks_mined": 424
     },
     {
-      "rank": 96,
+      "rank": 95,
       "address": "qzoXZVcaNYGmn6sJccRH81Sxkg9Q5tpE7VkQH7nXQJPbp95qu",
       "free_plancks": "129443090697500",
       "reserved_plancks": "0",
@@ -1519,7 +1504,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 97,
+      "rank": 96,
       "address": "qznrV9fDesXuRD2NfsEcTXvZopkJvqAVfjkGWdAAdZdsqZVWJ",
       "free_plancks": "126013633124989",
       "reserved_plancks": "0",
@@ -1534,7 +1519,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 98,
+      "rank": 97,
       "address": "qznAHKu1BLoJWyBjHQeq5w6BGp8sYuu7kWa8Cg2oPhRTnuapR",
       "free_plancks": "126000000000000",
       "reserved_plancks": "0",
@@ -1549,7 +1534,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 99,
+      "rank": 98,
       "address": "qzovYYWrF6EWtm4Wm9Ai4LgmvDTf5jErU9NnjDrtYrLDMECct",
       "free_plancks": "125551993867500",
       "reserved_plancks": "0",
@@ -1564,7 +1549,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 100,
+      "rank": 99,
       "address": "qzosDzuzYXvbe7cC8f2vDKc1kMufXpT5oGGKGSbHBqSuFY6cb",
       "free_plancks": "124999196697500",
       "reserved_plancks": "0",
@@ -1579,7 +1564,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 101,
+      "rank": 100,
       "address": "qzmMRieJr4m5KFGjST2vjZ5JjRiVKRokwPhMeNnDkoG9cGobQ",
       "free_plancks": "122998869000000",
       "reserved_plancks": "0",
@@ -1594,7 +1579,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 102,
+      "rank": 101,
       "address": "qzo5YdsWp2DG3TqdAS4VFTjwccywMKgtKnJrt9E4HMxvbv8UY",
       "free_plancks": "122011085300000",
       "reserved_plancks": "0",
@@ -1609,7 +1594,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 103,
+      "rank": 102,
       "address": "qzmmiJ9hCYgVFeqnFYC5Ya9XAMcukoQCgCjhHGKmewYjRhmBG",
       "free_plancks": "121797287216909",
       "reserved_plancks": "0",
@@ -1624,7 +1609,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 104,
+      "rank": 103,
       "address": "qzq5yVicW29KaC41A8TMud2EP1aYkDS1ZnS5AVxW74Yf4Tcv7",
       "free_plancks": "118028357663171",
       "reserved_plancks": "0",
@@ -1639,7 +1624,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 105,
+      "rank": 104,
       "address": "qzoajsXQPHbJdbrH2ch55Unbz5W5wbDMQJNFBbAEna33thDmd",
       "free_plancks": "117498408424320",
       "reserved_plancks": "0",
@@ -1654,7 +1639,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 106,
+      "rank": 105,
       "address": "qznmemLe42STFJPLjfdbPyxAK8kEAnz6yVZEMbpjkeyNhRy9B",
       "free_plancks": "117019860000000",
       "reserved_plancks": "0",
@@ -1669,7 +1654,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 107,
+      "rank": 106,
       "address": "qzpVHkvVcZtLW2HGwbdJsyfgkALGqNGTMvssGQFNqSLoFjAt4",
       "free_plancks": "116858166395000",
       "reserved_plancks": "0",
@@ -1684,7 +1669,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 108,
+      "rank": 107,
       "address": "qzne8eE5PWh1tqCbzVR8mqNfPCt6wDnQ4xjfBJe7nNHL9424g",
       "free_plancks": "116070109145000",
       "reserved_plancks": "0",
@@ -1699,7 +1684,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 109,
+      "rank": 108,
       "address": "qznadUJvJ9onypgHf7JtxWfKTiF5yh6ShM8pfqvSx38Zdx8pH",
       "free_plancks": "113120000000000",
       "reserved_plancks": "0",
@@ -1714,7 +1699,7 @@
       "blocks_mined": 365
     },
     {
-      "rank": 110,
+      "rank": 109,
       "address": "qzngnCxrsmr9zcdELVQWV9p6UWuukj7nvQ8xCssgDjQkep99q",
       "free_plancks": "109622265000000",
       "reserved_plancks": "0",
@@ -1729,7 +1714,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 111,
+      "rank": 110,
       "address": "qzpz8qHWkf1mjNBterLaU1Tgp7b1hV9GnTf5Tsv1NuzXUbFHU",
       "free_plancks": "106590000000000",
       "reserved_plancks": "0",
@@ -1744,7 +1729,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 112,
+      "rank": 111,
       "address": "qzmJgtA2XNeTKz5yurBSnmiuoNhJPYGkzKRxUrhB2FDj1Fchr",
       "free_plancks": "106051559111673",
       "reserved_plancks": "0",
@@ -1759,7 +1744,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 113,
+      "rank": 112,
       "address": "qzkJ2pjxZSs8c8Xxm1LcMC8N1JC6gpYPaLg7HQJJR25n3wLhg",
       "free_plancks": "103620000000000",
       "reserved_plancks": "0",
@@ -1774,7 +1759,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 114,
+      "rank": 113,
       "address": "qzkpcrnNPn751aBi2AG8U8CirRnypaqvE5ftBPQvovmJ4BD1v",
       "free_plancks": "102094077173737",
       "reserved_plancks": "0",
@@ -1789,13 +1774,13 @@
       "blocks_mined": 0
     },
     {
-      "rank": 115,
+      "rank": 114,
       "address": "qzjkAW57Y3PDBbDwSYK5jobj2WGZvkLGkUiqZy72JS7i4cCBf",
-      "free_plancks": "101025238966714",
+      "free_plancks": "101141093067000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "101025238966714",
+      "liquid_plancks": "101141093067000",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -1804,7 +1789,7 @@
       "blocks_mined": 0
     },
     {
-      "rank": 116,
+      "rank": 115,
       "address": "qzkHBTL7WCfBZMfUz6wV5fWVES3edzm8AfmwuRKVEEtsejA3y",
       "free_plancks": "100997000000000",
       "reserved_plancks": "0",
@@ -1819,13 +1804,28 @@
       "blocks_mined": 0
     },
     {
-      "rank": 117,
+      "rank": 116,
       "address": "qzmzdXM45KyBcH6w97DPeDUT7Z34A3w1JPCjxUNs28m4uqYvu",
       "free_plancks": "100757139000000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
       "liquid_plancks": "100757139000000",
+      "is_vesting_pool": false,
+      "is_genesis_recipient": false,
+      "is_guardian": false,
+      "is_multisig": false,
+      "is_high_security": false,
+      "blocks_mined": 0
+    },
+    {
+      "rank": 117,
+      "address": "qzpfaBqjx2j4XheiiBhFGAVVs4BD9N9NFBw7gZX4WZtdnT4jn",
+      "free_plancks": "100072871752287",
+      "reserved_plancks": "0",
+      "frozen_plancks": "0",
+      "locked_plancks": "0",
+      "liquid_plancks": "100072871752287",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -2120,21 +2120,6 @@
     },
     {
       "rank": 137,
-      "address": "qzo1Pr3XqYPvQGuMyLJr519o5DRCwupHGxAND1fB5XA1nwakq",
-      "free_plancks": "82902021011312",
-      "reserved_plancks": "0",
-      "frozen_plancks": "0",
-      "locked_plancks": "0",
-      "liquid_plancks": "82902021011312",
-      "is_vesting_pool": false,
-      "is_genesis_recipient": false,
-      "is_guardian": false,
-      "is_multisig": false,
-      "is_high_security": false,
-      "blocks_mined": 0
-    },
-    {
-      "rank": 138,
       "address": "qzmTrZVY8A1AonnAsu8BHZnBoNTEzvw6DQwSHpYVjHJT9S4HY",
       "free_plancks": "82640000000000",
       "reserved_plancks": "0",
@@ -2149,13 +2134,28 @@
       "blocks_mined": 0
     },
     {
-      "rank": 139,
+      "rank": 138,
       "address": "qzmjGymHMLeVg8MNdBnNVNvpnz7HSoZT5N9BaFxBxcDjV2vGA",
       "free_plancks": "82447464000000",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
       "liquid_plancks": "82447464000000",
+      "is_vesting_pool": false,
+      "is_genesis_recipient": false,
+      "is_guardian": false,
+      "is_multisig": false,
+      "is_high_security": false,
+      "blocks_mined": 0
+    },
+    {
+      "rank": 139,
+      "address": "qzo1Pr3XqYPvQGuMyLJr519o5DRCwupHGxAND1fB5XA1nwakq",
+      "free_plancks": "82175367455399",
+      "reserved_plancks": "0",
+      "frozen_plancks": "0",
+      "locked_plancks": "0",
+      "liquid_plancks": "82175367455399",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -2361,11 +2361,11 @@
     {
       "rank": 153,
       "address": "qzoX543UGT1jfA6hmRRqGCanD8D6ek1r6yrKeVq9RaNW2mhaH",
-      "free_plancks": "74512123411898",
+      "free_plancks": "74213010749182",
       "reserved_plancks": "0",
       "frozen_plancks": "0",
       "locked_plancks": "0",
-      "liquid_plancks": "74512123411898",
+      "liquid_plancks": "74213010749182",
       "is_vesting_pool": false,
       "is_genesis_recipient": false,
       "is_guardian": false,
@@ -3005,6 +3005,21 @@
     },
     {
       "rank": 196,
+      "address": "qznmXxVAZWrFVgzgW5ovSjLt181co22PM6RsEgugnpWu3Jdu2",
+      "free_plancks": "59850000000000",
+      "reserved_plancks": "0",
+      "frozen_plancks": "0",
+      "locked_plancks": "0",
+      "liquid_plancks": "59850000000000",
+      "is_vesting_pool": false,
+      "is_genesis_recipient": false,
+      "is_guardian": false,
+      "is_multisig": false,
+      "is_high_security": false,
+      "blocks_mined": 194
+    },
+    {
+      "rank": 197,
       "address": "qzodiWRBWHm7CQE5bqW8AGXcrBXqmAZ5ix2Qdzfcyewj4TgnL",
       "free_plancks": "59490000000000",
       "reserved_plancks": "0",
@@ -3017,21 +3032,6 @@
       "is_multisig": false,
       "is_high_security": false,
       "blocks_mined": 0
-    },
-    {
-      "rank": 197,
-      "address": "qznmXxVAZWrFVgzgW5ovSjLt181co22PM6RsEgugnpWu3Jdu2",
-      "free_plancks": "59220000000000",
-      "reserved_plancks": "0",
-      "frozen_plancks": "0",
-      "locked_plancks": "0",
-      "liquid_plancks": "59220000000000",
-      "is_vesting_pool": false,
-      "is_genesis_recipient": false,
-      "is_guardian": false,
-      "is_multisig": false,
-      "is_high_security": false,
-      "blocks_mined": 192
     },
     {
       "rank": 198,
@@ -3403,6 +3403,78 @@
   ],
   "whale_moves_recent": [
     {
+      "amount": "12192400000000",
+      "fee": "999302500",
+      "from_id": "qznES63vBU1hmE1bZaZAPyhq6AeSWJf9Rj7tpeM5MP9Sc1MTm",
+      "to_id": "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk",
+      "block_height": 216354,
+      "timestamp": "2026-10-13T07:08:30.217+00:00"
+    },
+    {
+      "amount": "33500000000000",
+      "fee": "999202500",
+      "from_id": "qzoDGC6sCScJBmLyDkyqq9Kikt79HcM2SgaggiGocgAPNKcBQ",
+      "to_id": "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk",
+      "block_height": 216344,
+      "timestamp": "2026-10-13T07:05:20.564+00:00"
+    },
+    {
+      "amount": "12192400000000",
+      "fee": "803502500",
+      "from_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "to_id": "qznES63vBU1hmE1bZaZAPyhq6AeSWJf9Rj7tpeM5MP9Sc1MTm",
+      "block_height": 216339,
+      "timestamp": "2026-10-13T07:04:44.982+00:00"
+    },
+    {
+      "amount": "10719000000000",
+      "fee": "999302500",
+      "from_id": "qzo6dCTZu8v74a3DtvGpTj4DpgaQYRB51XpNb1RMpWiwgmJdB",
+      "to_id": "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk",
+      "block_height": 216336,
+      "timestamp": "2026-10-13T07:02:46.865+00:00"
+    },
+    {
+      "amount": "33500000000000",
+      "fee": "999202500",
+      "from_id": "qzpfaBqjx2j4XheiiBhFGAVVs4BD9N9NFBw7gZX4WZtdnT4jn",
+      "to_id": "qzoDGC6sCScJBmLyDkyqq9Kikt79HcM2SgaggiGocgAPNKcBQ",
+      "block_height": 216327,
+      "timestamp": "2026-10-13T07:01:14.498+00:00"
+    },
+    {
+      "amount": "10719000000000",
+      "fee": "803502500",
+      "from_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "to_id": "qzo6dCTZu8v74a3DtvGpTj4DpgaQYRB51XpNb1RMpWiwgmJdB",
+      "block_height": 216320,
+      "timestamp": "2026-10-13T06:59:14.294+00:00"
+    },
+    {
+      "amount": "10098274627473",
+      "fee": "999302500",
+      "from_id": "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk",
+      "to_id": "qzp8qmLpmJvSaQJJWHu1YAWfRKjsr9NuaipRU8jASkc4DYJqb",
+      "block_height": 216307,
+      "timestamp": "2026-10-13T06:56:41.874+00:00"
+    },
+    {
+      "amount": "17673206000000",
+      "fee": "803502500",
+      "from_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "to_id": "qznUzuLVUq1PRhvgEJtZEPn95zESmJUjy2E3bQKqwEJLZxLq5",
+      "block_height": 216217,
+      "timestamp": "2026-10-13T06:32:11.17+00:00"
+    },
+    {
+      "amount": "11501098664969",
+      "fee": "803502500",
+      "from_id": "qzpdUwxV9hhNmNLGGU1Bs4LBZFnn4G5fn6uKx1nfLNdEh19tB",
+      "to_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
+      "block_height": 216193,
+      "timestamp": "2026-10-13T06:23:18.325+00:00"
+    },
+    {
       "amount": "11501919667469",
       "fee": "28351007976",
       "from_id": "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa",
@@ -3649,78 +3721,6 @@
       "to_id": "qzmTrZVY8A1AonnAsu8BHZnBoNTEzvw6DQwSHpYVjHJT9S4HY",
       "block_height": 215457,
       "timestamp": "2026-10-13T03:24:40.505+00:00"
-    },
-    {
-      "amount": "10057686383124",
-      "fee": "803502500",
-      "from_id": "qzpdUwxV9hhNmNLGGU1Bs4LBZFnn4G5fn6uKx1nfLNdEh19tB",
-      "to_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
-      "block_height": 215444,
-      "timestamp": "2026-10-13T03:21:22.567+00:00"
-    },
-    {
-      "amount": "10058507385624",
-      "fee": "26523629807",
-      "from_id": "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa",
-      "to_id": "qzpdUwxV9hhNmNLGGU1Bs4LBZFnn4G5fn6uKx1nfLNdEh19tB",
-      "block_height": 215400,
-      "timestamp": "2026-10-13T03:10:16.956+00:00"
-    },
-    {
-      "amount": "11985100000000",
-      "fee": "999302500",
-      "from_id": "qznES63vBU1hmE1bZaZAPyhq6AeSWJf9Rj7tpeM5MP9Sc1MTm",
-      "to_id": "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk",
-      "block_height": 215377,
-      "timestamp": "2026-10-13T03:05:07.884+00:00"
-    },
-    {
-      "amount": "11985100000000",
-      "fee": "803502500",
-      "from_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
-      "to_id": "qznES63vBU1hmE1bZaZAPyhq6AeSWJf9Rj7tpeM5MP9Sc1MTm",
-      "block_height": 215361,
-      "timestamp": "2026-10-13T03:02:05.098+00:00"
-    },
-    {
-      "amount": "47000000000000",
-      "fee": "999202500",
-      "from_id": "qzjhegNJVvDvtUGfrTJfpFx6C8qBGU9oF7qigfDmL2k6joX4Z",
-      "to_id": "qzmzw3Bf2sPHaqSZJnUmNJAYiD5DZosZ4xw1kZduqGGKePTDk",
-      "block_height": 215244,
-      "timestamp": "2026-10-13T02:37:07.542+00:00"
-    },
-    {
-      "amount": "47000000000000",
-      "fee": "803502500",
-      "from_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
-      "to_id": "qzjhegNJVvDvtUGfrTJfpFx6C8qBGU9oF7qigfDmL2k6joX4Z",
-      "block_height": 215228,
-      "timestamp": "2026-10-13T02:33:56.406+00:00"
-    },
-    {
-      "amount": "19997000000000",
-      "fee": "803502500",
-      "from_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
-      "to_id": "qzo8m57og2XNraCkAyRVYaYRnAMZvNH9TMk1GqaBMhptAZaGz",
-      "block_height": 215204,
-      "timestamp": "2026-10-13T02:25:33.986+00:00"
-    },
-    {
-      "amount": "11635991357766",
-      "fee": "803502500",
-      "from_id": "qzpdUwxV9hhNmNLGGU1Bs4LBZFnn4G5fn6uKx1nfLNdEh19tB",
-      "to_id": "qzomrwjTJf49jqYsyBpEZpVdEcAN3A4fdNJAV1xV9SA4Tm8rF",
-      "block_height": 215191,
-      "timestamp": "2026-10-13T02:21:41.144+00:00"
-    },
-    {
-      "amount": "11636812360266",
-      "fee": "31091675228",
-      "from_id": "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa",
-      "to_id": "qzpdUwxV9hhNmNLGGU1Bs4LBZFnn4G5fn6uKx1nfLNdEh19tB",
-      "block_height": 215149,
-      "timestamp": "2026-10-13T02:10:22.993+00:00"
     }
   ],
   "params": {

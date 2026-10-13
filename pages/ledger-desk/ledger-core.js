@@ -304,53 +304,118 @@ function toBigIntOrNull(v) {
   }
   return null;
 }
-function sanitizeState(raw) {
+// Round 3 (2026-10-13): validate RELATIONS at the stored-state boundary,
+// not just shapes — the same relations the app's own forms enforce. Round 1
+// kept any non-empty string as a vault address: the add form requires an
+// SS58 decode with a valid checksum, prefix 189, and a 32-byte key, and it
+// refuses duplicates, so a bad-checksum, another chain's, short-key, or
+// duplicated stored address was painted as a watched Quantus wallet and
+// scanned as one. The stored checkphrase is a DERIVED field: anything that
+// is not exactly 5 strings is not a checkphrase and is dropped to [] (the
+// app re-derives the true words at boot and replaces a mismatched set).
+// Event ids are match keys (delete-by-id, CSV round-trip dedupe), so
+// duplicates are dropped — first occurrence wins; quantities and fees are
+// bounded by the chain's 21M QTC supply (MAX_SUPPLY_PLANCKS); a non-empty
+// event address must pass the same address validator as the vault (the
+// event form only ever offers vault addresses or "external"). Price days
+// must be REAL calendar dates (2026-02-31 matched the old regex and sorted
+// as a price day) and are deduped keeping the last row, which is the row
+// priceLookup's last-wins scan would have used. Lists are capped so a
+// poisoned store cannot make every render walk an unbounded ledger.
+// opts.validateAddress(addr) -> bool is supplied by the app (full SS58
+// checksum decode); without it the core falls back to the strict SS58-189
+// shape (isSs58_189), the same shape the snapshot validators use.
+var MAX_VAULT_ADDRESSES = 500;
+var MAX_LEDGER_EVENTS = 10000;
+var MAX_PRICE_DAYS = 3660;
+function sanitizeState(raw, opts) {
   var clean = { addresses: [], events: [], prices: [], method: "FIFO" };
   if (!raw || typeof raw !== "object") return clean;
+  var validateAddress = (opts && typeof opts.validateAddress === "function")
+    ? opts.validateAddress : null;
+  function addrOk(a) {
+    if (typeof a !== "string" || !a) return false;
+    if (validateAddress) { try { return !!validateAddress(a); } catch (e) { return false; } }
+    return isSs58_189(a);
+  }
   if (Array.isArray(raw.addresses)) {
+    var seenAddr = {};
     raw.addresses.forEach(function (a) {
-      if (!a || typeof a.address !== "string" || !a.address) return;
+      if (clean.addresses.length >= MAX_VAULT_ADDRESSES) return;
+      if (!a || typeof a !== "object" || Array.isArray(a)) return;
+      if (!addrOk(a.address) || seenAddr[a.address]) return;
+      seenAddr[a.address] = 1;
+      // The checkphrase shape is exactly 5 words; a 3-word (or 6-word, or
+      // non-string-bearing) stored set is not a checkphrase for anything.
+      var words = (Array.isArray(a.words) && a.words.length === 5 &&
+        a.words.every(function (w) { return typeof w === "string" && !!w; }))
+        ? a.words.slice() : [];
       clean.addresses.push({
         address: a.address,
-        label: typeof a.label === "string" ? a.label : "",
-        words: Array.isArray(a.words) ? a.words.filter(function (w) { return typeof w === "string"; }) : [],
-        addedAt: (typeof a.addedAt === "number" && isFinite(a.addedAt)) ? a.addedAt : 0
+        label: typeof a.label === "string" ? a.label.slice(0, 80) : "",
+        words: words,
+        addedAt: (typeof a.addedAt === "number" && isFinite(a.addedAt) && a.addedAt >= 0) ? a.addedAt : 0
       });
     });
   }
   if (Array.isArray(raw.events)) {
+    var seenId = {};
     raw.events.forEach(function (e, i) {
+      if (clean.events.length >= MAX_LEDGER_EVENTS) return;
       if (!e || typeof e !== "object") return;
       if (!INFLOW[e.type] && !OUTFLOW[e.type]) return; // unknown type: engine would only flag it
       var dateMs = Number(e.dateMs);
       if (!isFinite(dateMs)) return;
       var qty = toBigIntOrNull(e.qtyPlanck);
-      if (qty === null || qty <= 0n) return; // an event without a real quantity is not an event
+      // An event without a real quantity is not an event — and no event
+      // can move more QTC than exists: the supply is capped at 21M.
+      if (qty === null || qty <= 0n || qty > MAX_SUPPLY_PLANCKS) return;
       var fee = toBigIntOrNull(e.feePlanck);
-      if (fee === null || fee < 0n) fee = 0n;
+      if (fee === null || fee < 0n || fee > MAX_SUPPLY_PLANCKS) fee = 0n;
       var price = null;
       if (e.priceMicro !== null && e.priceMicro !== undefined) {
         price = toBigIntOrNull(e.priceMicro);
         if (price === null || price < 0n) price = null; // unpriced beats poisoned
       }
+      var evAddr = typeof e.address === "string" ? e.address : "";
+      if (evAddr && !addrOk(evAddr)) return; // unattributable: not a Quantus address
+      var hasId = typeof e.id === "string" && !!e.id;
+      if (hasId && seenId[e.id]) return; // duplicate match key: drop, first wins
+      var id = hasId ? e.id : "ev-restored-" + i;
+      while (seenId[id]) id += "-r"; // restored ids must not collide either
+      seenId[id] = 1;
       clean.events.push({
-        id: (typeof e.id === "string" && e.id) ? e.id : "ev-restored-" + i,
+        id: id,
         dateMs: dateMs, type: e.type,
-        address: typeof e.address === "string" ? e.address : "",
+        address: evAddr,
         qtyPlanck: qty, priceMicro: price, feePlanck: fee,
-        note: typeof e.note === "string" ? e.note : "",
-        source: typeof e.source === "string" ? e.source : "manual",
-        ref: typeof e.ref === "string" ? e.ref : "",
+        note: typeof e.note === "string" ? e.note.slice(0, 500) : "",
+        source: typeof e.source === "string" ? e.source.slice(0, 64) : "manual",
+        ref: typeof e.ref === "string" ? e.ref.slice(0, 128) : "",
         internal: !!e.internal,
-        flags: Array.isArray(e.flags) ? e.flags.filter(function (f) { return typeof f === "string"; }) : []
+        flags: Array.isArray(e.flags) ? e.flags.filter(function (f) { return typeof f === "string"; }).slice(0, 16).map(function (f) { return f.slice(0, 32); }) : []
       });
     });
   }
   if (Array.isArray(raw.prices)) {
+    var pricePos = {};
     raw.prices.forEach(function (p) {
-      if (!p || typeof p.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(p.day)) return;
+      if (!p || typeof p !== "object" || typeof p.day !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(p.day)) return;
+      // Real calendar dates only: the regex alone admits 2026-02-31 and
+      // 2026-99-99, which then sort and price-lookup as genuine days.
+      var dt = new Date(p.day + "T00:00:00Z");
+      if (!isFinite(dt.getTime()) || dt.toISOString().slice(0, 10) !== p.day) return;
       var micro = toBigIntOrNull(p.micro);
       if (micro === null || micro < 0n) return;
+      if (Object.prototype.hasOwnProperty.call(pricePos, p.day)) {
+        // Duplicate day: priceLookup scans in order and the LAST row wins,
+        // so the last row is the one that was actually in effect — keep it.
+        clean.prices[pricePos[p.day]] = { day: p.day, micro: micro };
+        return;
+      }
+      if (clean.prices.length >= MAX_PRICE_DAYS) return;
+      pricePos[p.day] = clean.prices.length;
       clean.prices.push({ day: p.day, micro: micro });
     });
   }
@@ -531,6 +596,8 @@ var api = {
   validateLiveHead: validateLiveHead, validateMiners: validateMiners,
   validateFlowsMeta: validateFlowsMeta,
   toBigIntOrNull: toBigIntOrNull, sanitizeState: sanitizeState,
+  MAX_VAULT_ADDRESSES: MAX_VAULT_ADDRESSES, MAX_LEDGER_EVENTS: MAX_LEDGER_EVENTS,
+  MAX_PRICE_DAYS: MAX_PRICE_DAYS,
   rewardModelPlancks: rewardModelPlancks,
   parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc,
   parseUsdPerQtcToMicro: parseUsdPerQtcToMicro, formatUsd: formatUsd,
