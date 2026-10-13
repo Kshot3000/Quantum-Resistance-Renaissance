@@ -157,11 +157,11 @@ const goodEnv = codec.buildEnvelope(1, sha256(codec.utf8ToBytes("abc")), "Deed")
 const goodCall = codec.buildRemarkCall(goodEnv.bytes, true);
 const GOOD = { id: "n1", created: "2026-10-01T12:00:00.000Z", mode: "document",
   algo: "SHA-256", digestHex: goodDigest, label: "Deed", envelopeHex: goodEnv.hex,
-  callHex: goodCall.callHex, withEvent: true, feeQTC: "0.0005354", block: "123" };
+  callHex: goodCall.callHex, withEvent: true, feeQTC: "0.0005349", block: "123" };
 const GOOD_MSG2 = { id: "n2", created: "2026-10-02T12:00:00.000Z", mode: "message",
   algo: null, digestHex: null, label: null, envelopeHex: null,
   callHex: codec.buildRemarkCall(codec.utf8ToBytes("hi"), false).callHex,
-  withEvent: false, feeQTC: "0.0005", block: null };
+  withEvent: false, feeQTC: "0.0005307", block: null };
 t("sanitizeVault keeps valid doc + message anchors verbatim",
   (() => { const v = codec.sanitizeVault([GOOD, GOOD_MSG2]);
     return v.length === 2 && v[0].digestHex === goodDigest && v[0].block === "123" &&
@@ -216,6 +216,53 @@ t("sanitizeVault nulls an absurd block annotation, anchor survives",
 t("sanitizeVault nulls a block-0 annotation (genesis holds no remarks)",
   (() => { const v = codec.sanitizeVault([{ ...GOOD, block: "0" }]);
     return v.length === 1 && v[0].block === null; })());
+/* --- round 3: PRODUCER relations --- */
+t("sanitizeVault drops a payload above the producer cap (4097-byte message)",
+  codec.sanitizeVault([{ ...GOOD_MSG2, id: "n3", callHex: codec.buildRemarkCall(new Array(4097).fill(0x61), false).callHex }]).length === 0);
+t("sanitizeVault keeps a payload at exactly the cap (4096-byte message)",
+  (() => { const c = codec.buildRemarkCall(new Array(4096).fill(0x61), false);
+    return codec.sanitizeVault([{ ...GOOD_MSG2, id: "n4", callHex: c.callHex,
+      feeQTC: codec.formatQTC(BigInt(c.callHex.length / 2 + 5302) * 100000n) }]).length === 1; })());
+t("sanitizeVault drops a fee above the length band for the stored call",
+  codec.sanitizeVault([{ ...GOOD, feeQTC: "5" }]).length === 0);
+t("sanitizeVault drops a fee below the length band",
+  codec.sanitizeVault([{ ...GOOD, feeQTC: "0.0001" }]).length === 0);
+t("sanitizeVault drops a fee not divisible by the per-byte length fee",
+  codec.sanitizeVault([{ ...GOOD, feeQTC: "0.00053495" }]).length === 0);
+t("sanitizeVault drops a non-canonical fee (trailing-zero fraction)",
+  codec.sanitizeVault([{ ...GOOD, feeQTC: "0.00053490" }]).length === 0);
+t("sanitizeVault drops a non-canonical fee (leading-zero integer)",
+  codec.sanitizeVault([{ ...GOOD, feeQTC: "00.0005349" }]).length === 0);
+t("sanitizeVault keeps a fee at the band maximum (ML-DSA-87 + widest nonce)",
+  codec.sanitizeVault([{ ...GOOD, feeQTC: "0.000731" }]).length === 1);
+t("sanitizeVault drops a fee implying a 3-byte nonce (compact widths are 1, 2 or 4)",
+  codec.sanitizeVault([{ ...GOOD, feeQTC: "0.0005351" }]).length === 0);
+t("validFeeForCall pins the GOOD anchor's fee and rejects its neighbours",
+  codec.validFeeForCall(GOOD.feeQTC, GOOD.callHex.length / 2) === true &&
+  codec.validFeeForCall("0.0005353", GOOD.callHex.length / 2) === false &&
+  codec.validFeeForCall("0.0007311", GOOD.callHex.length / 2) === false);
+t("sanitizeVault drops a message anchor carrying a label (builds write null)",
+  codec.sanitizeVault([{ ...GOOD_MSG2, label: "hi" }]).length === 0);
+t("sanitizeVault dedupes duplicate callHex anchors, first wins",
+  (() => { const v = codec.sanitizeVault([GOOD, { ...GOOD, id: "n9" }]);
+    return v.length === 1 && v[0].id === "n1"; })());
+t("sanitizeVault reassigns a duplicate id instead of dropping the anchor",
+  (() => { const v = codec.sanitizeVault([GOOD, { ...GOOD_MSG2, id: "n1" }]);
+    return v.length === 2 && v[0].id !== v[1].id; })());
+t("sanitizeVault reassigns a non-producer id shape",
+  (() => { const v = codec.sanitizeVault([{ ...GOOD, id: "<img src=x>" }]);
+    return v.length === 1 && /^n-sanitized-\d+$/.test(v[0].id); })());
+t("sanitizeVault caps the vault at MAX_VAULT_ENTRIES",
+  (() => { const rows = [];
+    for (let i = 0; i < 600; i++) { const c = codec.buildRemarkCall(codec.utf8ToBytes("m" + i), false);
+      rows.push({ ...GOOD_MSG2, id: "n" + (1000 + i), callHex: c.callHex,
+        feeQTC: codec.formatQTC(BigInt(c.callHex.length / 2 + 5302) * 100000n) }); }
+    return codec.sanitizeVault(rows).length === codec.MAX_VAULT_ENTRIES; })());
+t("sanitizeVault drops a future-dated anchor",
+  codec.sanitizeVault([{ ...GOOD, created: new Date(Date.now() + 86400000).toISOString() }]).length === 0);
+t("sanitizeVault drops a pre-launch anchor (before Sept 2026)",
+  codec.sanitizeVault([{ ...GOOD, created: "2020-01-01T00:00:00.000Z" }]).length === 0);
+
 t("events reject trailing bytes after the last record",
   codec.decodeSystemEvents(craftEvents().concat([0xaa])).ok === false);
 t("events reject a Remarked record under the Finalization phase",

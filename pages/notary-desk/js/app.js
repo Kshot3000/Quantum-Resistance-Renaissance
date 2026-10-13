@@ -320,8 +320,17 @@ const VKEY = "qnot_vault_v1";
  * survive verbatim, poisoned entries drop, and renderers/verify only
  * ever see fields that have already checked out. */
 function loadVault() {
-  try { return C.sanitizeVault(JSON.parse(localStorage.getItem(VKEY) || "[]")); }
-  catch { return []; }
+  try {
+    const raw = localStorage.getItem(VKEY);
+    const clean = C.sanitizeVault(JSON.parse(raw || "[]"));
+    /* Persist the clean copy so poison does not survive to the next
+     * visit (the fleet persist-clean rule); the compare keeps a
+     * fully-valid vault byte-identical and untouched. */
+    if (raw !== null && JSON.stringify(clean) !== raw) {
+      try { saveVault(clean); } catch { /* quota — the clean copy still renders */ }
+    }
+    return clean;
+  } catch { return []; }
 }
 function saveVault(v) { localStorage.setItem(VKEY, JSON.stringify(v)); }
 

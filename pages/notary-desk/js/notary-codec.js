@@ -322,6 +322,64 @@
            (typeof v === "number" && Number.isSafeInteger(v) && v >= 0);
   }
 
+  /* Round 3 — PRODUCER relations. Rounds 1–2 checked shapes and the
+   * envelope relations, but several stored fields are DERIVED or
+   * bounded by the only producer (the Build button), and the sanitizer
+   * accepted values no build could ever have written:
+   *  - the remark payload is capped by the producer (messages at
+   *    MAX_MESSAGE_BYTES, document envelopes far below it), yet a
+   *    stored call of ANY size was parsed and hashed on every load;
+   *  - feeQTC is derived: signedLengthEstimate(callLen, scheme, nonce)
+   *    = totalBytes × LENGTH_FEE_PER_BYTE, in formatQTC's canonical
+   *    decimal. The vault stores neither scheme nor nonce, so the fee
+   *    cannot be recomputed exactly — but it must be a canonical
+   *    ≤12-fraction-digit decimal whose plancks are divisible by
+   *    LENGTH_FEE_PER_BYTE and whose implied total length lies in one
+   *    of the two intervals the schemes × nonce widths (1, 2 or 4 bytes)
+   *    allow for THIS call's length. An invented fee ("5", "0.0001")
+   *    painted as the anchor's quote is a fee figure no build made;
+   *  - a message build always writes label: null — a stored label on a
+   *    message anchor renders as its heading, a claim the user never
+   *    made;
+   *  - created is stamped at build time: before the chain's Sept-2026
+   *    launch or in the future (beyond a 5-minute clock skew) is not a
+   *    build this desk made, yet it paints in the verify HIT panel;
+   *  - the anchor's identity is its call: duplicate callHex rows are
+   *    the same on-chain anchor twice, and duplicate ids (the build
+   *    stamps "n" + epoch-ms) collide — ids are deduped by
+   *    reassignment, anchors by first-wins drop;
+   *  - the vault had no entry cap while renderVault paints every row.
+   */
+  var MAX_VAULT_ENTRIES = 500;
+  var VAULT_EPOCH_MS = Date.parse("2026-09-01T00:00:00.000Z");
+  var CREATED_SKEW_MS = 5 * 60 * 1000;
+  // Achievable signed lengths for a call of callLen bytes, mirroring
+  // signedLengthEstimate's body formula exactly: bodyLen = 1 +
+  // (1 + 32) + (1 + sig + pub) + 2 + nonceBytes + 1 + callLen, plus
+  // the 2-byte length prefix every producer-reachable body size
+  // takes (bodies run ~5,300–11,400 bytes: never < 64, never
+  // >= 16,384). The nonce compact width runs 1–4 bytes and the sig
+  // section is one of the two schemes', so the achievable totals are
+  // TWO disjoint {1,2,4}-offset sets — a total between them (ML-DSA-65
+  // section with a 5-byte nonce) is as unproducible as one outside.
+  function validFeeForCall(feeQTC, callLen) {
+    if (typeof feeQTC !== "string") return false;
+    var m = /^(0|[1-9]\d*)(?:\.(\d*[1-9]))?$/.exec(feeQTC);
+    if (!m) return false;
+    var frac = m[2] || "";
+    if (frac.length > 12) return false;
+    var plancks = BigInt(m[1]) * UNIT + BigInt((frac + "000000000000").slice(0, 12));
+    if (plancks % LENGTH_FEE_PER_BYTE !== 0n) return false;
+    var total = Number(plancks / LENGTH_FEE_PER_BYTE);
+    var fixed = callLen + 1 + (1 + 32) + 2 + 1 + 2; // + lenPrefix
+    return Object.keys(SIG_SCHEMES).some(function (k) {
+      var s = SIG_SCHEMES[k];
+      var nonceBytes = total - fixed - (1 + s.sig + s.pub);
+      // SCALE compact widths are 1, 2 or 4 bytes — never 3.
+      return nonceBytes === 1 || nonceBytes === 2 || nonceBytes === 4;
+    });
+  }
+
   /* Sanitize a parsed localStorage vault: returns a NEW array holding
    * only anchors whose every rendered/verified field checks out, with
    * fields normalized (lowercase hex, block annotation coerced to a
@@ -341,12 +399,17 @@
   function sanitizeVault(raw) {
     if (!Array.isArray(raw)) return [];
     var out = [];
+    var seenCalls = new Set(), seenIds = new Set();
     for (var i = 0; i < raw.length; i++) {
+      if (out.length >= MAX_VAULT_ENTRIES) break;
       var a = raw[i];
       if (!a || typeof a !== "object" || Array.isArray(a)) continue;
       if (a.mode !== "document" && a.mode !== "message") continue;
       if (typeof a.created !== "string" || !isFinite(Date.parse(a.created))) continue;
-      if (typeof a.feeQTC !== "string" || !/^\d+(\.\d+)?$/.test(a.feeQTC)) continue;
+      // RELATION (round 3): created is the build stamp — inside the
+      // chain's lifetime and not in the future.
+      var createdMs = Date.parse(a.created);
+      if (createdMs < VAULT_EPOCH_MS || createdMs > Date.now() + CREATED_SKEW_MS) continue;
       if (typeof a.withEvent !== "boolean") continue;
       if (a.label !== null && a.label !== undefined && typeof a.label !== "string") continue;
       if (typeof a.callHex !== "string" || !/^[0-9a-fA-F]+$/.test(a.callHex) ||
@@ -363,6 +426,20 @@
       var cpl = readCompact(callBytes, 2);
       if (!cpl || cpl.value === 0 || cpl.next + cpl.value !== callBytes.length) continue;
       var payloadBytes = callBytes.slice(cpl.next, cpl.next + cpl.value);
+      // RELATION (round 3): the producer caps the remark payload —
+      // messages at MAX_MESSAGE_BYTES, document envelopes far below
+      // it — so a longer payload is not a call this desk built.
+      if (payloadBytes.length > MAX_MESSAGE_BYTES) continue;
+      // RELATION (round 3): feeQTC is DERIVED from this call's length
+      // (see validFeeForCall) — an out-of-band or non-canonical figure
+      // was never quoted for this anchor.
+      if (!validFeeForCall(a.feeQTC, callBytes.length)) continue;
+      // RELATION (round 3): one anchor, one row — the call IS the
+      // anchor's identity; a second row for the same call describes
+      // the same on-chain remark with possibly different claims.
+      var callKey = a.callHex.toLowerCase();
+      if (seenCalls.has(callKey)) continue;
+      seenCalls.add(callKey);
       var digestHex = null, algo = null, envelopeHex = null;
       if (a.mode === "document") {
         if (typeof a.digestHex !== "string" || !/^[0-9a-fA-F]{64}$/.test(a.digestHex)) continue;
@@ -384,6 +461,9 @@
         if (bytesToHex(payloadBytes) !== envelopeHex) continue;
       } else {
         if (a.digestHex !== null || a.algo !== null || a.envelopeHex !== null) continue;
+        // RELATION (round 3): a message build writes label: null —
+        // a labelled message anchor paints a heading no build made.
+        if (a.label !== null && a.label !== undefined) continue;
       }
       var block = null;
       if (typeof a.block === "string" && /^\d+$/.test(a.block)) {
@@ -394,8 +474,15 @@
         var bn = Number(a.block);
         if (validChainHeight(bn) && bn >= 1) block = String(bn);
       }
+      // Ids are stamped "n" + epoch-ms by the build; a stored id of
+      // any other shape, or one already used by a kept anchor, is
+      // reassigned a unique sanitized id (never a drop — the anchor
+      // itself checked out).
+      var id = (typeof a.id === "string" && /^n\d{1,20}$/.test(a.id) && !seenIds.has(a.id))
+        ? a.id : "n-sanitized-" + out.length;
+      seenIds.add(id);
       out.push({
-        id: (typeof a.id === "string" && a.id) ? a.id : "n-sanitized-" + out.length,
+        id: id,
         created: a.created, mode: a.mode, algo: algo, digestHex: digestHex,
         label: (typeof a.label === "string" && a.label) ? a.label : null,
         envelopeHex: envelopeHex, callHex: a.callHex.toLowerCase(),
@@ -465,6 +552,7 @@
     parseBlockNumber: parseBlockNumber, isHash32: isHash32,
     validChainHeight: validChainHeight, MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT,
     validSubscriptionId: validSubscriptionId, sanitizeVault: sanitizeVault,
+    MAX_VAULT_ENTRIES: MAX_VAULT_ENTRIES, validFeeForCall: validFeeForCall,
     ss58Encode32: ss58Encode32, systemEventsKey: systemEventsKey
   };
 }));
