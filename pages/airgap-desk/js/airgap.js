@@ -167,6 +167,15 @@ export function decodeTicket(str) {
   const { prefix, accountId } = ss58Decode(String(obj.addr || ''));
   if (prefix !== QUANTUS_PREFIX) throw new Error(`ticket: wrong network prefix ${prefix} (need 189)`);
   if (!Number.isInteger(obj.nonce) || obj.nonce < 0) throw new Error('ticket: nonce must be a non-negative integer');
+  // The nonce is a u32 on chain (system_accountNextIndex — the issuer's
+  // own parseNonce bounds it to u32 before a ticket exists), and it is
+  // compact-encoded into the signing payload. A value >= 2^32 can never
+  // be the account's next index, and a non-safe integer (>= 2^53) does
+  // not even survive JSON.parse intact — the ticket text and the value
+  // the cold side signs would silently disagree. Same class as the
+  // spec/txv u32 bound below; it was the one ticket integer missing it.
+  if (!Number.isSafeInteger(obj.nonce) || obj.nonce > 0xFFFFFFFF)
+    throw new Error('ticket: nonce must fit u32 (<= 4294967295)');
   mustHex32(obj.genesis, 'genesis');
   mustHex32(obj.headHash, 'headHash');
   mustHex32(obj.era && obj.era.birthHash, 'era.birthHash');

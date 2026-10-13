@@ -42,9 +42,11 @@ Sign QTC transfers on a machine that never touches the network.
   `Utility.batch_all` — one signature, recipient leg first and untouched. The hot
   decoder accepts exactly that 2-leg batch shape and renders both legs, warning
   when the second leg does not pay the disclosed builder address.
-- `tests/run-tests.mjs`: 37/37 protocol tests (ticket/chunk/era codecs, full cold-sign →
+- `tests/run-tests.mjs`: 39/39 protocol tests (ticket/chunk/era codecs, full cold-sign →
   hot-verify round trip incl. tamper and wrong-ticket failures, ML-DSA-87 path,
-  service-fee math/batch/decode-whitelist tests).
+  service-fee math/batch/decode-whitelist tests; the ticket nonce is held to the
+  issuer's u32 grammar — a nonce ≥ 2³² or a non-safe integer the JSON text could
+  not carry exactly is refused, never signed).
 - Browser QA (`hidden_files/qa-airgap-browser.mjs` in the goal workspace): end-to-end
   sign→verify in headless Chromium, QR encode→decode round trip, tamper rejection, and
   honest offline failure states — zero console/page errors.

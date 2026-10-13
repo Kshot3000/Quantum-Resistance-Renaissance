@@ -113,6 +113,21 @@ test('ticket: era relations enforced (round 2)', () => {
   assert.throws(() => decodeTicket(encodeTicket(big)), /quantize step/);
 });
 
+test('ticket: nonce must fit u32 (producer grammar)', () => {
+  // The issuer's parseNonce bounds the nonce to u32 before a ticket
+  // exists; u32-max itself is producer-legal and survives.
+  assert.equal(decodeTicket(encodeTicket(fixtureTicket({ nonce: 4294967295 }))).nonce, 4294967295);
+  assert.equal(decodeTicket(encodeTicket(fixtureTicket({ nonce: 0 }))).nonce, 0);
+  assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ nonce: 4294967296 }))), /nonce must fit u32/);
+  assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ nonce: 9007199254740991 }))), /nonce must fit u32/);
+  assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ nonce: 1e21 }))), /nonce must fit u32/);
+  // Raw-JSON precision: the ticket text carries ...993, JSON.parse reads
+  // ...992 — the value signed must never silently differ from the text.
+  const raw = JSON.stringify(fixtureTicket({ nonce: 9007199254740993 }));
+  const s = 'QAGT1:' + b64urlEncode(te.encode(raw));
+  assert.throws(() => decodeTicket(s), /nonce must fit u32/);
+});
+
 test('ticket: spec/tx versions must fit u32 (round 2)', () => {
   assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ spec: 4294967296 }))), /fit u32/);
   assert.throws(() => decodeTicket(encodeTicket(fixtureTicket({ txv: 4294967296 }))), /fit u32/);
