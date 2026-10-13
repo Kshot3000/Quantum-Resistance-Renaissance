@@ -53,11 +53,11 @@ existential deposit are flagged in the playbook.
 - `js/ss58.js` — SS58 codec extracted verbatim from `../address-toolkit/app.js`
   (blake2b + base58 + ss58Decode), exposed as `window.QTC_SS58`
 - `js/qrcode.js` — vendored QR generator (shared copy from Key Forge)
-- `tests/pay-desk.test.js` — 128 node tests, all green
+- `tests/pay-desk.test.js` — 141 node tests, all green
 
 ## Verification
 
-- `node pages/pay-desk/tests/pay-desk.test.js` — 128/128 pass
+- `node pages/pay-desk/tests/pay-desk.test.js` — 141/141 pass
 - Headless-Chromium browser QA (`hidden_files/qa-paydesk-browser.mjs`) —
   full user flow exercised, zero console/page errors
 - Service-fee browser QA (`hidden_files/qa-paydesk-fee.mjs`) — 17/17:

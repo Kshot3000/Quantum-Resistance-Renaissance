@@ -32,19 +32,41 @@ function parseUsdToCents(s) {
   return v >= 0n ? v : null;
 }
 
+/* The grammar of a rate this desk itself writes: the rate-save handler
+ * accepts only /^\d+(\.\d+)?$/ from the rate input and saveRate stores
+ * that string verbatim; createInvoice copies it into inv.rate verbatim.
+ * Every stored-rate read (loadRate, sanitizeRegister) holds its input to
+ * this same grammar — a number, an exponent form, a leading dot, or
+ * padding is not a rate this desk ever saved. */
+var PRODUCER_RATE_RE = /^\d+(\.\d+)?$/;
+
 /* Exact decimal -> rational {num, den} (BigInts), or null.
  * Accepts "12.50", ".5", "0.008912", and exponent forms ("1e-3") so a rate
- * passed as a JS number stringifies safely. No float ever touches money. */
+ * passed as a JS number stringifies safely. No float ever touches money.
+ * The exponent and the resulting scale are BOUNDED (|exp| and |scale|
+ * <= 1000, input <= 512 chars): an exponent is a compact way to name an
+ * astronomic integer, and the old code computed 10n ** exponent with no
+ * bound, so the 11-char stored string "1e100000000" made loadRate — which
+ * runs at state init, before any UI — try to build a 100-million-digit
+ * BigInt and hang the desk on every load until site data was cleared.
+ * The bound loses nothing real: a JS number stringifies with an exponent
+ * of at most 308 in magnitude (5e-324 at the small end), and no money
+ * decimal carries anywhere near 1,000 fraction digits. */
+var MAX_DECIMAL_SCALE = 1000;
 function parseDecimalRational(s) {
   var t = String(s == null ? "" : s).trim();
+  if (t.length > 512) return null;
   var m = /^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(t);
   if (!m) return null;
   var digits = (m[1] || "") + (m[2] || "");
   if (digits === "") return null;
+  var exp = m[3] ? Number(m[3]) : 0;
+  if (!Number.isFinite(exp) || Math.abs(exp) > MAX_DECIMAL_SCALE) return null;
+  var scale = (m[2] || "").length - exp;
+  if (scale > MAX_DECIMAL_SCALE || scale < -MAX_DECIMAL_SCALE) return null;
   var num = BigInt(digits);
-  var scale = BigInt((m[2] || "").length) - (m[3] ? BigInt(m[3].replace(/^\+/, "")) : 0n);
-  if (scale >= 0n) return { num: num, den: 10n ** scale };
-  return { num: num * (10n ** (-scale)), den: 1n };
+  if (scale >= 0) return { num: num, den: 10n ** BigInt(scale) };
+  return { num: num * (10n ** BigInt(-scale)), den: 1n };
 }
 
 function parseQtcToPlancks(s) {
@@ -216,7 +238,13 @@ function sanitizeRegister(raw, isValidAddress, nowMs) {
     if (typeof inv.plancks !== "string" || !/^\d+$/.test(inv.plancks)) continue;
     var plancks = BigInt(inv.plancks), usdCents = BigInt(inv.usdCents);
     if (plancks <= 0n || usdCents <= 0n) continue;
-    var rateR = parseDecimalRational(inv.rate == null ? "" : String(inv.rate));
+    /* inv.rate is a producer field: createInvoice copies the saved rate
+     * string verbatim, so it must BE that string — same grammar as
+     * loadRate. String() coercion used to let a numeric rate, ".5", or an
+     * exponent form through to the parser (and the exponent form to its
+     * then-unbounded 10n ** exponent). */
+    if (typeof inv.rate !== "string" || !PRODUCER_RATE_RE.test(inv.rate)) continue;
+    var rateR = parseDecimalRational(inv.rate);
     if (!rateR || rateR.num <= 0n) continue;
     if (typeof inv.qtc !== "string" || inv.qtc !== centsToQtcString(usdCents, inv.rate)) continue;
     if (plancks !== parseQtcToPlancks(inv.qtc)) continue;
@@ -312,7 +340,14 @@ function loadRate(nowMs) {
   try {
     var r = JSON.parse(localStorage.getItem(RATE_KEY) || "null");
     if (!r || typeof r !== "object" || Array.isArray(r)) return null;
-    var rr = parseDecimalRational(r.usdPerQtc == null ? "" : String(r.usdPerQtc));
+    /* The stored rate must be the producer's string (PRODUCER_RATE_RE):
+     * saveRate only ever writes the rate input's trimmed, grammar-checked
+     * string. A stored number, ".5", "1e-3", or a padded copy is not a
+     * rate this desk saved — and the exponent form reached the parser's
+     * exponent branch, where it could hang the load (see
+     * parseDecimalRational's bound). */
+    if (typeof r.usdPerQtc !== "string" || !PRODUCER_RATE_RE.test(r.usdPerQtc)) return null;
+    var rr = parseDecimalRational(r.usdPerQtc);
     if (!rr || rr.num <= 0n) return null;
     /* saveRate stamps Date.now(): a stored ts outside the desk era or in
      * the future is not a rate this desk saved — reject it like a bad rate. */
@@ -758,7 +793,7 @@ function init() {
 
   $("rate-save").addEventListener("click", function () {
     var v = $("rate-usd").value.trim();
-    if (!/^\d+(\.\d+)?$/.test(v) || Number(v) <= 0) {
+    if (!PRODUCER_RATE_RE.test(v) || Number(v) <= 0) {
       $("rate-usd").focus();
       return;
     }

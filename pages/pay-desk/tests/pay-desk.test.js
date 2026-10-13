@@ -322,6 +322,63 @@ eq("csv quotes doubled", P.csvEscape('a"b'), '"a""b"');
   })();
 })();
 
+/* ---- stored-rate grammar + decimal-parser exponent bound ----
+ * The only writer of a stored rate is the rate-save handler: it trims
+ * the rate input, requires /^\d+(\.\d+)?$/, and saveRate stores that
+ * STRING verbatim; createInvoice copies it into inv.rate verbatim.
+ * loadRate and sanitizeRegister used to String()-coerce whatever they
+ * found, so a numeric rate, ".5", or "1e-3" survived — and the exponent
+ * form reached parseDecimalRational's exponent branch, which computed
+ * 10n ** exponent unbounded: the 11-char stored "1e100000000" hung
+ * loadRate (state init, before any UI) on every load. The parser now
+ * bounds |exponent| and |scale| at 1000 (a JS number stringifies with
+ * at most e308 / 5e-324, so nothing real is lost), and both stored-rate
+ * reads hold the value to the producer's string grammar. */
+(function () {
+  eq("parser: 1e100000000 refused, not computed", P.parseDecimalRational("1e100000000"), null);
+  eq("parser: 1e-100000000 refused, not computed", P.parseDecimalRational("1e-100000000"), null);
+  eq("parser: poison rate through centsToQtcString refused", P.centsToQtcString(100n, "1e100000000"), null);
+  t("parser: 5000-digit fraction refused", P.parseDecimalRational("0." + "0".repeat(5000) + "1") === null);
+  t("parser: smallest JS-number exponent 5e-324 still parses", P.parseDecimalRational("5e-324") !== null);
+
+  global.window = global.window || {};
+  require("../js/ss58.js");
+  const SS58 = global.window.QTC_SS58;
+  const valid = (a) => { const d = SS58.ss58Decode(a); return d.ok && d.prefix === 189 && d.key.length === 32; };
+  const KYLE = "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau";
+  const CREATED = Date.UTC(2026, 9, 1, 4, 5, 6);
+  const NOW = Date.UTC(2026, 9, 13, 17, 0, 0);
+  global.localStorage = {
+    _v: null,
+    getItem() { return this._v; }, setItem(k, v) { this._v = v; }, removeItem() { this._v = null; },
+  };
+  const setRate = (usdPerQtc) => { global.localStorage._v = JSON.stringify({ usdPerQtc, ts: NOW - 60000 }); };
+  setRate(12.5);
+  eq("rate grammar: numeric stored rate rejected", P.loadRate(NOW), null);
+  setRate(".5");
+  eq("rate grammar: leading-dot stored rate rejected", P.loadRate(NOW), null);
+  setRate("1e-3");
+  eq("rate grammar: exponent stored rate rejected", P.loadRate(NOW), null);
+  setRate(" 12.50 ");
+  eq("rate grammar: padded stored rate rejected", P.loadRate(NOW), null);
+  setRate("12.50");
+  t("rate grammar: producer string kept verbatim", (() => { const r = P.loadRate(NOW); return !!r && r.usdPerQtc === "12.50"; })());
+  delete global.localStorage;
+
+  const good = (over) => Object.assign({
+    id: "INV-20261001-040506-ABC", ref: "good", address: KYLE,
+    usdCents: "1250", qtc: "1", plancks: "1000000000000",
+    serviceFeeBps: 50, serviceFeeQtc: "0.005", serviceFeePlancks: "5000000000",
+    serviceFeeAddress: KYLE, merchantQtc: "0.995", merchantPlancks: "995000000000",
+    rate: "12.50", rateTs: CREATED, created: CREATED, expiresAt: CREATED + 1800000,
+    status: "pending",
+  }, over || {});
+  const S = (raw) => P.sanitizeRegister(raw, valid, NOW);
+  eq("rate grammar: register exponent rate dropped (relation otherwise exact)", S([good({ rate: "1.25e1" })]).length, 0);
+  eq("rate grammar: register numeric rate dropped", S([good({ rate: 12.5 })]).length, 0);
+  eq("rate grammar: register exponent bomb dropped", S([good({ rate: "1e100000000" })]).length, 0);
+})();
+
 /* ---- constants ---- */
 eq("plancks per QTC", P.PLANCKS_PER_QTC, 1000000000000n);
 
