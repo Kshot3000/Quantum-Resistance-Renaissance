@@ -170,16 +170,8 @@
   function loadPlan() {
     try {
       const p = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
-      return {
-        beneficiaries: Array.isArray(p.beneficiaries) ? p.beneficiaries : [],
-        holdings: Array.isArray(p.holdings) ? p.holdings : [],
-        deadmanChoice: p.deadmanChoice || "",
-        deadmanText: p.deadmanText || "",
-        checks: Array.isArray(p.checks) ? p.checks : [],
-        owner: p.owner || "",
-        extra: p.extra || "",
-      };
-    } catch (e) { return { beneficiaries: [], holdings: [], deadmanChoice: "", deadmanText: "", checks: [], owner: "", extra: "" }; }
+      return LOGIC.sanitizePlan(p);
+    } catch (e) { return LOGIC.sanitizePlan(null); }
   }
   function savePlan() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(plan)); } catch (e) {}
@@ -316,15 +308,7 @@
     r.onload = () => {
       try {
         const p = JSON.parse(r.result);
-        plan = {
-          beneficiaries: Array.isArray(p.beneficiaries) ? p.beneficiaries : [],
-          holdings: Array.isArray(p.holdings) ? p.holdings : [],
-          deadmanChoice: p.deadmanChoice || "",
-          deadmanText: p.deadmanText || "",
-          checks: Array.isArray(p.checks) ? p.checks : [],
-          owner: p.owner || "",
-          extra: p.extra || "",
-        };
+        plan = LOGIC.sanitizePlan(p);
         savePlan(); hydratePlan(); validatePlan();
       } catch (err) { alert("Could not read that file: " + err.message); }
     };

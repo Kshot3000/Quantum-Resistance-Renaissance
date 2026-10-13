@@ -19,6 +19,67 @@
       .replace(/'/g, "&#39;");
   }
 
+  // ---------- untrusted-plan boundary ----------
+  // The plan reaches this module from localStorage and from a user-imported
+  // JSON file — both are untrusted. Every consumer below assumes string
+  // fields and plain-object entries; a poisoned plan (null entries, numeric
+  // "names", an object where a string belongs) used to throw TypeErrors in
+  // the validators, the letter builder, and the app's renderers — and the
+  // import path then persisted the poison, crashing every later boot.
+  // sanitizePlan is the single gate: it returns a plan of the exact shape
+  // the UI produces, dropping anything it cannot vouch for.
+  function str(v, cap) {
+    return typeof v === "string" ? v.slice(0, cap) : "";
+  }
+  function pctStr(v) {
+    if (typeof v === "number" && Number.isFinite(v)) return String(v);
+    return str(v, 32);
+  }
+  function isEntry(v) {
+    return !!v && typeof v === "object" && !Array.isArray(v);
+  }
+  const MAX_BENEFICIARIES = 100;
+  const MAX_HOLDINGS = 100;
+
+  function sanitizePlan(raw) {
+    const p = isEntry(raw) ? raw : {};
+    const beneficiaries = (Array.isArray(p.beneficiaries) ? p.beneficiaries : [])
+      .filter(isEntry)
+      .slice(0, MAX_BENEFICIARIES)
+      .map((b) => ({
+        name: str(b.name, 500),
+        relation: str(b.relation, 500),
+        sharePct: pctStr(b.sharePct),
+        contact: str(b.contact, 500),
+        notes: str(b.notes, 2000),
+      }));
+    const holdings = (Array.isArray(p.holdings) ? p.holdings : [])
+      .filter(isEntry)
+      .slice(0, MAX_HOLDINGS)
+      .map((h) => ({
+        item: str(h.item, 500),
+        location: str(h.location, 500),
+        access: str(h.access, 2000),
+      }));
+    const known = new Set(CHECKLIST_IDS);
+    const checks = [];
+    for (const id of Array.isArray(p.checks) ? p.checks : []) {
+      if (typeof id === "string" && known.has(id) && !checks.includes(id)) checks.push(id);
+    }
+    return {
+      beneficiaries,
+      holdings,
+      deadmanChoice: str(p.deadmanChoice, 64),
+      deadmanText: str(p.deadmanText, 20000),
+      checks,
+      owner: str(p.owner, 500),
+      extra: str(p.extra, 20000),
+    };
+  }
+  const CHECKLIST_IDS = [
+    "backup", "copies", "split", "heirs", "letter", "checkphrase", "tested", "review",
+  ];
+
   // ---------- beneficiaries ----------
   // beneficiary: { name, relation, sharePct, contact, notes }
   function validateBeneficiaries(list) {
@@ -30,13 +91,14 @@
     }
     let total = 0;
     const seen = new Set();
-    list.forEach((b, i) => {
+    list.forEach((rawB, i) => {
+      const b = isEntry(rawB) ? rawB : {};
       const tag = `Beneficiary ${i + 1}`;
-      const name = (b.name || "").trim();
+      const name = str(b.name, Infinity).trim();
       if (!name) errors.push(`${tag}: name is required.`);
       else {
         const key = name.toLowerCase();
-        if (seen.has(key)) errors.push(`${tag}: duplicate name "${b.name}".`);
+        if (seen.has(key)) errors.push(`${tag}: duplicate name "${name}".`);
         seen.add(key);
       }
       const pct = Number(b.sharePct);
@@ -45,7 +107,7 @@
       } else {
         total += pct;
       }
-      if (!(b.contact || "").trim() && !(b.notes || "").trim()) {
+      if (!str(b.contact, Infinity).trim() && !str(b.notes, Infinity).trim()) {
         warnings.push(`${tag || name}: no contact or notes — how will they be reached?`);
       }
     });
@@ -63,12 +125,13 @@
   function validateHoldings(list) {
     const errors = [];
     const warnings = [];
-    (list || []).forEach((h, i) => {
+    (list || []).forEach((rawH, i) => {
+      const h = isEntry(rawH) ? rawH : {};
       const tag = `Holding ${i + 1}`;
-      if (!(h.item || "").trim() && !(h.location || "").trim() && !(h.access || "").trim()) return;
-      if (!(h.item || "").trim()) errors.push(`${tag}: describe the item.`);
-      if (!(h.location || "").trim()) warnings.push(`${tag}: no storage location recorded.`);
-      if (!(h.access || "").trim()) warnings.push(`${tag}: no access instructions recorded.`);
+      if (!str(h.item, Infinity).trim() && !str(h.location, Infinity).trim() && !str(h.access, Infinity).trim()) return;
+      if (!str(h.item, Infinity).trim()) errors.push(`${tag}: describe the item.`);
+      if (!str(h.location, Infinity).trim()) warnings.push(`${tag}: no storage location recorded.`);
+      if (!str(h.access, Infinity).trim()) warnings.push(`${tag}: no access instructions recorded.`);
     });
     return { errors, warnings };
   }
@@ -104,13 +167,13 @@
   // ---------- inheritance letter ----------
   // plan: { owner, date, beneficiaries, holdings, deadman, extraNotes }
   function buildLetter(plan) {
-    const p = plan || {};
-    const owner = (p.owner || "").trim() || "[Your full legal name]";
-    const date = (p.date || "").trim() || new Date().toISOString().slice(0, 10);
-    const beneficiaries = Array.isArray(p.beneficiaries) ? p.beneficiaries : [];
-    const holdings = Array.isArray(p.holdings) ? p.holdings : [];
-    const deadman = (p.deadman || "").trim();
-    const extra = (p.extraNotes || "").trim();
+    const p = isEntry(plan) ? plan : {};
+    const owner = str(p.owner, Infinity).trim() || "[Your full legal name]";
+    const date = str(p.date, Infinity).trim() || new Date().toISOString().slice(0, 10);
+    const beneficiaries = (Array.isArray(p.beneficiaries) ? p.beneficiaries : []).map((b) => (isEntry(b) ? b : {}));
+    const holdings = (Array.isArray(p.holdings) ? p.holdings : []).map((h) => (isEntry(h) ? h : {}));
+    const deadman = str(p.deadman, Infinity).trim();
+    const extra = str(p.extraNotes, Infinity).trim();
 
     const benRows = beneficiaries.length
       ? beneficiaries.map((b, i) => {
@@ -122,8 +185,8 @@
         }).join("")
       : `<tr><td colspan="5" class="empty">No beneficiaries recorded yet — add them in the Plan tab.</td></tr>`;
 
-    const holdRows = holdings.filter((h) => (h.item || "").trim()).length
-      ? holdings.filter((h) => (h.item || "").trim()).map((h, i) =>
+    const holdRows = holdings.filter((h) => str(h.item, Infinity).trim()).length
+      ? holdings.filter((h) => str(h.item, Infinity).trim()).map((h, i) =>
           `<tr><td>${i + 1}</td><td>${esc(h.item)}</td>` +
           `<td>${esc(h.location) || "—"}</td><td>${esc(h.access) || "—"}</td></tr>`
         ).join("")
@@ -168,5 +231,5 @@ then move the rest.</div>
 </body></html>`;
   }
 
-  return { esc, validateBeneficiaries, validateHoldings, CHECKLIST, readinessScore, buildLetter };
+  return { esc, sanitizePlan, validateBeneficiaries, validateHoldings, CHECKLIST, readinessScore, buildLetter };
 });

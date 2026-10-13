@@ -33,7 +33,7 @@ plan a non-crypto person can follow, and print the letter your heirs will need.
 - `tests/vectors/shamir-vectors.json` — 45 known-answer vectors from
   `tests/gen-vectors.py`, an **independent Python implementation**; the JS
   `combine()` recovers every vector from first-*t* and last-*t* subsets.
-- `tests/run-tests.mjs` — 68/68 green: field axioms, split validation,
+- `tests/run-tests.mjs` — 81/81 green: field axioms, split validation,
   deterministic round-trips (n up to 16, secrets to 300 bytes, UTF-8/emoji),
   tamper/duplication/mixed-share rejection, plan validation, readiness math,
   letter XSS escaping.
@@ -52,3 +52,5 @@ plan a non-crypto person can follow, and print the letter your heirs will need.
 
 Built by [@kshot9000](https://x.com/kshot9000) · Donations (QTC):
 `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`
+
+Built for the Quantus blockchain — team: [@Quantus-Network](https://github.com/Quantus-Network)

@@ -9,14 +9,14 @@ var E = EnergyCore;
 
 /* ---------- constants ---------- */
 var FALLBACK = {
-  difficulty: "559445223602993",
-  height: 214463,
+  difficulty: "564903778831945",
+  height: 214729,
   // total supply in plancks (free + reserved + frozen), balances aggregate @ block
-  // 214,465, fetched 2026-10-12 — the SAME capture as the difficulty above
-  // (@ block 214,463, fetched 15 seconds apart; never mix snapshot dates in one bundle).
+  // 214,730, fetched 2026-10-13 — the SAME capture as the difficulty above
+  // (@ block 214,729, fetched 13 seconds apart; never mix snapshot dates in one bundle).
   // This is total_issuance for the emission formula, NOT mined rewards alone
   // (genesis endowments count toward issuance).
-  totalSupplyPlancks: "5810545585460768206",
+  totalSupplyPlancks: "5810710290371373732",
   fetchedAt: null,
   txRate: null,
   txRateSub: null,
@@ -269,7 +269,7 @@ function renderHero() {
   } else {
     pill.textContent = "no snapshot — using fallback figures";
     pill.classList.add("warn");
-    note.textContent = "The chain snapshots could not be loaded, so this page is showing fallback figures from the last verified capture (Oct 12, 2026) instead of inventing chain state.";
+    note.textContent = "The chain snapshots could not be loaded, so this page is showing fallback figures from the last verified capture (Oct 13, 2026) instead of inventing chain state.";
   }
 }
 

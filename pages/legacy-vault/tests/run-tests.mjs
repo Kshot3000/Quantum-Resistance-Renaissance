@@ -176,5 +176,60 @@ for (const [n, t, len] of combos) {
   ok("esc() handles nulls", LOGIC.esc(null) === "" && LOGIC.esc(undefined) === "");
 }
 
+// ---------- untrusted-plan boundary (localStorage + imported JSON) ----------
+{
+  // validators and the letter builder must never throw on poisoned entries
+  let threw = false;
+  try {
+    LOGIC.validateBeneficiaries([null, "x", 42, [], { name: 123, sharePct: {}, contact: [] }]);
+    LOGIC.validateHoldings([null, "x", { item: 7, location: {}, access: null }]);
+    LOGIC.buildLetter({ owner: 123, date: {}, deadman: [], extraNotes: 9, beneficiaries: [null, { sharePct: [] }], holdings: [null, { item: 5 }] });
+    LOGIC.buildLetter(null);
+    LOGIC.buildLetter("nope");
+  } catch (e) { threw = true; }
+  ok("validators + letter survive poisoned entries without throwing", !threw);
+  ok("null beneficiary reports errors instead of crashing",
+    LOGIC.validateBeneficiaries([null]).errors.length > 0);
+  ok("numeric owner falls back to the letter placeholder",
+    LOGIC.buildLetter({ owner: 123, beneficiaries: [], holdings: [] }).includes("[Your full legal name]"));
+
+  // sanitizePlan: shape, typing, caps
+  const clean = LOGIC.sanitizePlan({
+    beneficiaries: [
+      { name: "Ada", relation: "daughter", sharePct: 60, contact: "a@x", notes: "n" },
+      null, "junk", [1],
+      { name: 42, relation: {}, sharePct: "40", contact: [], notes: null },
+    ],
+    holdings: [{ item: "Share #1", location: "safe", access: "key" }, null, { item: 9 }],
+    deadmanChoice: "lawyer", deadmanText: 123, checks: ["backup", "bogus", "backup", 7, "tested"],
+    owner: "Kyle", extra: { nope: true },
+  });
+  ok("sanitizePlan drops non-object beneficiary entries", clean.beneficiaries.length === 2);
+  ok("sanitizePlan keeps good fields verbatim",
+    clean.beneficiaries[0].name === "Ada" && clean.beneficiaries[0].sharePct === "60" && clean.beneficiaries[0].contact === "a@x");
+  ok("sanitizePlan blanks non-string fields",
+    clean.beneficiaries[1].name === "" && clean.beneficiaries[1].contact === "" && clean.beneficiaries[1].sharePct === "40");
+  ok("sanitizePlan drops non-object holdings and blanks numeric item",
+    clean.holdings.length === 2 && clean.holdings[1].item === "");
+  ok("sanitizePlan keeps only known checklist ids, deduped",
+    JSON.stringify(clean.checks) === JSON.stringify(["backup", "tested"]));
+  ok("sanitizePlan keeps every real CHECKLIST id",
+    LOGIC.sanitizePlan({ checks: LOGIC.CHECKLIST.map((c) => c.id) }).checks.length === LOGIC.CHECKLIST.length);
+  ok("sanitizePlan blanks non-string scalars",
+    clean.deadmanText === "" && clean.extra === "" && clean.owner === "Kyle" && clean.deadmanChoice === "lawyer");
+  ok("sanitizePlan(null) is the empty plan",
+    JSON.stringify(LOGIC.sanitizePlan(null)) === JSON.stringify(LOGIC.sanitizePlan({})));
+  ok("sanitizePlan caps beneficiary count",
+    LOGIC.sanitizePlan({ beneficiaries: Array.from({ length: 500 }, () => ({ name: "x" })) }).beneficiaries.length === 100);
+  // a sanitized plan always validates and letters without throwing
+  let threw2 = false;
+  try {
+    LOGIC.validateBeneficiaries(clean.beneficiaries);
+    LOGIC.validateHoldings(clean.holdings);
+    LOGIC.buildLetter({ owner: clean.owner, beneficiaries: clean.beneficiaries, holdings: clean.holdings, deadman: clean.deadmanText, extraNotes: clean.extra });
+  } catch (e) { threw2 = true; }
+  ok("sanitized plan flows through validate + letter cleanly", !threw2);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log("FAILURES:\n" + failures.join("\n")); process.exit(1); }
