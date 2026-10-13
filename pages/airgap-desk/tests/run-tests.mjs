@@ -251,6 +251,11 @@ test('protocol: ML-DSA-87 path works end to end', () => {
 
 /* ---------------- service fee (profit route) ---------------- */
 
+test('ss58: reserved prefix forms are rejected, never read as prefix 189', () => {
+  assert.throws(() => ss58Decode('KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC'), /Reserved SS58 prefix form/);
+  assert.throws(() => ss58Decode('LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ'), /Reserved SS58 prefix form/);
+});
+
 test('fee: address pins — fee account id derives from the disclosed address', () => {
   const { prefix, accountId } = ss58Decode(SERVICE_FEE_ADDRESS);
   assert.equal(prefix, 189);

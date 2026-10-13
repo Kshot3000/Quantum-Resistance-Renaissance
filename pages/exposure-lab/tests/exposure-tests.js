@@ -25,6 +25,12 @@ async function ta(name, fn){
     var d = C.ss58Decode("qzjhuX9r6CzXzH3VWUcZjd9DHZHkC26BU6CGFp49m8YjQFJDc");
     assert.strictEqual(d.ok, false); assert.strictEqual(d.kind, "checksum");
   });
+  t("ss58 reserved prefix forms rejected", function(){
+    var d = C.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC");
+    assert.strictEqual(d.ok, false); assert.strictEqual(d.kind, "format");
+    var e = C.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ");
+    assert.strictEqual(e.ok, false); assert.strictEqual(e.kind, "format");
+  });
   t("validateQTC ok", function(){
     var v = C.validateQTC("qzjhuX9r6CzXzH3VWUcZjd9DHZHkC26BU6CGFp49m8YjQFJDa");
     assert.strictEqual(v.ok, true); assert.strictEqual(v.chain, "qtc");

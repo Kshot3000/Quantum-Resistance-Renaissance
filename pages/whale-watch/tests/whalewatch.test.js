@@ -45,6 +45,12 @@ t("blake2b('abc') matches RFC 7693 test vector", function(){
   var r = m.ss58Decode(bad);
   assert.ok(!r.ok && r.kind === "checksum", JSON.stringify(r));
 });
+t("ss58 reserved prefix forms rejected", function(){
+  var r = m.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC");
+  assert.ok(!r.ok && r.kind === "format", JSON.stringify(r));
+  var r2 = m.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ");
+  assert.ok(!r2.ok && r2.kind === "format", JSON.stringify(r2));
+});
 t("node:crypto blake2b512 sanity (oracle exists)", function(){
   var h = crypto.createHash("blake2b512").update("abc").digest("hex");
   assert.strictEqual(h.slice(0, 16), "ba80a53f981c4d0d", "node oracle sanity");

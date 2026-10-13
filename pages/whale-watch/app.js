@@ -168,6 +168,13 @@ function ss58Decode(addr){
   }
   if (raw.length < 4)
     return { ok: false, kind: "length", error: "Too short (" + raw.length + " bytes) to be an SS58 address." };
+  // SS58 prefix framing: top bits 00 = 1-byte prefix, 01 = 2-byte prefix.
+  // 10/11 are reserved — a payload starting that way is not valid SS58 at
+  // all, and must not be misread as a 1-byte prefix (a hand-built 0xBD
+  // payload otherwise decoded "ok" with a fabricated prefix 189).
+  if ((raw[0] & 0xc0) !== 0 && (raw[0] & 0xc0) !== 0x40)
+    return { ok: false, kind: "format",
+             error: "Reserved SS58 prefix form — the first byte's top bits (10/11) are not a valid SS58 prefix encoding." };
   var prefixLen = ((raw[0] & 0xc0) === 0x40) ? 2 : 1;
   var prefix = prefixLen === 1 ? raw[0]
     : (((raw[0] & 0x3f) << 2) | (raw[1] >>> 6) | ((raw[1] & 0x3f) << 8));

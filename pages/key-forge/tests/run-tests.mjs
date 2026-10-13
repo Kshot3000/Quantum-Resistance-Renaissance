@@ -112,6 +112,14 @@ const KYLE_QTC = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
   let threw = false;
   try { ss58Decode(bad); } catch { threw = true; }
   ok('ss58 rejects bad checksum', threw);
+  // reserved prefix forms (top bits 10/11) are not SS58 at all: a hand-built
+  // 0xBD payload carries a valid checksum over its own bytes, yet must not
+  // decode as prefix 189 (the chain's decoders reject the form outright)
+  for (const res of ['KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC', 'LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ']) {
+    let rThrew = false;
+    try { ss58Decode(res); } catch { rThrew = true; }
+    ok('ss58 rejects reserved prefix form', rThrew);
+  }
   // base58 round-trip
   const raw = base58Decode(KYLE_QTC);
   eq('base58 round-trip', base58Encode(raw), KYLE_QTC);

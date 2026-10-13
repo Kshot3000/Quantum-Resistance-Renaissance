@@ -69,6 +69,12 @@ t("SS58 decode of known Quantus address", () => {
   assert.ok(r.ok, "decodes");
   assert.equal(r.prefix, 189);
 });
+t("SS58 reserved prefix forms rejected (contact-vault codec)", () => {
+  const r = SS58.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC");
+  assert.ok(!r.ok && r.kind === "format", "0xBD form must not read as prefix 189");
+  const r2 = SS58.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ");
+  assert.ok(!r2.ok && r2.kind === "format", "0xC0 form must not read as prefix 192");
+});
 t("checkphrase spot-check from upstream vectors", () => {
   const v = VECTORS.testCases[0];
   const words = CHECK.addressToChecksum(v.address, WORDS);

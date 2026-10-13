@@ -170,6 +170,13 @@ test('keypair: deterministic from mnemonic; address is SS58-189', async () => {
   assert.notEqual(a.address, c.address);
 });
 
+test('ss58Decode rejects the reserved prefix forms', () => {
+  // hand-built 0xBD / 0xC0 payloads carry valid checksums over their own
+  // bytes; the reserved forms are not SS58 and must never read as 189/192
+  assert.throws(() => ss58Decode('KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC'), /Reserved SS58 prefix form/);
+  assert.throws(() => ss58Decode('LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ'), /Reserved SS58 prefix form/);
+});
+
 test('parseRecipient: enforces prefix 189, rejects bad checksum', async () => {
   const { parseRecipient } = await import('../js/rpc.js');
   await loadWordlist();

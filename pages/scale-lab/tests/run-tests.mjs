@@ -91,6 +91,12 @@ test("ss58 tampered address fails checksum", () => {
   const d = CR.ss58Decode(addr.slice(0, -1) + alt);
   assert(!d.ok && d.kind === "checksum", "expected checksum failure, got " + JSON.stringify(d));
 });
+test("ss58 reserved prefix forms rejected", () => {
+  const d = CR.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC");
+  assert(!d.ok && d.kind === "format", "0xBD form must not read as prefix 189, got " + JSON.stringify(d));
+  const e = CR.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ");
+  assert(!e.ok && e.kind === "format", "0xC0 form must not read as prefix 192, got " + JSON.stringify(e));
+});
 test("ss58 rejects bad base58 chars", () => {
   const d = CR.ss58Decode("not an address!!");
   assert(!d.ok && d.kind === "base58", "expected base58 failure");

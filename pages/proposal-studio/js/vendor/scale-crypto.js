@@ -178,6 +178,12 @@
     }
     if (raw.length < 4)
       return { ok: false, kind: "length", error: "Too short (" + raw.length + " bytes) to be an SS58 address." };
+    // SS58 prefix framing: top bits 00 = 1-byte, 01 = 2-byte. 10/11 are
+    // reserved — not valid SS58, and must not be misread as a 1-byte
+    // prefix (a hand-built 0xBD payload otherwise decoded as prefix 189).
+    if ((raw[0] & 0xc0) !== 0 && (raw[0] & 0xc0) !== 0x40)
+      return { ok: false, kind: "format",
+               error: "Reserved SS58 prefix form — the first byte's top bits (10/11) are not a valid SS58 prefix encoding." };
     var prefixLen = ((raw[0] & 0xc0) === 0x40) ? 2 : 1;
     var prefix = prefixLen === 1 ? raw[0]
       : (((raw[0] & 0x3f) << 2) | (raw[1] >>> 6) | ((raw[1] & 0x3f) << 8));

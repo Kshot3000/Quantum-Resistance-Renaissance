@@ -242,7 +242,12 @@ export function ss58Decode(address) {
   const raw = base58Decode(address.trim());
   if (raw.length < 3) throw new Error('Address too short');
   let prefix, pb;
-  if ((raw[0] & 0x40) === 0) {
+  // SS58 prefix framing: top bits 00 = 1-byte prefix, 01 = 2-byte prefix.
+  // 10/11 are reserved — a payload starting that way is not valid SS58 at
+  // all (a hand-built 0xBD payload otherwise decoded as prefix 189).
+  if ((raw[0] & 0xc0) === 0x80 || (raw[0] & 0xc0) === 0xc0)
+    throw new Error('Reserved SS58 prefix form');
+  if ((raw[0] & 0xc0) !== 0x40) {
     prefix = raw[0];
     pb = raw.slice(0, 1);
   } else {

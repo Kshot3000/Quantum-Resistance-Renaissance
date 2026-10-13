@@ -9,14 +9,14 @@ var E = EnergyCore;
 
 /* ---------- constants ---------- */
 var FALLBACK = {
-  difficulty: "513726713970694",
-  height: 217568,
+  difficulty: "500082626237735",
+  height: 217817,
   // total supply in plancks (free + reserved + frozen), balances aggregate @ block
-  // 217,568, fetched 2026-10-13 — the SAME capture as the difficulty above
-  // (@ block 217,568, fetched 2 seconds apart; never mix snapshot dates in one bundle).
+  // 217,817, fetched 2026-10-13 — the SAME capture as the difficulty above
+  // (@ block 217,817, fetched 20 seconds apart; never mix snapshot dates in one bundle).
   // This is total_issuance for the emission formula, NOT mined rewards alone
   // (genesis endowments count toward issuance).
-  totalSupplyPlancks: "5812500276822982734",
+  totalSupplyPlancks: "5812642694275523575",
   fetchedAt: null,
   txRate: null,
   txRateSub: null,

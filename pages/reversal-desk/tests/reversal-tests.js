@@ -49,6 +49,10 @@ const bad = RC.ss58Decode("qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbaX");
 ok(!bad.ok && /Checksum/.test(bad.error), "SS58 checksum catches typo");
 const eth = RC.ss58Decode("0x4b6f3BC697D9dAF3e8dE182aEc56eD208B9087f1");
 ok(!eth.ok, "SS58 rejects hex address");
+const res189 = RC.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC");
+ok(!res189.ok && /Reserved SS58 prefix form/.test(res189.error), "SS58 reserved form (0xBD) rejected, not read as prefix 189");
+const res192 = RC.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ");
+ok(!res192.ok && /Reserved SS58 prefix form/.test(res192.error), "SS58 reserved form (0xC0) rejected");
 
 /* ---------- SCALE primitives ---------- */
 eq(RC.u32LE(7200), [0x20, 0x1c, 0x00, 0x00], "u32LE 7200");

@@ -75,6 +75,9 @@ test("checkAddress uses prefix 189", () => {
   const bad = C.checkAddress("qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYb", (a) => S.ss58Decode(a));
   assert.equal(bad.ok, false);
   assert.equal(C.checkAddress("", (a) => S.ss58Decode(a)).ok, false);
+  // reserved SS58 prefix forms are rejected by the codec itself
+  assert.equal(S.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC").ok, false);
+  assert.equal(S.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ").ok, false);
   // A valid non-189 address is rejected by prefix
   const polkadotish = C.checkAddress(good, () => ({ prefix: 0 }));
   assert.equal(polkadotish.ok, false);

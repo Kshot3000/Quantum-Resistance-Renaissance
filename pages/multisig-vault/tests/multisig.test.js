@@ -40,6 +40,8 @@ eq(r2.sortedHex.join(","), ["11".repeat(32), "ab".repeat(32), "cd".repeat(32)].j
 let d1 = C.ss58Decode(r1.ss58);
 ok(d1.ok && d1.prefix === 189, "derived SS58 prefix 189 + checksum ok");
 eq(C.toHex(d1.key), V1_EXPECT, "derived SS58 key = digest");
+ok(!C.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC").ok, "rejects reserved prefix form (0xBD, fake 189)");
+ok(!C.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ").ok, "rejects reserved prefix form (0xC0, fake 192)");
 
 /* validation */
 ok(!C.deriveMultisigAddress([V1_SIGNERS[0]], 1, 0).ok, "rejects <2 signers");

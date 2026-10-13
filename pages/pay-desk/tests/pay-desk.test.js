@@ -225,6 +225,8 @@ eq("csv quotes doubled", P.csvEscape('a"b'), '"a""b"');
   eq("bad address dropped", S([good({ address: "not-an-address" })]).length, 0);
   eq("wrong-prefix address dropped", S([good({ address: SS58.ss58Encode(new Array(32).fill(7), 42) })]).length, 0);
   eq("short-key address dropped", S([good({ address: SS58.ss58Encode(new Array(20).fill(7), 189) })]).length, 0);
+  eq("reserved-form address dropped (0xBD fake 189)", S([good({ address: "KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC" })]).length, 0);
+  t("ss58 codec rejects reserved forms directly", SS58.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC").kind === "format" && SS58.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ").kind === "format");
   eq("garbage created dropped (toISOString crash)", S([good({ created: "garbage" })]).length, 0);
   eq("unknown status dropped", S([good({ status: "evil-status" })]).length, 0);
   eq("duplicate ids deduped", S([good(), good({ ref: "dupe" })]).length, 1);
