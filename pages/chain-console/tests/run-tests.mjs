@@ -7,6 +7,7 @@ import {
   RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory, sanitizeHistory, BROADCAST_METHODS, formatPartialFeeQtc,
   parseBlockNumber, isHash32, validPlanckField, validChainHeight, validExtrinsicHex, MAX_CHAIN_HEIGHT,
 } from '../js/core.js';
+import { qtcToPlancks } from '../js/lib/scale.js';
 import { ConsoleRpc } from '../js/rpc-client.js';
 import { ss58Encode, hexEncode } from '../js/lib/quantus-crypto.js';
 import { RECIPES } from '../js/recipes.js';
@@ -99,6 +100,9 @@ t('formatMs', formatMs(500) === '500 ms' && formatMs(1500) === '1.50 s');
   t('balance: decode ok', d.ok && d.free === 2n * 10n ** 12n);
   t('balance: qtc strings', d.freeQtc === '2' && d.frozenQtc === '0.5');
   t('balance: total', d.totalQtc === '2.5');
+  t('units: qtcToPlancks exactly the 21M supply cap stays valid', qtcToPlancks('21000000') === 21000000000000000000n);
+  let capErr = null; try { qtcToPlancks('21000000.000000000001'); } catch (e) { capErr = e; }
+  t('units: qtcToPlancks refuses 1 planck over the supply cap', !!capErr && /21,000,000 QTC total supply/.test(capErr.message));
   t('balance: bad hex', !decodeBalanceStorage('0xzz').ok);
   t('balance: truncated', !decodeBalanceStorage('0x0102').ok);
 }

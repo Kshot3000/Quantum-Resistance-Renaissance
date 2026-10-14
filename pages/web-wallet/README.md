@@ -45,7 +45,7 @@ Live: https://kshot3000.github.io/Quantum-Resistance-Renaissance/pages/web-walle
 
 ```bash
 cd pages/web-wallet
-node --test tests/run-tests.mjs        # 55/55 offline: xxhash vectors, SCALE codec,
+node --test tests/run-tests.mjs        # 56/56 offline: xxhash vectors, SCALE codec,
                                        # era math, BIP-39, keygen, sign/verify,
                                        # exact payload/extrinsic layouts, keystore
                                        # vault-blob boundary (validateVaultBlob

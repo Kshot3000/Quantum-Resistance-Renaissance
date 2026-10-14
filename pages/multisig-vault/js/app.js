@@ -164,7 +164,7 @@ $("b-build").addEventListener("click", function(){
   var pid = Math.max(0, Number($("b-proposal").value) || 0);
   if (!vaultHex || !recipHex) { out.innerHTML = '<div class="empty-state">Fix the highlighted fields first.</div>'; return; }
   if (amount === null || amount <= 0n){
-    out.innerHTML = '<div class="empty-state">Amount must be a positive QTC value (up to 12 decimals).</div>';
+    out.innerHTML = '<div class="empty-state">Amount must be a positive QTC value (up to 12 decimals) no larger than the 21,000,000 QTC total supply.</div>';
     return;
   }
   if (!(height >= 1) || Math.floor(height) !== height){

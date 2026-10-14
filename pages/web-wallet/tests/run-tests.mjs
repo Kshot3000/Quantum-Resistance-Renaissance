@@ -289,6 +289,14 @@ test('units: plancks <-> QTC', () => {
   assert.throws(() => qtcToPlancks('1.1234567890123')); // >12 decimals
 });
 
+test('units: qtcToPlancks supply cap (21M QTC hard cap)', () => {
+  assert.equal(qtcToPlancks('21000000'), 21000000000000000000n); // exactly the cap stays valid
+  assert.equal(qtcToPlancks('21000000.000000000000'), 21000000000000000000n);
+  assert.throws(() => qtcToPlancks('21000000.000000000001'), /21,000,000 QTC total supply/); // 1 planck over
+  assert.throws(() => qtcToPlancks('21000001'), /total supply/);
+  assert.throws(() => qtcToPlancks('1000000000000'), /total supply/);
+});
+
 test('u32le', () => {
   assert.deepEqual(u32le(153), Uint8Array.of(0x99, 0x00, 0x00, 0x00));
 });

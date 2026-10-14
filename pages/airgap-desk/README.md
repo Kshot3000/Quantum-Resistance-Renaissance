@@ -42,7 +42,7 @@ Sign QTC transfers on a machine that never touches the network.
   `Utility.batch_all` — one signature, recipient leg first and untouched. The hot
   decoder accepts exactly that 2-leg batch shape and renders both legs, warning
   when the second leg does not pay the disclosed builder address.
-- `tests/run-tests.mjs`: 39/39 protocol tests (ticket/chunk/era codecs, full cold-sign →
+- `tests/run-tests.mjs`: 40/40 protocol tests (ticket/chunk/era codecs, full cold-sign →
   hot-verify round trip incl. tamper and wrong-ticket failures, ML-DSA-87 path,
   service-fee math/batch/decode-whitelist tests; the ticket nonce is held to the
   issuer's u32 grammar — a nonce ≥ 2³² or a non-safe integer the JSON text could

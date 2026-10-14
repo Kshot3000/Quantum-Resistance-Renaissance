@@ -297,6 +297,12 @@ test('fee: computeServiceFee is exact floor math, capped at 100 bps', () => {
   assert.equal(feeBpsLabel(100), '1%');
 });
 
+test('units: qtcToPlancks supply cap (21M QTC hard cap)', () => {
+  assert.equal(qtcToPlancks('21000000'), 21000000000000000000n); // exactly the cap stays valid
+  assert.throws(() => qtcToPlancks('21000000.000000000001'), /21,000,000 QTC total supply/); // 1 planck over
+  assert.throws(() => qtcToPlancks('25000000'), /total supply/);
+});
+
 test('fee: fee-free call is byte-identical to the plain transfer', () => {
   // ML-DSA signing is hedged, so identity is asserted where it is
   // deterministic: the signing PAYLOAD (which embeds the call bytes).

@@ -38,6 +38,7 @@
 var SS58_PREFIX = 189;
 var DECIMALS = 12;
 var PLANCKS = 1000000000000n;               // 10^12
+var MAX_SUPPLY_PLANCKS = 21000000n * PLANCKS; // 21M QTC hard cap — no payout can exceed every QTC that will ever exist
 var PALLET_INDEX = 19;                       // Multisig in construct_runtime!
 var PALLET_ID = [0x70, 0x79, 0x2f, 0x6d, 0x6c, 0x74, 0x73, 0x67]; // b"py/mltsg"
 var BALANCES_PALLET_INDEX = 2;
@@ -316,7 +317,9 @@ function qtcToPlancks(qtcStr){
   var parts = s.split(".");
   var whole = BigInt(parts[0]) * PLANCKS;
   var frac = parts[1] ? BigInt((parts[1] + "000000000000").slice(0, 12)) : 0n;
-  return whole + frac;
+  var plancks = whole + frac;
+  if (plancks > MAX_SUPPLY_PLANCKS) return null; // over the 21M supply cap — unfundable by construction (exactly the cap stays valid)
+  return plancks;
 }
 function plancksToQtc(p){
   p = BigInt(p);

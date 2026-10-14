@@ -68,6 +68,9 @@ eq(C.qtcToPlancks("1").toString(), "1000000000000", "qtc->plancks 1");
 eq(C.plancksToQtc(51500000000n), "0.0515", "plancks->qtc");
 eq(C.plancksToQtc(C.qtcToPlancks("123.456789")), "123.456789", "money round-trip");
 ok(C.qtcToPlancks("abc") === null, "rejects bad amount");
+eq(C.qtcToPlancks("21000000").toString(), "21000000000000000000", "qtc->plancks exactly the 21M supply cap stays valid");
+ok(C.qtcToPlancks("21000000.000000000001") === null, "rejects 1 planck over the supply cap");
+ok(C.qtcToPlancks("25000000") === null, "rejects amount over the supply cap");
 
 /* SCALE compact */
 eq(C.toHex(C.compactU128(0n)), "00", "compact 0");

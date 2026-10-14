@@ -262,6 +262,12 @@ export function decodeAccountInfo(bytes) {
 export const DECIMALS = 12n;
 export const PLANCKS_PER_QTC = 10n ** DECIMALS;
 export const EXISTENTIAL_DEPOSIT = 1000000000n; // 0.001 QTC (MILII_UNIT)
+/* The chain's hard supply cap: 21,000,000 QTC will ever exist, so no
+ * transfer amount above it can ever be funded. This parser feeds the
+ * signing path — refuse it here, at entry, with the cap named (the same
+ * bound SafeSend and the Distribution Planner enforce). Exactly the cap
+ * stays valid. */
+export const MAX_SUPPLY_PLANCKS = 21000000n * PLANCKS_PER_QTC;
 
 export function plancksToQtc(plancks) {
   const p = BigInt(plancks);
@@ -274,7 +280,9 @@ export function qtcToPlancks(str) {
   const s = String(str).trim();
   if (!/^\d+(\.\d{1,12})?$/.test(s)) throw new Error('amount must look like 1.5 (max 12 decimals)');
   const [w, f = ''] = s.split('.');
-  return BigInt(w) * PLANCKS_PER_QTC + BigInt((f + '000000000000').slice(0, 12));
+  const plancks = BigInt(w) * PLANCKS_PER_QTC + BigInt((f + '000000000000').slice(0, 12));
+  if (plancks > MAX_SUPPLY_PLANCKS) throw new Error('amount exceeds the 21,000,000 QTC total supply — no account can ever hold that much');
+  return plancks;
 }
 
 /* Human-readable breakdown of a built extrinsic (transparency inspector). */
