@@ -218,6 +218,26 @@ ok("sanitize accepts a consistent two-transfer genesis",
 rejects("genesis list not amount-descending", (d) => { twoTransfer(d, 3000000000000n, S0 - 3000000000000n); });
 rejects("duplicate genesis recipient", (d) => { twoTransfer(d, S0 - 3000000000000n, 3000000000000n); d.genesis.transfers[1].to = POOL_ADDR; });
 rejects("accounts_total below the genesis recipient count", (d) => { twoTransfer(d, S0 - 3000000000000n, 3000000000000n); d.accounts_total = 1; });
+// ---------- sanitizeSupply round 3: aggregate summands ----------
+// balances.free is SUM(free) over every account; the vesting pool and
+// the mint sentinel are two distinct accounts in that sum, so their
+// free balances together may not exceed the aggregate.
+rejects("pool_free above the balances.free aggregate", (d) => {
+  d.balances_plancks.free = (BigInt(d.vesting.pool_free_plancks) - 1n).toString();
+});
+rejects("sentinel free above the balances.free aggregate", (d) => {
+  d.mint_sentinel.free_plancks = (BigInt(d.balances_plancks.free) + 1n).toString();
+});
+rejects("pool + sentinel free above the aggregate by 1 planck (each within it alone)", (d) => {
+  d.mint_sentinel.free_plancks = (BigInt(d.balances_plancks.free) - BigInt(d.vesting.pool_free_plancks) + 1n).toString();
+});
+ok("sanitize accepts pool + sentinel free exactly equal to the aggregate",
+  (() => { const d = cloneFixture();
+    d.mint_sentinel.free_plancks = (BigInt(d.balances_plancks.free) - BigInt(d.vesting.pool_free_plancks)).toString();
+    return !!A.sanitizeSupply(d); })());
+ok("sanitize accepts a null pool balance beside a within-aggregate sentinel",
+  (() => { const d = cloneFixture(); d.vesting.pool_free_plancks = null; return !!A.sanitizeSupply(d); })());
+
 ok("validBlockHeight shape (fleet)", A.validBlockHeight(203246) === 203246 && A.validBlockHeight("203246") === 203246 &&
   A.validBlockHeight(0) === null && A.validBlockHeight(2.5) === null && A.validBlockHeight("2.02e5") === null &&
   A.validBlockHeight(true) === null && A.validBlockHeight(9007199254740991) === null);

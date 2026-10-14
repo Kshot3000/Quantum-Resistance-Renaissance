@@ -656,7 +656,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Supply Audit <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The independent money-supply verifier: the exact on-chain emission recurrence recomputed to the planck (verified against <code>pallet_mining_rewards</code>), every recorded mint tallied from the indexer, and the full 22-transfer genesis allocation itemized — reconciled against reported balances. The protocol passes; the indexer's balance sheet is flagged +0.75% with the evidence itemized. Exact BigInt math, no floats.</p>
-        <div class="meta">38/38 logic tests green · first-block known answer exact · browser QA green</div>
+        <div class="meta">92/92 logic tests green · first-block known answer exact · pool + sentinel balances held as summands of the reported free aggregate · browser QA green</div>
       </a>
       <a class="app-card vesting" href="pages/vesting-desk/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+458,611% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+450,810% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">

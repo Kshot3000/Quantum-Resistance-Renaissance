@@ -70,6 +70,12 @@ function quantize(x){ return x - (x % LEAF_QUANTUM); }
  * outflows cover the recorded rewards; and the payload's redundant
  * totals (total_supply_plancks, sentinel out_count/out_total) restate
  * their components exactly when present.
+ * Round 3 (aggregate summands): balances.free is the indexer's SUM of
+ * free over EVERY account, and the vesting pool and the mint sentinel
+ * are two distinct accounts in that sum (the pool is genesis row 0's
+ * recipient; every genesis transfer leaves the sentinel for a
+ * different account, so pool != sentinel) — their free balances are
+ * summands of the aggregate, so pool_free + sentinel_free <= free.
  */
 var MAX_HEIGHT = 10000000;
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
@@ -246,6 +252,14 @@ function sanitizeSupply(d, nowMs){
     var outTotal = planckField(ms.out_total_plancks, "mint_sentinel.out_total_plancks");
     if (BigInt(outTotal) !== BigInt(sentinelOut) + BigInt(gTotal)) malformed("mint_sentinel.out_total_plancks != nongenesis + genesis totals");
   }
+  /* Round 3: the pool and sentinel free balances are summands of the
+   * balances.free aggregate (SUM over all accounts, every summand
+   * non-negative) and the two accounts are distinct (see header), so
+   * together they can never exceed the aggregate they are part of.
+   * A null pool balance (account unavailable) makes the pool summand
+   * vacuous; the sentinel figure is always present. */
+  var summands = BigInt(sentinelFree) + (poolFree !== null ? BigInt(poolFree) : 0n);
+  if (summands > BigInt(free)) malformed("pool + sentinel free balances exceed the balances.free aggregate");
 
   return {
     ok: true, source: typeof d.source === "string" ? d.source : ENDPOINT,

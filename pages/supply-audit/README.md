@@ -43,7 +43,7 @@ indexer's inflated balance sum.
   fallback), rendering, charts.
 - `js/audit-core.js` — exact protocol math + audit computation, no DOM;
   shared with the node tests (UMD).
-- `tests/supply.test.js` — 40 assertions: constants, quantization,
+- `tests/supply.test.js` — 92 assertions: constants, quantization,
   first-block known answer, recurrence properties, formatting, synthetic
   fixture, and regression pins on the real snapshot. The snapshot pins for
   the balance gap and the sentinel-outflow ratio are structural bands, not
