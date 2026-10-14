@@ -426,6 +426,12 @@ function sanitizeBtcApi(api){
   if (spent > funded) return null;
   if (tx === 0 && (spent > 0 || funded > 0 || bal > 0)) return null;
   if (bal > 0 && funded <= spent) return null;
+  // Relation (round 3): the balance is bounded by the chain's hard cap —
+  // no address can hold more BTC than will ever exist (21,000,000 BTC =
+  // 2.1e15 sats, a safe integer). A forged answer claiming 30M BTC on one
+  // address painted as audit evidence before this bound. Exactly the cap
+  // stays valid, the fleet convention for definitional bounds.
+  if (bal > 2100000000000000) return null;
   return {
     spent_txo_count: spent, funded_txo_count: funded, tx_count: tx,
     balance_sats: bal,
@@ -519,7 +525,7 @@ function analyzeETH(v, api){
     // the evidence must name the fallback instead of rendering 1 wei.
     var sentEv = api.sent_signal
       ? "This address has at least one outgoing transaction on record (Blockscout fallback: sent/not-sent signal only — the exact sent total is unavailable, so no sent amount is claimed)."
-      : "This address has sent " + fmtETH(api.total_sent_wei || "0") + " in " + (api.n_tx || "?") + " transaction(s).";
+      : "This address has sent " + fmtETH(api.total_sent_wei || "0") + " in total (" + (api.n_tx || "?") + " transaction(s) on record, sends and receives combined — the sent total is what publishes the key).";
     return { verdict: "exposed", title: "EXPOSED — public key recoverable",
       evidence: [
         sentEv,

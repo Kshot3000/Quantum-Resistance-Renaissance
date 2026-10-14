@@ -347,6 +347,30 @@ async function ta(name, fn){
     assert.ok(!/0\.000000000000000001/.test(a.evidence.join(" ")), a.evidence.join(" "));
   });
 
+  /* --- API-payload boundary round 3: money-figure cap + evidence meaning (2026-10-14) --- */
+  t("BTC: balance cannot exceed the 21M BTC hard cap", function(){
+    assert.strictEqual(C.sanitizeBtcApi(
+      { spent_txo_count: 0, funded_txo_count: 5, tx_count: 3, balance_sats: 3000000000000000 }), null);
+    assert.strictEqual(C.sanitizeBtcApi(
+      { spent_txo_count: 0, funded_txo_count: 5, tx_count: 3, balance_sats: 2100000000000001 }), null);
+    var ok = C.sanitizeBtcApi(
+      { spent_txo_count: 0, funded_txo_count: 5, tx_count: 3, balance_sats: 2100000000000000 });
+    assert.strictEqual(ok.balance_sats, 2100000000000000); // exactly the cap stays valid
+    var a = C.analyzeBTC({ chain: "btc", ok: true, format: "P2PKH (legacy)" },
+      { spent_txo_count: 0, funded_txo_count: 5, tx_count: 3, balance_sats: 3000000000000000 });
+    assert.strictEqual(a.verdict, "unknown"); // over-cap answer is malformed, never painted
+  });
+  t("ETH: sent evidence does not attribute the total tx count to sends", function(){
+    var a = C.analyzeETH({ chain: "eth", ok: true },
+      { n_tx: 130419, total_sent_wei: "87589693563485660527532",
+        total_received_wei: "87406422835568717360638", balance_wei: "5769653936881798941" });
+    assert.strictEqual(a.verdict, "exposed");
+    var ev = a.evidence.join(" ");
+    assert.ok(/has sent/.test(ev), ev);
+    assert.ok(!/in 130419 transaction/.test(ev), ev); // n_tx counts sends AND receives
+    assert.ok(/sends and receives combined/.test(ev), ev);
+  });
+
   /* --- samples --- */
   await ta("every sample address validates on its chain", async function(){
     for (var i = 0; i < C.SAMPLES.length; i++){
