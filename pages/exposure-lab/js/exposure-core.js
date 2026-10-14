@@ -463,6 +463,156 @@ function sanitizeEthApi(api){
   if (api.is_contract === true) out.is_contract = true;
   return out;
 }
+/* ============================================================
+ * Exact-integer recovery from raw response text (round 4,
+ * 2026-10-14): BlockCypher writes the wei totals as plain integer
+ * literals of 20+ digits, but JSON.parse converts every number to
+ * a double — past 2^53 wei (≈0.009 ETH) the parsed total is an
+ * inexact float, validPlancks rightly refuses it, and the PRIMARY
+ * path therefore failed for every real active address, leaving the
+ * total-less Blockscout fallback to carry every ETH verdict. This
+ * scanner recovers the exact digit strings of named TOP-LEVEL
+ * fields from the raw text before parsing loses them.
+ * Conservative by construction: only depth-1 members are read
+ * (nested values and string contents are tokenized and skipped, so
+ * a txref's "value"/"ref_balance" or a string embedding a fake
+ * '"total_sent": 1' can never be picked up); only a plain JSON
+ * integer literal (optional minus, no fraction/exponent) recovers —
+ * any other form (decimal, exponent, string, bool, null, object,
+ * array) marks the key present-but-inexact (null in the result),
+ * and a DUPLICATED top-level key is also inexact (JSON.parse keeps
+ * the last occurrence, a scanner sees both — ambiguous, so no
+ * guess). Absent keys stay absent (undefined). Malformed text
+ * yields null wholesale; the caller then falls back to the parsed
+ * values, whose floats the sanitizer refuses as before. The scan
+ * is a single linear pass with a nesting cap — no backtracking,
+ * no unbounded allocation on hostile text.
+ * ============================================================ */
+function extractTopLevelInts(text, keys){
+  if (typeof text !== "string" || !Array.isArray(keys)) return null;
+  var wanted = {};
+  for (var ki = 0; ki < keys.length; ki++) wanted[keys[ki]] = true;
+  var out = {}, seen = {};
+  var i = 0, n = text.length;
+  function skipWs(){
+    while (i < n && (text[i] === " " || text[i] === "\t" || text[i] === "\n" || text[i] === "\r")) i++;
+  }
+  // Parse the JSON string at text[i] === '"'; returns its decoded
+  // value or null on malformed input; advances i past the close.
+  function parseString(){
+    if (text[i] !== '"') return null;
+    i++;
+    var s = "";
+    while (i < n){
+      var c = text[i];
+      if (c === '"'){ i++; return s; }
+      if (c === "\\"){
+        var e = text[i + 1];
+        if (e === undefined) return null;
+        if (e === "u"){
+          var hex = text.substr(i + 2, 4);
+          if (!/^[0-9a-fA-F]{4}$/.test(hex)) return null;
+          s += String.fromCharCode(parseInt(hex, 16));
+          i += 6;
+        } else if (e === '"' || e === "\\" || e === "/"){ s += e; i += 2; }
+        else if (e === "b"){ s += "\b"; i += 2; }
+        else if (e === "f"){ s += "\f"; i += 2; }
+        else if (e === "n"){ s += "\n"; i += 2; }
+        else if (e === "r"){ s += "\r"; i += 2; }
+        else if (e === "t"){ s += "\t"; i += 2; }
+        else return null;
+      }
+      else if (c < " ") return null; // raw control char: invalid JSON
+      else { s += c; i++; }
+    }
+    return null; // unterminated
+  }
+  // Skip one JSON value at i (depth-capped). Returns false iff malformed.
+  function skipValue(depth){
+    if (depth > 100 || i >= n) return false;
+    var c = text[i];
+    if (c === '"') return parseString() !== null;
+    if (c === "{"){
+      i++; skipWs();
+      if (text[i] === "}"){ i++; return true; }
+      for (;;){
+        skipWs();
+        if (parseString() === null) return false;
+        skipWs();
+        if (text[i] !== ":") return false;
+        i++; skipWs();
+        if (!skipValue(depth + 1)) return false;
+        skipWs();
+        if (text[i] === ","){ i++; continue; }
+        if (text[i] === "}"){ i++; return true; }
+        return false;
+      }
+    }
+    if (c === "["){
+      i++; skipWs();
+      if (text[i] === "]"){ i++; return true; }
+      for (;;){
+        skipWs();
+        if (!skipValue(depth + 1)) return false;
+        skipWs();
+        if (text[i] === ","){ i++; continue; }
+        if (text[i] === "]"){ i++; return true; }
+        return false;
+      }
+    }
+    // number / true / false / null: consume the bare token.
+    var m = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|^true|^false|^null/.exec(text.slice(i));
+    if (!m) return false;
+    i += m[0].length;
+    return true;
+  }
+  // Read one depth-1 value at i: {plain: digitString} for a plain
+  // integer literal, {plain: null} for any other well-formed value,
+  // or null when malformed.
+  function readValue(){
+    var c = text[i];
+    if (c === "-" || (c >= "0" && c <= "9")){
+      var m = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(i));
+      if (!m) return null;
+      i += m[0].length;
+      return { plain: /^-?\d+$/.test(m[0]) ? m[0] : null };
+    }
+    if (!skipValue(1)) return null;
+    return { plain: null };
+  }
+  skipWs();
+  if (text[i] !== "{") return null;
+  i++; skipWs();
+  if (text[i] === "}"){ i++; skipWs(); return i === n ? out : null; }
+  for (;;){
+    skipWs();
+    var key = parseString();
+    if (key === null) return null;
+    skipWs();
+    if (text[i] !== ":") return null;
+    i++; skipWs();
+    var isWanted = wanted[key] === true;
+    var val;
+    if (isWanted){
+      val = readValue();
+      if (val === null) return null;
+    } else {
+      if (!skipValue(1)) return null;
+      val = null;
+    }
+    if (isWanted){
+      // A second occurrence makes the key ambiguous: mark inexact.
+      out[key] = seen[key] ? null : val.plain;
+      seen[key] = true;
+    }
+    skipWs();
+    if (text[i] === ","){ i++; continue; }
+    if (text[i] === "}"){ i++; break; }
+    return null;
+  }
+  skipWs();
+  return i === n ? out : null;
+}
 function malformedVerdict(chainLabel){
   return { verdict: "unknown", title: "Chain data was malformed",
     evidence: ["The " + chainLabel + " lookup returned values that are not valid chain data (fractional, negative, or non-numeric counts/amounts) — no exposure verdict can rest on them."],
@@ -643,7 +793,8 @@ var ExposureCore = {
   analyzeETH: analyzeETH, analyzeQTC: analyzeQTC, analyzeSubstrate: analyzeSubstrate,
   summarize: summarize, fmtBTC: fmtBTC, fmtETH: fmtETH, SAMPLES: SAMPLES,
   validPlancks: validPlancks, nonNegInt: nonNegInt,
-  sanitizeBtcApi: sanitizeBtcApi, sanitizeEthApi: sanitizeEthApi
+  sanitizeBtcApi: sanitizeBtcApi, sanitizeEthApi: sanitizeEthApi,
+  extractTopLevelInts: extractTopLevelInts
 };
 
 if (typeof window !== "undefined") window.ExposureCore = ExposureCore;

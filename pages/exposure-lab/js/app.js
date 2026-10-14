@@ -96,22 +96,58 @@ async function fetchBTC(addr, validation){
   } catch (e){ return { offline: true, error: String(e && e.message || e) }; }
 }
 
+/* Fetch keeping the RAW response text alongside the parsed body.
+ * Round 4: JSON.parse turns BlockCypher's 20+-digit wei totals into
+ * inexact floats (past 2^53 wei), which the sanitizer rightly refuses
+ * — so the parsed body alone can never carry the primary ETH path
+ * for a real active address. The raw text still holds the exact
+ * integer literals; fetchETH recovers them with
+ * C.extractTopLevelInts. Responses without .text() (test stubs)
+ * degrade to parsed-only, exactly the pre-round-4 behavior. */
+async function fetchRawJSON(url, timeoutMs){
+  var ctrl = new AbortController();
+  var to = setTimeout(function(){ ctrl.abort(); }, timeoutMs || 15000);
+  try {
+    var r = await fetch(url, { signal: ctrl.signal, headers: { "Accept": "application/json" } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    if (typeof r.text === "function"){
+      var text = await r.text();
+      return { text: text, parsed: JSON.parse(text) };
+    }
+    if (typeof r.json === "function") return { text: null, parsed: await r.json() };
+    throw new Error("unreadable response");
+  } finally { clearTimeout(to); }
+}
+
 /* ETH via BlockCypher, Blockscout v2 as fallback. */
 async function fetchETH(addr){
   try {
-    var b = await fetchJSON("https://api.blockcypher.com/v1/eth/main/addrs/" + encodeURIComponent(addr));
+    var raw = await fetchRawJSON("https://api.blockcypher.com/v1/eth/main/addrs/" + encodeURIComponent(addr));
+    var b = raw.parsed;
     if (!b || typeof b !== "object" || Array.isArray(b)) throw new Error("malformed BlockCypher answer");
     if (typeof b.address !== "string" || b.address.toLowerCase() !== addr.toLowerCase())
       throw new Error("BlockCypher answer for a different address");
+    // Round 4: prefer the exact digit strings recovered from the raw
+    // text for the wei totals. A total the extractor marks inexact
+    // (decimal/exponent/duplicate) or cannot read stays with its
+    // parsed value — a float the sanitizer refuses, which falls
+    // through to the Blockscout fallback like any other failure.
+    var ext = raw.text ? C.extractTopLevelInts(raw.text,
+      ["total_sent", "total_received", "final_balance", "balance"]) : null;
+    var pick = function(key, parsedVal){
+      return (ext && typeof ext[key] === "string") ? ext[key] : parsedVal;
+    };
     // Validate before normalizing: a garbage wei total or count must
     // not be String()-coerced into the analysis ("[object Object] wei"
     // was rendered as evidence pre-fix). Malformed primary data falls
     // through to the Blockscout fallback like any other failure.
     var clean = C.sanitizeEthApi({
       n_tx: (b.n_tx === undefined || b.n_tx === null) ? 0 : b.n_tx,
-      total_sent_wei: b.total_sent,
-      total_received_wei: b.total_received,
-      balance_wei: b.final_balance !== undefined ? b.final_balance : b.balance
+      total_sent_wei: pick("total_sent", b.total_sent),
+      total_received_wei: pick("total_received", b.total_received),
+      balance_wei: (b.final_balance !== undefined || (ext && ext.final_balance !== undefined))
+        ? pick("final_balance", b.final_balance)
+        : pick("balance", b.balance)
     });
     if (!clean) throw new Error("malformed BlockCypher payload");
     clean.source = "blockcypher";

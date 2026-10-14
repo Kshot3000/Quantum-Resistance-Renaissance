@@ -371,6 +371,70 @@ async function ta(name, fn){
     assert.ok(/sends and receives combined/.test(ev), ev);
   });
 
+  /* --- Exact-integer recovery from raw text, round 4 (2026-10-14) --- */
+  var RAW_BC = "{\n" +
+    '  "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",\n' +
+    '  "total_received": 87406422835568717360638,\n' +
+    '  "total_sent": 87589693563485660527532,\n' +
+    '  "balance": 5769653936881798941,\n' +
+    '  "final_balance": 5769653936881798941,\n' +
+    '  "n_tx": 130419,\n' +
+    '  "txrefs": [ { "value": 100000000000000, "ref_balance": -183270727916943166894,\n' +
+    '    "note": "see \\"total_sent\\": 1 inside a string" } ],\n' +
+    '  "hasMore": true\n}';
+  var TOT_KEYS = ["total_sent", "total_received", "final_balance", "balance"];
+  t("extractTopLevelInts recovers the exact wei totals JSON.parse destroys", function(){
+    var parsed = JSON.parse(RAW_BC);
+    assert.notStrictEqual(String(parsed.total_sent), "87589693563485660527532"); // the bug
+    var ext = C.extractTopLevelInts(RAW_BC, TOT_KEYS);
+    assert.strictEqual(ext.total_sent, "87589693563485660527532");
+    assert.strictEqual(ext.total_received, "87406422835568717360638");
+    assert.strictEqual(ext.final_balance, "5769653936881798941");
+    assert.strictEqual(ext.balance, "5769653936881798941");
+    assert.ok(!("value" in ext) && !("ref_balance" in ext)); // nested fields never leak up
+  });
+  t("extracted totals sanitize and render as exact evidence", function(){
+    var ext = C.extractTopLevelInts(RAW_BC, TOT_KEYS);
+    var clean = C.sanitizeEthApi({ n_tx: 130419, total_sent_wei: ext.total_sent,
+      total_received_wei: ext.total_received, balance_wei: ext.final_balance });
+    assert.ok(clean);
+    var a = C.analyzeETH({ chain: "eth", ok: true }, clean);
+    assert.strictEqual(a.verdict, "exposed");
+    assert.ok(a.evidence.join(" ").includes("87589.693563485660527532 ETH"), a.evidence.join(" "));
+    assert.ok(a.evidence.join(" ").includes("5.769653936881798941 ETH"), a.evidence.join(" "));
+  });
+  t("extractTopLevelInts marks decimal / exponent / string totals inexact", function(){
+    assert.strictEqual(C.extractTopLevelInts('{"total_sent": 87589.5}', TOT_KEYS).total_sent, null);
+    assert.strictEqual(C.extractTopLevelInts('{"total_sent": 8.758969356348566e22}', TOT_KEYS).total_sent, null);
+    assert.strictEqual(C.extractTopLevelInts('{"total_sent": "12345"}', TOT_KEYS).total_sent, null);
+    var mixed = C.extractTopLevelInts('{"total_sent": 87589.5, "final_balance": 3}', TOT_KEYS);
+    assert.strictEqual(mixed.total_sent, null);
+    assert.strictEqual(mixed.final_balance, "3"); // siblings still recover
+  });
+  t("extractTopLevelInts: duplicate top-level key is ambiguous, never guessed", function(){
+    assert.strictEqual(C.extractTopLevelInts('{"total_sent": 111, "total_sent": 222}', TOT_KEYS).total_sent, null);
+  });
+  t("extractTopLevelInts: negative totals pass through for the sanitizer to refuse", function(){
+    var ext = C.extractTopLevelInts('{"total_sent": -5}', TOT_KEYS);
+    assert.strictEqual(ext.total_sent, "-5");
+    assert.strictEqual(C.sanitizeEthApi({ n_tx: 3, total_sent_wei: ext.total_sent,
+      total_received_wei: "0", balance_wei: "0" }), null);
+  });
+  t("extractTopLevelInts refuses malformed text wholesale, keeps absent keys absent", function(){
+    assert.strictEqual(C.extractTopLevelInts("[1,2,3]", TOT_KEYS), null);
+    assert.strictEqual(C.extractTopLevelInts('{"total_sent": 123', TOT_KEYS), null);
+    assert.strictEqual(C.extractTopLevelInts(42, TOT_KEYS), null);
+    assert.strictEqual(C.extractTopLevelInts(null, TOT_KEYS), null);
+    var sparse = C.extractTopLevelInts('{"address": "0xabc", "n_tx": 4}', TOT_KEYS);
+    assert.strictEqual(sparse.total_sent, undefined);
+    assert.deepStrictEqual(C.extractTopLevelInts("{}", TOT_KEYS), {});
+  });
+  t("extractTopLevelInts: small totals and loose whitespace still recover", function(){
+    var ext = C.extractTopLevelInts('{ "total_sent" : 2000000000000000 , "final_balance" : 3000000000000000 }', TOT_KEYS);
+    assert.strictEqual(ext.total_sent, "2000000000000000");
+    assert.strictEqual(ext.final_balance, "3000000000000000");
+  });
+
   /* --- samples --- */
   await ta("every sample address validates on its chain", async function(){
     for (var i = 0; i < C.SAMPLES.length; i++){
