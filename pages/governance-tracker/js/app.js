@@ -29,7 +29,10 @@ function timeoutSignal(ms) {
  * to the fleet capture-time bounds; round 2 enforces the producer relations
  * (chain-time-inside-the-capture row timestamps, member-count tallies with
  * bare <= ayes, one track + one row per lifecycle type per referendum,
- * track_name re-derived from track, hash/block identity fields). Core
+ * track_name re-derived from track, hash/block identity fields); round 3
+ * holds the lifecycle itself (no stage stamped before a prerequisite, no
+ * event after a terminal, TIMED_OUT never beside DECISION_STARTED) and the
+ * proposal identity every event of a referendum restates. Core
  * corruption fails the load honestly; malformed rows drop individually. */
 
 function loadSnapshot() {

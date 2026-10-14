@@ -254,7 +254,13 @@ function parseProposalCalls(json) {
  *  - extrinsic success is a boolean (a string "false" is neither), its
  *    index_in_block a count, its args capped; exact duplicate extrinsic
  *    and upgrade rows dedupe first-wins (a vote painted twice is a voter
- *    invented). */
+ *    invented).
+ *
+ * Round 3 (lifecycle + identity): stages are ordered by the runtime —
+ * no event stamped before a prerequisite stage, no event after a
+ * terminal, TIMED_OUT never coexists with DECISION_STARTED — and all
+ * events of a referendum restate one proposal identity (preimage hash,
+ * size, is_runtime_upgrade from the earliest event). See validateSnapshot. */
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // prefix-189 shape (qz + 47 base58), as in Vesting Desk
 var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain exists from Sept 2026
 var MAX_CHAIN_HEIGHT = 10000000; // fleet plausible-height ceiling
@@ -387,6 +393,70 @@ function validateSnapshot(raw, nowMs) {
     keptRefs.push(r);
   });
   refs = keptRefs;
+  // Round 3 (lifecycle + identity relations): the surviving events of one
+  // referendum are ONE proposal's lifecycle, and the runtime orders it —
+  // a stage cannot be stamped before a stage that must precede it
+  // (SUBMITTED < DECISION_STARTED < CONFIRM_STARTED < any terminal), no
+  // event can follow a terminal event (a terminal ends the lifecycle;
+  // indices are never reused), and TIMED_OUT by definition means the
+  // referendum never entered the deciding queue, so it cannot coexist
+  // with a DECISION_STARTED at or before it. Every event also restates
+  // the SAME proposal: the earliest event's preimage hash, size and
+  // is_runtime_upgrade are the proposal's identity, and a later event
+  // contradicting a stated field is not that proposal's event (a null
+  // hash/size is absence, not contradiction). Violators drop; the
+  // referendum's honest events stand. Verified on the real snapshot
+  // (referendum #0, capture 2026-10-14): stages strictly ordered in
+  // time and block height, one hash/size/upgrade flag across all rows.
+  var STAGE = { SUBMITTED: 0, DECISION_STARTED: 1, CONFIRM_STARTED: 2,
+    CONFIRMED: 3, REJECTED: 3, CANCELLED: 3, KILLED: 3, TIMED_OUT: 3 };
+  var groups3 = {};
+  refs.forEach(function (r) {
+    var k = String(r.referendum_index);
+    if (!groups3[k]) groups3[k] = [];
+    groups3[k].push(r);
+  });
+  var lifeRefs = [];
+  Object.keys(groups3).forEach(function (k) {
+    var g = groups3[k]; // chronological (refs sorted above)
+    var idHash = null, idSize = null, idUpgrade = g[0].is_runtime_upgrade;
+    for (var i = 0; i < g.length; i++) {
+      if (idHash === null && g[i].proposal_preimage_hash !== null) idHash = g[i].proposal_preimage_hash;
+      if (idSize === null && g[i].proposal_size_bytes !== null) idSize = g[i].proposal_size_bytes;
+    }
+    // Pass A (prerequisites): an event stamped before a stage that must
+    // precede it drops — including a terminal stamped before its own
+    // prerequisites, which therefore ends nothing.
+    var passA = g.filter(function (r) {
+      var t = Date.parse(r.timestamp), stage = STAGE[r.type];
+      for (var i = 0; i < g.length; i++) {
+        var o = g[i]; if (o === r) continue;
+        var ot = Date.parse(o.timestamp), os = STAGE[o.type];
+        if (os < stage && ot > t) return false;
+        if (r.type === "TIMED_OUT" && o.type === "DECISION_STARTED" && ot <= t) return false;
+      }
+      return true;
+    });
+    // Pass B (finality): among the lifecycle-valid survivors, an event
+    // stamped after a terminal event drops — the terminal ended it.
+    var passB = passA.filter(function (r) {
+      var t = Date.parse(r.timestamp);
+      for (var i = 0; i < passA.length; i++) {
+        var o = passA[i]; if (o === r) continue;
+        if (STAGE[o.type] === 3 && Date.parse(o.timestamp) < t) return false;
+      }
+      return true;
+    });
+    passB.forEach(function (r) {
+      if (r.proposal_preimage_hash !== null && idHash !== null && r.proposal_preimage_hash !== idHash) return;
+      if (r.proposal_size_bytes !== null && idSize !== null && r.proposal_size_bytes !== idSize) return;
+      if (r.is_runtime_upgrade !== idUpgrade) return;
+      lifeRefs.push(r);
+    });
+  });
+  lifeRefs.sort(byTimestamp);
+  if (refs.length && !lifeRefs.length) return null; // every claimed event violated its lifecycle — fail honestly
+  refs = lifeRefs;
   var exts = [], seenExt = {};
   (d.extrinsics || []).forEach(function (x) {
     var c = cleanExtrinsic(x, fetchedMs); if (!c) return;

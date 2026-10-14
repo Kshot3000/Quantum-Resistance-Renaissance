@@ -260,4 +260,51 @@ t("validateSnapshot: duplicate extrinsics dedupe; string success/index neutraliz
   assert.equal(v.extrinsics[0].index_in_block, null);
 });
 
+t("validateSnapshot: a terminal stamped before its prerequisites drops, honest events stand", () => {
+  const s = clone(REAL); s.data.referenda[3].timestamp = "2026-09-23T07:00:00.000Z"; // CONFIRMED before SUBMITTED
+  const v = V(s);
+  assert.equal(v.referenda.length, 3);
+  assert.equal(C.statusOf(v.referenda), "CONFIRM_STARTED");
+});
+t("validateSnapshot: stages stamped before DECISION_STARTED drops them, the decision stands", () => {
+  const s = clone(REAL); s.data.referenda[1].timestamp = "2026-09-23T13:00:00.000Z"; // DECISION after CONFIRM/CONFIRMED
+  const v = V(s);
+  assert.equal(v.referenda.length, 2);
+  assert.deepEqual(v.referenda.map((r) => r.type), ["SUBMITTED", "DECISION_STARTED"]);
+});
+t("validateSnapshot: an event after a valid terminal drops", () => {
+  const s = clone(REAL); const c = clone(s.data.referenda[3]);
+  c.type = "CANCELLED"; c.timestamp = "2026-09-24T00:00:00.000Z"; s.data.referenda.push(c);
+  const v = V(s);
+  assert.equal(v.referenda.length, 4);
+  assert.equal(C.statusOf(v.referenda), "CONFIRMED");
+});
+t("validateSnapshot: TIMED_OUT cannot coexist with DECISION_STARTED, but stands alone", () => {
+  const base = REAL.data.referenda[0];
+  const mk = (idx, type, ts) => { const e = clone(base); e.referendum_index = idx; e.type = type; e.timestamp = ts; return e; };
+  const s = clone(REAL);
+  s.data.referenda.push(mk(1, "SUBMITTED", "2026-09-24T00:00:00.000Z"), mk(1, "DECISION_STARTED", "2026-09-24T01:00:00.000Z"), mk(1, "TIMED_OUT", "2026-09-25T00:00:00.000Z"));
+  s.data.referenda.push(mk(2, "SUBMITTED", "2026-09-24T00:00:00.000Z"), mk(2, "TIMED_OUT", "2026-09-25T00:00:00.000Z"));
+  const v = V(s);
+  assert.deepEqual(v.referenda.filter((r) => r.referendum_index === 1).map((r) => r.type), ["SUBMITTED", "DECISION_STARTED"]);
+  assert.deepEqual(v.referenda.filter((r) => r.referendum_index === 2).map((r) => r.type), ["SUBMITTED", "TIMED_OUT"]);
+});
+t("validateSnapshot: proposal identity is constant per referendum — flips drop, nulls keep", () => {
+  const s1 = clone(REAL); s1.data.referenda[2].proposal_preimage_hash = "0x" + "a".repeat(64);
+  assert.equal(V(s1).referenda.length, 3);
+  const s2 = clone(REAL); s2.data.referenda[1].proposal_size_bytes = 999;
+  assert.ok(!V(s2).referenda.some((r) => r.type === "DECISION_STARTED"));
+  const s3 = clone(REAL); s3.data.referenda[3].is_runtime_upgrade = false;
+  assert.ok(!V(s3).referenda.some((r) => r.type === "CONFIRMED"));
+  const s4 = clone(REAL); s4.data.referenda[1].proposal_preimage_hash = null; // absence, not contradiction
+  assert.equal(V(s4).referenda.length, 4);
+});
+t("validateSnapshot: equal-timestamp lifecycle steps (same block) are kept", () => {
+  const base = REAL.data.referenda[0];
+  const mk = (type, ts) => { const e = clone(base); e.referendum_index = 3; e.type = type; e.timestamp = ts; return e; };
+  const s = clone(REAL);
+  s.data.referenda.push(mk("SUBMITTED", "2026-09-24T00:00:00.000Z"), mk("DECISION_STARTED", "2026-09-24T00:00:00.000Z"));
+  assert.equal(V(s).referenda.filter((r) => r.referendum_index === 3).length, 2);
+});
+
 console.log("\n" + passed + " tests passed");
