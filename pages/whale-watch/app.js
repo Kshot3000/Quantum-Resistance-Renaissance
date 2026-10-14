@@ -567,13 +567,19 @@ function validateSnapshot(raw){
     if (out.length > MOVES_CAP) return null;
     return out;
   }
+  var GENESIS_CAP = 3; // producer limit: genesis query is limit:3 in fetch-whale-data.mjs
   var genesis = [];
   if (Array.isArray(raw.genesis_allocation)){
-    var mintFrom = null;
+    var mintFrom = null, seenGenesis = {};
     raw.genesis_allocation.forEach(function(g){
       if (!g || typeof g !== "object") return;
       var amt = decStr(g.amount_plancks), bh = nonNegInt(g.block_height);
       if (amt === null || BigInt(amt) <= 0n || BigInt(amt) > supplyTotal) return;
+      // Round 4: the indexer returns each block-1 transfer once — an exact
+      // duplicate row is not producer data (the move lists' dedupe precedent).
+      var gkey = amt + "|" + g.from + "|" + g.to + "|" + g.timestamp;
+      if (seenGenesis[gkey]) return; // dedupe first-wins
+      seenGenesis[gkey] = true;
       if (bh !== 1) return; // round 2: genesis allocations live at block 1, by definition
       if (!(g.from === "0".repeat(48) || validAddr(g.from)) || !validAddr(g.to)) return; // genesis origin may be the mint sentinel
       if (g.from === g.to) return;
@@ -594,6 +600,15 @@ function validateSnapshot(raw){
     var p = BigInt(a.amount_plancks), q = BigInt(b.amount_plancks);
     return p < q ? 1 : p > q ? -1 : 0;
   });
+  // Round 4: per-row caps do not bound a set. The producer emits at most
+  // GENESIS_CAP block-1 rows, and their sum is part of the supply that
+  // exists at the capture — a longer list, or a set summing past the whole
+  // supply, is not producer data (the MOVES_CAP wholesale precedent:
+  // payload-level failure, never a silent paint).
+  if (genesis.length > GENESIS_CAP) return null;
+  var genesisSum = 0n;
+  genesis.forEach(function(g){ genesisSum += BigInt(g.amount_plancks); });
+  if (genesisSum > supplyTotal) return null;
   // Round 2: the pool account IS the block-1 allocation recipient — if the
   // snapshot names both, they must name the same account.
   if (poolEntry && genesis.length && poolEntry.address !== genesis[0].to) return null;

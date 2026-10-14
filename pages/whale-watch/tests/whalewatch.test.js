@@ -240,6 +240,29 @@ t("genesis rows off block 1 or from a second origin drop individually", function
   assert.ok(v !== null);
   assert.strictEqual(v.genesis_allocation.length, 1);
 });
+// --- validateSnapshot round 4: genesis aggregate containment ---
+t("a 4th genesis row fails wholesale (producer limit is 3)", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    var r = JSON.parse(JSON.stringify(s.genesis_allocation[2]));
+    r.amount_plancks = (1n * PL).toString();
+    s.genesis_allocation.push(r);
+  })), null);
+});
+t("genesis rows summing past the whole supply fail wholesale", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    s.top.slice(0, 3).forEach(function(e, i){
+      s.genesis_allocation[i] = { amount_plancks: "5000000000000000000", from: "0".repeat(48),
+        to: e.address, block_height: 1, timestamp: s.genesis_allocation[0].timestamp };
+    });
+  })), null);
+});
+t("an exact duplicate genesis row dedupes first-wins", function(){
+  var v = m.validateSnapshot(snap(function(s){
+    s.genesis_allocation.push(JSON.parse(JSON.stringify(s.genesis_allocation[0])));
+  }));
+  assert.ok(v !== null);
+  assert.strictEqual(v.genesis_allocation.length, REAL.genesis_allocation.length);
+});
 t("a move postdating its snapshot drops; recent owes >= 10 QTC / 7 days", function(){
   var v = m.validateSnapshot(snap(function(s){
     s.whale_moves_alltime[0].timestamp = "2999-01-01T00:00:00.000Z";
