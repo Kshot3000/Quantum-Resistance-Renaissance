@@ -53,9 +53,12 @@ recipients), 4 consolidators (≥8 senders), 3 peel chains.
 
 ## Tests
 
-- `node pages/flow-tracer/tests/run-tests.mjs` — 18/18 logic tests green
+- `node pages/flow-tracer/tests/run-tests.mjs` — 35/35 logic tests green
   (graph build, BFS trace, layout determinism, peel/fan detectors, dossier math,
-  formatting).
+  formatting, load/RPC boundary, snapshot relations rounds 2–3: ids must match a
+  producer grammar and agree with their block, extrinsic ids hold the hash
+  grammar, one agreed block time per height and time never runs backwards —
+  with the real snapshot as a passing control).
 - Headless-Chromium CDP QA (`hidden_files/qa-flowtracer-browser.mjs`) — zero
   console errors, trace render, dossier, all five radar tabs, notable table,
   quick picks, attribution.
@@ -63,3 +66,7 @@ recipients), 4 consolidators (≥8 senders), 3 peel chains.
 ## Refresh
 
 `node scripts/fetch-flow-data.mjs && git add data/flows.json && git commit`
+
+## Built by
+
+[@kshot9000](https://x.com/kshot9000) · QTC donations: `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau` · Upstream: [@Quantus-Network](https://github.com/Quantus-Network)

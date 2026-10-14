@@ -3,6 +3,7 @@
  * All money math is BigInt plancks; every vector asserts exact equality.
  */
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -343,17 +344,72 @@ t("round 2: snapshot rows must belong to the snapshot (shape, head, dust, captur
   const M = F.sanitizeSnapshotMeta({ window_from: 5, chain_height: 100, captured_at: "2026-10-01T00:00:00.000Z", dust_threshold_planck: "1000000000000" });
   const mk = (id, amount, from, to, h, extra = {}) => ({ id, amount, from_id: from, to_id: to, block_height: h, timestamp: "2026-10-01T00:00:00.000Z", fee: "0", extrinsic_id: null, ...extra });
   const clean = F.sanitizeSnapshotTransfers([
-    mk("ok", "1000000000000", A, B, 50),
+    mk("0000000050-abcde-000001", "1000000000000", A, B, 50),
     mk("badaddr", "1000000000000", "not-an-address", B, 50),
     mk("future", "1000000000000", A, B, 101),
     mk("dust", "999999999999", A, B, 60),
     mk("late", "1000000000000", A, B, 50, { timestamp: "2026-10-05T00:00:00.000Z" }),
-    mk("0000000001-x-1", "5669940001000000000", C, A, 1),
+    mk("0000000001-cb81a-000035", "5669940001000000000", C, A, 1),
     mk("genesis-0", "5669940001000000000", C, A, 1, { timestamp: null }),
     mk("genesis-1", "3000000000000", C, B, 1, { timestamp: null }),
   ], M);
-  assert.deepEqual(clean.map((r) => r.id), ["ok", "0000000001-x-1", "genesis-1"]);
-  assert.deepEqual(F.sanitizeSnapshotTransfers([mk("ok", "1000000000000", A, B, 50)], null), []);
+  assert.deepEqual(clean.map((r) => r.id), ["0000000050-abcde-000001", "0000000001-cb81a-000035", "genesis-1"]);
+  assert.deepEqual(F.sanitizeSnapshotTransfers([mk("0000000050-abcde-000001", "1000000000000", A, B, 50)], null), []);
+});
+
+/* --- round 3 relations (2026-10-14): id grammar/agreement, extrinsic
+ * grammar, block-time coherence — all verified on the real snapshot
+ * (capture 221,996) before being held --- */
+t("round 3: extrinsic id holds the producer grammar (hash, optional own-id suffix naming this block)", () => {
+  const HASH = "0x" + "ab".repeat(32);
+  const row = (ex, h = 50) => ({ id: "x", amount: "2000000000000", from_id: "A", to_id: "B", block_height: h, timestamp: null, fee: "0", extrinsic_id: ex });
+  assert.equal(F.sanitizeTransfers([row(HASH)])[0].extrinsic_id, HASH);
+  assert.equal(F.sanitizeTransfers([row(HASH + "-0000000050-abcde-000007")])[0].extrinsic_id, HASH + "-0000000050-abcde-000007");
+  assert.equal(F.sanitizeTransfers([row(HASH + "-0000000051-abcde-000007")])[0].extrinsic_id, null); // suffix names another block
+  assert.equal(F.sanitizeTransfers([row("0x1")])[0].extrinsic_id, null);
+  assert.equal(F.sanitizeTransfers([row("0x" + "AB".repeat(32))])[0].extrinsic_id, null);
+  assert.equal(F.sanitizeTransfers([row(null)])[0].extrinsic_id, null);
+});
+t("round 3: snapshot ids must match a producer grammar and agree with the row's block", () => {
+  const A = "qz" + "A".repeat(47), B = "qz" + "B".repeat(47);
+  const M = F.sanitizeSnapshotMeta({ window_from: 5, chain_height: 100, captured_at: "2026-10-01T00:00:00.000Z", dust_threshold_planck: "1000000000000" });
+  const mk = (id, h, extra = {}) => ({ id, amount: "2000000000000", from_id: A, to_id: B, block_height: h, timestamp: "2026-09-30T00:00:00.000Z", fee: "0", extrinsic_id: null, ...extra });
+  const ids = (rows) => F.sanitizeSnapshotTransfers(rows, M).map((r) => r.id);
+  assert.deepEqual(ids([mk("0000000050-abcde-000001", 50)]), ["0000000050-abcde-000001"]);
+  assert.deepEqual(ids([mk("0000000051-abcde-000001", 50)]), []); // segment names block 51, row sits at 50
+  assert.deepEqual(ids([mk("genesis-3", 1, { timestamp: null })]), ["genesis-3"]);
+  assert.deepEqual(ids([mk("genesis-3", 50)]), []); // synthetic genesis ids exist only at block 1
+  assert.deepEqual(ids([mk("ok", 50)]), []); // no producer grammar
+  assert.deepEqual(ids([mk("0000000050-x-1", 50)]), []); // malformed indexer id
+});
+t("round 3: block time is one time per height and never runs backwards", () => {
+  const A = "qz" + "A".repeat(47), B = "qz" + "B".repeat(47), C = "qz" + "C".repeat(47);
+  const M = F.sanitizeSnapshotMeta({ window_from: 5, chain_height: 100, captured_at: "2026-10-01T00:00:00.000Z", dust_threshold_planck: "1000000000000" });
+  const T1 = "2026-09-30T00:00:00.000Z", T2 = "2026-09-30T01:00:00.000Z", T3 = "2026-09-30T02:00:00.000Z";
+  const mk = (id, h, ts, extra = {}) => ({ id, amount: "2000000000000", from_id: A, to_id: B, block_height: h, timestamp: ts, fee: "0", extrinsic_id: null, ...extra });
+  const idx = (h, ev) => String(h).padStart(10, "0") + "-abcde-" + ev;
+  // same height, same stamp: both survive
+  assert.equal(F.sanitizeSnapshotTransfers([mk(idx(50, "000001"), 50, T1), mk(idx(50, "000002"), 50, T1, { from_id: C })], M).length, 2);
+  // same height, two stamps: the height has no agreed block time — both
+  // timestamped rows drop, a row claiming no time survives
+  const conflict = F.sanitizeSnapshotTransfers([
+    mk(idx(50, "000001"), 50, T1), mk(idx(50, "000002"), 50, T2, { from_id: C }),
+    mk(idx(50, "000003"), 50, null, { from_id: B, to_id: C }),
+  ], M);
+  assert.deepEqual(conflict.map((r) => r.id), [idx(50, "000003")]);
+  // time running backwards: the out-of-order height drops, later heights survive
+  const back = F.sanitizeSnapshotTransfers([mk(idx(50, "000001"), 50, T2), mk(idx(60, "000001"), 60, T1), mk(idx(70, "000001"), 70, T3)], M);
+  assert.deepEqual(back.map((r) => r.id), [idx(50, "000001"), idx(70, "000001")]);
+  // equal stamps across heights are monotone (non-decreasing), not a violation
+  assert.equal(F.sanitizeSnapshotTransfers([mk(idx(50, "000001"), 50, T1), mk(idx(60, "000001"), 60, T1)], M).length, 2);
+});
+t("round 3: the real snapshot passes unchanged (producer control)", () => {
+  const QF = require(join(__dirname, "..", "..", "..", "assets", "flows-decode.js"));
+  const snap = QF.decode(JSON.parse(readFileSync(join(__dirname, "..", "..", "..", "data", "flows.json"), "utf8")));
+  const meta = F.sanitizeSnapshotMeta(snap.meta);
+  assert.ok(meta, "real meta must sanitize");
+  const cleaned = F.sanitizeSnapshotTransfers(snap.transfers, meta);
+  assert.equal(cleaned.length, snap.transfers.length);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

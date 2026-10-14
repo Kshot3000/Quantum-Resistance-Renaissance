@@ -78,6 +78,24 @@ function chainLifetimeTs(v) {
   return ts;
 }
 
+/* Round 3 (2026-10-14): the extrinsic id is the indexer-written extrinsic
+ * hash — 0x + 64 lowercase hex — optionally suffixed with the extrinsic's
+ * own indexer id (same grammar as a transfer id), whose height segment
+ * must then name THIS row's block: the transfer lives inside that
+ * extrinsic, so they share a block. Verified on the real snapshot
+ * (capture 221,996): 6,010 plain, 1 suffixed with a matching segment,
+ * 101 null (genesis / system rows), 0 other shapes. Anything else is not
+ * a value the producer writes; the field anchors no total here, so it
+ * nulls (the round-1 recoverable convention) rather than dropping the row. */
+var EXTRINSIC_RE = /^0x[0-9a-f]{64}(?:-(\d{10})-[0-9a-f]{5}-\d{6})?$/;
+function cleanExtrinsicId(v, height) {
+  if (typeof v !== "string" || !v) return null;
+  var m = EXTRINSIC_RE.exec(v);
+  if (!m) return null;
+  if (m[1] != null && Number(m[1]) !== height) return null;
+  return v;
+}
+
 function sanitizeTransfer(r, i) {
   if (!r || typeof r !== "object" || Array.isArray(r)) return null;
   var amount = validPlancks(r.amount);
@@ -101,7 +119,7 @@ function sanitizeTransfer(r, i) {
   return {
     id: id, amount: amount, from_id: r.from_id, to_id: r.to_id,
     block_height: height, timestamp: ts,
-    fee: fee, extrinsic_id: typeof r.extrinsic_id === "string" && r.extrinsic_id ? r.extrinsic_id : null,
+    fee: fee, extrinsic_id: cleanExtrinsicId(r.extrinsic_id, height),
   };
 }
 
@@ -189,7 +207,7 @@ function sanitizeSnapshotTransfers(rows, meta) {
     if (r.block_height === 1 && !r.id.startsWith("genesis-"))
       genesisFacts.add(r.from_id + ">" + r.to_id + "@1:" + r.amount);
   });
-  return clean.filter(function (r) {
+  var kept = clean.filter(function (r) {
     if (!SS58_189_SHAPE.test(r.from_id) || !SS58_189_SHAPE.test(r.to_id)) return false;
     if (r.block_height > meta.chain_height) return false;
     if (r.timestamp !== null && Date.parse(r.timestamp) > capturedMs + 300000) return false;
@@ -198,7 +216,56 @@ function sanitizeSnapshotTransfers(rows, meta) {
         genesisFacts.has(r.from_id + ">" + r.to_id + "@1:" + r.amount)) return false;
     return true;
   });
+  /* Round 3 (2026-10-14): id and block-time relations, both verified on
+   * the real snapshot (capture 221,996) before being held:
+   *   - a row's id must be one of the two producer grammars AND agree
+   *     with its own fields: an indexer id <10-digit height>-<5 hex>-<6
+   *     digits> embeds the block height it names (6,091/6,091 segments
+   *     equal their row's height), and a synthetic genesis-N id exists
+   *     only at block 1 (21/21). A row whose identity contradicts its
+   *     block — or matches no grammar the producer writes — is not
+   *     snapshot data (the generic path's synthetic "row-…" ids are
+   *     minted in-memory only; they never appear in a written file).
+   *   - a transfer's timestamp IS its block's timestamp: at any one
+   *     height every non-null stamp is identical (0 conflicts across
+   *     3,658 heights), and block time never runs backwards as height
+   *     grows. A height carrying two different stamps has no agreed
+   *     block time, and a height stamped earlier than a lower height
+   *     breaks the chain's forward time — the timestamped rows at such
+   *     heights drop (rows claiming no time, e.g. the synthetic genesis
+   *     rows, stay; their facts are restated by the loader's genesis
+   *     count check). */
+  kept = kept.filter(function (r) {
+    var m = INDEXER_ID_RE.exec(r.id);
+    if (m) return Number(m[1]) === r.block_height;
+    if (GENESIS_ID_RE.test(r.id)) return r.block_height === 1;
+    return false;
+  });
+  var tsByHeight = new Map();
+  kept.forEach(function (r) {
+    if (r.timestamp === null) return;
+    if (!tsByHeight.has(r.block_height)) tsByHeight.set(r.block_height, new Set());
+    tsByHeight.get(r.block_height).add(r.timestamp);
+  });
+  var badTime = new Set(), agreed = new Map();
+  tsByHeight.forEach(function (set, h) {
+    if (set.size > 1) badTime.add(h);
+    else agreed.set(h, Array.from(set)[0]);
+  });
+  var maxMs = -Infinity;
+  Array.from(agreed.keys()).sort(function (a, b) { return a - b; }).forEach(function (h) {
+    var ms = Date.parse(agreed.get(h));
+    if (ms < maxMs) badTime.add(h);
+    else maxMs = ms;
+  });
+  if (badTime.size) kept = kept.filter(function (r) {
+    return r.timestamp === null || !badTime.has(r.block_height);
+  });
+  return kept;
 }
+
+var INDEXER_ID_RE = /^(\d{10})-[0-9a-f]{5}-\d{6}$/; // indexer transfer id; segment 1 is the block height
+var GENESIS_ID_RE = /^genesis-\d+$/; // synthetic ids minted by fetch-flow-data.mjs for block-1 rows
 
 /* Build adjacency indexes over a row list. Rows are sanitized at this
  * boundary (see above), so every graph consumer — snapshot, live, or
