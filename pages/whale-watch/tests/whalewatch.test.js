@@ -260,5 +260,57 @@ t("dropping a whale row by poison fails honestly (bracket cannot reconcile)", fu
   assert.strictEqual(m.validateSnapshot(snap(function(s){ s.top[3].reserved_plancks = "oops"; })), null);
 });
 
+// --- validateSnapshot round 3: move-list producer relations ---
+t("a move larger than the total supply drops; exactly the supply is kept", function(){
+  var tot = function(s){ return BigInt(s.supply_plancks.free) + BigInt(s.supply_plancks.reserved) + BigInt(s.supply_plancks.frozen); };
+  var v = m.validateSnapshot(snap(function(s){ s.whale_moves_alltime[5].amount = (tot(s) + PL).toString(); }));
+  assert.ok(v !== null);
+  assert.strictEqual(v.whale_moves_alltime.length, REAL.whale_moves_alltime.length - 1);
+  var v2 = m.validateSnapshot(snap(function(s){ s.whale_moves_alltime[5].amount = tot(s).toString(); }));
+  assert.ok(v2 !== null);
+  assert.strictEqual(v2.whale_moves_alltime.length, REAL.whale_moves_alltime.length);
+});
+t("an exact duplicate move dedupes first-wins", function(){
+  var v = m.validateSnapshot(snap(function(s){
+    s.whale_moves_alltime.splice(10, 0, JSON.parse(JSON.stringify(s.whale_moves_alltime[3])));
+  }));
+  assert.ok(v !== null);
+  assert.strictEqual(v.whale_moves_alltime.length, REAL.whale_moves_alltime.length);
+});
+t("move order is rebuilt: alltime largest-first, recent newest-first", function(){
+  var v = m.validateSnapshot(snap(function(s){
+    var a = s.whale_moves_alltime, tmp = a[0]; a[0] = a[7]; a[7] = tmp;
+    var r = s.whale_moves_recent, tmp2 = r[0]; r[0] = r[9]; r[9] = tmp2;
+  }));
+  assert.ok(v !== null);
+  for (var i = 1; i < v.whale_moves_alltime.length; i++)
+    assert.ok(BigInt(v.whale_moves_alltime[i-1].amount) >= BigInt(v.whale_moves_alltime[i].amount), "alltime desc at " + i);
+  for (var j = 1; j < v.whale_moves_recent.length; j++)
+    assert.ok(Date.parse(v.whale_moves_recent[j-1].timestamp) >= Date.parse(v.whale_moves_recent[j].timestamp), "recent desc at " + j);
+  assert.strictEqual(v.whale_moves_alltime[0].amount, REAL.whale_moves_alltime[0].amount);
+});
+t("a cleaned move list longer than the producer 40-cap fails the snapshot", function(){
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    var extra = JSON.parse(JSON.stringify(s.whale_moves_alltime[39]));
+    extra.amount = (BigInt(extra.amount) - PL).toString();
+    extra.block_height -= 1;
+    s.whale_moves_alltime.push(extra);
+  })), null);
+  assert.strictEqual(m.validateSnapshot(snap(function(s){
+    var extra = JSON.parse(JSON.stringify(s.whale_moves_recent[39]));
+    extra.timestamp = new Date(Date.parse(s.fetched_at) - 60000).toISOString();
+    extra.amount = (50n * PL).toString();
+    s.whale_moves_recent.push(extra);
+  })), null);
+});
+t("a shuffled genesis list is rebuilt largest-first (pool identity reads row 0)", function(){
+  var v = m.validateSnapshot(snap(function(s){
+    var g = s.genesis_allocation, tmp = g[0]; g[0] = g[1]; g[1] = tmp;
+  }));
+  assert.ok(v !== null, "shuffled genesis must still validate");
+  assert.strictEqual(v.genesis_allocation[0].amount_plancks, REAL.genesis_allocation[0].amount_plancks);
+  assert.strictEqual(v.genesis_allocation[0].to, REAL.genesis_allocation[0].to);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

@@ -362,7 +362,15 @@ function timeoutSignal(ms) {
  * cannot postdate their snapshot and "recent" moves owe the tab's
  * >= 10 QTC / 7-day contract; genesis rows sit at block 1 from a single
  * mint origin; a present-but-malformed reserved/frozen drops its row
- * instead of silently becoming "0". */
+ * instead of silently becoming "0".
+ * Round 3 (2026-10-14): the move lists' own producer relations — a move
+ * cannot exceed the total supply (the genesis rows' bound, now held by
+ * every transfer row); exact duplicate moves dedupe first-wins (the
+ * producer query has no joins); the order the tabs print is rebuilt,
+ * never trusted (alltime amount desc, recent timestamp desc, genesis
+ * amount desc — the pool identity reads genesis row 0); and a cleaned
+ * list longer than the producer's 40-row cap fails the snapshot, like
+ * the top list's 200-cap. */
 function decStr(v){
   if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) return BigInt(v).toString();
   if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return String(v);
@@ -408,10 +416,16 @@ function cleanTopEntry(raw, seen){
 var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain genesis was 2026-09-09
 var RECENT_MIN_PLANCKS = 10000000000000n; // 10 QTC — the recent tab's printed contract
 var RECENT_WINDOW_MS = 7 * 86400000;
-function cleanMove(raw, maxHeight, fetchedMs, isRecent){
+var MOVES_CAP = 40; // producer limits: ALLTIME_N / RECENT_N in fetch-whale-data.mjs
+function cleanMove(raw, maxHeight, fetchedMs, isRecent, supplyTotal){
   if (!raw || typeof raw !== "object") return null;
   var amount = decStr(raw.amount);
   if (amount === null || BigInt(amount) <= 0n) return null;
+  // Round 3: a transfer cannot move more than the whole supply that exists
+  // (free + reserved + frozen at the capture — earlier supplies were only
+  // smaller). The genesis rows already held this bound; the moves did not,
+  // so a forged 100M-QTC "whale move" painted in both tabs.
+  if (supplyTotal !== null && BigInt(amount) > supplyTotal) return null;
   var fee = raw.fee == null ? "0" : decStr(raw.fee);
   if (fee === null) return null;
   var from = raw.from_id == null ? null : raw.from_id;
@@ -522,8 +536,35 @@ function validateSnapshot(raw){
   }
   if (!Array.isArray(raw.whale_moves_alltime) || !Array.isArray(raw.whale_moves_recent)) return null;
   function cleanMoves(list, isRecent){
-    var out = [];
-    list.forEach(function(m){ var c = cleanMove(m, height, fetchedMs, isRecent); if (c) out.push(c); });
+    var out = [], seenMove = {};
+    list.forEach(function(m){
+      var c = cleanMove(m, height, fetchedMs, isRecent, supplyTotal);
+      if (!c) return;
+      // Round 3: the indexer returns each transfer once (no joins in the
+      // producer query) — an exact duplicate row is not producer data.
+      var key = c.amount + "|" + c.fee + "|" + c.from_id + "|" + c.to_id + "|" + c.block_height + "|" + c.timestamp;
+      if (seenMove[key]) return; // dedupe first-wins
+      seenMove[key] = true;
+      out.push(c);
+    });
+    // Round 3: the tabs' printed contracts are ORDER contracts — "Largest
+    // all-time" renders in list order with no re-sort, and "Recent" reads
+    // newest-first. The producer orders alltime by amount desc and recent
+    // by timestamp desc; like the top list above, the order is rebuilt
+    // from the survivors (stable sort keeps producer order on ties)
+    // instead of trusting the payload's.
+    out.sort(function(a, b){
+      if (isRecent){
+        var x = Date.parse(a.timestamp), y = Date.parse(b.timestamp);
+        return x < y ? 1 : x > y ? -1 : 0;
+      }
+      var p = BigInt(a.amount), q = BigInt(b.amount);
+      return p < q ? 1 : p > q ? -1 : 0;
+    });
+    // Round 3: the producer caps both lists at MOVES_CAP rows — a longer
+    // cleaned list is not producer data (the top list's 200-cap precedent:
+    // payload-level failure, never a silent paint).
+    if (out.length > MOVES_CAP) return null;
     return out;
   }
   var genesis = [];
@@ -544,9 +585,21 @@ function validateSnapshot(raw){
       genesis.push({ amount_plancks: amt, from: g.from, to: g.to, block_height: bh, timestamp: g.timestamp });
     });
   }
+  // Round 3: the producer orders genesis by amount desc, and both the
+  // pool check below and renderMoves read row 0 as THE allocation
+  // recipient — rebuild that order from the survivors (stable) instead of
+  // trusting the payload's, so a shuffled list cannot fail the pool
+  // identity or crown a 3-QTC row as the genesis allocation.
+  genesis.sort(function(a, b){
+    var p = BigInt(a.amount_plancks), q = BigInt(b.amount_plancks);
+    return p < q ? 1 : p > q ? -1 : 0;
+  });
   // Round 2: the pool account IS the block-1 allocation recipient — if the
   // snapshot names both, they must name the same account.
   if (poolEntry && genesis.length && poolEntry.address !== genesis[0].to) return null;
+  var movesAll = cleanMoves(raw.whale_moves_alltime, false);
+  var movesRecent = cleanMoves(raw.whale_moves_recent, true);
+  if (movesAll === null || movesRecent === null) return null; // round 3 cap
   return {
     ok: true, source: typeof raw.source === "string" ? raw.source : "",
     fetched_at: raw.fetched_at, block_height: height,
@@ -555,8 +608,8 @@ function validateSnapshot(raw){
     mined_plancks: decStr(raw.mined_plancks) || "0",
     vesting: { schedules: vSched, total_plancks: vTotal, claimed_plancks: vClaimed },
     genesis_allocation: genesis, brackets: brackets, top: top,
-    whale_moves_alltime: cleanMoves(raw.whale_moves_alltime, false),
-    whale_moves_recent: cleanMoves(raw.whale_moves_recent, true),
+    whale_moves_alltime: movesAll,
+    whale_moves_recent: movesRecent,
     params: raw.params && typeof raw.params === "object" ? raw.params : {}
   };
 }
