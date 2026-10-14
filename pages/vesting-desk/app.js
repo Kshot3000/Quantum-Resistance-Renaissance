@@ -50,7 +50,11 @@
    * Like every malformed last-claim stamp it sanitizes to null (the
    * row is kept — the stamp is cosmetic, never money math); the
    * anchor is the payload's own capture time on the snapshot path
-   * and load time on the live path, never view time. */
+   * and load time on the live path, never view time.
+   * Round 5 (2026-10-14): the validated SET is held to the genesis
+   * aggregate — per-cohort sums <= the mainnet_vesting.rs cohort
+   * totals and the grand sum <= the 27% genesis mint — see
+   * validateSchedules. A set breaking containment fails wholesale. */
   const ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
   const MS_MIN = 946684800000, MS_MAX = 4102444800000; // 2000-01-01 .. 2100-01-01
   function decStr(v) {
@@ -137,10 +141,34 @@
       cliff_ms: cliff, start_ms: start, end_ms: end, last_claim_at_ms: last,
     };
   }
+  /* Round 5 (2026-10-14): AGGREGATE containment. Rounds 1–4 held each
+   * row alone (per-row total <= the whole genesis mint), but the SET
+   * was never held to the genesis it claims: 48 individually-valid rows
+   * could sum past the 27% mint, one cohort could carry more than its
+   * genesis allocation, and value could shift between cohorts (grant
+   * value painted as already-vested liquidity) while every row passed.
+   * The genesis set is fixed by mainnet_vesting.rs, so the producer's
+   * own caps travel with the core constants: each cohort's sum <= its
+   * genesis total (grant 5,417,940 / intents 42,000 / liquidity
+   * 210,000 QTC) and the grand sum <= the 5,670,000 QTC mint (the real
+   * set sums 5,669,940 — the rest is seeds + the pot's ED buffer).
+   * A set that breaks containment fails WHOLESALE (empty): trimming
+   * rows until it fits would manufacture a genesis set the chain
+   * never wrote, so loadData falls to its honest unavailable state. */
+  const COHORT_CAPS = {
+    grant: VC.GRANT_TOTAL_QTC * Q, intents: VC.INTENTS_TOTAL_QTC * Q,
+    liquidity: VC.LIQUIDITY_TOTAL_QTC * Q,
+  };
   function validateSchedules(rows, anchorMs) {
     const seen = new Set();
     const out = [];
     for (const r of rows) { const s = validSchedule(r, seen, anchorMs); if (s) out.push(s); }
+    if (!out.length) return out;
+    const sums = { grant: 0n, intents: 0n, liquidity: 0n };
+    let total = 0n;
+    for (const s of out) { const t = BigInt(s.total_plancks); sums[s.cohort] += t; total += t; }
+    for (const k of Object.keys(COHORT_CAPS)) if (sums[k] > COHORT_CAPS[k]) return [];
+    if (total > VC.GENESIS_MINT_QTC * Q) return [];
     return out;
   }
   function buildByCohort(schedules) {

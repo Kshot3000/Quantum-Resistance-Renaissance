@@ -64,7 +64,7 @@ beneficiary had ~2,441 QTC vested and had claimed nothing.
 
 ## Tests
 
-- `tests/run-tests.mjs` — 35/35 node unit tests: pallet-exact vesting vectors,
+- `tests/run-tests.mjs` — 39/39 node unit tests: pallet-exact vesting vectors,
   25-QTC alignment, cohort taxonomy, genesis constants, monthly-curve sanity,
   a full `data/vesting.json` integrity pass (every schedule's vested amount
   recomputed from the snapshot timestamp), and the load-boundary rounds —

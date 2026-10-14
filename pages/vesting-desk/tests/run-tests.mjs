@@ -294,4 +294,46 @@ t("boundary: validBlockHeight is the fleet 1..10,000,000 shape", () => {
   assert.equal(VApp.validBlockHeight(null), null);
 });
 
+/* --- aggregate containment round 5 (app.js, 2026-10-14): rounds 1–4
+ * held each row alone, but the SET was never held to the genesis —
+ * individually-valid rows could sum past the 27% mint, a cohort could
+ * exceed its mainnet_vesting.rs allocation, and grant value could
+ * shift into the fully-vested liquidity cohort. validateSchedules now
+ * fails such a set wholesale (never trims it into a fabricated set). */
+const cloneReal = () => REAL_V.schedules.map((s) => ({ ...s }));
+t("boundary: the real genesis set passes aggregate containment (48/48)", () => {
+  assert.equal(VApp.validateSchedules(cloneReal(), ANCHOR_V).length, 48);
+});
+t("boundary: a cohort sum over its genesis total fails the set wholesale", () => {
+  const rows = cloneReal();
+  const extra = { ...rows.find((s) => s.cohort === "grant") };
+  extra.id = 900; extra.total_plancks = (100000n * Q).toString();
+  rows.push(extra);
+  assert.equal(VApp.validateSchedules(rows, ANCHOR_V).length, 0);
+  const intents = cloneReal();
+  intents.find((s) => s.id === 45).total_plancks = (42001n * Q).toString();
+  assert.equal(VApp.validateSchedules(intents, ANCHOR_V).length, 0);
+  const liqRows = cloneReal();
+  const l = liqRows.find((s) => s.id === 46);
+  l.total_plancks = (210001n * Q).toString(); l.claimed_plancks = "0"; l.last_claim_at_ms = null;
+  assert.equal(VApp.validateSchedules(liqRows, ANCHOR_V).length, 0);
+});
+t("boundary: a grand sum over the genesis mint fails wholesale; a subset under the caps passes", () => {
+  const rows = cloneReal();
+  const g = rows.find((s) => s.cohort === "grant");
+  g.total_plancks = (BigInt(g.total_plancks) + 1000n * Q).toString();
+  assert.equal(VApp.validateSchedules(rows, ANCHOR_V).length, 0);
+  assert.equal(VApp.validateSchedules(cloneReal().filter((s) => s.id !== 0), ANCHOR_V).length, 47);
+});
+t("boundary: shifting grant value into liquidity fails wholesale (cohort identity, not just the sum)", () => {
+  const rows = cloneReal();
+  const move = 50000n * Q;
+  const g = rows.find((s) => s.cohort === "grant");
+  const l = rows.find((s) => s.id === 46);
+  g.total_plancks = (BigInt(g.total_plancks) - move).toString();
+  l.total_plancks = (BigInt(l.total_plancks) + move).toString();
+  l.claimed_plancks = "0"; l.last_claim_at_ms = null;
+  assert.equal(VApp.validateSchedules(rows, ANCHOR_V).length, 0);
+});
+
 console.log(`\nvesting-core: ${pass} tests green`);
