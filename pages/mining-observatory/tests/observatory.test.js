@@ -311,5 +311,40 @@ t("sanitizeMiners tolerates a fetched_at at the genesis floor", function(){
   assert.strictEqual(m.sanitizeMiners(p).chain_height, 2000);
 });
 
+// 16. Round 4: all_time producer relations — the top-100 cap and the
+// cross-view count relation (an address's all-time count covers its
+// window count; the two tabs are one chain at one capture).
+expectBad("sanitizeMiners rejects an all-time count below the same address's window count", function(p){
+  p.all_time[0].blocks = 500; // window credits A with 600 of the last 1,000
+});
+t("sanitizeMiners accepts an all-time count equal to the window count", function(){
+  var p = fillGood(goodPayload());
+  p.all_time[0].blocks = 600;
+  assert.strictEqual(m.sanitizeMiners(p).chain_height, 2000);
+});
+var ALPHA4 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function addr4(i){
+  return "qz" + ALPHA4[10 + Math.floor(i / 40)] + ALPHA4[10 + (i % 40)].repeat(46);
+}
+function topPayload(n){
+  var p = fillGood(goodPayload());
+  p.chain_height = 100000;
+  p.window = { start_height: 99001, end_height: 100000, block_count: 1000, observed_block_time_s: 10 };
+  p.buckets = [
+    { start: 99001, end: 99500, blocks: 500, miners: p.buckets[0].miners },
+    { start: 99501, end: 100000, blocks: 500, miners: p.buckets[1].miners },
+  ];
+  p.all_time = [];
+  for (var i = 0; i < n - 3; i++) p.all_time.push({ address: addr4(i), blocks: 10 });
+  p.all_time.push({ address: VA("a"), blocks: 1200 }, { address: VA("b"), blocks: 500 }, { address: VA("c"), blocks: 200 });
+  return p;
+}
+t("sanitizeMiners accepts exactly 100 all-time rows (the producer cap)", function(){
+  assert.strictEqual(m.sanitizeMiners(topPayload(100)).all_time.length, 100);
+});
+t("sanitizeMiners rejects 101 all-time rows (over the producer's top-100)", function(){
+  assert.throws(function(){ m.sanitizeMiners(topPayload(101)); }, /malformed miners snapshot/);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

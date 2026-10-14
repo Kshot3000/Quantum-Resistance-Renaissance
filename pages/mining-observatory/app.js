@@ -136,7 +136,21 @@ function loadData(){
  * chain existed) was cited as this snapshot's provenance. Round 3: the
  * fleet capture-time bounds (genesis floor 2026-09-01, now+1h ceiling)
  * that Batch 49 aligned across the sync-fallback siblings now gate
- * this validator too — it was the fleet's last future-only copy. */
+ * this validator too — it was the fleet's last future-only copy.
+ * Round 4 — the ALL-TIME list's producer relations: all_time is the
+ * fetch script's top-100 aggregate (ALL_TIME_LIMIT in
+ * fetch-miner-data.mjs), so a 101st row is not producer data and fails
+ * the snapshot like any other core violation; and the two views are
+ * two aggregates over ONE chain at ONE capture, so for any address
+ * present in both, its all-time count must cover its window count —
+ * the window's blocks are a subset of all blocks, and the all-time
+ * query runs after the window walk, so chain growth between the two
+ * queries only widens the gap. A payload whose all-time tab credits
+ * an address with FEWER blocks than its window tab (verified on the
+ * real snapshot before being held: 35 of 40 window miners appear in
+ * all_time, 0 violations) painted two contradictory decentralization
+ * verdicts from one capture. (Membership is still NOT required —
+ * small window miners legitimately sit outside the top 100.) */
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
 var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
 
@@ -220,7 +234,7 @@ function sanitizeMiners(d){
   });
   if (wsum !== wCount) bad("window_miners counts do not sum to window.block_count");
   var at = d.all_time;
-  if (!Array.isArray(at) || !at.length) bad("all_time");
+  if (!Array.isArray(at) || !at.length || at.length > 100) bad("all_time");
   var seen = {}, asum = 0;
   at.forEach(function(r){
     if (!r || typeof r !== "object") bad("all_time row");
@@ -229,6 +243,8 @@ function sanitizeMiners(d){
     seen[r.address] = 1;
     var n = posInt(r.blocks, height);
     if (n === null) bad("all_time count");
+    if (wm[r.address] !== undefined && n < wm[r.address])
+      bad("all_time count below the same address's window count");
     asum += n;
   });
   if (asum > height) bad("all_time counts exceed chain_height");
