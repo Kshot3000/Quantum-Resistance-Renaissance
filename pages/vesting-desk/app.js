@@ -40,7 +40,17 @@
    * shape let a 2020 stamp compute vesting at a pre-genesis instant
    * and a 2099 stamp vest the whole pool. The bound lives ONLY in
    * validFetchedAtMs: msStr stays 2000..2100 because schedule
-   * cliff/start/end legitimately reach 2030. */
+   * cliff/start/end legitimately reach 2030.
+   * Round 4 (2026-10-13): last_claim_at_ms held the RELATIONS the
+   * producer can write, not just the msStr shape — a stamp on a
+   * schedule that never claimed (claimed == 0), a stamp before the
+   * cliff (vested is identically 0 before it, so no claim can have
+   * paid), or a stamp after the capture (+60s skew, the Governance
+   * round-2 tolerance) painted in the detail panel as claim history.
+   * Like every malformed last-claim stamp it sanitizes to null (the
+   * row is kept — the stamp is cosmetic, never money math); the
+   * anchor is the payload's own capture time on the snapshot path
+   * and load time on the live path, never view time. */
   const ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
   const MS_MIN = 946684800000, MS_MAX = 4102444800000; // 2000-01-01 .. 2100-01-01
   function decStr(v) {
@@ -82,7 +92,7 @@
     const n = Number(s);
     return Number.isSafeInteger(n) && n >= 1 && n <= 10000000 ? n : null;
   }
-  function validSchedule(raw, seenIds) {
+  function validSchedule(raw, seenIds, anchorMs) {
     if (!raw || typeof raw !== "object") return null;
     const idStr = decStr(raw.id);
     if (idStr === null) return null;
@@ -111,7 +121,15 @@
     if (VC.cohortOf(start, end) === "unknown") return null;
     // A malformed last-claim stamp is cosmetic, not money-critical:
     // sanitize it to null instead of dropping an otherwise valid schedule.
-    const last = raw.last_claim_at_ms == null ? null : msStr(raw.last_claim_at_ms);
+    // Round 4: the same treatment for a shape-valid stamp that breaks the
+    // producer relations — none exists on an unclaimed schedule, none can
+    // predate the cliff (vested is 0 before it), and none can postdate
+    // the capture that carries it (+60s chain-clock skew tolerance).
+    let last = raw.last_claim_at_ms == null ? null : msStr(raw.last_claim_at_ms);
+    if (last !== null) {
+      const anchor = typeof anchorMs === "number" && isFinite(anchorMs) ? anchorMs : Date.now();
+      if (BigInt(claimed) === 0n || BigInt(last) < BigInt(cliff) || BigInt(last) > BigInt(anchor) + 60000n) last = null;
+    }
     seenIds.add(id);
     return {
       id, beneficiary: raw.beneficiary, cohort: VC.cohortOf(start, end),
@@ -119,10 +137,10 @@
       cliff_ms: cliff, start_ms: start, end_ms: end, last_claim_at_ms: last,
     };
   }
-  function validateSchedules(rows) {
+  function validateSchedules(rows, anchorMs) {
     const seen = new Set();
     const out = [];
-    for (const r of rows) { const s = validSchedule(r, seen); if (s) out.push(s); }
+    for (const r of rows) { const s = validSchedule(r, seen, anchorMs); if (s) out.push(s); }
     return out;
   }
   function buildByCohort(schedules) {
@@ -157,14 +175,14 @@
       if (json.errors) throw new Error("graphql");
       const rows = json.data && json.data.schedules;
       if (!Array.isArray(rows)) throw new Error("live payload malformed");
+      const nowMs = String(Date.now());
       const schedules = validateSchedules(rows.map((s) => ({
         id: s && s.id, beneficiary: s && s.beneficiary,
         total_plancks: s && s.total, claimed_plancks: s && s.claimed,
         cliff_ms: s && s.cliff, start_ms: s && s.start, end_ms: s && s.end,
         last_claim_at_ms: s ? s.last_claim_at : null,
-      })));
+      })), Number(nowMs));
       if (!schedules.length) throw new Error("live payload: no valid schedules");
-      const nowMs = String(Date.now());
       DATA = {
         ok: true, source: "https://sqm.quantus.com/v1/graphql (live)",
         fetched_at: new Date(Number(nowMs)).toISOString(), fetched_at_ms: nowMs,
@@ -177,7 +195,7 @@
       if (!raw || !Array.isArray(raw.schedules)) throw new Error("snapshot malformed");
       const fetchedMs = validFetchedAtMs(raw.fetched_at_ms);
       if (fetchedMs === null) throw new Error("snapshot fetched_at_ms invalid");
-      const schedules = validateSchedules(raw.schedules);
+      const schedules = validateSchedules(raw.schedules, Number(fetchedMs));
       if (!schedules.length) throw new Error("snapshot: no valid schedules");
       /* Provenance is ALWAYS re-derived from fetched_at_ms — the value
        * the vesting math anchors on. The raw fetched_at string used to be

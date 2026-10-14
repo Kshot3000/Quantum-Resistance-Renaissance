@@ -64,10 +64,14 @@ beneficiary had ~2,441 QTC vested and had claimed nothing.
 
 ## Tests
 
-- `tests/run-tests.mjs` — 26/26 node unit tests: pallet-exact vesting vectors,
+- `tests/run-tests.mjs` — 35/35 node unit tests: pallet-exact vesting vectors,
   25-QTC alignment, cohort taxonomy, genesis constants, monthly-curve sanity,
-  and a full `data/vesting.json` integrity pass (every schedule's vested amount
-  recomputed from the snapshot timestamp).
+  a full `data/vesting.json` integrity pass (every schedule's vested amount
+  recomputed from the snapshot timestamp), and the load-boundary rounds —
+  including round 4: a `last_claim_at_ms` stamp is kept only when it holds
+  the producer relations (the schedule actually claimed, the stamp is not
+  before the cliff, and it is not after the capture + 60s skew); anything
+  else sanitizes to null rather than painting as claim history.
 - Browser QA: `~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-vesting-browser.mjs`
   (headless Chromium 152, CDP, file:// + snapshot fallback).
 

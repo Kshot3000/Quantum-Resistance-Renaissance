@@ -236,6 +236,54 @@ t("boundary: validFetchedAtMs enforces the fleet capture-time bounds", () => {
   assert.equal(VApp.validFetchedAtMs("1.5", NOW), null);
   assert.equal(VApp.validFetchedAtMs(null, NOW), null);
 });
+/* --- last-claim relations round 4 (app.js, 2026-10-13): the stamp was
+ * shape-checked only (msStr 2000..2100), so a last_claim on a schedule
+ * that never claimed, one before the cliff (vested is identically 0
+ * before it — no claim can have paid), or one after the capture painted
+ * in the detail panel as claim history. Producer relations hold it:
+ * exists only when claimed > 0, >= cliff, <= capture + 60s skew. A
+ * violating stamp sanitizes to null (cosmetic field, row kept) — the
+ * same convention as a malformed stamp; a claimed schedule with no
+ * stamp keeps null (a date is never fabricated). */
+const ANCHOR_V = Number(REAL_V.fetched_at_ms);
+const liqRow = () => ({ ...REAL_V.schedules.find((s) => s.id === 46) });
+t("boundary: real claimed schedule keeps its last_claim at the capture anchor", () => {
+  const v = VApp.validSchedule(liqRow(), freshSeen(), ANCHOR_V);
+  assert.ok(v);
+  assert.equal(v.last_claim_at_ms, liqRow().last_claim_at_ms);
+  const g = VApp.validSchedule(baseRow(), freshSeen(), ANCHOR_V);
+  assert.ok(g);
+  assert.equal(g.last_claim_at_ms, null); // unclaimed grant: no stamp exists
+});
+t("boundary: last_claim before the cliff or on an unclaimed schedule sanitizes to null", () => {
+  const before = liqRow();
+  before.last_claim_at_ms = String(BigInt(before.cliff_ms) - 1n);
+  const vb = VApp.validSchedule(before, freshSeen(), ANCHOR_V);
+  assert.ok(vb); // row kept — the stamp is cosmetic
+  assert.equal(vb.last_claim_at_ms, null);
+  const atCliff = liqRow();
+  atCliff.last_claim_at_ms = atCliff.cliff_ms;
+  assert.equal(VApp.validSchedule(atCliff, freshSeen(), ANCHOR_V).last_claim_at_ms, atCliff.cliff_ms);
+  const unclaimed = baseRow();
+  unclaimed.last_claim_at_ms = String(ANCHOR_V - 1000);
+  const vu = VApp.validSchedule(unclaimed, freshSeen(), ANCHOR_V);
+  assert.ok(vu);
+  assert.equal(vu.last_claim_at_ms, null);
+});
+t("boundary: last_claim after the capture sanitizes to null; +60s skew is the edge", () => {
+  const after = liqRow();
+  after.last_claim_at_ms = String(ANCHOR_V + 3600 * 1000);
+  assert.equal(VApp.validSchedule(after, freshSeen(), ANCHOR_V).last_claim_at_ms, null);
+  const y2100 = liqRow();
+  y2100.last_claim_at_ms = "4102444800000";
+  assert.equal(VApp.validSchedule(y2100, freshSeen(), ANCHOR_V).last_claim_at_ms, null);
+  const skew = liqRow();
+  skew.last_claim_at_ms = String(ANCHOR_V + 30 * 1000);
+  assert.equal(VApp.validSchedule(skew, freshSeen(), ANCHOR_V).last_claim_at_ms, skew.last_claim_at_ms);
+  const noStamp = liqRow();
+  noStamp.last_claim_at_ms = null; // claimed > 0, stamp absent: never fabricated
+  assert.equal(VApp.validSchedule(noStamp, freshSeen(), ANCHOR_V).last_claim_at_ms, null);
+});
 t("boundary: validBlockHeight is the fleet 1..10,000,000 shape", () => {
   assert.equal(VApp.validBlockHeight(REAL_V.block_height), REAL_V.block_height);
   assert.equal(VApp.validBlockHeight(String(REAL_V.block_height)), REAL_V.block_height);
