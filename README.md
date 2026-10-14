@@ -18,12 +18,12 @@ The homepage recomputes three runtime rules in the browser from `data/supply.jso
   - `address-toolkit/` — SS58 prefix-189 address inspector/encoder
   - `network-dashboard/` — live mainnet telemetry from the public Subsquid indexer
   - `quantum-shield/` — interactive post-quantum explainer (ML-DSA, signature math, exposure demo)
-  - `tokenomics/` — QTC tokenomics explorer (verified genesis vesting, unlock simulator, emission tail, fee-burn calculator, funding)
+  - `tokenomics/` — QTC tokenomics explorer (verified genesis vesting, unlock simulator, emission tail, fee-burn calculator, funding; the shared exact decimal parser refuses exponent/length bombs instead of computing them)
   - `block-explorer/` — QTC block explorer (mainnet block/extrinsic/account search)
   - `mining-studio/` — QTC mining command center (setup wizard, rig builder with an earnings estimator whose network hashrate / total-issuance / observed-pace defaults derive live from the hourly chain snapshots, with a dated static fallback bundle from the same capture for the no-fetch path, benchmark grader, wormhole explainer, security checklist, troubleshooter)
   - `safesend/` — QTC SafeSend Lab (checkphrase address verifier on the real upstream algorithm, reversible-transfer simulator, high-security accounts guide, pallet call reference)
   - `benchmark-lab/` — QTC Benchmark Lab (Quantus vs Bitcoin/Ethereum/Solana/Ergo: consensus, PQ signatures, throughput math, fees, supply, launch fairness — every figure cited)
-  - `fee-throughput-lab/` — QTC Fee & Throughput Lab (exact length-fee estimator from the runtime polynomial, wormhole exit + high-security fee calculators, QTPS visualizer, aggregation explorer, signature-size lab — figures verified Sept 29, 2026)
+  - `fee-throughput-lab/` — QTC Fee & Throughput Lab (exact length-fee estimator from the runtime polynomial, wormhole exit + high-security fee calculators, QTPS visualizer, aggregation explorer, signature-size lab — figures verified Sept 29, 2026; the exact decimal parser bounds input length and exponent so a pasted "1e100000000" can't hang the calculators)
   - `threat-lab/` — QTC Threat Lab (Q-Day countdown across 2028/2029/2032 sourced horizons, 11-scenario wallet-exposure simulator for BTC/ETH/SOL/ADA/QTC, sourced chain-readiness table, Shor-vs-Grover explainer, quantum milestone timeline — every claim cited, Sept 29, 2026)
   - `emission-lab/` — QTC Emission Lab (exact on-chain reward formula R = (21M − S) / 50,000,000 verified against the runtime source, live reward pulse, interactive decay simulator, milestone timeline, 80-year supply projections — no halvings, Sept 30, 2026)
   - `mining-observatory/` — QTC Mining Observatory (miner decentralization from real mainnet coinbase data: Nakamoto coefficient, Herfindahl index vs DOJ bands, 51% crossing curve, miner leaderboard with explorer deep-links, concentration-over-time charts — Sept 30, 2026)

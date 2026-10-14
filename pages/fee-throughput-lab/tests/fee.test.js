@@ -125,6 +125,23 @@ t("qtcToPlancksExact", function(){
   assert.strictEqual(p(0.0002), 200000000n, "number input via shortest round-trip string");
 });
 
+// 17b. Parser DoS bound: exponent/length bombs are refused (0n, the
+// parser's junk convention), never computed. Unbounded, "1e100000000"
+// tried to build a 100-million-digit string in "0".repeat(scale) and
+// hung the pane on every keystroke, and a several-hundred-digit
+// exponent overflowed parseInt to Infinity and threw in repeat().
+// Bounds (512 chars, |exp| <= 1000) sit far past JS-number forms
+// (<= 24 chars, exp in [-324, 308]) and the 20-digit whole supply.
+t("qtcToPlancksExact DoS bound", function(){
+  var p = m.qtcToPlancksExact;
+  assert.strictEqual(p("1e100000000"), 0n, "exponent bomb refused, not computed");
+  assert.strictEqual(p("1e-100000000"), 0n, "negative exponent bomb is exactly 0 plancks");
+  assert.strictEqual(p("1e" + "9".repeat(400)), 0n, "parseInt-Infinity exponent refused, no throw");
+  assert.strictEqual(p("9".repeat(600)), 0n, "over-long digit string refused");
+  assert.strictEqual(p("1e1000"), 10n ** 1012n, "bound edge: exp 1000 still parses exactly");
+  assert.strictEqual(p("1e308"), 10n ** 320n, "largest JS-number exponent still exact");
+});
+
 // 18. Sweep: wormhole fee vs the pallet's own fixed point. The pallet charges
 // ceil(net_quanta*4/9996) on the minted amount; for every gross (in whole
 // quanta) that decomposes exactly, the app fee must equal the pallet fee.

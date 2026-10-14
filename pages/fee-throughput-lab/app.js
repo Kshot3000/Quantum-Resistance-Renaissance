@@ -114,12 +114,25 @@ var QUANTUM_PLANCKS = 10000000000n; // SCALE_DOWN_FACTOR: 1 quantum = 0.01 QTC
 function qtcToPlancksExact(value){
   if (typeof value === "bigint") return value > 0n ? value * 1000000000000n : 0n;
   var s = String(value == null ? "" : value).trim();
+  /* DoS bound (the Pay Desk parser lesson): refuse over-long inputs and
+   * absurd exponents instead of computing them. Unbounded, "1e100000000"
+   * made the "0".repeat(scale) below try to build a 100-million-digit
+   * string and hang the pane on every keystroke, and a several-hundred-
+   * digit exponent made parseInt return Infinity and repeat() throw.
+   * The bounds sit far past every legitimate form: JS numbers stringify
+   * to <= 24 chars with exponents in [-324, 308], and the whole
+   * 21,000,000 QTC supply is only 20 digits of plancks. Refusal follows
+   * this parser's existing convention — junk and negatives return 0n;
+   * a huge negative exponent's true value is 0 plancks anyway. */
+  if (s.length > 512) return 0n;
   var m = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(s);
   if (!m || (m[2] === "" && !m[3])) return 0n;
+  var exp = m[4] ? parseInt(m[4], 10) : 0;
+  if (!isFinite(exp) || exp > 1000 || exp < -1000) return 0n;
   var raw = (m[2] || "") + (m[3] || "");
   var lead = raw.length - raw.replace(/^0+/, "").length; // leading zeros stripped
   var digits = raw.replace(/^0+/, "") || "0";
-  var point = (m[2] || "").length - lead + (m[4] ? parseInt(m[4], 10) : 0); // digits left of the decimal point
+  var point = (m[2] || "").length - lead + exp; // digits left of the decimal point
   if (m[1] === "-") return 0n;
   var scale = point + 12; // digits to keep so the last kept digit is 1 planck
   var kept, roundUp = false;

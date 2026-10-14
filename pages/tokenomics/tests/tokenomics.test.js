@@ -165,6 +165,26 @@ t("high-security fee is an exact Permill floor to the planck", () => {
   assert.equal(A.hsFee("0.000000000199").feePlancks, 1n);
 });
 
+t("exact parser DoS bound: exponent/length bombs refused, never computed", () => {
+  // Same standardized parser as the Fee Lab. Unbounded, "1e100000000"
+  // tried to build a 100-million-digit string in "0".repeat(scale) and
+  // hung the pane on every keystroke; a several-hundred-digit exponent
+  // overflowed parseInt to Infinity and threw in repeat(). Refusal is
+  // 0n, this parser's junk/negative convention.
+  const p = A.qtcToPlancksExact;
+  assert.equal(p("1e100000000"), 0n);
+  assert.equal(p("1e-100000000"), 0n);
+  assert.equal(p("1e" + "9".repeat(400)), 0n);
+  assert.equal(p("9".repeat(600)), 0n);
+  assert.equal(p("1e1000"), 10n ** 1012n, "bound edge: exp 1000 still parses exactly");
+  assert.equal(p("1e308"), 10n ** 320n, "largest JS-number exponent still exact");
+  assert.equal(p("2.5e-12"), 3n, "legitimate exponent form unchanged");
+  // The fee wrappers inherit the refusal: a bombed exit paints the
+  // zero state, not a hang and not a fee on a phantom amount.
+  assert.equal(A.wormholeFee("1e100000000").amountPlancks, 0n);
+  assert.equal(A.hsFee("1e100000000").amountPlancks, 0n);
+});
+
 t("high-security rows always add up exactly", () => {
   for (let i = 1; i <= 5000; i++) {
     const s = (i * 1.6180339887 % 10000).toFixed(3);
