@@ -82,7 +82,7 @@ ok("no dev-tax claim in constants", Studio.CHAIN.WORMHOLE_EXIT_FEE_BPS === 4);
  * data/consensus.json + data/supply.json shapes at block ~151,373 */
 var CONS = { fetched_at: "2026-10-02T08:02:18.680Z", head: 151372,
   current: { height: 151372, difficulty: "541503155817540", est_hashrate_hs: "45125262984795" },
-  block_times_ms: { avg_ms: 12413, sample: 3000 } };
+  block_times_ms: { avg_ms: 12413, sample: 3000, last: Array(3000).fill(12413) } };
 var SUP = { fetched_at: "2026-10-02T08:02:28.460Z", block_height: 151373, total_supply_plancks: "5763610080351232263" };
 var dn = Studio.deriveNetworkDefaults(CONS, SUP);
 ok("derive netGH from est hashrate", Math.abs(dn.netGH - 45125.262984795) < 1e-6, dn.netGH);
@@ -105,7 +105,7 @@ ok("derive partial: consensus only", dpart.netGH > 0 && dpart.supplyQtc === null
  * fetched_at was rendered verbatim into the hint's innerHTML, and a
  * float height was cited as the capture height. */
 var dpoison = Studio.deriveNetworkDefaults(
-  { fetched_at: '<b id="pwn">PWNED</b>', head: 194177.9, current: { height: 194177.9, est_hashrate_hs: "9.9e13" }, block_times_ms: { avg_ms: 15000, sample: 3000 } },
+  { fetched_at: '<b id="pwn">PWNED</b>', head: 194177.9, current: { height: 194177.9, est_hashrate_hs: "9.9e13" }, block_times_ms: { avg_ms: 15000, sample: 3000, last: Array(3000).fill(15000) } },
   { fetched_at: "garbage!!", block_height: -5, total_supply_plancks: "6.5e18" });
 ok("derive rejects sci hashrate", dpoison.netGH === null, dpoison.netGH);
 ok("derive rejects float height (no supply fallback either)", dpoison.height === null, dpoison.height);
@@ -180,6 +180,30 @@ ok("round2: real snapshots pass unchanged", dreal.netGH === Number(realCons.curr
   dreal.height === realCons.head && Math.abs(dreal.blocksPerDay - 86400000 / realCons.block_times_ms.avg_ms) < 1e-9,
   JSON.stringify(dreal));
 
+/* snapshot-boundary round 3 (pace recompute — the consensus-lab
+ * standard): avg_ms must BE Math.round(mean(last)) with sample ===
+ * last.length, the fetch script's own construction. Pre-fix, a tampered
+ * avg_ms of 2,000 beside an honest 14,000 window painted 43,200
+ * blocks/day (~7x the honest pace) here and in the two sibling apps
+ * reading the same snapshot (mining-calculator, pool-desk). */
+var BT3 = { avg_ms: 14000, sample: 300, last: Array(300).fill(14000) };
+var dpace3 = Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151372, current: CONS.current, block_times_ms: BT3 }, SUP);
+ok("round3: honest window anchors the pace", Math.abs(dpace3.blocksPerDay - 86400000 / 14000) < 1e-9, dpace3.blocksPerDay);
+ok("round3: paceAvgMs accepts an exact varied mean", Studio.paceAvgMs({ avg_ms: 15000, sample: 200, last: Array(100).fill(10000).concat(Array(100).fill(20000)) }) === 15000);
+var bt3tamper = JSON.parse(JSON.stringify(BT3)); bt3tamper.avg_ms = 2000;
+ok("round3: tampered avg rejected", Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151372, current: CONS.current, block_times_ms: bt3tamper }, SUP).blocksPerDay === null);
+var bt3short = JSON.parse(JSON.stringify(BT3)); bt3short.sample = 3000;
+ok("round3: sample != last.length rejected", Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151372, current: CONS.current, block_times_ms: bt3short }, SUP).blocksPerDay === null);
+var bt3none = { avg_ms: 14000, sample: 300 };
+ok("round3: missing last rejected", Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151372, current: CONS.current, block_times_ms: bt3none }, SUP).blocksPerDay === null);
+var bt3neg = JSON.parse(JSON.stringify(BT3)); bt3neg.last[0] = -5;
+ok("round3: negative delta rejected", Studio.deriveNetworkDefaults(
+  { fetched_at: CONS.fetched_at, head: 151372, current: CONS.current, block_times_ms: bt3neg }, SUP).blocksPerDay === null);
+
 /* estimate supply guard: a cleared/negative supply field must dash the
  * earnings, never paint "NaN QTC" (blockReward(NaN) is NaN). */
 ok("estimate null on NaN supply", Studio.estimate(1200, 50, NaN) === null);
@@ -215,7 +239,7 @@ ok("fallback curSupply within emission bounds", Number(csVal) >= 5670000 && Numb
 var hintM = html.match(/id="supplyHint"[^>]*>([\s\S]*?)<\/p>/);
 ok("fallback hint cites a dated capture height", !!hintM && /block [0-9]{1,3},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
 ok("fallback hint difficulty matches painted netHash (one capture)",
-   !!hintM && /439,188,796,454,808/.test(hintM[1]) && Math.abs(Number(nhVal) - 439188796454808 / 12 / 1e9) < 1,
+   !!hintM && /441,525,356,366,992/.test(hintM[1]) && Math.abs(Number(nhVal) - 441525356366992 / 12 / 1e9) < 1,
    nhVal);
 ok("stale 45,125 example gone", !/45,125/.test(html));
 

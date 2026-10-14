@@ -171,7 +171,7 @@ const fixture = {
   consensus: {
     fetched_at: "2026-10-02T06:00:21.381Z",
     current: { height: 150644, est_hashrate_hs: "38525603542782" },
-    block_times_ms: { sample: 3000, avg_ms: 13365 },
+    block_times_ms: { sample: 3000, avg_ms: 13365, last: Array(3000).fill(13365) },
   },
   supply: { fetched_at: "2026-10-02T06:00:30.000Z", total_supply_plancks: "5763112233946770492" },
 };
@@ -270,6 +270,22 @@ eq("consistent balances aggregate accepted",
   const dd = bnd(c, bSup(), bLive());
   eq("sample <100 -> 7200 target pace", dd.blocksPerDay, 7200);
   t("target pace label says protocol target", /protocol target/.test(dd.paceLabel)); }
+
+// pace recompute (round 3, the consensus-lab standard): avg_ms must BE
+// Math.round(mean(last)) with sample === last.length — a tampered avg
+// beside an honest window painted a ~7x inflated blocks/day before this.
+{ const c = bCons(); c.block_times_ms.avg_ms = 2000;
+  const dd = bnd(c, bSup(), bLive());
+  eq("tampered avg_ms -> 7200 target pace", dd.blocksPerDay, 7200);
+  t("tampered avg pace label says protocol target", /protocol target/.test(dd.paceLabel)); }
+{ const c = bCons(); c.block_times_ms.sample = 2999;
+  eq("sample != last.length -> 7200 target pace", bnd(c, bSup(), bLive()).blocksPerDay, 7200); }
+{ const c = bCons(); delete c.block_times_ms.last;
+  eq("missing last -> 7200 target pace", bnd(c, bSup(), bLive()).blocksPerDay, 7200); }
+{ const c = bCons(); c.block_times_ms.last[2999] = 1336500;
+  eq("one inflated delta -> 7200 target pace", bnd(c, bSup(), bLive()).blocksPerDay, 7200); }
+eq("paceAvgMs accepts the honest fixture window", P.paceAvgMs(fixture.consensus.block_times_ms), 13365);
+eq("paceAvgMs accepts an exact varied mean", P.paceAvgMs({ avg_ms: 15000, sample: 200, last: [...Array(100).fill(10000), ...Array(100).fill(20000)] }), 15000);
 
 // block-avg path: poisoned rewards drop individually; all-poisoned -> static
 { const l = bLive(); l.data.blocks = [{ height: 150644, reward: "999999999999999999" }, { height: 150643, reward: "abc" }, { height: 150642, reward: "300000000000" }];

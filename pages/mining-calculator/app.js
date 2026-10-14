@@ -30,17 +30,17 @@ CHAIN.BLOCKS_PER_DAY = 86400 / CHAIN.BLOCK_TIME_S; // 7200
 /* Dated static FALLBACK bundle — replaced at load by deriveNetworkDefaults()
  * from the hourly data/*.json snapshots. Kept honest and dated for the
  * no-fetch path (file://, offline). Every figure comes from ONE capture
- * (2026-10-14 18:22Z): consensus difficulty @224,878 and total issuance
- * @224,880, fetched 13 seconds apart — never mix snapshot dates in one bundle.
+ * (2026-10-14 19:29Z): consensus difficulty @225,164 and total issuance
+ * @225,165, fetched 12 seconds apart — never mix snapshot dates in one bundle.
  * Guarded by tests/calc.test.js (fallback-integrity suite). */
 var FALLBACK = {
-  difficulty: "439188796454808",        // data/consensus.json @224,878
-  netHs: 36599066371234,                // = floor(difficulty / 12 s)
-  totalSupplyPlancks: "5817634352518693742", // data/supply.json @224,880
-  supplyQtc: 5817634.3525,              // total issuance incl. genesis
-  avgBlockMs: 14935,                    // consensus block_times_ms (3,000-block sample)
-  height: 224878,
-  fetchedAt: "2026-10-14T18:22:21.182Z"
+  difficulty: "441525356366992",        // data/consensus.json @225,164
+  netHs: 36793779697249,                // = floor(difficulty / 12 s)
+  totalSupplyPlancks: "5817792217511333059", // data/supply.json @225,165
+  supplyQtc: 5817792.2175,              // total issuance incl. genesis
+  avgBlockMs: 14862,                    // consensus block_times_ms (3,000-block sample)
+  height: 225164,
+  fetchedAt: "2026-10-14T19:29:29.596Z"
 };
 
 /* Pure: block reward from total issuance (the emission formula's S —
@@ -112,6 +112,30 @@ function totalSupplyOf(sup){
   return sum != null ? sum.toString() : null;
 }
 
+/* Round 3 (producer recompute — the consensus-lab standard): avg_ms is
+ * not a measurement on its own; the fetch script DEFINES it as
+ * Math.round(mean(last)) over its own delta array, and sample IS that
+ * array's length. A pace anchors blocks/day only when it recomputes
+ * exactly from the window it claims to summarize: last present, every
+ * delta a non-negative safe integer, sample === last.length, and
+ * avg_ms === Math.round(mean(last)). Before this, a tampered avg_ms
+ * (2,000 beside an honest 14,000 window) painted 43,200 blocks/day —
+ * a ~7x inflated earnings pace — in every app reading the snapshot. */
+function paceAvgMs(bt){
+  if (!bt || typeof bt !== "object") return null;
+  var avg = intField(bt.avg_ms), sample = intField(bt.sample);
+  if (avg == null || sample == null) return null;
+  if (!(avg > 1000 && avg < 120000) || sample < 100) return null;
+  var last = bt.last;
+  if (!Array.isArray(last) || last.length !== sample) return null;
+  var sum = 0;
+  for (var i = 0; i < last.length; i++) {
+    if (!Number.isSafeInteger(last[i]) || last[i] < 0) return null;
+    sum += last[i];
+  }
+  return Math.round(sum / last.length) === avg ? avg : null;
+}
+
 /* Pure: derive the calculator's network defaults from the builder's
  * hourly chain snapshots (data/consensus.json + data/supply.json):
  *  - netHs:        consensus.current.est_hashrate_hs (difficulty / 12 s)
@@ -136,12 +160,12 @@ function deriveNetworkDefaults(consensus, supply){
     out.fetchedAt = validFetchedAt(consensus.fetched_at);
   }
   if (consensus && consensus.block_times_ms) {
-    var avg = intField(consensus.block_times_ms.avg_ms);
-    var sample = intField(consensus.block_times_ms.sample);
     /* Observed pace is a mean over the fetch script's block sample —
      * require the sample that construction guarantees (>= 100 of its
-     * up-to-3,000 blocks) before a pace anchors blocks/day. */
-    if (avg != null && avg > 1000 && avg < 120000 && sample != null && sample >= 100) {
+     * up-to-3,000 blocks) AND the round-3 recompute (paceAvgMs) before
+     * a pace anchors blocks/day. */
+    var avg = paceAvgMs(consensus.block_times_ms);
+    if (avg != null) {
       out.avgBlockMs = avg;
       out.blocksPerDay = 86400000 / avg;
     }
@@ -461,7 +485,7 @@ if (typeof document !== "undefined" && typeof window !== "undefined"){
 if (typeof module !== "undefined" && module.exports){
   module.exports = { CHAIN: CHAIN, FALLBACK: FALLBACK, chainState: chainState, estimate: estimate,
                      blockReward: blockReward, totalSupplyOf: totalSupplyOf,
-                     deriveNetworkDefaults: deriveNetworkDefaults,
+                     deriveNetworkDefaults: deriveNetworkDefaults, paceAvgMs: paceAvgMs,
                      intField: intField, validPlancks: validPlancks, validHeight: validHeight, validFetchedAt: validFetchedAt,
                      fmtNum: fmtNum, fmtQTC: fmtQTC, fmtMoney: fmtMoney, fmtDuration: fmtDuration, fmtUtc: fmtUtc };
 }

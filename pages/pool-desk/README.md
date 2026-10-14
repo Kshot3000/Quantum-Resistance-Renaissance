@@ -27,7 +27,7 @@ All pool facts read 2026-10-01: `pool.ariabrain.com/qtc.html` (AriaPool: fee, PP
 
 ## Tests
 
-- `node tests/pool-desk.test.js` — 115/115 logic tests (fee stacking, comparator math, solo stats, validators, command builder for all 5 pool×miner combos, data integrity of every published fact, live-default derivation + fallback layers, fallback-bundle integrity guards).
+- `node tests/pool-desk.test.js` — 152/152 logic tests (fee stacking, comparator math, solo stats, validators, command builder for all 5 pool×miner combos, data integrity of every published fact, live-default derivation + fallback layers, fallback-bundle integrity guards, round-3 pace recompute).
 - Real-browser QA via `~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-pooldesk-livedefaults.mjs` (headless Chromium, file:// + CDP, real snapshot injection + static-fallback path, zero console errors).
 
 100% client-side. Built by [@kshot9000](https://x.com/kshot9000) · QTC donations: `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`

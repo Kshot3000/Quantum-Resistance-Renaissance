@@ -112,6 +112,30 @@ function totalSupplyOf(sup) {
   return sum != null ? sum.toString() : null;
 }
 Studio.totalSupplyOf = totalSupplyOf;
+/* Round 3 (producer recompute — the consensus-lab standard): avg_ms is
+ * not a measurement on its own; the fetch script DEFINES it as
+ * Math.round(mean(last)) over its own delta array, and sample IS that
+ * array's length. A pace anchors blocks/day only when it recomputes
+ * exactly from the window it claims to summarize: last present, every
+ * delta a non-negative safe integer, sample === last.length, and
+ * avg_ms === Math.round(mean(last)). Before this, a tampered avg_ms
+ * (2,000 beside an honest 14,000 window) painted 43,200 blocks/day —
+ * a ~7x inflated earnings pace — in every app reading the snapshot. */
+function paceAvgMs(bt) {
+  if (!bt || typeof bt !== "object") return null;
+  var avg = intField(bt.avg_ms), sample = intField(bt.sample);
+  if (avg == null || sample == null) return null;
+  if (!(avg > 1000 && avg < 120000) || sample < 100) return null;
+  var last = bt.last;
+  if (!Array.isArray(last) || last.length !== sample) return null;
+  var sum = 0;
+  for (var i = 0; i < last.length; i++) {
+    if (!Number.isSafeInteger(last[i]) || last[i] < 0) return null;
+    sum += last[i];
+  }
+  return Math.round(sum / last.length) === avg ? avg : null;
+}
+Studio.paceAvgMs = paceAvgMs;
 /* Round 2 (relations, not just shapes — the mining-calculator standard,
  * verified on live data at head 206,532 before enforcing): the hashrate
  * must restate its own difficulty (est_hashrate_hs == difficulty / 12,
@@ -119,7 +143,9 @@ Studio.totalSupplyOf = totalSupplyOf;
  * two reads of the same tip and must agree, the observed pace needs the
  * >= 100-block sample the fetch construction guarantees, and the supply
  * payload must belong to the same capture as the consensus payload
- * (heights within 100 blocks; the sync script asserts a 0–10 gap). */
+ * (heights within 100 blocks; the sync script asserts a 0–10 gap).
+ * Round 3 adds the pace recompute (paceAvgMs above): avg_ms must equal
+ * Math.round(mean(last)) with sample === last.length. */
 Studio.deriveNetworkDefaults = function (consensus, supply) {
   var out = { netGH: null, supplyQtc: null, blocksPerDay: null, avgBlockMs: null, height: null, fetchedAt: null };
   if (consensus && consensus.current) {
@@ -133,9 +159,8 @@ Studio.deriveNetworkDefaults = function (consensus, supply) {
     out.fetchedAt = validFetchedAt(consensus.fetched_at);
   }
   if (consensus && consensus.block_times_ms) {
-    var avg = intField(consensus.block_times_ms.avg_ms);
-    var sample = intField(consensus.block_times_ms.sample);
-    if (avg != null && avg > 1000 && avg < 120000 && sample != null && sample >= 100) {
+    var avg = paceAvgMs(consensus.block_times_ms);
+    if (avg != null) {
       out.avgBlockMs = avg;
       out.blocksPerDay = 86400000 / avg;
     }

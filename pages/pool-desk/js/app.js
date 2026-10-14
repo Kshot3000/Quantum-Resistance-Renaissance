@@ -20,14 +20,14 @@ const NETWORK_DEFAULTS = {
   // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
   // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
   // and dated for the no-fetch path (file://, offline). All four figures come from
-  // ONE capture (2026-10-14 18:22Z): consensus difficulty @224,878 and total
-  // issuance @224,880, 13 seconds apart — never mix snapshot dates in one bundle
+  // ONE capture (2026-10-14 19:29Z): consensus difficulty @225,164 and total
+  // issuance @225,165, 12 seconds apart — never mix snapshot dates in one bundle
   // (the Sept-30 bundle survived to Oct 2 at half the real hashrate and skewed
   // every fallback-path earnings figure ~2x; guarded in tests).
-  blockRewardQTC: 0.3036473, // emission formula: (21M − 5,817,634.3525 total issuance) / 50M, data/supply.json @224880, 2026-10-14
-  blockRewardLabel: "0.3036 QTC · emission formula @ height 224880, 2026-10-14",
-  netHashHS: 36599066371234, // difficulty 439188796454808 / 12s, data/consensus.json @224878, 2026-10-14
-  netHashLabel: "≈36.60 TH/s · from difficulty 439188796454808 @ height 224878, 2026-10-14",
+  blockRewardQTC: 0.3036442, // emission formula: (21M − 5,817,792.2175 total issuance) / 50M, data/supply.json @225165, 2026-10-14
+  blockRewardLabel: "0.3036 QTC · emission formula @ height 225165, 2026-10-14",
+  netHashHS: 36793779697249, // difficulty 441525356366992 / 12s, data/consensus.json @225164, 2026-10-14
+  netHashLabel: "≈36.79 TH/s · from difficulty 441525356366992 @ height 225164, 2026-10-14",
 };
 
 const SOURCES = [
@@ -225,6 +225,29 @@ function validHeight(v) {
   var h = intField(v);
   return (h != null && h >= 1 && h <= 10000000) ? h : null;
 }
+/* Round 3 (producer recompute — the consensus-lab standard): avg_ms is
+ * not a measurement on its own; the fetch script DEFINES it as
+ * Math.round(mean(last)) over its own delta array, and sample IS that
+ * array's length. A pace anchors blocks/day only when it recomputes
+ * exactly from the window it claims to summarize: last present, every
+ * delta a non-negative safe integer, sample === last.length, and
+ * avg_ms === Math.round(mean(last)). Before this, a tampered avg_ms
+ * (2,000 beside an honest 14,000 window) painted 43,200 blocks/day —
+ * a ~7x inflated earnings pace — in every app reading the snapshot. */
+function paceAvgMs(bt) {
+  if (!bt || typeof bt !== "object") return null;
+  var avg = intField(bt.avg_ms), sample = intField(bt.sample);
+  if (avg == null || sample == null) return null;
+  if (!(avg > 1000 && avg < 120000) || sample < 100) return null;
+  var last = bt.last;
+  if (!Array.isArray(last) || last.length !== sample) return null;
+  var sum = 0;
+  for (var i = 0; i < last.length; i++) {
+    if (!Number.isSafeInteger(last[i]) || last[i] < 0) return null;
+    sum += last[i];
+  }
+  return Math.round(sum / last.length) === avg ? avg : null;
+}
 /* A capture time must be a real one: inside the chain's lifetime
  * (genesis floor 2026-09-01, the fleet bound) and not in the future —
  * a fetched_at of 2999 was previously cited verbatim as the snapshot's
@@ -375,10 +398,12 @@ function deriveNetworkDefaults(snap) {
   // --- daily pace: observed block times beat the 12s target on honesty,
   // but only on the sample the fetch construction guarantees: it emits a
   // Math.round mean over up to 3,000 blocks — require an integer avg in a
-  // sane band and >= 100 sampled blocks before a pace anchors blocks/day.
-  var avgMs = consensus && consensus.block_times_ms ? intField(consensus.block_times_ms.avg_ms) : null;
+  // sane band, >= 100 sampled blocks, AND the round-3 recompute
+  // (paceAvgMs: avg_ms === Math.round(mean(last)), sample === last.length)
+  // before a pace anchors blocks/day.
+  var avgMs = consensus && consensus.block_times_ms ? paceAvgMs(consensus.block_times_ms) : null;
   var sample = consensus && consensus.block_times_ms ? intField(consensus.block_times_ms.sample) : null;
-  if (avgMs != null && avgMs > 1000 && avgMs < 120000 && sample != null && sample >= 100) {
+  if (avgMs != null && sample != null) {
     out.blocksPerDay = paceBlocksPerDay(avgMs);
     out.paceLabel = "≈" + Math.round(out.blocksPerDay).toLocaleString("en-US") +
       " blocks/day · observed pace, last " + sample + " blocks (target 7,200)";
@@ -708,7 +733,7 @@ if (typeof module !== "undefined" && module.exports) {
     effectiveFee, grossPerDay, netPerDay, soloStats, pplnsWindowBlocks,
     toHS, fmtQTC, fmtDays, validateAddress, validateWorker, authToken, buildCommand,
     poolById, minerOptions,
-    blockRewardQtc, totalSupplyOf, paceBlocksPerDay, deriveNetworkDefaults, formatUtc,
+    blockRewardQtc, totalSupplyOf, paceBlocksPerDay, paceAvgMs, deriveNetworkDefaults, formatUtc,
     intField, validPlancks, validHeight, validFetchedAt,
   };
 }
