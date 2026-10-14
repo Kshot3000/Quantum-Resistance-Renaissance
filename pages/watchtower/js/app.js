@@ -75,7 +75,7 @@ try {
           ? parsed.settings.pollMinutes : 0;
         state.settings.notify = parsed.settings.notify === true;
       }
-      state.lastScan = QWATCH.parseableTs(parsed.lastScan);
+      state.lastScan = QWATCH.eraTs(parsed.lastScan);
       state.ruleSeq = Number.isInteger(parsed.ruleSeq) && parsed.ruleSeq > 0 ? parsed.ruleSeq : 1;
     }
   }
@@ -261,7 +261,7 @@ function buildScanContext(bundle) {
   var transfers = QWATCH.sanitizeTransfers(bundle.flows && bundle.flows.transfers, flowsMeta ? flowsMeta.chain_height : null);
   var gov = QWATCH.sanitizeGovernance(bundle.gov && bundle.gov.data);
   var balances = QWATCH.buildBalanceMap((bundle.whales && bundle.whales.top) || []);
-  var fetchedAt = src ? QWATCH.parseableTs(src.fetched_at) : null;
+  var fetchedAt = src ? QWATCH.eraTs(src.fetched_at) : null;
   return {
     bundle: bundle,
     balances: balances,
@@ -275,7 +275,7 @@ function buildScanContext(bundle) {
     fetchedAt: fetchedAt,
     snapshotCapturedAt: bundle.mode === "snapshot" ? fetchedAt : null,
     flowsMeta: flowsMeta,
-    govFetchedAt: bundle.gov ? QWATCH.parseableTs(bundle.gov.fetched_at) : null,
+    govFetchedAt: bundle.gov ? QWATCH.eraTs(bundle.gov.fetched_at) : null,
   };
 }
 

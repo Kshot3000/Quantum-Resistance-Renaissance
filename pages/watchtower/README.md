@@ -25,7 +25,7 @@ Stored state is treated as an untrusted boundary and sanitized against what the 
 
 ## Tests
 
-`node tests/run-tests.mjs` — 32 logic tests (planck math, rule transitions, per-transfer dedupe, self-test fixtures, stored-state boundary + relations rounds 1–3).
+`node tests/run-tests.mjs` — 33 logic tests (planck math, rule transitions, per-transfer dedupe, self-test fixtures, stored-state boundary + relations rounds 1–4; round 4 era-holds the producer stamps — watchlist addedAt, stored lastScan, snapshot fetched_at — to the chain-era window, so a 2020/2999 stamp nulls instead of painting as fact).
 
 ## Built by
 

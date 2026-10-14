@@ -149,6 +149,18 @@ function parseableTs(v) {
   return typeof v === "string" && isFinite(Date.parse(v)) ? v : null;
 }
 
+function eraTs(v) {
+  // A timestamp string that could be a producer stamp of this chain's
+  // era: parseable AND inside [genesis floor, now + 1h skew] — the
+  // chainTimeMs window sanitizeAlerts already holds. Round 4: the
+  // stamps whose only producers stamp "now" (watchlist addedAt, the
+  // stored lastScan, the snapshots' fetched_at) held only parseableTs,
+  // so a 2020 or 2999 stamp survived as fact — a 2999 lastScan painted
+  // "Last scan: just now" forever and a 2999 fetched_at defeated the
+  // snapshot-staleness badge. Returns the string verbatim or null.
+  return chainTimeMs(v) !== null ? v : null;
+}
+
 function validChainHeight(v) {
   // A height the chain could actually be at: parseHeight plus the
   // fleet 10,000,000 ceiling — 99,999,999,999 parses fine and painted
@@ -430,7 +442,7 @@ function sanitizeWatchlist(rows, validateFn) {
       address: addr,
       nick: typeof x.nick === "string" ? x.nick.slice(0, 40) : "",
       note: typeof x.note === "string" ? x.note.slice(0, 140) : "",
-      addedAt: parseableTs(x.addedAt),
+      addedAt: eraTs(x.addedAt), // producer stamps now: era window, not mere parseability (round 4)
       checkphrase: phrase, // null -> re-derived at init
     });
   });
@@ -783,6 +795,7 @@ var api = {
   nonNegInt: nonNegInt,
   validPlancks: validPlancks,
   parseableTs: parseableTs,
+  eraTs: eraTs,
   validChainHeight: validChainHeight,
   chainTimeMs: chainTimeMs,
   MAX_SUPPLY_PLANCKS: MAX_SUPPLY_PLANCKS,

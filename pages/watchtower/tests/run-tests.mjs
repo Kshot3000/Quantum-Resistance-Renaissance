@@ -323,6 +323,27 @@ test("round 3: sanitizeWatchlist enforces producer relations", () => {
   assert.deepEqual(W.sanitizeWatchlist("junk"), []);
 });
 
+test("round 4: eraTs + watchlist addedAt hold the producer era window", () => {
+  // Producers stamp addedAt with new Date().toISOString() (watch form
+  // and backup import alike), so the stamp must be a chain-era time —
+  // parseable alone let 2020/2999 stamps ride the backup export as fact.
+  assert.equal(W.eraTs("2026-10-01T00:00:00Z"), "2026-10-01T00:00:00Z");
+  assert.equal(W.eraTs("2026-09-01T00:00:00.000Z"), "2026-09-01T00:00:00.000Z"); // genesis floor edge
+  assert.equal(W.eraTs("2020-01-01T00:00:00Z"), null);
+  assert.equal(W.eraTs("2999-01-01T00:00:00Z"), null);
+  assert.equal(W.eraTs("2026-08-31T23:59:59Z"), null); // pre-genesis
+  assert.equal(W.eraTs("garbage"), null);
+  assert.equal(W.eraTs(null), null);
+  assert.equal(W.eraTs(1791000000000), null);
+  const wl = W.sanitizeWatchlist([
+    { address: ADDR_A, addedAt: "2020-01-01T00:00:00Z" },
+    { address: ADDR_B, addedAt: "2999-01-01T00:00:00Z" },
+  ]);
+  assert.equal(wl.length, 2); // rows kept — addedAt is cosmetic
+  assert.equal(wl[0].addedAt, null);
+  assert.equal(wl[1].addedAt, null);
+});
+
 test("round 3: sanitizeAlerts relations — dedupe, era window, caps", () => {
   const TS = "2026-10-12T00:00:00Z";
   const out = W.sanitizeAlerts([
