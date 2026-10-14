@@ -131,6 +131,26 @@ eq("zone floored", retargetZone(10).cls, "up");
   poison("min above current", (s) => { s.difficulty.min = (BigInt(s.current.difficulty) + 1n).toString(); });
   poison("max below current", (s) => { s.difficulty.max = (BigInt(s.current.difficulty) - 1n).toString(); });
   poison("genesis_ts disagrees with trend[0]", (s) => { s.genesis_ts += 60000; });
+  // round 3: producer-recompute relations — interior recent points and the
+  // block-time window's chronological tail are pinned, not just the tails.
+  poison("recent interior difficulty inflated", (s) => {
+    s.recent[700][2] = (BigInt(s.recent[700][2]) * 2n).toString();
+  });
+  poison("recent interior timestamp +5s at a wide-gap index", (s) => {
+    let idx = -1;
+    for (let i = 1; i < s.recent.length - 1; i++) {
+      if (s.recent[i][1] - s.recent[i - 1][1] > 7000 && s.recent[i + 1][1] - s.recent[i][1] > 7000) { idx = i; break; }
+    }
+    if (idx < 0) throw new Error("no wide-gap index in real snapshot");
+    s.recent[idx][1] += 5000;
+  });
+  poison("block-time window adjacent swap (stats are order-blind)", (s) => {
+    const L = s.block_times_ms.last;
+    let a = -1;
+    for (let i = L.length - 1499; i < L.length - 1; i++) { if (L[i] !== L[i + 1]) { a = i; break; } }
+    if (a < 0) throw new Error("no swap pair in real window");
+    const t = L[a]; L[a] = L[a + 1]; L[a + 1] = t;
+  });
   // validBlockHeight fleet shape
   eq("height number", validBlockHeight(202254), 202254);
   eq("height digit string", validBlockHeight("202254"), 202254);

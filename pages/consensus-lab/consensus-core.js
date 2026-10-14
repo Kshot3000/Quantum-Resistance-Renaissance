@@ -90,7 +90,10 @@ export function pctChange(oldD, newD) {
  * hex == difficulty, net_change == the exact BigInt recompute, the
  * block-time stats == the stats of the last[] window they summarize,
  * blocks_indexed + missing == head, trend/recent tails == current, and
- * trend[0] == the genesis point. The 2026-10-09 validator checked shapes
+ * trend[0] == the genesis point. Round 3 adds the producer's own
+ * recompute: every recent difficulty == the exact retarget of its
+ * predecessor over the pair's timestamp delta, and the block-time
+ * window's tail == the recent series' own deltas. The 2026-10-09 validator checked shapes
  * only (finite / BigInt-parseable): a head of 9,007,199,254,740,991, a
  * tampered avg_ms, or a difficulty.min above the current difficulty all
  * painted as real. Shape is not a boundary — relations are. */
@@ -185,6 +188,32 @@ export function validSnapshot(j, nowMs = Date.now()) {
     if (trendTail[0] !== head || recentTail[0] !== head) return false;
     if (trendTail[1] !== recentTail[1]) return false;
     if (trendTail[2] !== cur.difficulty || recentTail[2] !== cur.difficulty) return false;
+    // round 3: the recent series is a suffix of the producer's recomputed
+    // chain, so every difficulty in it must BE the exact retarget of its
+    // predecessor over the pair's own timestamp delta (block 2 uses the
+    // 12s target, mirroring fetch-consensus-data.mjs) — an interior point
+    // inflated between two honest neighbours fails both transitions even
+    // though the tails still agree with current. The producer walks the
+    // indexed sequence, so the recurrence holds across missing-height
+    // gaps exactly as it does between consecutive heights.
+    const rec = j.recent;
+    for (let i = 1; i < rec.length; i++) {
+      const prevD = digitBig(rec[i - 1][2]), thisD = digitBig(rec[i][2]);
+      if (prevD === null || thisD === null) return false;
+      const delta = rec[i][0] === 2 ? TARGET_MS
+        : (rec[i][1] > rec[i - 1][1] ? BigInt(rec[i][1] - rec[i - 1][1]) : 0n);
+      if (calculateDifficulty(prevD, delta).difficulty !== thisD) return false;
+    }
+    // round 3: the block-time window and the recent series are two views
+    // of the same head-end transitions — the window's tail must BE the
+    // recent series' own timestamp deltas. The window stats above are
+    // order-blind (sorted), so reordering the window passed round 2; the
+    // overlap pins its chronological tail.
+    const overlap = Math.min(last.length, rec.length - 1);
+    for (let k = 0; k < overlap; k++) {
+      const rd = rec[rec.length - overlap + k][1] - rec[rec.length - overlap + k - 1][1];
+      if (last[last.length - overlap + k] !== rd) return false;
+    }
     return true;
   } catch { return false; }
 }
