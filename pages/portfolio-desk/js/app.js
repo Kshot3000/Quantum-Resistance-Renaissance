@@ -220,7 +220,10 @@ function buildChain(bundle, addrs, nowMs) {
   }
   if (vesting) c.schedules = QPORT.sanitizeSchedules(vesting.schedules);
   if (flows) c.byAddr = indexTransfers(QPORT.sanitizeTransfers(flows.transfers));
-  if (miners) c.minedCounts = QPORT.sanitizeMinedCounts(miners.window_miners, miners.all_time);
+  if (miners) c.minedCounts = QPORT.sanitizeMinedCounts(miners.window_miners, miners.all_time, {
+    chainHeight: miners.chain_height,
+    windowBlocks: miners.window && miners.window.block_count,
+  });
   return c;
 }
 

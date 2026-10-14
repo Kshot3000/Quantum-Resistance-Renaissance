@@ -148,6 +148,31 @@ function sanitizeSchedule(s) {
   };
 }
 
+/* Round 3 (2026-10-14): schedule-list relations. The producer
+ * (fetch-vesting-data.mjs over the genesis vesting snapshot) writes
+ * schedule ids that are globally unique (verified 48/48 on the real
+ * snapshot) and per-beneficiary grants whose totals sum to the
+ * 5,669,940 QTC vesting pool — far under the supply cap. A duplicated
+ * row therefore restates the SAME grant: counting it twice doubles
+ * the beneficiary's locked/claimable in every rollup. And two grants
+ * that are each under the per-row cap can still sum past every QTC
+ * that will ever exist for one beneficiary. First copy wins; a row
+ * that would push the beneficiary's total over the cap is dropped. */
+function dedupeScheduleList(list) {
+  var seenIds = {}, total = 0n, out = [];
+  list.forEach(function (s) {
+    if (s.id !== null && s.id !== undefined) {
+      if (seenIds[s.id]) return;
+      seenIds[s.id] = 1;
+    }
+    var t = BigInt(s.total_plancks);
+    if (total + t > MAX_SUPPLY_PLANCKS) return;
+    total += t;
+    out.push(s);
+  });
+  return out;
+}
+
 function sanitizeSchedules(rows) {
   var byBeneficiary = new Map();
   if (!Array.isArray(rows)) return byBeneficiary;
@@ -160,6 +185,7 @@ function sanitizeSchedules(rows) {
     if (!arr) { arr = []; byBeneficiary.set(s.beneficiary, arr); }
     arr.push(clean);
   });
+  byBeneficiary.forEach(function (arr, addr) { byBeneficiary.set(addr, dedupeScheduleList(arr)); });
   return byBeneficiary;
 }
 
@@ -218,7 +244,20 @@ function sanitizeTopBalances(rows) {
   return byAddr;
 }
 
-function sanitizeMinedCounts(windowMiners, allTime) {
+function sanitizeMinedCounts(windowMiners, allTime, bounds) {
+  // Round 3 (2026-10-14): chain-containment relations, verified on the
+  // real miners.json at capture 225,165 before being held: every block
+  // has exactly one author, so no address's all_time count can exceed
+  // chain_height (live max 95,851), the top-100 all_time counts SUM to
+  // at most chain_height (live 225,021), and no window count can
+  // exceed the window's own block_count (live max 10,390 of 15,000;
+  // window counts sum to exactly 15,000). bounds is optional — without
+  // it the round-2 behaviour stands. An over-height all_time entry is
+  // not the address's count: the window floor (if any) stands instead.
+  // An all_time list whose kept entries sum past chain_height is not
+  // producer data at all: the whole list is voided, window floors kept.
+  var chainHeight = bounds ? nonNegInt(bounds.chainHeight) : null;
+  var windowBlocks = bounds ? nonNegInt(bounds.windowBlocks) : null;
   // miners.json carries TWO views of the same fact: window_miners is
   // complete for the last 15,000 blocks, all_time is cumulative since
   // genesis for the top-100 miners — and all_time already INCLUDES the
@@ -235,19 +274,27 @@ function sanitizeMinedCounts(windowMiners, allTime) {
     Object.keys(windowMiners).forEach(function (addr) {
       if (!SS58_189_RE.test(addr)) return;
       var v = nonNegInt(windowMiners[addr]);
-      if (v !== null) counts.set(addr, v);
+      if (v === null) return;
+      if (windowBlocks !== null && v > windowBlocks) return;
+      if (chainHeight !== null && v > chainHeight) return;
+      counts.set(addr, v);
     });
   if (Array.isArray(allTime)) {
     var seenAllTime = {};
+    var kept = [];
     allTime.forEach(function (m) {
       if (!m || typeof m !== "object") return;
       if (typeof m.address !== "string" || !SS58_189_RE.test(m.address)) return;
       if (seenAllTime[m.address]) return;
       var v = nonNegInt(m.blocks);
       if (v === null) return; // a garbage count is unknown, never NaN blocks mined
+      if (chainHeight !== null && v > chainHeight) return;
       seenAllTime[m.address] = 1;
-      counts.set(m.address, v);
+      kept.push([m.address, v]);
     });
+    var sum = kept.reduce(function (a, kv) { return a + kv[1]; }, 0);
+    if (chainHeight === null || sum <= chainHeight)
+      kept.forEach(function (kv) { counts.set(kv[0], kv[1]); });
   }
   return counts;
 }
@@ -317,7 +364,7 @@ function rollupAddress(entry, ctx, nowMs) {
   var bal = ctx.balances ? sanitizeBalance(ctx.balances.get(entry.address)) : null;
   var free = bal ? BigInt(bal.free) : null;
   var rawScheds = (ctx.schedules && ctx.schedules.get(entry.address)) || [];
-  var scheds = Array.isArray(rawScheds) ? rawScheds.map(sanitizeSchedule).filter(Boolean) : [];
+  var scheds = Array.isArray(rawScheds) ? dedupeScheduleList(rawScheds.map(sanitizeSchedule).filter(Boolean)) : [];
   var locked = 0n, claimable = 0n, vestedTotal = 0n;
   var schedRows = [];
   scheds.forEach(function (s) {

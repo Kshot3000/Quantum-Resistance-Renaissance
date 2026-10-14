@@ -23,7 +23,7 @@ Read-only by design. The desk never asks for keys, seeds, or signatures and neve
 
 ## Tests
 
-- `node tests/run-tests.mjs` — 19/19 logic tests (vesting math, rollups, vault, CSV export, boundary sanitizers, vault producer relations)
+- `node tests/run-tests.mjs` — 21/21 logic tests (vesting math, rollups, vault, CSV export, boundary sanitizers, vault producer relations, mined-count chain containment + schedule identity relations)
 - Browser QA: real-browser verification of the add/validate/checkphrase flow, donut render, and live-first data load
 
 ---

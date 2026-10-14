@@ -342,3 +342,45 @@ test("csvExport produces a parseable holdings CSV", () => {
   assert.ok(lines[1].includes("qzA"));
   assert.ok(lines[1].includes("1.000000"));
 });
+
+test("round 3 relations: mined counts are contained by the chain they claim", () => {
+  const MA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7",
+        MB = "qzo9ddk2km1qqAmXNiwo55vs5LNTU851mSQc8ufBwkQygHRBv";
+  // Live-verified at capture 225,165: all_time max 95,851 <= chain_height,
+  // all_time sum 225,021 <= chain_height, window max 10,390 <= 15,000.
+  const B = { chainHeight: 225165, windowBlocks: 15000 };
+  const honest = P.sanitizeMinedCounts({ [MA]: 10390, [MB]: 7 }, [{ address: MA, blocks: 95851 }, { address: MB, blocks: 40000 }], B);
+  assert.equal(honest.get(MA), 95851);
+  assert.equal(honest.get(MB), 40000);
+  // One address cannot have authored more blocks than exist.
+  assert.equal(P.sanitizeMinedCounts({}, [{ address: MA, blocks: 225166 }], B).has(MA), false);
+  // An over-height all_time entry falls back to the window floor, never the poison.
+  assert.equal(P.sanitizeMinedCounts({ [MA]: 500 }, [{ address: MA, blocks: 9999999 }], B).get(MA), 500);
+  // A window count cannot exceed the window itself.
+  assert.equal(P.sanitizeMinedCounts({ [MA]: 15001 }, [], B).has(MA), false);
+  assert.equal(P.sanitizeMinedCounts({ [MA]: 15000 }, [], B).get(MA), 15000);
+  // An all_time list summing past chain_height is void wholesale; floors stand.
+  const voided = P.sanitizeMinedCounts({ [MA]: 500 }, [{ address: MA, blocks: 200000 }, { address: MB, blocks: 100000 }], B);
+  assert.equal(voided.get(MA), 500);
+  assert.equal(voided.has(MB), false);
+  // No bounds: round-2 behaviour unchanged.
+  assert.equal(P.sanitizeMinedCounts({}, [{ address: MA, blocks: 9999999 }]).get(MA), 9999999);
+});
+
+test("round 3 relations: schedule identity dedupe and per-beneficiary cap", () => {
+  const MA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7";
+  const W = { cliff_ms: "1820479917807", start_ms: "1820479917807", end_ms: "1915087917807" };
+  const S = (patch) => Object.assign({ id: 7, beneficiary: MA, cohort: "grant", total_plancks: "840000000000000000", claimed_plancks: "0" }, W, patch);
+  // Producer ids are globally unique (48/48 live): a duplicate row restates
+  // the same grant and must not double the rollup's locked/claimable.
+  assert.equal(P.sanitizeSchedules([S({}), S({})]).get(MA).length, 1);
+  assert.equal(P.sanitizeSchedules([S({}), S({ id: 8 })]).get(MA).length, 2);
+  // Each row under the cap, the pair over it: the crossing row drops.
+  const BIG = "20000000000000000000";
+  assert.equal(P.sanitizeSchedules([S({ id: 1, total_plancks: BIG }), S({ id: 2, total_plancks: BIG })]).get(MA).length, 1);
+  // The rollup path holds the same relations against a poisoned ctx.
+  const vault = P.blankVault();
+  P.addToVault(vault, MA, "x");
+  const ctx = { balances: new Map(), schedules: new Map([[MA, [S({}), S({})]]]), byAddr: new Map(), minedCounts: new Map() };
+  assert.equal(P.rollupPortfolio(vault, ctx, 0).rows[0].schedules.length, 1);
+});
