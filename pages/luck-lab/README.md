@@ -25,7 +25,7 @@ Memoryless-Poisson mining math: solo finds at rate h/D per second, wait exponent
 
 ## Tests
 
-- `node tests/luck-core.test.js` — 45/45 logic tests (exponential quantiles, Poisson PMF, seeded-RNG determinism, Monte Carlo convergence to theory, retarget catch-up math, emission formula, formatters).
+- `node tests/luck-core.test.js` — 88/88 logic tests (exponential quantiles, Poisson PMF, seeded-RNG determinism, Monte Carlo convergence to theory, retarget catch-up math, emission formula, formatters, snapshot boundary incl. the round-3 tail-anchored pace window).
 - Real-browser QA via `~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-lucklab-browser.mjs` (headless Chromium, file:// + CDP, zero console errors).
 
 100% client-side. Built by [@kshot9000](https://x.com/kshot9000) · QTC donations: `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`

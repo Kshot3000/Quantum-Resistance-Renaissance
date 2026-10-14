@@ -9,19 +9,19 @@
   var $ = function (id) { return document.getElementById(id); };
 
   // Fallback bundle — ONE capture, never mixed dates: every field below comes
-  // from the 2026-10-14 17:23Z snapshot refresh (consensus @ block 224,637 +
-  // supply @ block 224,637, fetched 14 seconds apart). The previous bundle paired
+  // from the 2026-10-14 18:22Z snapshot refresh (consensus @ block 224,878 +
+  // supply @ block 224,880, fetched 13 seconds apart). The previous bundle paired
   // Oct 1 difficulty/head with an Oct 2 supply-derived reward, which silently
   // skewed every fallback-painted figure. Guarded by tests/luck-core.test.js
   // (cross-checked against energy-observatory's fallback bundle).
   var state = {
-    difficulty: 440075578544018,   // fallback: consensus snapshot 2026-10-14
-    netHs: 36672964878668,         // = difficulty / 12 s (indexer est. hashrate)
-    reward: 0.3036501,             // fallback: (21M − 5,817,496.0264 total supply) / 50M, same capture
-    blocksPerDay: 5788,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
-    avgBlockMs: 14927,
-    head: 224637,
-    fetchedAt: "2026-10-14T17:23:13.671Z",
+    difficulty: 439188796454808,   // fallback: consensus snapshot 2026-10-14
+    netHs: 36599066371234,         // = difficulty / 12 s (indexer est. hashrate)
+    reward: 0.3036473,             // fallback: (21M − 5,817,634.3525 total supply) / 50M, same capture
+    blocksPerDay: 5785,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
+    avgBlockMs: 14935,
+    head: 224878,
+    fetchedAt: "2026-10-14T18:22:21.182Z",
     source: "snapshot"
   };
 
@@ -142,6 +142,34 @@
     return (avg > 1000 && avg < 120000) ? avg : null;
   }
 
+  /* Round 3 — the pace window's TAIL identity. recentPaceMs holds the
+   * window's internal shape, but the window is the producer's LAST
+   * <=1500 blocks (fetch-consensus-data.mjs pushes stamps in height
+   * order and slices the tail), so its final entry IS the head block:
+   * [head, head stamp, current difficulty], and every stamp is a real
+   * block time inside the chain's lifetime and at/before the capture
+   * (60s of producer clock skew allowed). A window ending hundreds of
+   * blocks early, carrying another block's difficulty at its tail, or
+   * stamped in 2999 / before genesis may be internally consistent, but
+   * it is not THIS capture's window and its span is not the current
+   * observed pace. Only the pace falls — difficulty, head and reward
+   * anchor independently of the window. */
+  var RECENT_GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
+  var RECENT_TAIL_SKEW_MS = 60000;
+  function recentTailAnchored(rec, headHeight, diffStr, fetchedMs) {
+    if (!Array.isArray(rec) || !rec.length) return false;
+    var first = rec[0], last = rec[rec.length - 1];
+    if (!Array.isArray(first) || !Array.isArray(last)) return false;
+    if (validHeight(last[0]) !== headHeight) return false;
+    var tailDiff = validPlancks(last[2]);
+    if (tailDiff == null || BigInt(tailDiff) !== BigInt(diffStr)) return false;
+    var fTs = first[1], lTs = last[1];
+    if (!Number.isInteger(fTs) || !Number.isInteger(lTs)) return false;
+    if (fTs < RECENT_GENESIS_FLOOR_MS) return false;
+    if (lTs > fetchedMs + RECENT_TAIL_SKEW_MS) return false;
+    return true;
+  }
+
   /* Derive the page's chain state from the two snapshots. Every payload
    * is validated at this boundary before it anchors a figure: strict
    * integer shapes, the fetch scripts' own exact cross-checks
@@ -177,7 +205,9 @@
         out.fetchedAt = consAt;
         out.snapshotOk = true;
         var avg = recentPaceMs(con.recent);
-        if (avg != null) { out.avgBlockMs = avg; out.blocksPerDay = 86400000 / avg; }
+        if (avg != null && recentTailAnchored(con.recent, hh, diff, Date.parse(consAt))) {
+          out.avgBlockMs = avg; out.blocksPerDay = 86400000 / avg;
+        }
       }
     }
 
@@ -558,7 +588,7 @@
   /* node test hook */
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { deriveSnapshotState: deriveSnapshotState, totalSupplyOf: totalSupplyOf,
-                       recentPaceMs: recentPaceMs, intField: intField, validPlancks: validPlancks,
+                       recentPaceMs: recentPaceMs, recentTailAnchored: recentTailAnchored, intField: intField, validPlancks: validPlancks,
                        validHeight: validHeight, validFetchedAt: validFetchedAt, FALLBACK: state };
   }
 })();

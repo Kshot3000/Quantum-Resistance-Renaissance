@@ -135,11 +135,12 @@ t("percentile p=0 -> min", L.percentile([3, 1, 2].sort((a, b) => a - b), 0) === 
 global.LuckCore = L;
 const A = require("../js/app.js");
 {
+  const CAPMS = Date.parse("2026-10-02T15:00:29.848Z");
   const mkRecent = (n, stepMs, h0, ts0) =>
     Array.from({ length: n }, (_, i) => [h0 + i, ts0 + i * stepMs, "669104327575800"]);
   const CONS = { fetched_at: "2026-10-02T15:00:29.848Z", head: 153406,
     current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "55758693964650" },
-    recent: mkRecent(1500, 14000, 151907, 1756944000000) };
+    recent: mkRecent(1500, 14000, 151907, CAPMS - 29848 - 1499 * 14000) };
   const SUP = { fetched_at: "2026-10-02T15:00:40.038Z", block_height: 153406,
     total_supply_plancks: "5766179473775204913",
     balances_plancks: { free: "5766179473775204813", reserved: "100", frozen: "0" } };
@@ -191,14 +192,31 @@ const A = require("../js/app.js");
   const nullRec = clone(CONS); nullRec.recent[500] = null;
   const dNullRec = A.deriveSnapshotState(nullRec, clone(SUP));
   t("boundary: poisoned recent entry -> pace dropped, difficulty anchors", dNullRec.avgBlockMs === null && dNullRec.snapshotOk === true);
-  const gapRec = clone(CONS); gapRec.recent = mkRecent(11, 1100, 150000, 1756944000000).map((p, i) => [p[0] + i * 99, p[1], p[2]]);
+  const gapRec = clone(CONS); gapRec.recent = mkRecent(11, 1100, 150000, CAPMS - 29848 - 10 * 1100).map((p, i) => [p[0] + i * 99, p[1], p[2]]);
   t("boundary: gapped heights -> no pace (span would overcount blocks)", A.deriveSnapshotState(gapRec, clone(SUP)).avgBlockMs === null);
-  const strTs = clone(CONS); strTs.recent = mkRecent(11, 14000, 153396, 1756944000000).map((p) => [p[0], String(p[1]), p[2]]);
+  const strTs = clone(CONS); strTs.recent = mkRecent(11, 14000, 153396, CAPMS - 29848 - 10 * 14000).map((p) => [p[0], String(p[1]), p[2]]);
   t("boundary: string timestamps -> no pace", A.deriveSnapshotState(strTs, clone(SUP)).avgBlockMs === null);
-  const few = clone(CONS); few.recent = mkRecent(10, 14000, 153397, 1756944000000);
+  const few = clone(CONS); few.recent = mkRecent(10, 14000, 153397, CAPMS - 29848 - 9 * 14000);
   t("boundary: <11-entry window -> no pace", A.deriveSnapshotState(few, clone(SUP)).avgBlockMs === null);
-  const fast = clone(CONS); fast.recent = mkRecent(11, 500, 153396, 1756944000000);
+  const fast = clone(CONS); fast.recent = mkRecent(11, 500, 153396, CAPMS - 29848 - 10 * 500);
   t("boundary: 500ms average -> no pace (outside the plausible band)", A.deriveSnapshotState(fast, clone(SUP)).avgBlockMs === null);
+
+  // Round 3 — the window's tail identity: the producer's recent slice ENDS
+  // at the head, so a window from another capture (or another era) is not
+  // this capture's pace, however consistent its interior. Only pace falls.
+  const earlyWin = clone(CONS); earlyWin.recent = mkRecent(1500, 14000, 151407, CAPMS - 29848 - (1499 + 500) * 14000);
+  const dEarly = A.deriveSnapshotState(earlyWin, clone(SUP));
+  t("round3: window ending 500 blocks before head -> no pace, difficulty anchors", dEarly.avgBlockMs === null && dEarly.snapshotOk === true);
+  const tailDif = clone(CONS); tailDif.recent[1499][2] = "12345";
+  t("round3: tail carrying another block's difficulty -> no pace", A.deriveSnapshotState(tailDif, clone(SUP)).avgBlockMs === null);
+  const futWin = clone(CONS); futWin.recent = mkRecent(1500, 14000, 151907, Date.parse("2999-01-01T00:00:00Z") - 1499 * 14000);
+  t("round3: window stamped in 2999 -> no pace", A.deriveSnapshotState(futWin, clone(SUP)).avgBlockMs === null);
+  const oldWin = clone(CONS); oldWin.recent = mkRecent(1500, 14000, 151907, Date.parse("2020-01-01T00:00:00Z"));
+  t("round3: window stamped before genesis (2020) -> no pace", A.deriveSnapshotState(oldWin, clone(SUP)).avgBlockMs === null);
+  const lateWin = clone(CONS); lateWin.recent = mkRecent(1500, 14000, 151907, CAPMS + 3600000 - 1499 * 14000);
+  t("round3: tail stamped an hour after the capture -> no pace", A.deriveSnapshotState(lateWin, clone(SUP)).avgBlockMs === null);
+  const skewWin = clone(CONS); skewWin.recent = mkRecent(1500, 14000, 151907, CAPMS + 30000 - 1499 * 14000);
+  t("round3: tail stamped 30s after capture (skew) still anchors pace", A.deriveSnapshotState(skewWin, clone(SUP)).avgBlockMs === 14000);
 
   // The REAL current snapshots must pass their own boundary unchanged.
   const fs2 = require("fs"), path2 = require("path");
