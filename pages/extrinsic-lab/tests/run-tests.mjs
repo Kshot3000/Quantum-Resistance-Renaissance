@@ -322,5 +322,41 @@ test('verifyExtrinsic refuses out-of-range versions instead of wrapping them', (
   assertEq(D.eraBirth(100, 64, 8), 72, 'eraBirth at/above phase stays <= head');
 });
 
+/* ---------- 11: SCALE bool is a discriminant, not a coercion (round 3) ----------
+ * Every other single-byte discriminant in decode.js is held to its
+ * producer set (Option throws for >1, MultiAddress/signature/era reject
+ * unknown forms), but bool used !!r.u8(): byte 0x02/0x80/0xFF painted as
+ * a clean `true` keep_alive / aye. parity-scale-codec decodes bool as
+ * 0x00 false / 0x01 true and errors on anything else — the runtime
+ * rejects such an extrinsic outright, so the decoder must too. */
+function transferAllCall(boolByte) {
+  return D.concatBytes([Uint8Array.of(2, 4, 0x00), rand32(70), Uint8Array.of(boolByte)]);
+}
+function burnCall(boolByte) {
+  return D.concatBytes([Uint8Array.of(2, 10), compactEncode(1n), Uint8Array.of(boolByte)]);
+}
+test('bool args decode 0x00 as false and 0x01 as true', () => {
+  assertEq(D.decodeCallBytes(transferAllCall(0x00)).args[1].decoded, false, 'transfer_all keep_alive 0x00');
+  assertEq(D.decodeCallBytes(transferAllCall(0x01)).args[1].decoded, true, 'transfer_all keep_alive 0x01');
+  assertEq(D.decodeCallBytes(burnCall(0x00)).args[1].decoded, false, 'burn keep_alive 0x00');
+  assertEq(D.decodeCallBytes(burnCall(0x01)).args[1].decoded, true, 'burn keep_alive 0x01');
+});
+test('bool args reject non-SCALE bytes 0x02 / 0x80 / 0xFF', () => {
+  for (const bad of [0x02, 0x80, 0xff]) {
+    for (const build of [transferAllCall, burnCall]) {
+      let threw = false;
+      try { D.decodeCallBytes(build(bad)); } catch (e) { threw = /bad bool encoding/.test(e.message); }
+      assert(threw, 'byte 0x' + bad.toString(16) + ' must throw a bool error, not paint true');
+    }
+  }
+});
+test('a signed extrinsic carrying a poisoned bool byte fails decode', () => {
+  const kp = ml_dsa65.keygen(); kp.accountId = rand32(71);
+  const { hex } = signAndAssemble({ kp, scheme: 65, call: transferAllCall(0x02), era: Uint8Array.of(0), nonce: 0n, tip: 0n, specVersion: SPEC, txVersion: TXV, genesisHash: GENESIS, birthHash: GENESIS });
+  let threw = false;
+  try { D.decodeExtrinsic(hex); } catch (e) { threw = /bad bool encoding/.test(e.message); }
+  assert(threw, 'poisoned keep_alive must fail the whole decode');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

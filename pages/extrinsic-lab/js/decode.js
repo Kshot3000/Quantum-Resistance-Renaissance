@@ -117,7 +117,18 @@ function decodeShape(r, shape, depth) {
     case 'u32': v = r.u32le(); break;
     case 'u64': v = r.u64le(); break;
     case 'u128': v = r.u128le(); break;
-    case 'bool': v = !!r.u8(); break;
+    case 'bool': {
+      /* SCALE bool is a one-byte discriminant, not a truthiness coercion:
+       * parity-scale-codec decodes 0x00 as false and 0x01 as true and
+       * rejects every other byte — the runtime refuses such an extrinsic
+       * outright, so the decoder must too (the Option discriminant below
+       * is held to the same rule). !!r.u8() painted 0x02/0x80/0xFF as a
+       * clean `true` keep_alive / aye. */
+      var bv = r.u8();
+      if (bv > 1) throw new Error('bad bool encoding 0x' + bv.toString(16) + ' (SCALE bool is 0x00 or 0x01)');
+      v = bv === 1;
+      break;
+    }
     case 'compact': v = r.compact(); break;
     case 'accountId': v = accountDisplay(r.take(32)); break;
     case 'hash': v = { kind: 'hash', hex: '0x' + bytesToHex(r.take(32)) }; break;
