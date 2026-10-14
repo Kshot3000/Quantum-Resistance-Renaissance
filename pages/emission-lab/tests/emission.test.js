@@ -165,14 +165,19 @@ t("anchor rejects a status that disagrees with the blocks", function(){
   assert.ok(m.anchorFromSnapshot(d, NOW), "status absent is fine (older snapshots)");
 });
 
-// 16. Anchor relations: rewards are leaf-quantized and clustered
-t("anchor rejects unquantized or out-of-cluster rewards", function(){
+// 16. Anchor relations: rewards are leaf-quantized; a single payout above
+// the base cluster is a fee-carrying block (round 3 — the indexer payout
+// is base + fees), displayed but never anchoring.
+t("anchor rejects unquantized rewards; a lone fee block anchors nothing", function(){
   var d = validData(); d.blocks[0].reward = "305000000000";
   assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "0.305 QTC is not a minted reward");
-  d = validData(); d.blocks[0].reward = "410000000000";
-  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "0.41 QTC breaks the cluster");
   d = validData(); d.blocks[0].reward = "0";
   assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "zero reward");
+  d = validData(); d.blocks[0].reward = "410000000000";
+  var a = m.anchorFromSnapshot(d, NOW);
+  assert.ok(a, "one fee-carrying block does not break the anchor");
+  assert.strictEqual(a.feeBlocks, 1, "the 0.41 payout is counted as a fee block");
+  approx(a.meanReward, (0.31 * 7 + 0.30 * 7) / 14, 1e-9, "cluster mean excludes the fee block");
 });
 
 // 17. Anchor relations: timestamps descend with heights, chain-era only
@@ -192,6 +197,48 @@ t("anchor bounds fetched_at and rejects mixed-date snapshots", function(){
   assert.ok(a && a.fetchedAt === null, "future fetched_at dropped, never painted");
   d = validData(); d.fetched_at = new Date(NOW - 3600000).toISOString();
   assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "newest block after fetched_at");
+});
+
+// 19. Round 3: the base cluster must be the majority of the window —
+// fee-carrying blocks are ~3% of producer blocks, so a window where
+// most payouts sit above the cluster is forged, not busy.
+t("anchor rejects a majority-fee window", function(){
+  var d = validData();
+  for (var i = 0; i < 8; i++) d.blocks[i].reward = "420000000000";
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "8 fee blocks of 15: minority base cluster");
+  d = validData();
+  for (var j = 0; j < 7; j++) d.blocks[j].reward = "420000000000";
+  var a = m.anchorFromSnapshot(d, NOW);
+  assert.ok(a && a.feeBlocks === 7, "7 fee blocks of 15 still anchors on the majority cluster");
+});
+
+// 20. Round 3: R0 held to the genesis mint — remaining mining supply
+// starts at MINING_EMISSIONS and only falls; one quantum of cluster
+// bias (R0_QUANTUM_TOLERANCE) is the only slack.
+t("anchor rejects an R0 above the mining emissions plus one quantum", function(){
+  var d = validData(); d.blocks.forEach(function(b){ b.reward = "350000000000"; });
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "all-0.35: R0 17.5M implies supply below genesis");
+  d = validData(); d.blocks.forEach(function(b){ b.reward = "310000000000"; });
+  var a = m.anchorFromSnapshot(d, NOW);
+  assert.ok(a, "all-0.31 (the live shape) anchors");
+  approx(a.R0, 15500000, 1e-6, "R0 = 0.31 x divisor, inside the tolerance");
+  assert.strictEqual(m.R0_QUANTUM_TOLERANCE, 500000, "tolerance is exactly one quantum x divisor");
+});
+
+// 21. Round 3: implied minted held to the height — the per-block
+// emission only decays from the genesis-era 0.3066 QTC, so a window
+// at height h cannot imply more minted than h x 0.3066 (+ tolerance).
+t("anchor rejects implied minted beyond height x genesis reward", function(){
+  var d = validData(); d.blocks.forEach(function(b){ b.reward = "200000000000"; });
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "all-0.20 at 217,568 implies 5.33M minted");
+  d = validData(); d.blocks.forEach(function(b){ b.reward = "280000000000"; });
+  assert.strictEqual(m.anchorFromSnapshot(d, NOW), null, "all-0.28 at 217,568 implies 1.33M minted");
+  // the same 0.30 base is producer-possible only much later (the true
+  // reward decays below 0.305 after ~261k blocks): at 400,000 it anchors.
+  var late = { status: { block_height: 400000 }, fetched_at: new Date(NOW).toISOString(), blocks: [] };
+  for (var i = 0; i < 15; i++) late.blocks.push({ height: 400000 - i, hash: "0x" + "ab".repeat(32),
+    timestamp: new Date(NOW - 18000 - i * 13700).toISOString(), reward: "300000000000" });
+  assert.ok(m.anchorFromSnapshot(late, NOW), "all-0.30 at height 400,000 anchors");
 });
 
 console.log("\n" + passed + " passed, " + failed + " failed");

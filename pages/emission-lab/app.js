@@ -16,7 +16,8 @@ var PLANCKS = 1e12;               // 1 QTC = 10^12 planck
 var LEAF_QUANTUM_QTC = 0.01;      // wormhole leaf quantum; rewards quantized to this
 var LEAF_PLANCKS = 10000000000;   // 0.01 QTC in plancks (10^12 / 100)
 var MAX_CHAIN_HEIGHT = 10000000;  // fleet plausible-height ceiling
-var MAX_REWARD_SPREAD_QTC = 0.03; // anchor window reward cluster bound (3 quanta)
+var R0_QUANTUM_TOLERANCE = 500000; // 1 leaf quantum x EMISSION_DIVISOR: the most a
+                                   // quantum-cluster mean can misstate R0, either way
 var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // pre-launch floor
 
 // ---- Closed-form decay model ----------------------------------------------
@@ -102,16 +103,35 @@ function milestones(R0, blocksPerDay){
 //   * every timestamp a real chain-era time (genesis floor, now+1h cap),
 //     strictly descending with its height, each step <= 600 s;
 //   * every reward a positive integer planck count that is an exact
-//     multiple of the leaf quantum, and the whole window's rewards within
-//     MAX_REWARD_SPREAD_QTC of each other (the true reward moves by a
-//     factor of (1 - 1/50M) per block — over 15 blocks the cluster is the
-//     quantization oscillation, observed spread exactly 1 quantum);
+//     multiple of the leaf quantum (round 3, 2026-10-14: the payout is
+//     the indexer's MiningRewards "Total reward (base + fees)" — the
+//     subsquid generated types say so in as many words — so a block
+//     carrying fee-paying extrinsics legitimately pays whole quanta
+//     ABOVE the base emission; the round-2 whole-window cluster spread
+//     rejected the real snapshot whenever such a block landed in the
+//     window (live sample: 10 of 300 blocks at 0.32-0.42 QTC, window
+//     spread 0.08). The base cluster is what anchors: payouts within
+//     one quantum of the window minimum (the true base moves by a
+//     factor of (1 - 1/50M) per block, so over 15 blocks the base
+//     oscillation is exactly that 1 quantum), the cluster must be the
+//     MAJORITY of the window (fee-carrying blocks are ~3% of blocks),
+//     and R0 is derived from the cluster mean alone — fee blocks are
+//     displayed in the pulse but never anchor a figure);
 //   * status.block_height, when the payload carries one, equals the top
 //     block's height (a disagreement is a mixed-date snapshot);
 //   * the newest block is not newer than the fetched_at that claims to
 //     contain it (+60 s clock slack), and fetched_at itself must be a real
 //     capture time (fleet bounds) or it is dropped to null — a label, never
-//     painted from an out-of-bounds value.
+//     painted from an out-of-bounds value;
+//   * the cluster-derived R0 is held to the chain it claims (round 3):
+//     R0 <= MINING_EMISSIONS + R0_QUANTUM_TOLERANCE (remaining mining
+//     supply starts at 15.33M and only falls; the tolerance is the one
+//     quantum a cluster mean can misstate it by — past it, the implied
+//     supply sits below the genesis mint), and the implied minted total
+//     MINING_EMISSIONS - R0, again past the same tolerance, cannot
+//     exceed height x the genesis-era reward MINING_EMISSIONS /
+//     EMISSION_DIVISOR (the per-block emission only ever decays, so no
+//     window at this height can imply more minted than that).
 function anchorFromSnapshot(data, nowMs){
   var now = isFinite(nowMs) ? nowMs : Date.now();
   if (!data || !Array.isArray(data.blocks)) return null;
@@ -141,20 +161,31 @@ function anchorFromSnapshot(data, nowMs){
     var dt = times[j - 1] - times[j];
     if (!(dt > 0) || dt > 600000) return null; // strictly descending, <= 10 min apart
   }
-  var rMax = Math.max.apply(null, rewards), rMin = Math.min.apply(null, rewards);
-  if (rMax - rMin > MAX_REWARD_SPREAD_QTC + 1e-9) return null; // one quantized cluster
   if (data.status != null){
     var sh = Number(data.status && data.status.block_height);
     if (!isFinite(sh) || sh !== heights[0]) return null; // status and blocks: same moment
   }
   if (fetchedMs !== null && times[0] > fetchedMs + 60000) return null; // block newer than its snapshot
-  var mean = rewards.reduce(function(a, x){ return a + x; }, 0) / rewards.length;
+  // Base cluster (round 3): payouts within one leaf quantum of the window
+  // minimum are base emission; anything above paid the miner fees on top
+  // and is counted (feeBlocks) but never anchors. The cluster must be the
+  // majority — a window where most blocks claim fee bumps is not the
+  // producer's ~3% fee-carrying rate, it is a forged window.
+  var rMin = Math.min.apply(null, rewards);
+  var cluster = rewards.filter(function(x){ return x <= rMin + LEAF_QUANTUM_QTC + 1e-9; });
+  if (cluster.length < Math.ceil(rewards.length / 2)) return null;
+  var mean = cluster.reduce(function(a, x){ return a + x; }, 0) / cluster.length;
   var R0 = mean * EMISSION_DIVISOR;
   if (!isFinite(mean) || mean <= 0 || !isFinite(R0) || R0 <= 0 || R0 >= MAX_SUPPLY) return null;
+  if (R0 > MINING_EMISSIONS + R0_QUANTUM_TOLERANCE) return null; // supply below the genesis mint
+  if ((MINING_EMISSIONS - R0) - R0_QUANTUM_TOLERANCE >
+      heights[0] * (MINING_EMISSIONS / EMISSION_DIVISOR)) return null; // minted more than the chain can have
   var bt = (times[0] - times[times.length - 1]) / 1000 / (heights[0] - heights[heights.length - 1]);
   if (!isFinite(bt) || bt < 1 || bt > 600) return null; // internally inconsistent snapshot
   return { R0: R0, meanReward: mean, rewards: rewards, heights: heights,
            height: heights[0], time: times[0], blockTime: bt,
+           feeBlocks: rewards.length - cluster.length,
+           clusterMax: Math.max.apply(null, cluster),
            fetchedAt: fetchedAt };
 }
 
@@ -164,7 +195,7 @@ if (typeof module !== "undefined" && module.exports){
     MAX_SUPPLY: MAX_SUPPLY, GENESIS_MINT: GENESIS_MINT, MINING_EMISSIONS: MINING_EMISSIONS,
     EMISSION_DIVISOR: EMISSION_DIVISOR, PLANCKS: PLANCKS, LEAF_QUANTUM_QTC: LEAF_QUANTUM_QTC,
     LEAF_PLANCKS: LEAF_PLANCKS, MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT,
-    MAX_REWARD_SPREAD_QTC: MAX_REWARD_SPREAD_QTC, GENESIS_FLOOR_MS: GENESIS_FLOOR_MS,
+    R0_QUANTUM_TOLERANCE: R0_QUANTUM_TOLERANCE, GENESIS_FLOOR_MS: GENESIS_FLOOR_MS,
     decayFactor: decayFactor, remainingQtc: remainingQtc, supplyQtc: supplyQtc,
     rewardQtc: rewardQtc, blocksToRemaining: blocksToRemaining, issuanceOver: issuanceOver,
     annualInflation: annualInflation, halvingBlocks: halvingBlocks,
@@ -227,8 +258,10 @@ if (typeof window !== "undefined"){
     el("stat-snapshot").textContent = a.fetchedAt ?
       "snapshot " + new Date(a.fetchedAt).toLocaleString("en-US", { timeZone: "America/Chicago" }) : "live";
     el("hero-note").textContent =
-      "Anchored on " + a.rewards.length + " recent blocks (mean reward " + fmtQTC(a.meanReward, 4) +
-      " QTC, quantized to " + LEAF_QUANTUM_QTC.toFixed(2) + " QTC). Remaining supply and " +
+      "Anchored on " + a.rewards.length + " recent blocks (mean base reward " + fmtQTC(a.meanReward, 4) +
+      " QTC, quantized to " + LEAF_QUANTUM_QTC.toFixed(2) + " QTC" +
+      (a.feeBlocks ? "; " + a.feeBlocks + " fee-carrying block(s) paid above base and are excluded from the anchor" : "") +
+      "). Remaining supply and " +
       "projections are derived from the on-chain formula R = (21M − S) / 50,000,000 — " +
       "a model, not a chain-state read. Small deviations from pure exponential come " +
       "from fee burns, included fees, and reward quantization.";
@@ -262,9 +295,11 @@ if (typeof window !== "undefined"){
       if (n <= 16) ctx.fillText(String(a.heights[i]).slice(-4), x + w / 2, H - 2);
       ctx.textAlign = "left";
     }
-    el("pulse-note").textContent = a.rewards.length + " blocks · values alternate between " +
-      fmtQTC(Math.min.apply(null, a.rewards), 2) + " and " + fmtQTC(Math.max.apply(null, a.rewards), 2) +
-      " QTC because the pallet quantizes each reward to the 0.01 QTC leaf quantum before minting.";
+    el("pulse-note").textContent = a.rewards.length + " blocks · the base emission alternates between " +
+      fmtQTC(Math.min.apply(null, a.rewards), 2) + " and " + fmtQTC(a.clusterMax, 2) +
+      " QTC because the pallet quantizes each reward to the 0.01 QTC leaf quantum before minting" +
+      (a.feeBlocks ? "; " + a.feeBlocks + " block(s) pay more — up to " + fmtQTC(Math.max.apply(null, a.rewards), 2) +
+        " QTC — because the miner payout is base + fees, and fee-carrying blocks keep the fees on top." : ".");
   }
 
   function drawSupply(a, log){
