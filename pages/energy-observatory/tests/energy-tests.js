@@ -194,7 +194,7 @@ t("us home 10,791 kWh/yr", E.EXTERNAL.us_home_kwh_2022.value === 10791);
   const D = app.deriveSnapshotState;
   const CONS = { fetched_at: "2026-10-02T15:00:29.848Z", head: 153406,
     current: { height: 153406, difficulty: "669104327575800", est_hashrate_hs: "55758693964650" },
-    trend: [[153000, 1756944000000, "669104327575800"], [153406, 1757030400000, "669104327575800"]] };
+    trend: [[153000, Date.parse("2026-10-02T13:30:00Z"), "669104327575800"], [153406, Date.parse("2026-10-02T14:59:00Z"), "669104327575800"]] };
   const SUP = { fetched_at: "2026-10-02T15:00:40.038Z", block_height: 153406,
     total_supply_plancks: "5766179473775204913",
     balances_plancks: { free: "5766179473775204813", reserved: "100", frozen: "0" } };
@@ -240,9 +240,35 @@ t("us home 10,791 kWh/yr", E.EXTERNAL.us_home_kwh_2022.value === 10791);
   t("boundary: supply alone anchors reward (layered fallback)", D(null, SUP, null).rewardQtc > 0);
 
   const tr = cp(CONS);
-  tr.trend = [[153406, "not-a-date", "669104327575800"], [153300, 1757030400000, "9.9e13"],
-              [153000, 1756944000000, "669104327575800"]];
-  t("boundary: poisoned trend points drop individually", D(tr, SUP, LIV).trend.length === 1);
+  tr.trend = [[153406, "not-a-date", "669104327575800"], [153300, Date.parse("2026-10-02T14:59:00Z"), "9.9e13"],
+              [153000, Date.parse("2026-10-02T13:30:00Z"), "669104327575800"]];
+  t("boundary: poisoned trend points drop individually", app.cleanTrend(tr.trend).length === 1);
+  t("boundary: a trend whose tail point dropped anchors no history (round-3 tail rule)", D(tr, SUP, LIV).trend.length === 0);
+
+  /* Round 3 (trend relations): the producer samples the height-ordered
+   * block walk every 100 and pushes the head stamp last — heights and
+   * timestamps strictly increase inside the chain's lifetime, and the
+   * tail IS [head, headTs, current.difficulty]. */
+  const CT = app.cleanTrend;
+  t("round3: 2999 trend stamp drops", CT([[153000, Date.parse("2999-01-01T00:00:00Z"), "5"]]).length === 0);
+  t("round3: pre-genesis trend stamp (2020) drops", CT([[153000, Date.parse("2020-01-01T00:00:00Z"), "5"]]).length === 0);
+  t("round3: out-of-order height drops, first point stands",
+    CT([[153406, Date.parse("2026-10-02T14:59:00Z"), "5"], [153000, Date.parse("2026-10-02T13:30:00Z"), "5"]]).length === 1);
+  t("round3: duplicate height drops", CT([[153000, Date.parse("2026-10-02T13:30:00Z"), "5"],
+    [153000, Date.parse("2026-10-02T13:30:00Z"), "5"]]).length === 1);
+  t("round3: backwards stamp at a higher height drops", CT([[153000, Date.parse("2026-10-02T14:59:00Z"), "5"],
+    [153406, Date.parse("2026-10-02T13:30:00Z"), "5"]]).length === 1);
+  t("round3: equal stamps at two heights drop the second", CT([[153000, Date.parse("2026-10-02T13:30:00Z"), "5"],
+    [153406, Date.parse("2026-10-02T13:30:00Z"), "5"]]).length === 1);
+  const tailH = cp(CONS); tailH.trend = [[153000, Date.parse("2026-10-02T13:30:00Z"), "669104327575800"],
+    [153400, Date.parse("2026-10-02T14:59:00Z"), "669104327575800"]];
+  const tailHD = D(tailH, SUP, LIV);
+  t("round3: tail naming another block voids the trend, difficulty still anchors",
+    tailHD.trend.length === 0 && tailHD.snapshotOk === true);
+  const tailD = cp(CONS); tailD.trend[1][2] = "12345";
+  t("round3: tail carrying another difficulty voids the trend", D(tailD, SUP, LIV).trend.length === 0);
+  const tailP = cp(CONS); tailP.trend[1][1] = Date.parse("2999-01-01T00:00:00Z");
+  t("round3: poisoned tail voids the trend (no partial other-capture history)", D(tailP, SUP, LIV).trend.length === 0);
 
   const ld = cp(LIV);
   ld.data.daily = [{ date: "2026-10-02T00:00:00+00:00", blocks_count: 6000, tx_count: "abc" },

@@ -9,14 +9,14 @@ var E = EnergyCore;
 
 /* ---------- constants ---------- */
 var FALLBACK = {
-  difficulty: "437956149488155",
-  height: 224395,
+  difficulty: "440075578544018",
+  height: 224637,
   // total supply in plancks (free + reserved + frozen), balances aggregate @ block
-  // 224,395, fetched 2026-10-14 — the SAME capture as the difficulty above
-  // (@ block 224,395, fetched 11 seconds apart; never mix snapshot dates in one bundle).
+  // 224,637, fetched 2026-10-14 — the SAME capture as the difficulty above
+  // (@ block 224,637, fetched 14 seconds apart; never mix snapshot dates in one bundle).
   // This is total_issuance for the emission formula, NOT mined rewards alone
   // (genesis endowments count toward issuance).
-  totalSupplyPlancks: "5817349722433816353",
+  totalSupplyPlancks: "5817496026381539757",
   fetchedAt: null,
   txRate: null,
   txRateSub: null,
@@ -104,7 +104,18 @@ function totalSupplyOf(sup) {
 /* Trend points [height, tsMs, difficulty] for the history chart: drop
  * poisoned points individually (a garbage timestamp otherwise buckets
  * into a "NaN-aN-aN" day and a scientific-notation difficulty inflates
- * that day's energy) instead of losing — or faking — the whole history. */
+ * that day's energy) instead of losing — or faking — the whole history.
+ * Round 3 (relations): the producer (fetch-consensus-data.mjs) walks the
+ * indexed blocks in height order and samples every 100, so a real trend
+ * is a CHAIN, not a bag of points — heights strictly increase, block
+ * timestamps strictly increase with them (block time never runs
+ * backwards), and every stamp sits inside the chain's lifetime (the
+ * 2026-09-01 genesis floor to now+1h, the validFetchedAt window). A
+ * point breaking the chain against the previous KEPT point drops: a
+ * 2999 or 2020 stamp, a shuffled or duplicate height, or a stamp that
+ * moves backwards/forwards-sideways at a higher height is not a
+ * measurement of this chain's history. */
+var TREND_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
 function cleanTrend(trend) {
   if (!Array.isArray(trend)) return [];
   var out = [];
@@ -112,9 +123,12 @@ function cleanTrend(trend) {
     var p = trend[i];
     if (!Array.isArray(p)) continue;
     var h = validHeight(p[0]);
-    var ts = (typeof p[1] === "number" && Number.isInteger(p[1]) && p[1] > 0) ? p[1] : null;
+    var ts = (typeof p[1] === "number" && Number.isInteger(p[1]) &&
+              p[1] >= TREND_FLOOR_MS && p[1] <= Date.now() + 3600000) ? p[1] : null;
     var d = validPlancks(p[2]);
     if (h == null || ts == null || d == null || BigInt(d) <= 0n) continue;
+    var prev = out[out.length - 1];
+    if (prev && (h <= prev[0] || ts <= prev[1])) continue;
     out.push([h, ts, d]);
   }
   return out;
@@ -156,6 +170,15 @@ function deriveSnapshotState(con, sup, liv) {
       out.fetchedAt = consAt;
       out.snapshotOk = true;
       out.trend = cleanTrend(con.trend);
+      // Tail identity: the producer's final trend push IS the head stamp
+      // ([head, headTs, current.difficulty]). A cleaned trend whose last
+      // point names another block or carries another block's difficulty
+      // is a different capture's history (or its tail was itself poisoned)
+      // — it anchors nothing, while the difficulty/height above, which
+      // cross-checked independently, still stand.
+      if (out.trend.length &&
+          (out.trend[out.trend.length - 1][0] !== hh ||
+           out.trend[out.trend.length - 1][2] !== diff)) out.trend = [];
     }
   }
 
