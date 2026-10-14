@@ -441,6 +441,21 @@
    * means the list itself is not what the fetcher produced. */
   var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain exists from Sept 2026
   var SNAPSHOT_LIST_CAP = 25; // fetch-reversal-data.mjs: limit: 25 on every list
+  /* Round 3 (lifecycle relations): a scheduled amount/fee is a money
+   * figure painted as chain fact, so it holds the definitional bound —
+   * no transfer can exceed the 21M QTC that will ever exist (exactly
+   * the cap stays valid, the SafeSend/Distribution bound). And the
+   * lists are one lifecycle, not four independent lists: a transfer is
+   * scheduled first and reaches ONE terminal state, so a cancelled or
+   * executed row timestamped BEFORE its own scheduled row claims an
+   * impossible history, and a tx_id in both terminal lists claims two.
+   * Verified on the real snapshot (capture 222,688) before being held:
+   * all 25 terminal rows whose tx also appears in the scheduled list
+   * are stamped at/after it (0 violations) and cancelled ∩ executed is
+   * empty. Considered and dropped: cancelled_by == the scheduled
+   * sender (4/4 in-window, but a high-security guardian cancel is a
+   * legitimate second canceller — the sample cannot rule it out). */
+  var MAX_SUPPLY_PLANCKS = 21000000n * 1000000000000n;
 
   function nonNegInt(v) {
     var n;
@@ -494,6 +509,7 @@
       if (ms > prevMs) return null;
       if (kind === "scheduled") {
         if (validPlancks(r.amount) === null || validPlancks(r.fee) === null) continue;
+        if (BigInt(r.amount) > MAX_SUPPLY_PLANCKS || BigInt(r.fee) > MAX_SUPPLY_PLANCKS) continue;
         if (!isQzAddress(r.from_id) || !isQzAddress(r.to_id)) continue;
       } else if (kind === "cancelled") {
         if (!isQzAddress(r.cancelled_by_id)) continue;
@@ -552,6 +568,28 @@
       var executed = cleanSnapshotList(d.executed, totals.executed, "executed", fetchedMs);
       var highSec = cleanSnapshotList(d.high_security, totals.high_security, "high_security", fetchedMs);
       if (scheduled === null || cancelled === null || executed === null || highSec === null) return null;
+      /* Lifecycle relations across the cleaned lists. A terminal row
+       * stamped before its own scheduled row is impossible history —
+       * drop the terminal row (the scheduled fact stands on its own
+       * row); if that empties a list the fetcher filled, the payload
+       * is not the fetcher's — fail the snapshot. A tx_id claiming
+       * both terminal states contradicts itself: neither claim can be
+       * trusted, so the snapshot fails rather than painting one. */
+      var schedMs = {};
+      scheduled.forEach(function (r) { schedMs[r.tx_id] = Date.parse(r.timestamp); });
+      function dropPredated(rows, rawRows) {
+        var kept = rows.filter(function (r) {
+          return !(r.tx_id in schedMs) || Date.parse(r.timestamp) >= schedMs[r.tx_id];
+        });
+        return (kept.length === 0 && rawRows.length > 0) ? null : kept;
+      }
+      cancelled = dropPredated(cancelled, d.cancelled);
+      executed = dropPredated(executed, d.executed);
+      if (cancelled === null || executed === null) return null;
+      var inExecuted = {};
+      executed.forEach(function (r) { inExecuted[r.tx_id] = 1; });
+      for (var ci = 0; ci < cancelled.length; ci++)
+        if (inExecuted[cancelled[ci].tx_id]) return null;
       return {
         ok: true,
         fetched_at: raw.fetched_at,

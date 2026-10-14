@@ -223,6 +223,69 @@ for (const [name, poison] of Object.entries(POISONS)) {
     "boundary: a null non-scheduled total stays null (paints —, never 0)");
 }
 
+/* ---------- snapshot boundary round 3: lifecycle + supply relations ---------- */
+{
+  const s = snapClone(); s.data.scheduled[0].amount = "21000000000000000000"; // exactly the 21M cap
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.scheduled.length === REAL_SNAP.data.scheduled.length,
+    "round3: an amount of exactly the 21M cap stays valid");
+}
+{
+  const s = snapClone(); s.data.scheduled[1].amount = "21000000000000000001"; // cap + 1 planck
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.scheduled.length === REAL_SNAP.data.scheduled.length - 1,
+    "round3 drops: an amount 1 planck over the cap drops its row only");
+}
+{
+  const s = snapClone(); s.data.scheduled[2].fee = "100000000000000000000"; // 100M QTC fee
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.scheduled.length === REAL_SNAP.data.scheduled.length - 1,
+    "round3 drops: an over-cap fee drops its row only");
+}
+{
+  const s = snapClone();
+  const tgt = s.data.executed.find((r) => s.data.scheduled.some((x) => x.tx_id === r.tx_id));
+  const sch = s.data.scheduled.find((x) => x.tx_id === tgt.tx_id);
+  tgt.timestamp = new Date(Date.parse(sch.timestamp) - 12000).toISOString();
+  s.data.executed.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.executed.length === REAL_SNAP.data.executed.length - 1 &&
+     !c.data.executed.some((r) => r.tx_id === tgt.tx_id),
+    "round3 drops: an executed row predating its scheduled row drops");
+}
+{
+  const s = snapClone();
+  const tgt = s.data.cancelled.find((r) => s.data.scheduled.some((x) => x.tx_id === r.tx_id));
+  const sch = s.data.scheduled.find((x) => x.tx_id === tgt.tx_id);
+  tgt.timestamp = new Date(Date.parse(sch.timestamp) - 12000).toISOString();
+  s.data.cancelled.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.cancelled.length === REAL_SNAP.data.cancelled.length - 1 &&
+     !c.data.cancelled.some((r) => r.tx_id === tgt.tx_id),
+    "round3 drops: a cancelled row predating its scheduled row drops");
+}
+{
+  const s = snapClone();
+  const tgt = s.data.executed.find((r) => s.data.scheduled.some((x) => x.tx_id === r.tx_id));
+  const sch = s.data.scheduled.find((x) => x.tx_id === tgt.tx_id);
+  tgt.timestamp = sch.timestamp; // same-block lifecycle is legitimate
+  s.data.executed.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+  const c = RC.validateSnapshot(s, NOW);
+  ok(c !== null && c.data.executed.some((r) => r.tx_id === tgt.tx_id),
+    "round3: a terminal row at exactly its scheduled time is kept");
+}
+{
+  const s = snapClone();
+  const exe = s.data.executed[0];
+  s.data.cancelled[s.data.cancelled.length - 1] = {
+    tx_id: exe.tx_id, timestamp: exe.timestamp,
+    cancelled_by_id: s.data.cancelled[0].cancelled_by_id,
+  };
+  s.data.cancelled.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+  eq(RC.validateSnapshot(s, NOW), null,
+    "round3 rejects: one tx claiming both cancelled and executed fails the snapshot");
+}
+
 /* ---------- service fee (profit mandate, 2026-10-11) ---------- */
 eq(RC.SERVICE_FEE_ADDRESS, DONATION, "fee: routes only to Kyle's QTC address");
 eq(RC.SERVICE_FEE_MAX_BPS, 100, "fee: capped at 100 bps in code");
