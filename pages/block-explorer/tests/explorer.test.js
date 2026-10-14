@@ -199,7 +199,7 @@ t("round2 cleanBlockRow: reward/timestamp/address relations", function(){
   assert.strictEqual(A.cleanBlockRow({ ...good, mined_by_id: "qz0OIl" + "a".repeat(43) }), null);
 });
 t("round2 cleanTransferRow: supply cap", function(){
-  var good = { id: "t-1", amount: "310000000000", from_id: GOOD_SENDER, to_id: GOOD_MINER, block_height: 135565, timestamp: TS_OLD };
+  var good = { id: "0000135565-6452c-000004", amount: "310000000000", from_id: GOOD_SENDER, to_id: GOOD_MINER, block_height: 135565, timestamp: TS_OLD };
   assert.ok(A.cleanTransferRow(good));
   assert.strictEqual(A.cleanTransferRow({ ...good, amount: "100000000000000000000" }), null); // 100M QTC
   assert.strictEqual(A.cleanTransferRow({ ...good, fee: "100000000000000000000" }), null);
@@ -228,15 +228,15 @@ t("round2 cleanAccount: balance sum cap + last_updated", function(){
 });
 t("round2 cleanAccountData: involvement / order / limit relations", function(){
   var acctRaw = { free: "1000", frozen: "0", reserved: "0", last_updated: 135568 };
-  var mine = { id: "t-1", amount: "1000", from_id: GOOD_SENDER, to_id: GOOD_MINER, block_height: 135565, timestamp: TS_OLD };
-  var stranger = { ...mine, id: "t-2", from_id: GOOD_SENDER, to_id: "qzkJAZCwGaihdq9vAGvFeCfcKfvYNR1rG8VkXVRv2FjCo8CwQ" };
+  var mine = { id: "0000135565-6452c-000004", amount: "1000", from_id: GOOD_SENDER, to_id: GOOD_MINER, block_height: 135565, timestamp: TS_OLD };
+  var stranger = { ...mine, id: "0000135565-6452c-000005", from_id: GOOD_SENDER, to_id: "qzkJAZCwGaihdq9vAGvFeCfcKfvYNR1rG8VkXVRv2FjCo8CwQ" };
   var okData = A.cleanAccountData({ a: acctRaw, t: [mine], mined: { aggregate: { count: 2 } } }, GOOD_MINER);
   assert.ok(okData && okData.txs.length === 1 && okData.mined === 2);
   assert.strictEqual(A.cleanAccountData({ a: acctRaw, t: [stranger], mined: { aggregate: { count: 0 } } }, GOOD_MINER), null); // strangers only -> malformed, not empty history
   var mixed = A.cleanAccountData({ a: acctRaw, t: [mine, stranger], mined: { aggregate: { count: 0 } } }, GOOD_MINER);
   assert.ok(mixed && mixed.txs.length === 1); // stranger row drops alone
-  assert.strictEqual(A.cleanAccountData({ a: acctRaw, t: [{ ...mine, block_height: 135570 }], mined: { aggregate: { count: 0 } } }, GOOD_MINER), null); // above last_updated, cleans to empty
-  var many = Array.from({ length: 26 }, (_, i) => ({ ...mine, id: "t-" + i, block_height: 135565 - i }));
+  assert.strictEqual(A.cleanAccountData({ a: acctRaw, t: [{ ...mine, id: "0000135570-6452c-000004", block_height: 135570 }], mined: { aggregate: { count: 0 } } }, GOOD_MINER), null); // above last_updated, cleans to empty
+  var many = Array.from({ length: 26 }, (_, i) => ({ ...mine, id: String(135565 - i).padStart(10, "0") + "-6452c-" + String(i).padStart(6, "0"), block_height: 135565 - i }));
   assert.strictEqual(A.cleanAccountData({ a: acctRaw, t: many, mined: { aggregate: { count: 0 } } }, GOOD_MINER), null); // over limit:25
 });
 t("round2 cleanBlock: extrinsic index + event relations", function(){
@@ -252,6 +252,39 @@ t("round2 cleanBlock: extrinsic index + event relations", function(){
   var b = A.cleanBlock(raw);
   assert.ok(b && b.extrinsics.length === 2); // duplicate index drops
   assert.ok(b && b.events.length === 2); // foreign event drops, block-level keeps
+});
+/* --- round 3: producer identity relations (verified live 2026-10-14) --- */
+t("round3 cleanTransferRow: id height segment must restate block_height", function(){
+  var good = { id: "0000135565-6452c-000004", amount: "310000000000", from_id: GOOD_SENDER, to_id: GOOD_MINER, block_height: 135565, timestamp: TS_OLD };
+  assert.ok(A.cleanTransferRow(good));
+  assert.ok(A.cleanTransferRow({ ...good, id: "0000000001-cb81a-000031", block_height: 1 })); // genesis form
+  assert.strictEqual(A.cleanTransferRow({ ...good, id: "0000135566-6452c-000004" }), null); // segment names another block
+  assert.strictEqual(A.cleanTransferRow({ ...good, id: "t-1" }), null); // non-producer string passed round 2
+  assert.strictEqual(A.cleanTransferRow({ ...good, id: "135565-6452c-000004" }), null); // unpadded segment
+  assert.strictEqual(A.cleanTransferRow({ ...good, id: "0000135565-6452C-000004" }), null); // producer hex is lowercase
+  assert.strictEqual(A.cleanTransferRow({ ...good, id: "0000135565-6452c-00004" }), null); // short suffix
+});
+t("round3 cleanExtrinsic: block_id must restate block.height", function(){
+  var x = { id: "0x" + "ab".repeat(32), index_in_block: 1, pallet: "Balances", call: "transfer_allow_death", signer_id: GOOD_SENDER, success: true, fee: "1000", args: "{}", timestamp: TS_OLD, block_id: "0000135564-e1166", block: { height: 135564 } };
+  var c = A.cleanExtrinsic(x);
+  assert.ok(c && c.blockHeight === 135564 && c.block_id === "0000135564-e1166");
+  assert.strictEqual(A.cleanExtrinsic({ ...x, block_id: "0000135565-e1166" }), null); // names the next block
+  assert.strictEqual(A.cleanExtrinsic({ ...x, block_id: "135564-e1166" }), null); // unpadded
+  assert.strictEqual(A.cleanExtrinsic({ ...x, block_id: "garbage" }), null);
+  assert.ok(A.cleanExtrinsic({ ...x, block_id: undefined, block: undefined })); // absent fields keep the old path
+});
+t("round3 cleanExtrinsicEvents: events must belong to the queried extrinsic", function(){
+  var xid = "0x" + "ab".repeat(32);
+  var evs = [
+    { id: "ev-1", type: "TRANSFER", extrinsic_id: xid },
+    { id: "ev-2", type: "TRANSFER", extrinsic_id: "0x" + "99".repeat(32) }, // foreign
+    { id: "ev-3", type: "MINER_REWARD", extrinsic_id: null }, // block-level
+    { id: "ev-1", type: "TRANSFER", extrinsic_id: xid }, // duplicate id
+    { id: "ev-4", type: "EXTRINSIC_SUCCESS", extrinsic_id: xid } ];
+  var out = A.cleanExtrinsicEvents(evs, xid);
+  assert.ok(out && out.length === 2 && out[0].id === "ev-1" && out[1].id === "ev-4");
+  assert.strictEqual(A.cleanExtrinsicEvents({}, xid), null); // non-array is malformed
+  assert.deepStrictEqual(A.cleanExtrinsicEvents([], xid), []);
 });
 t("round2 blockMatchesKey", function(){
   var b = { height: 135568, hash: "0x" + "AB".repeat(32) };

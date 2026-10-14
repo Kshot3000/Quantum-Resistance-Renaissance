@@ -253,6 +253,21 @@ function cleanBlockRow(raw){
     mined_by_id: raw.mined_by_id, extrinsicsCount: cnt };
 }
 
+/* Round 3 (producer identity relations — verified live 2026-10-14):
+ * a row's own indexer id names the block it belongs to. Transfer ids
+ * are <10-digit zero-padded height>-<5 lowercase hex>-<6 digits> and
+ * the height segment EQUALS block_height (200/200 sampled rows incl.
+ * genesis); an extrinsic's block_id is <padded height>-<5 hex> and
+ * its segment EQUALS block.height; and the extrinsic view's events
+ * are queried BY extrinsic_id, so every real event restates the
+ * queried id (the query now selects the field it filters on). A row
+ * whose identity contradicts its claim painted as chain fact
+ * pre-fix — a transfer could carry any string id at any height, an
+ * extrinsic could name a different block than its own block object,
+ * and a foreign or duplicated event painted on an extrinsic's page. */
+var TRANSFER_ID_RE = /^(\d{10})-[0-9a-f]{5}-\d{6}$/;
+var BLOCK_ID_RE = /^(\d{10})-[0-9a-f]{5}$/;
+
 function cleanTransferRow(raw){
   if (!raw || typeof raw !== "object") return null;
   var id = validIdStr(raw.id);
@@ -260,6 +275,8 @@ function cleanTransferRow(raw){
   var height = validHeight(raw.block_height);
   var ts = validTimestamp(raw.timestamp);
   if (id === null || amount === null || height === null || ts === null) return null;
+  var idm = TRANSFER_ID_RE.exec(id);
+  if (!idm || Number(idm[1]) !== height) return null;
   if (validAddress(raw.from_id || "") === null || validAddress(raw.to_id || "") === null) return null;
   if (raw.fee !== undefined && raw.fee !== null && planckWithinSupply(validPlanck(raw.fee)) === null) return null;
   return { id: id, amount: amount, from_id: raw.from_id, to_id: raw.to_id,
@@ -331,7 +348,35 @@ function cleanExtrinsic(raw){
     base.blockHeight = validHeight(raw.block && raw.block.height);
     if (base.blockHeight === null) return null;
   }
+  /* block_id relation: when the indexer row carries a block_id, it
+   * must be the producer form and, when the block object is present,
+   * its height segment must restate that block's height — a block_id
+   * naming a different block than the one displayed is a forged or
+   * mismatched answer, and the extrinsic fails honestly. */
+  if (raw.block_id !== null && raw.block_id !== undefined){
+    var bm = (typeof raw.block_id === "string") ? BLOCK_ID_RE.exec(raw.block_id) : null;
+    if (!bm) return null;
+    if (base.blockHeight !== null && Number(bm[1]) !== base.blockHeight) return null;
+    base.block_id = raw.block_id;
+  }
   return base;
+}
+
+/* The extrinsic view's event list is a claim about ONE extrinsic —
+ * the query filters event.extrinsic_id = the requested id, so a kept
+ * event must restate that id (a foreign or block-level event painted
+ * on the extrinsic's page pre-fix) and duplicate ids are one event.
+ * A non-array payload is malformed wholesale, like the other views. */
+function cleanExtrinsicEvents(rawList, xid){
+  if (!Array.isArray(rawList)) return null;
+  var out = [], seen = {};
+  rawList.map(cleanEventRow).filter(Boolean).forEach(function(e){
+    if (e.extrinsic_id !== xid) return;
+    if (seen[e.id]) return;
+    seen[e.id] = 1;
+    out.push(e);
+  });
+  return out;
 }
 
 function cleanAccount(raw){
@@ -461,7 +506,8 @@ var API = { esc: esc, fmtInt: fmtInt, fmtQTC: fmtQTC, ageFmt: ageFmt,
   cleanStats: cleanStats, cleanBlockRow: cleanBlockRow,
   cleanTransferRow: cleanTransferRow, cleanExtrinsicRow: cleanExtrinsicRow,
   cleanEventRow: cleanEventRow, cleanBlock: cleanBlock,
-  cleanExtrinsic: cleanExtrinsic, cleanAccount: cleanAccount, cleanHome: cleanHome,
+  cleanExtrinsic: cleanExtrinsic, cleanExtrinsicEvents: cleanExtrinsicEvents,
+  cleanAccount: cleanAccount, cleanHome: cleanHome,
   validAddress: validAddress, rewardPlausible: rewardPlausible,
   blockRewardEst: blockRewardEst, cleanAccountData: cleanAccountData,
   blockMatchesKey: blockMatchesKey };
@@ -582,7 +628,7 @@ function qBlock(key){
 
 function qExtrinsic(id){
   return 'query { x: extrinsic(where: {id: {_eq: "' + id + '"}}, limit: 1) { id index_in_block pallet call signer_id success fee args timestamp block_id block { height } } ' +
-    'ev: event(where: {extrinsic_id: {_eq: "' + id + '"}}) { id type } }';
+    'ev: event(where: {extrinsic_id: {_eq: "' + id + '"}}) { id type extrinsic_id } }';
 }
 
 function qAccount(id){
@@ -794,9 +840,9 @@ function vExtrinsic(id){
     var x = cleanExtrinsic(rawX);
     if (!x) throw new Error("indexer returned malformed extrinsic data");
     if (x.id !== id) throw new Error("indexer returned malformed extrinsic data");
-    if (!Array.isArray(d.ev)) throw new Error("indexer returned malformed extrinsic data");
+    var evs = cleanExtrinsicEvents(d.ev, id);
+    if (!evs) throw new Error("indexer returned malformed extrinsic data");
     var height = x.blockHeight;
-    var evs = d.ev.map(cleanEventRow).filter(Boolean);
     var evRows = evs.map(function(e){
       return '<div class="event-row"><span class="etype">' + esc(e.type) + '</span><span class="mono" style="color:var(--ink-faint)">' + esc(shortHash(e.id, 12, 6)) + '</span></div>';
     }).join("");
