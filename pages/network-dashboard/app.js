@@ -30,7 +30,12 @@ var CHAIN = {
  * kept rows must run newest-first in height and time with no
  * duplicates, every reward must fit the emission schedule for its
  * own height, a day's active accounts cannot exceed all accounts,
- * and the snapshot's capture time must be real. Core status fields
+ * and the snapshot's capture time must be real. Round 3 adds the
+ * daily series' own relations: kept rows must be consecutive UTC
+ * days (the chart spaces rows by index, so a gap compresses time),
+ * and the newest row must belong to the capture's era (its UTC day
+ * or the day before), since it anchors the "last 24h" TPS figure.
+ * Core status fields
  * and payload-level contradictions reject the whole payload (the
  * caller reads it exactly like a failed fetch — last good telemetry
  * stays, the pill reports the failure); individual rows that are
@@ -181,11 +186,32 @@ function sanitizeData(data, opts){
     if (aa > accounts) return; /* a day's active accounts are a subset of all accounts */
     if (seenDates[dateMs]) return;
     if (daily.length && dateMs >= Date.parse(daily[daily.length - 1].date)){ dailyOrderBroken = true; return; }
+    /* Consecutiveness relation (round 3): the query returns one row
+     * per UTC day, newest first — kept rows must step by exactly one
+     * day. The activity chart spaces rows by INDEX, so a missing day
+     * silently compresses time and the surviving rows pose as an
+     * unbroken 14-day series. A gap is payload-level poison, exactly
+     * like the ascending-order break above, not a row to drop. */
+    if (daily.length && dateMs !== Date.parse(daily[daily.length - 1].date) - 86400000){ dailyOrderBroken = true; return; }
     seenDates[dateMs] = 1;
     daily.push({ date: d.date, blocks_count: bc, tx_count: tc, active_accounts: aa });
   });
   if (dailyOrderBroken) return null;
   if (dailyRaw.length && !daily.length) return null; /* TPS must never be fabricated from an empty set */
+  /* Capture-era relation (round 3): renderStats paints the newest
+   * daily row's tx_count as "txs in last 24h", so that row must belong
+   * to THIS payload's capture — its UTC day, or the day before it
+   * (the indexer may not have opened today's row at a capture just
+   * past midnight). A newest row days older, or after the capture
+   * day, means the daily series and the status/blocks halves describe
+   * different chain eras: a mixed-date payload. Anchored to the
+   * capture (fetchedMs), never to view time, so an honestly old
+   * snapshot still passes with its own capture. */
+  if (daily.length && fetchedMs !== null){
+    var captureDayMs = Math.floor(fetchedMs / 86400000) * 86400000;
+    var newestDayMs = Date.parse(daily[0].date);
+    if (newestDayMs < captureDayMs - 86400000 || newestDayMs > captureDayMs) return null;
+  }
   return {
     status: { block_height: height, total_accounts: accounts,
       total_immediate_transfers: imm, total_scheduled_transfers: sched },

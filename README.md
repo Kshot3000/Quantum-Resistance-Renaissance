@@ -16,7 +16,7 @@ The homepage recomputes three runtime rules in the browser from `data/supply.jso
 - `pages/` — Each shipped app gets its own folder, verified in a real browser before it goes live:
   - `mining-calculator/` — QTC reward estimator + emission chart + mining quickstart (network hashrate / total-issuance / observed-pace defaults derive live from the hourly chain snapshots, with a dated fallback bundle)
   - `address-toolkit/` — SS58 prefix-189 address inspector/encoder
-  - `network-dashboard/` — live mainnet telemetry from the public Subsquid indexer
+  - `network-dashboard/` — live mainnet telemetry from the public Subsquid indexer (indexer/snapshot payloads relation-validated before anything renders: block head vs status, rewards vs the emission schedule, and the daily series must be consecutive UTC days whose newest row belongs to the capture's era)
   - `quantum-shield/` — interactive post-quantum explainer (ML-DSA, signature math, exposure demo)
   - `tokenomics/` — QTC tokenomics explorer (verified genesis vesting, unlock simulator, emission tail, fee-burn calculator, funding; the shared exact decimal parser refuses exponent/length bombs instead of computing them)
   - `block-explorer/` — QTC block explorer (mainnet block/extrinsic/account search)

@@ -148,5 +148,25 @@ check("sanitizeData r2 rejects over-limit lists and an invalid capture time",
   D.sanitizeData(payload3(), { fetchedAt: "2020-01-01T00:00:00.000Z", nowMs: OPTS.nowMs }) === null &&
   D.sanitizeData(payload3(), { fetchedAt: "2026-10-09T00:00:00.000Z", nowMs: OPTS.nowMs }) === null);
 
+/* ---- boundary hardening round 3: daily consecutiveness + capture era ---- */
+function payload4(mut){
+  var d = payload3();
+  d.daily.push({ date: "2026-10-08T00:00:00+00:00", blocks_count: 5900, tx_count: 7900, active_accounts: 880 });
+  if (mut) mut(d);
+  return d;
+}
+check("sanitizeData r3 accepts a consecutive 3-day series ending on the capture day",
+  (function(){ var c = D.sanitizeData(payload4(), OPTS); return c && c.daily.length === 3; })());
+check("sanitizeData r3 rejects a daily series with a missing day (chart spaces rows by index)",
+  D.sanitizeData(payload4(function(d){ d.daily.splice(1, 1); }), OPTS) === null &&
+  D.sanitizeData(payload4(function(d){ d.daily[2].date = "2026-10-07T00:00:00+00:00"; }), OPTS) === null);
+check("sanitizeData r3 rejects a newest daily row stale or future vs the capture era",
+  D.sanitizeData(payload4(), { fetchedAt: "2026-10-14T01:00:00.000Z", nowMs: Date.parse("2026-10-14T01:00:00Z") }) === null &&
+  D.sanitizeData(payload4(function(d){ d.daily.forEach(function(r, i){ r.date = "2026-10-" + (12 - i) + "T00:00:00+00:00"; }); }),
+    { fetchedAt: "2026-10-10T01:00:00.000Z", nowMs: Date.parse("2026-10-14T01:00:00Z") }) === null);
+check("sanitizeData r3 accepts the capture-minus-one-day lag, and stays gated off without a capture time",
+  (function(){ var c = D.sanitizeData(payload4(function(d){ d.daily = d.daily.slice(1); }), OPTS); return c && c.daily.length === 2; })() &&
+  !!D.sanitizeData(payload4(), { nowMs: OPTS.nowMs }));
+
 console.log(fails === 0 ? "\nALL TESTS PASSED" : "\n" + fails + " TEST(S) FAILED");
 process.exit(fails === 0 ? 0 : 1);
