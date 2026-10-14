@@ -21,6 +21,11 @@
  *  - Signature sizes: ML-DSA-65 = 3,309 B, ML-DSA-87 = 4,627 B (FIPS 204;
  *    cross-checked with the Key Forge's vendored noble implementation).
  *  - 1 QTC = 10^12 plancks (chain UNIT constant; dev-hub converter).
+ *  - Total supply is hard-capped at 21,000,000 QTC (the chain's monetary
+ *    policy; the same MAX_SUPPLY_QTC the SafeSend desk enforces). No
+ *    account can ever hold — or send — more QTC than will ever exist, so
+ *    a single amount over the cap is refused in the parser, and a plan
+ *    whose running total crosses the cap is warned on the crossing row.
  *
  * The fee figure is the LENGTH-FEE FLOOR only: it excludes the weight-based
  * fee component and any tip, which the CLI quotes exactly before submission.
@@ -41,6 +46,7 @@
 "use strict";
 
 var PLANCKS_PER_QTC = BigInt("1000000000000"); // 10^12
+var MAX_SUPPLY_PLANCKS = BigInt("21000000") * PLANCKS_PER_QTC; // 21M QTC hard cap
 var LENGTH_FEE_PER_BYTE = 100000;              // plancks/byte (runtime polynomial)
 var QUANTUS_PREFIX = 189;
 var DEFAULT_BATCH_SIZE = 256;                  // from the CLI team's airdrop example
@@ -62,6 +68,8 @@ function parseAmountToPlancks(str) {
   frac = (frac + "000000000000").slice(0, 12);
   var plancks = BigInt(whole === "" ? "0" : whole) * PLANCKS_PER_QTC + BigInt(frac);
   if (plancks <= BigInt(0)) return { ok: false, error: "amount is zero" };
+  if (plancks > MAX_SUPPLY_PLANCKS)
+    return { ok: false, error: "amount exceeds the total QTC supply cap of 21,000,000 — no account can send more QTC than will ever exist" };
   return { ok: true, plancks: plancks };
 }
 
@@ -124,6 +132,7 @@ function validateAddress(addr, ss58) {
 /* ---------- full row validation ---------- */
 function validateRows(rows, ss58, checkphrase, wordlist) {
   var seen = {};
+  var runningTotal = BigInt(0), supplyWarned = false;
   var out = [];
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
@@ -141,6 +150,11 @@ function validateRows(rows, ss58, checkphrase, wordlist) {
     } catch (e) { v.checkphrase = null; }
     if (m.plancks < BigInt(1000000))
       v.warnings.push("dust amount (< 0.000001 QTC) — double-check the recipient");
+    runningTotal += m.plancks;
+    if (!supplyWarned && runningTotal > MAX_SUPPLY_PLANCKS) {
+      supplyWarned = true;
+      v.warnings.push("plan total through this line exceeds the total QTC supply of 21,000,000 — no wallet can ever fund this plan in full");
+    }
     if (seen[r.address]) {
       v.warnings.push("duplicate of line " + seen[r.address] + " — the CLI would pay this address twice");
     } else {
@@ -350,6 +364,7 @@ function summarize(validated) {
 
 var api = {
   PLANCKS_PER_QTC: PLANCKS_PER_QTC,
+  MAX_SUPPLY_PLANCKS: MAX_SUPPLY_PLANCKS,
   LENGTH_FEE_PER_BYTE: LENGTH_FEE_PER_BYTE,
   QUANTUS_PREFIX: QUANTUS_PREFIX,
   DEFAULT_BATCH_SIZE: DEFAULT_BATCH_SIZE,

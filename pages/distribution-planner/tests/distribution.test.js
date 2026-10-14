@@ -55,6 +55,35 @@ t("parseAmountToPlancks: rejects bad input", function () {
   });
   assert.ok(/12/.test(DistCore.parseAmountToPlancks("1.0000000000001").error));
 });
+t("parseAmountToPlancks: total-supply cap (21M QTC hard cap)", function () {
+  // No account can ever hold or send more QTC than will ever exist —
+  // the same MAX_SUPPLY_QTC the SafeSend desk enforces. Exactly the cap
+  // stays valid; one planck over is refused in the parser itself, so the
+  // row path and the per-batch tip path (both call this parser) agree.
+  assert.strictEqual(DistCore.MAX_SUPPLY_PLANCKS, BigInt("21000000000000000000"));
+  var at = DistCore.parseAmountToPlancks("21000000");
+  assert.strictEqual(at.ok, true);
+  assert.strictEqual(at.plancks, BigInt("21000000000000000000"));
+  ["21000000.000000000001", "150000000", "999999999999999999999"].forEach(function (s) {
+    var r = DistCore.parseAmountToPlancks(s);
+    assert.strictEqual(r.ok, false, s);
+    assert.ok(/supply cap of 21,000,000/.test(r.error), s + " names the cap");
+  });
+});
+t("validateRows: cumulative plan total over supply warns once, on the crossing row", function () {
+  var rows = DistCore.parseInput(POOL + " 15000000\n" + MSIG + " 15000000\n" + SMALL + " 1");
+  var v = DistCore.validateRows(rows, ss58, check, WORDLIST);
+  assert.strictEqual(v[0].ok, true);
+  assert.ok(!v[0].warnings.some(function (w) { return /supply/.test(w); }), "row 1 clean");
+  assert.strictEqual(v[1].ok, true);
+  assert.ok(v[1].warnings.some(function (w) { return /plan total through this line exceeds the total QTC supply/.test(w); }), "crossing row warned");
+  assert.ok(!v[2].warnings.some(function (w) { return /supply/.test(w); }), "warning fires once");
+  var under = DistCore.validateRows(DistCore.parseInput(POOL + " 10000000\n" + MSIG + " 10000000"), ss58, check, WORDLIST);
+  assert.ok(under.every(function (r) { return !r.warnings.some(function (w) { return /supply/.test(w); }); }), "under-supply plan unwarned");
+  var over = DistCore.validateRows(DistCore.parseInput(POOL + " 150000000"), ss58, check, WORDLIST);
+  assert.strictEqual(over[0].ok, false);
+  assert.ok(/supply/.test(over[0].error), "single over-supply row refused");
+});
 
 /* ---------- SCALE compact lengths ---------- */
 t("compactLenU128 matches SCALE compact encoding", function () {
