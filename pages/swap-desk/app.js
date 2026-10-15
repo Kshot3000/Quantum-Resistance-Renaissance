@@ -54,7 +54,8 @@ function isConclusiveScan(result) {
   return !!result && typeof result.total === "number" && result.total > 0;
 }
 
-/* The asset half of a cached probe. `listed: true` is a claim about ONE
+/* The asset grammar for BOTH probe paths — the persisted cache and the
+ * live render. `listed: true` is a claim about ONE
  * specific asset, so the stored asset must be identifiable as QTC by the
  * SAME rule the live scan uses (its asset id, raw or 1cs_v1-wrapped, or a
  * QTC-symbol token on the Quantus chain) — an arbitrary object beside
@@ -65,7 +66,7 @@ function isConclusiveScan(result) {
  * carried ~132 USD at listing; 1e6 — some 7,500x that — is a sanity
  * ceiling against invented figures, not a forecast).
  * Implausible fields are dropped, never painted. */
-function sanitizeCachedAsset(a) {
+function sanitizeAsset(a) {
   if (!a || typeof a !== "object" || Array.isArray(a)) return null;
   var id = String(a.assetId || a.asset_id || "");
   var chain = String(a.blockchain || a.chain || "").toLowerCase();
@@ -89,7 +90,7 @@ function sanitizeCachedAsset(a) {
  * time must be a real probe time (the desk's probes began Sept 2026; a
  * small future skew is tolerated), the latency a plausible duration, the
  * scanned total a positive count, `listed` a boolean, and — when listed —
- * the asset the QTC asset itself (see sanitizeCachedAsset). Returns a
+ * the asset the QTC asset itself (see sanitizeAsset). Returns a
  * normalized copy or null. */
 var PROBE_FLOOR_MS = Date.UTC(2026, 8, 1); // 2026-09-01: no probe predates the desk
 function sanitizeCachedProbe(raw, nowMs) {
@@ -107,7 +108,7 @@ function sanitizeCachedProbe(raw, nowMs) {
   if (!isFinite(total) || Math.floor(total) !== total || total < 1 || total > 1000000) return null;
   var asset = null;
   if (r.listed) {
-    asset = sanitizeCachedAsset(r.asset);
+    asset = sanitizeAsset(r.asset);
     if (!asset) return null;
   }
   return { ok: true, result: { listed: r.listed, asset: asset, total: total }, ms: ms, at: at };
@@ -123,12 +124,27 @@ function platformFeeBps(mode) {
   return 20; // "observed" default
 }
 
-/* Illustrative fee math on a hypothetical solver offer. Fee lives inside amountOut. */
+/* Illustrative fee math on a hypothetical solver offer. Fee lives inside amountOut.
+ * The three inputs have grammars, and the math inverts outside them: a
+ * basis-point rate lives in [0, 10000] (past it the "fee" exceeds the offer
+ * and the net goes negative) and a slippage percent lives in [0, 100] (past
+ * it the "guaranteed minimum" goes negative — the lab painted ≥ -499 USDC).
+ * A non-finite offer is reachable from the fee-offer field itself (a free
+ * number input: 1e999 parseFloats to Infinity and painted NaN figures), so
+ * non-finite inputs fall back to 0 and the returned feeBps/slippagePct are
+ * the clamped values the render labels. */
 function illustrativeQuote(offer, feeBps, slippagePct) {
-  offer = Math.max(0, Number(offer) || 0);
+  offer = Number(offer);
+  if (!isFinite(offer) || offer < 0) offer = 0;
+  feeBps = Number(feeBps);
+  if (!isFinite(feeBps) || feeBps < 0) feeBps = 0;
+  if (feeBps > 10000) feeBps = 10000;
+  slippagePct = Number(slippagePct);
+  if (!isFinite(slippagePct) || slippagePct < 0) slippagePct = 0;
+  if (slippagePct > 100) slippagePct = 100;
   var fee = offer * feeBps / 10000;
   var net = offer - fee;
-  var minOut = net * (1 - Math.max(0, Number(slippagePct) || 0) / 100);
+  var minOut = net * (1 - slippagePct / 100);
   return { offer: offer, feeBps: feeBps, fee: fee, net: net, minOut: minOut, slippagePct: slippagePct };
 }
 
@@ -230,11 +246,13 @@ function renderWatch(res) {
   } else if (res.result.listed) {
     pill.classList.add("listed");
     txt.textContent = "QTC IS LISTED";
-    var a = res.result.asset || {};
-    var dec = Number(a.decimals);
-    var price = Number(a.price);
-    det.textContent = "Found " + (a.assetId || QTC_ASSET_ID) + " — " + (isFinite(dec) && Math.floor(dec) === dec && dec >= 0 && dec <= 255 ? dec + " decimals" : "decimals n/a") +
-      (isFinite(price) && price > 0 ? ", $" + price.toLocaleString("en-US", { maximumFractionDigits: 2 }) + " USD (1Click reference)" : "") + ". Quotes can now exist; depth still depends on solvers.";
+    // The live asset is held to the SAME grammar as the cached one
+    // (sanitizeAsset): the old inline check bounded decimals but let any
+    // positive price paint, so an absurd live figure (API change/compromise)
+    // would headline unchecked while the cache path dropped it at 1e6.
+    var a = sanitizeAsset(res.result.asset) || {};
+    det.textContent = "Found " + (a.assetId || QTC_ASSET_ID) + " — " + ("decimals" in a ? a.decimals + " decimals" : "decimals n/a") +
+      ("price" in a ? ", $" + a.price.toLocaleString("en-US", { maximumFractionDigits: 2 }) + " USD (1Click reference)" : "") + ". Quotes can now exist; depth still depends on solvers.";
     $("stat-status").textContent = "LISTED";
     $("stat-status-sub").textContent = "quotes possible";
   } else {
@@ -386,7 +404,8 @@ if (typeof module !== "undefined" && module.exports) {
     scanTokensForQTC: scanTokensForQTC,
     isConclusiveScan: isConclusiveScan,
     sanitizeCachedProbe: sanitizeCachedProbe,
-    sanitizeCachedAsset: sanitizeCachedAsset,
+    sanitizeAsset: sanitizeAsset,
+    sanitizeCachedAsset: sanitizeAsset,
     platformFeeBps: platformFeeBps,
     illustrativeQuote: illustrativeQuote,
     deadlineFor: deadlineFor,

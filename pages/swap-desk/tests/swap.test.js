@@ -127,7 +127,7 @@ t("attribution + endpoint constants", function(){
   var html = fs.readFileSync(__dirname + "/../index.html", "utf8");
   assert.ok(html.indexOf("qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau") !== -1, "donation address");
   assert.ok(html.indexOf("https://x.com/kshot9000") !== -1, "x link");
-  assert.ok(html.indexOf("app.js?v=1.19.0") !== -1, "js cache key");
+  assert.ok(html.indexOf("app.js?v=1.20.0") !== -1, "js cache key");
   // De-pinned (2026-10-02): the a11y contrast pass bumped the css key to
   // 1.17.2 without updating this pin. Assert a keyed css load at >= the
   // 1.17.0 floor instead of an exact version that drifts every release.
@@ -214,6 +214,51 @@ t("sanitizeCachedProbe: listed requires the QTC asset, fields normalized", funct
   assert.ok(!("decimals" in dropped.result.asset) && !("price" in dropped.result.asset) && !("evil" in dropped.result.asset), "bad/unknown fields dropped");
   var frac = m.sanitizeCachedProbe(base({ assetId: "nep141:qtc.omft.near", decimals: 12.5, price: "abc" }), now);
   assert.ok(frac && !("decimals" in frac.result.asset) && !("price" in frac.result.asset), "fractional decimals / string price dropped");
+});
+
+// 17. illustrativeQuote input grammars: a bps rate lives in [0, 10000] and a
+// slippage percent in [0, 100] — outside them the math inverts (fee > offer,
+// negative "guaranteed minimum"); a non-finite offer (the fee-offer field
+// accepts 1e999 -> Infinity) must not paint NaN figures.
+t("illustrativeQuote: slippage clamped to [0, 100]", function(){
+  var q = m.illustrativeQuote(1000, 20, 150);
+  assert.strictEqual(q.slippagePct, 100); assert.strictEqual(q.minOut, 0);
+  var big = m.illustrativeQuote(1000, 20, 1e6);
+  assert.strictEqual(big.slippagePct, 100); assert.ok(big.minOut >= 0);
+  var neg = m.illustrativeQuote(1000, 20, -5);
+  assert.strictEqual(neg.slippagePct, 0); approx(neg.minOut, neg.net, 1e-9);
+  var edge = m.illustrativeQuote(1000, 20, 100);
+  assert.strictEqual(edge.minOut, 0);
+});
+
+t("illustrativeQuote: feeBps clamped to [0, 10000]", function(){
+  var q = m.illustrativeQuote(1000, 20000, 1);
+  assert.strictEqual(q.feeBps, 10000); approx(q.fee, 1000, 1e-9); approx(q.net, 0, 1e-9);
+  var neg = m.illustrativeQuote(1000, -20, 1);
+  assert.strictEqual(neg.feeBps, 0); approx(neg.fee, 0, 1e-9); approx(neg.net, 1000, 1e-9);
+  var nan = m.illustrativeQuote(1000, NaN, NaN);
+  assert.strictEqual(nan.feeBps, 0); assert.strictEqual(nan.slippagePct, 0);
+  assert.ok(isFinite(nan.fee) && isFinite(nan.minOut));
+});
+
+t("illustrativeQuote: non-finite offer falls back to zero", function(){
+  var q = m.illustrativeQuote(Infinity, 20, 1);
+  assert.strictEqual(q.offer, 0);
+  assert.ok(isFinite(q.fee) && isFinite(q.net) && isFinite(q.minOut));
+  var neg = m.illustrativeQuote(-Infinity, 20, 1);
+  assert.strictEqual(neg.offer, 0);
+});
+
+// 18. The live render path shares the cached path's asset grammar:
+// sanitizeAsset is the one sanitizer both routes use.
+t("sanitizeAsset: shared grammar (live + cached)", function(){
+  assert.strictEqual(typeof m.sanitizeAsset, "function");
+  assert.strictEqual(m.sanitizeAsset, m.sanitizeCachedAsset);
+  var a = m.sanitizeAsset({ assetId: "nep141:qtc.omft.near", decimals: 12, price: 1e15 });
+  assert.ok(a && !("price" in a) && a.decimals === 12, "absurd price dropped, decimals kept");
+  var okA = m.sanitizeAsset({ assetId: "nep141:qtc.omft.near", decimals: 12, price: 132.01 });
+  assert.ok(okA && okA.price === 132.01, "genuine live asset survives");
+  assert.strictEqual(m.sanitizeAsset({ assetId: "nep141:fake.near", price: 5 }), null, "invented asset refused");
 });
 
 console.log("\n" + passed + " passed, " + failed + " failed");
