@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+445,139% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+442,084% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -826,8 +826,8 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Everyone</span>
         </div>
         <h3>QTC Notary Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The on-chain timestamping &amp; proof-of-existence desk: hash any document in your browser, wrap the digest in a versioned envelope, and anchor it with a byte-exact <code>System.remark</code> extrinsic — then verify it, keep it in a local vault, and read the live public remark board. Never signs; every byte cited to upstream source.</p>
-        <div class="meta">46/46 logic tests green · full browser QA green · zero console errors</div>
+        <p>The on-chain timestamping &amp; proof-of-existence desk: hash any document in your browser, wrap the digest in a versioned envelope, and anchor it with a byte-exact <code>System.remark</code> extrinsic — then verify it, keep it in a local vault, and read the live public remark board. Never signs; every byte cited to upstream source. The vault Save button refuses at its 500-anchor cap instead of silently evicting the oldest anchor.</p>
+        <div class="meta">109/109 logic tests green · vault-cap browser QA 8/8 · zero console errors</div>
       </a>
       <a class="app-card zktree" href="pages/zktree-desk/">
         <div class="icon-row">

@@ -337,6 +337,16 @@ function saveVault(v) { localStorage.setItem(VKEY, JSON.stringify(v)); }
 $("saveVaultBtn").addEventListener("click", () => {
   if (!lastBuild) return;
   const v = loadVault();
+  /* Creation-path cap gate: sanitizeVault caps the vault at
+   * MAX_VAULT_ENTRIES at load, but this unshift is the only way in —
+   * at a full vault it persisted 501 rows and the render's loadVault
+   * silently evicted the OLDEST anchor while this button claimed
+   * "✓ Saved". Refuse at the cap and name it instead. */
+  if (C.vaultRoom(v.length) <= 0) {
+    $("saveVaultBtn").textContent = "Vault is full — the cap is " + C.MAX_VAULT_ENTRIES + " anchors. Delete one before saving another.";
+    setTimeout(() => { $("saveVaultBtn").textContent = "💾 Save anchor to my vault"; }, 3200);
+    return;
+  }
   v.unshift(lastBuild);
   saveVault(v); renderVault();
   /* A saved anchor is a vault determinant of any Verify verdict: a

@@ -258,6 +258,12 @@ t("sanitizeVault caps the vault at MAX_VAULT_ENTRIES",
       rows.push({ ...GOOD_MSG2, id: "n" + (1000 + i), callHex: c.callHex,
         feeQTC: codec.formatQTC(BigInt(c.callHex.length / 2 + 5302) * 100000n) }); }
     return codec.sanitizeVault(rows).length === codec.MAX_VAULT_ENTRIES; })());
+t("vaultRoom reports the room left under the vault cap",
+  codec.vaultRoom(0) === 500 && codec.vaultRoom(499) === 1 && codec.vaultRoom(250) === 250);
+t("vaultRoom is zero at and past the cap (never negative)",
+  codec.vaultRoom(500) === 0 && codec.vaultRoom(5000) === 0);
+t("vaultRoom treats a non-finite or negative count as no room",
+  codec.vaultRoom(NaN) === 0 && codec.vaultRoom("x") === 0 && codec.vaultRoom(-3) === 0);
 t("sanitizeVault drops a future-dated anchor",
   codec.sanitizeVault([{ ...GOOD, created: new Date(Date.now() + 86400000).toISOString() }]).length === 0);
 t("sanitizeVault drops a pre-launch anchor (before Sept 2026)",

@@ -492,6 +492,18 @@
     return out;
   }
 
+  /* Room left in the vault under the load cap sanitizeVault enforces.
+   * The Save button is the vault's only creation path and it unshifted
+   * with no cap check: at a full vault the new anchor painted "✓ Saved"
+   * while the next loadVault (called by that same render) kept the
+   * first 500 and silently evicted the OLDEST anchor. The save path
+   * asks this gate first and refuses at the cap instead. */
+  function vaultRoom(currentCount) {
+    var n = Math.floor(Number(currentCount));
+    if (!isFinite(n) || n < 0) return 0;
+    return Math.max(0, MAX_VAULT_ENTRIES - n);
+  }
+
   /* ---------------- SS58 (prefix 189) ----------------
    * Needs a 64-byte-output BLAKE2b hasher injected: blake2b512(bytes) -> 64-byte array.
    * (Substrate's ss58hash uses Blake2b::new(64); digest length is part of the
@@ -553,6 +565,7 @@
     validChainHeight: validChainHeight, MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT,
     validSubscriptionId: validSubscriptionId, sanitizeVault: sanitizeVault,
     MAX_VAULT_ENTRIES: MAX_VAULT_ENTRIES, validFeeForCall: validFeeForCall,
+    vaultRoom: vaultRoom,
     ss58Encode32: ss58Encode32, systemEventsKey: systemEventsKey
   };
 }));
