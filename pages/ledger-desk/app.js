@@ -463,10 +463,15 @@ function renderDetections() {
   }).join("");
 }
 function addSelectedDetections() {
-  var added = 0;
+  var added = 0, cappedDet = 0;
   document.querySelectorAll("[data-det]").forEach(function (cb) {
     if (!cb.checked) return;
     var d = detections[Number(cb.getAttribute("data-det"))];
+    /* Ledger cap: the scan path creates events too — hold it to the
+     * same MAX_LEDGER_EVENTS room as the importer and the manual form,
+     * or a scan added to a near-full ledger silently loses its tail on
+     * the next load (sanitizeState trims to the first 10,000). */
+    if (!L.eventRoom(state.events.length)) { cappedDet++; return; }
     state.events.push({ id: uid(), dateMs: d.dateMs, type: d.type, address: d.address,
       qtyPlanck: d.qtyPlanck, priceMicro: null, feePlanck: d.feePlanck || 0n,
       note: d.note, source: "detect", ref: d.ref, internal: !!d.internal,
@@ -476,7 +481,11 @@ function addSelectedDetections() {
   detections = [];
   $("detectList").innerHTML = "";
   $("detectActions").hidden = true;
-  $("scanStatus").textContent = added ? added + " events added to the ledger." : "Nothing selected.";
+  $("scanStatus").textContent = cappedDet
+    ? (added ? added + " events added to the ledger. " : "") +
+      cappedDet + " selected not added — ledger cap of " +
+      L.MAX_LEDGER_EVENTS.toLocaleString("en-US") + " events reached."
+    : (added ? added + " events added to the ledger." : "Nothing selected.");
   if (added) voidReport("detected events were added to the ledger");
   save(); renderAll();
 }
@@ -525,6 +534,15 @@ function renderEvents() {
 }
 function handleEventSubmit(ev) {
   ev.preventDefault();
+  /* Ledger cap: the manual form creates events too — refuse at the
+   * MAX_LEDGER_EVENTS the load-time sanitizer enforces, instead of
+   * adding an event the next load would silently trim. */
+  if (!L.eventRoom(state.events.length)) {
+    alert("Ledger is full — the ledger cap of " +
+      L.MAX_LEDGER_EVENTS.toLocaleString("en-US") +
+      " events is reached. Delete some events before adding more.");
+    return;
+  }
   var qty = L.parseQtcToPlanck($("evQty").value);
   if (qty === null || qty <= 0n) { alert("Enter a valid QTC amount."); return; }
   var price = L.parseUsdPerQtcToMicro($("evPrice").value);
@@ -570,7 +588,7 @@ function importEventsCsv(file) {
       if (e.id) existingIds[e.id] = 1;
       if (e.ref) existingRefs[e.ref] = 1;
     });
-    var added = 0, bad = 0, dup = 0;
+    var added = 0, bad = 0, dup = 0, capped = 0;
     for (var i = 1; i < rows.length; i++) {
       try {
         var r = rows[i];
@@ -590,6 +608,14 @@ function importEventsCsv(file) {
         var csvId = idx("id") >= 0 ? L.csvUnguardText(String(r[idx("id")] || "").trim()) : "";
         var csvRef = idx("ref") >= 0 ? L.csvUnguardText(String(r[idx("ref")] || "").trim()) : "";
         if ((csvId && existingIds[csvId]) || (csvRef && existingRefs[csvRef])) { dup++; continue; }
+        /* Ledger cap (white-hat, 2026-10-15): sanitizeState caps the
+         * ledger at MAX_LEDGER_EVENTS at load, but this importer pushed
+         * straight onto state.events — a large CSV grew the ledger far
+         * beyond its own cap in-session (every render walks it), and the
+         * next load silently trimmed the excess after the alert below
+         * had claimed it all imported. A valid, non-duplicate row that
+         * a full ledger cannot hold is counted as capped, never pushed. */
+        if (!L.eventRoom(state.events.length)) { capped++; continue; }
         var fee = L.parseQtcToPlanck(r[idx("fee_qtc")] || "") || 0n;
         if (fee > L.MAX_SUPPLY_PLANCKS) fee = 0n;
         var newId = csvId || uid();
@@ -608,7 +634,9 @@ function importEventsCsv(file) {
     save(); renderAll();
     alert("Imported " + added + " events" +
       (dup ? " (" + dup + " duplicates skipped)" : "") +
-      (bad ? " (" + bad + " rows skipped)" : "") + ".");
+      (bad ? " (" + bad + " rows skipped)" : "") +
+      (capped ? " (" + capped + " not imported — ledger cap of " +
+        L.MAX_LEDGER_EVENTS.toLocaleString("en-US") + " events reached)" : "") + ".");
   };
   rd.readAsText(file);
 }

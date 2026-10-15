@@ -515,4 +515,17 @@ t("sanitizeState r3: string fields capped; address list capped at 500", () => {
   assert.equal(L.sanitizeState(many, OPTS3).addresses.length, 1);
 });
 
+t("eventRoom: the creation-path gate arithmetic for MAX_LEDGER_EVENTS", () => {
+  // The load-time sanitizer caps events at 10,000; every path that
+  // CREATES events (CSV import, manual form, scan add) asks eventRoom
+  // first, so an in-session ledger can never outgrow the cap its next
+  // load would silently trim back to.
+  assert.equal(L.eventRoom(0), 10000);
+  assert.equal(L.eventRoom(9999), 1);
+  assert.equal(L.eventRoom(10000), 0);
+  assert.equal(L.eventRoom(15000), 0); // never negative
+  assert.equal(L.eventRoom("garbage"), 10000); // uncountable = empty, never a crash
+  assert.equal(L.eventRoom(-3), 10000);
+});
+
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nAll " + n + " tests passed.");

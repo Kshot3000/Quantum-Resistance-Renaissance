@@ -361,6 +361,19 @@ function toBigIntOrNull(v) {
 var MAX_VAULT_ADDRESSES = 500;
 var MAX_LEDGER_EVENTS = 10000;
 var MAX_PRICE_DAYS = 3660;
+/* How many more events fit under MAX_LEDGER_EVENTS. Every path that
+ * CREATES events — the manual form, the scan's add-selected, and the CSV
+ * importer — must hold itself to this room, not just the load-time
+ * sanitizer: a cap enforced only in sanitizeState is a silent data-loss
+ * rule (the CSV importer pushed a 12,000-row file to 12,000 in-session
+ * events — every render walks the ledger — and the next load trimmed it
+ * back to the first 10,000 without a word, after the import alert had
+ * claimed all 12,000). Same pattern as the Contact Vault import cap. */
+function eventRoom(currentCount) {
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) n = 0;
+  return Math.max(0, MAX_LEDGER_EVENTS - n);
+}
 function sanitizeState(raw, opts) {
   var clean = { addresses: [], events: [], prices: [], method: "FIFO" };
   if (!raw || typeof raw !== "object") return clean;
@@ -630,7 +643,7 @@ var api = {
   validateFlowsMeta: validateFlowsMeta,
   toBigIntOrNull: toBigIntOrNull, sanitizeState: sanitizeState,
   MAX_VAULT_ADDRESSES: MAX_VAULT_ADDRESSES, MAX_LEDGER_EVENTS: MAX_LEDGER_EVENTS,
-  MAX_PRICE_DAYS: MAX_PRICE_DAYS,
+  MAX_PRICE_DAYS: MAX_PRICE_DAYS, eventRoom: eventRoom,
   rewardModelPlancks: rewardModelPlancks,
   parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc,
   parseUsdPerQtcToMicro: parseUsdPerQtcToMicro, formatUsd: formatUsd,
