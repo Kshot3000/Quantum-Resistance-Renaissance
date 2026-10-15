@@ -165,8 +165,21 @@ function buildCommand(cmd, values, globals) {
   if (globals.waitForTx) parts.push("--wait-for-transaction");
   if (trim(globals.coldRequestOut || "")) parts.push("--cold-request-out", shellQuote(trim(globals.coldRequestOut)));
   if (trim(globals.coldResponseIn || "")) parts.push("--cold-response-in", shellQuote(trim(globals.coldResponseIn)));
-  if (globals.cameraIndex !== undefined && String(globals.cameraIndex) !== "0" && trim(String(globals.cameraIndex)) !== "")
-    parts.push("--camera-index", String(parseInt(globals.cameraIndex, 10)));
+  /* The camera index is a u32 global (GLOBALS declares kind "uint", u:32),
+   * and the command-level camera-index field is held to isValidUint — but
+   * this global used to be parseInt-coerced straight into the command:
+   * "abc" painted --camera-index NaN, "-1" and 2^32 passed a u32 flag the
+   * CLI rejects, and "2.9" / "1; anything" were silently truncated to the
+   * integer prefix, so the copied command named a camera the user never
+   * chose. The builder now enforces the same uint grammar itself: an
+   * invalid index is a problem (which blocks Copy / Download .sh, the
+   * gates that read problems) and NO flag is emitted. Valid values are
+   * emitted canonically via BigInt ("007" -> 7, as parseInt did). */
+  var camRaw = globals.cameraIndex === undefined ? "" : trim(String(globals.cameraIndex));
+  if (camRaw !== "" && camRaw !== "0") {
+    if (isValidUint(camRaw, 32)) parts.push("--camera-index", BigInt(camRaw).toString());
+    else problems.push({ field: "cameraIndex", msg: "unsigned integer, 0 – 2^32−1" });
+  }
 
   var path = cmd.cmd.split(" ");
   for (var i = 0; i < path.length; i++) parts.push(path[i]);

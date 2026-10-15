@@ -123,6 +123,24 @@ eq("globals", r.cmd, "quantus --verbose --node-url wss://rpc.quantus.network --w
 r = build("balance", { address: GOOD }, { nodeUrl: "ws://127.0.0.1:9944" });
 t("default node-url omitted", r.cmd.indexOf("--node-url") === -1, r.cmd);
 
+/* ---- global camera-index gate: the u32 global must obey the same
+ * isValidUint grammar as the command-level camera-index field. It used
+ * to be parseInt-coerced into the command: "abc" -> NaN, "-1"/2^32
+ * passed, "2.9"/"1; x" silently truncated to the integer prefix. ---- */
+r = build("balance", { address: GOOD }, { cameraIndex: "2" });
+t("camera 2 emitted, no problems", r.cmd.indexOf("--camera-index 2") >= 0 && r.problems.length === 0, r.cmd);
+r = build("balance", { address: GOOD }, { cameraIndex: "007" });
+t("camera 007 canonicalized to 7", r.cmd.indexOf("--camera-index 7") >= 0 && r.problems.length === 0, r.cmd);
+r = build("balance", { address: GOOD }, { cameraIndex: "4294967295" });
+t("camera u32 max emitted", r.cmd.indexOf("--camera-index 4294967295") >= 0 && r.problems.length === 0, r.cmd);
+r = build("balance", { address: GOOD }, { cameraIndex: "0" });
+t("camera 0 omitted (default), no problems", r.cmd.indexOf("--camera-index") === -1 && r.problems.length === 0, r.cmd);
+["abc", "2.9", "-1", "4294967296", "99999999999999999999999999", "1; rm -rf /", "$(id)", "0x2", "2e3", "+2"].forEach(v => {
+  r = build("balance", { address: GOOD }, { cameraIndex: v });
+  t("camera " + JSON.stringify(v) + " flagged, not emitted",
+    r.problems.some(p => p.field === "cameraIndex") && r.cmd.indexOf("--camera-index") === -1, r.cmd);
+});
+
 r = build("signing-qr", { from: GOOD });
 eq("signing-qr minimal", r.cmd, "quantus signing-qr --from " + GOOD);
 
