@@ -168,5 +168,14 @@ check("sanitizeData r3 accepts the capture-minus-one-day lag, and stays gated of
   (function(){ var c = D.sanitizeData(payload4(function(d){ d.daily = d.daily.slice(1); }), OPTS); return c && c.daily.length === 2; })() &&
   !!D.sanitizeData(payload4(), { nowMs: OPTS.nowMs }));
 
+/* ---- boundary hardening round 4: daily blocks aggregate containment ---- */
+check("sanitizeData r4 rejects a daily row claiming more blocks than the chain has",
+  D.sanitizeData(payload4(function(d){ d.daily[0].blocks_count = 200001; }), OPTS) === null);
+check("sanitizeData r4 rejects rows each within height whose sum passes it (days partition the chain)",
+  D.sanitizeData(payload4(function(d){ d.daily.forEach(function(r){ r.blocks_count = 100000; }); }), OPTS) === null &&
+  D.sanitizeData(payload4(function(d){ d.daily[0].blocks_count = 200000 - 6000 - 5900 + 1; }), OPTS) === null);
+check("sanitizeData r4 accepts a daily sum exactly at the chain height",
+  (function(){ var c = D.sanitizeData(payload4(function(d){ d.daily[0].blocks_count = 200000 - 6000 - 5900; }), OPTS); return c && c.daily.length === 3; })());
+
 console.log(fails === 0 ? "\nALL TESTS PASSED" : "\n" + fails + " TEST(S) FAILED");
 process.exit(fails === 0 ? 0 : 1);

@@ -35,6 +35,14 @@ var CHAIN = {
  * days (the chart spaces rows by index, so a gap compresses time),
  * and the newest row must belong to the capture's era (its UTC day
  * or the day before), since it anchors the "last 24h" TPS figure.
+ * Round 4 adds aggregate containment for the daily series: the
+ * daily_chain_stats rows PARTITION the chain by UTC day — every block
+ * belongs to exactly one day — so no row's blocks_count, and no sum
+ * of rows, can exceed the status block_height in the same payload
+ * (verified on the real snapshot before being held: capture 226,103,
+ * 14 rows, max 6,639, sum 83,453 <= 226,103). A set breaking that
+ * bound is payload-level poison, like the round-3 gap: dropping the
+ * offending row would manufacture a series the indexer never wrote.
  * Core status fields
  * and payload-level contradictions reject the whole payload (the
  * caller reads it exactly like a failed fetch — last good telemetry
@@ -198,6 +206,13 @@ function sanitizeData(data, opts){
   });
   if (dailyOrderBroken) return null;
   if (dailyRaw.length && !daily.length) return null; /* TPS must never be fabricated from an empty set */
+  /* Aggregate containment (round 4): the daily rows partition the
+   * chain by UTC day, so their blocks_counts are disjoint slices of
+   * the one chain the status height counts — the kept sum can never
+   * pass it (a single row past it breaks the same bound alone). */
+  var dailyBlocksSum = 0;
+  daily.forEach(function(d){ dailyBlocksSum += d.blocks_count; });
+  if (dailyBlocksSum > height) return null;
   /* Capture-era relation (round 3): renderStats paints the newest
    * daily row's tx_count as "txs in last 24h", so that row must belong
    * to THIS payload's capture — its UTC day, or the day before it
