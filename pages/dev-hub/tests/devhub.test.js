@@ -126,6 +126,30 @@ t("buildJsonRpc rejects invalid params", function(){
   assert.strictEqual(m.buildJsonRpc("system_chain", "").ok, true);
 });
 
+// 11b. buildJsonRpc curl shell-quoting: the -d payload is copy-paste
+// code — a param carrying a single quote must stay inside the quoting
+// (fleet shellQuote standard), never break out as shell syntax.
+t("buildJsonRpc shell-quotes the curl payload", function(){
+  var r = m.buildJsonRpc("state_getStorage", "[\"x'; echo INJECTED; echo '\"]");
+  assert.strictEqual(r.ok, true);
+  assert.ok(r.curl.indexOf("'\\''") >= 0, "embedded quote is escaped as '\\''");
+  assert.ok(r.curl.indexOf("-d '{\"jsonrpc\"") >= 0, "payload opens single-quoted");
+  assert.ok(/ http:\/\/localhost:9944$/.test(r.curl), "command ends with the bare URL, quoting closed");
+  // the -d argument is exactly shellQuote(the compact JSON) — nothing raw leaks
+  var want = "-d " + m.shellQuote(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "state_getStorage",
+    params: ["x'; echo INJECTED; echo '"] })) + " http://localhost:9944";
+  assert.ok(r.curl.indexOf(want) >= 0, "payload segment is the fully escaped form");
+});
+t("shellQuote escapes per the POSIX single-quote rule", function(){
+  assert.strictEqual(m.shellQuote("plain"), "'plain'");
+  assert.strictEqual(m.shellQuote("a'b"), "'a'\\''b'");
+  assert.strictEqual(m.shellQuote("'"), "''\\'''");
+  assert.strictEqual(m.shellQuote(""), "''");
+  var r = m.buildJsonRpc("chain_getBlockHash", "[137536]");
+  assert.ok(r.curl.indexOf("-d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"chain_getBlockHash\",\"params\":[137536]}' http://localhost:9944") >= 0,
+    "ordinary payloads keep the exact pre-fix curl shape");
+});
+
 // 12. groupDigits
 t("groupDigits formats thousands", function(){
   assert.strictEqual(m.groupDigits("1000000000000"), "1,000,000,000,000");

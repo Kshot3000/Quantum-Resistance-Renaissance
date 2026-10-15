@@ -122,6 +122,16 @@ var RPC_PRESETS = {
   "state_getStorage": { hint: "storage key as 0x… — leave [] for the template", params: [] }
 };
 
+/* POSIX shell single-quote escaping (the fleet shellQuote standard,
+ * CLI Forge / Distribution Planner): a single-quoted string may contain
+ * any byte except ' itself, which is written as '\'' (close, escaped
+ * quote, reopen). The curl command below is copy-paste code — a param
+ * carrying a raw ' would otherwise break out of the -d quoting and run
+ * as shell commands on the user's machine. */
+function shellQuote(s){
+  return "'" + String(s).replace(/'/g, "'\\''") + "'";
+}
+
 function buildJsonRpc(method, paramsJson){
   var params;
   try {
@@ -131,9 +141,9 @@ function buildJsonRpc(method, paramsJson){
   return {
     ok: true,
     json: JSON.stringify({ jsonrpc: "2.0", id: 1, method: method, params: params }, null, 2),
-    curl: "curl -s -H 'Content-Type: application/json' -d '" +
-      JSON.stringify({ jsonrpc: "2.0", id: 1, method: method, params: params }) +
-      "' http://localhost:9944"
+    curl: "curl -s -H 'Content-Type: application/json' -d " +
+      shellQuote(JSON.stringify({ jsonrpc: "2.0", id: 1, method: method, params: params })) +
+      " http://localhost:9944"
   };
 }
 
@@ -463,7 +473,7 @@ var api = {
   DONATE_ADDR: DONATE_ADDR,
   qtcToPlancks: qtcToPlancks, plancksToQtc: plancksToQtc,
   groupDigits: groupDigits, belowED: belowED,
-  lookupPallet: lookupPallet, buildJsonRpc: buildJsonRpc,
+  lookupPallet: lookupPallet, buildJsonRpc: buildJsonRpc, shellQuote: shellQuote,
   init: init
 };
 
