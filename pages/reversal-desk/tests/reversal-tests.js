@@ -53,6 +53,8 @@ const res189 = RC.ss58Decode("KrwtH2a2bBuev66iHckW65v3DvQBeC9CZcWeFfFWLRv8UHKC")
 ok(!res189.ok && /Reserved SS58 prefix form/.test(res189.error), "SS58 reserved form (0xBD) rejected, not read as prefix 189");
 const res192 = RC.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ");
 ok(!res192.ok && /Reserved SS58 prefix form/.test(res192.error), "SS58 reserved form (0xC0) rejected");
+const longSs58 = RC.ss58Decode("z".repeat(20000));
+ok(!longSs58.ok && /Too long/.test(longSs58.error), "SS58 20,000-char input refused as too long before decoding");
 
 /* ---------- SCALE primitives ---------- */
 eq(RC.u32LE(7200), [0x20, 0x1c, 0x00, 0x00], "u32LE 7200");

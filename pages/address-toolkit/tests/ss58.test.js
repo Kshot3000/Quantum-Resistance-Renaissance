@@ -83,5 +83,18 @@ check("isQuantusAddress(null/garbage) is false",
         rd.ok === false && rd.kind === "format", ra);
 });
 
+/* Input-length bound (white-hat): b58decode is quadratic in the input
+ * length, so ss58Decode must refuse over-long input BEFORE decoding —
+ * a Quantus address is 49 chars and the gate is 128. */
+var longAddr = "z".repeat(20000);
+var ld = C.ss58Decode(longAddr);
+check("20,000-char input refused as length before decoding",
+      ld.ok === false && ld.kind === "length", ld.error);
+var threwLong = false;
+try { C.b58decode(longAddr); } catch (e) { threwLong = !!(e && e.badLength === 20000); }
+check("direct b58decode(20,000) throws badLength", threwLong);
+check("100-char garbage still gets an ordinary (non-length) rejection",
+      C.ss58Decode("z".repeat(100)).kind !== "length");
+
 console.log(fails === 0 ? "ALL GREEN" : fails + " FAILURES");
 process.exit(fails ? 1 : 0);

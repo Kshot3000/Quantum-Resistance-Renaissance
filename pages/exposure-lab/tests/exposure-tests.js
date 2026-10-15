@@ -31,6 +31,10 @@ async function ta(name, fn){
     var e = C.ss58Decode("LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ");
     assert.strictEqual(e.ok, false); assert.strictEqual(e.kind, "format");
   });
+  t("ss58 over-long input refused as length before decoding", function(){
+    var d = C.ss58Decode("z".repeat(20000));
+    assert.strictEqual(d.ok, false); assert.strictEqual(d.kind, "length");
+  });
   t("validateQTC ok", function(){
     var v = C.validateQTC("qzjhuX9r6CzXzH3VWUcZjd9DHZHkC26BU6CGFp49m8YjQFJDa");
     assert.strictEqual(v.ok, true); assert.strictEqual(v.chain, "qtc");

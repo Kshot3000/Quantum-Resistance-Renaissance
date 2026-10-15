@@ -177,6 +177,12 @@ test('ss58Decode rejects the reserved prefix forms', () => {
   assert.throws(() => ss58Decode('LAJs41CEk4XqPGK71DPaDniKANq4ok2m8SB36iBQizhbKEDJ'), /Reserved SS58 prefix form/);
 });
 
+test('ss58Decode refuses over-long input before decoding', () => {
+  // base58Decode is quadratic in input length; the gate is 128 chars
+  // (a Quantus address is 49) and must fire before any decoding loop
+  assert.throws(() => ss58Decode('z'.repeat(20000)), /Address too long/);
+});
+
 test('parseRecipient: enforces prefix 189, rejects bad checksum', async () => {
   const { parseRecipient } = await import('../js/rpc.js');
   await loadWordlist();

@@ -186,6 +186,7 @@ export function base58Encode(bytes) {
 }
 
 export function base58Decode(str) {
+  if (str && str.length > 128) throw new Error('Base58 input too long (' + str.length + ' characters)');
   let n = 0n;
   for (const ch of str) {
     const d = B58.indexOf(ch);
@@ -239,6 +240,11 @@ export function ss58Encode(accountId, prefix = QUANTUS_SS58_PREFIX) {
 }
 
 export function ss58Decode(address) {
+  // Length bound BEFORE decoding (white-hat): base58Decode rescales
+  // a growing BigInt per character (quadratic), so an unbounded paste
+  // froze the tab. A Quantus address is 49 characters; refuse over 128.
+  if (typeof address === 'string' && address.trim().length > 128)
+    throw new Error('Address too long (' + address.trim().length + ' characters) — a Quantus address is 49 characters; refused before decoding');
   const raw = base58Decode(address.trim());
   if (raw.length < 3) throw new Error('Address too short');
   let prefix, pb;

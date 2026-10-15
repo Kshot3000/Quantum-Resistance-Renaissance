@@ -120,6 +120,11 @@ const KYLE_QTC = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
     try { ss58Decode(res); } catch { rThrew = true; }
     ok('ss58 rejects reserved prefix form', rThrew);
   }
+  // length bound: base58Decode is quadratic in the input length, so an
+  // over-long paste must be refused before decoding (gate: 128 chars)
+  let lThrew = false;
+  try { ss58Decode('z'.repeat(20000)); } catch (e) { lThrew = /too long/i.test(e.message); }
+  ok('ss58 refuses 20,000-char input as too long before decoding', lThrew);
   // base58 round-trip
   const raw = base58Decode(KYLE_QTC);
   eq('base58 round-trip', base58Encode(raw), KYLE_QTC);

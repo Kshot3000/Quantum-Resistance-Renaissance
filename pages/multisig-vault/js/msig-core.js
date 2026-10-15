@@ -175,6 +175,7 @@ function blake2b(input, outLen){
 /* ================= base58 / SS58 ================= */
 var ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 function b58decode(s){
+  if (s && s.length > 128) throw { badLength: s.length };
   for (var ci = 0; ci < s.length; ci++)
     if (ALPHABET.indexOf(s[ci]) < 0) throw { badChar: s[ci], pos: ci };
   var zeros = 0;
@@ -230,6 +231,15 @@ function ss58Encode(keyBytes, prefix){
   return b58encode(body.concat([hash[0], hash[1]]));
 }
 function ss58Decode(addr){
+  // Length bound BEFORE decoding (white-hat): b58decode is quadratic in the
+  // input length — every character rescans the whole accumulated byte array —
+  // so an unbounded paste froze the tab (20,000 chars took seconds; 100k is a
+  // ~minute freeze). A Quantus address is 49 characters and the largest SS58
+  // this codec can emit is 51; inputs over 128 characters are refused up
+  // front.
+  if (typeof addr === "string" && addr.length > 128)
+    return { ok: false, kind: "length",
+             error: "Too long (" + addr.length + " characters) to be an SS58 address — a Quantus address is 49 characters; refused before decoding." };
   var raw;
   try { raw = b58decode(addr); }
   catch (e){
