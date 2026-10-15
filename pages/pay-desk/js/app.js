@@ -305,9 +305,26 @@ function fmtCountdown(ms) {
   return sec + "s";
 }
 
+/* Spreadsheet formula injection (white-hat round, 2026-10-15): a CSV cell
+ * whose parsed value begins — after leading spaces/tabs, which Excel /
+ * Sheets skip — with =, +, - or @ (or begins with a tab/CR) is EVALUATED
+ * as a formula when the file is opened; quoting does not prevent it. The
+ * register's one free-text field, the invoice reference, reaches this
+ * exporter — a reference like "=2+5+cmd|' /C calc'!A0" would run on the
+ * machine of whoever opens the CSV. Guard text cells with a leading
+ * single quote (spreadsheet apps render the text without it and never
+ * evaluate it). Every other register field is a producer value that can
+ * never start with those characters (non-negative BigInt amounts, the
+ * INV- id, the validated qz… address, the rate grammar, the status enum,
+ * the ISO stamp), so the guard is a no-op for them — verified in tests. */
+function csvGuardText(s) {
+  var t = String(s == null ? "" : s);
+  return /^[ \t]*[=+@-]/.test(t) || /^[\t\r]/.test(t) ? "'" + t : t;
+}
+
 function csvEscape(v) {
-  var s = String(v);
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  var s = csvGuardText(String(v));
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
 /* tip-button snippet generator (pure) */
@@ -873,6 +890,7 @@ if (typeof module !== "undefined" && module.exports) {
     invoiceTotals: invoiceTotals,
     fmtCountdown: fmtCountdown,
     csvEscape: csvEscape,
+    csvGuardText: csvGuardText,
     tipSnippet: tipSnippet,
     splitServiceFee: splitServiceFee,
     sanitizeRegister: sanitizeRegister,

@@ -582,8 +582,13 @@ function importEventsCsv(file) {
         if (csvAddr && !validVaultAddress(csvAddr)) { bad++; continue; }
         var t = (r[idx("type")] || "").trim();
         if (!L.INFLOW[t] && !L.OUTFLOW[t]) { bad++; continue; }
-        var csvId = idx("id") >= 0 ? String(r[idx("id")] || "").trim() : "";
-        var csvRef = idx("ref") >= 0 ? String(r[idx("ref")] || "").trim() : "";
+        /* The desk's own export guards formula-leading text cells with a
+         * leading single quote (see ledger-core csvGuardText); strip that
+         * one quote here so an exported file re-imports byte-identically
+         * and the id/ref dedupe below keeps matching. Foreign values that
+         * merely start with a quote keep it. */
+        var csvId = idx("id") >= 0 ? L.csvUnguardText(String(r[idx("id")] || "").trim()) : "";
+        var csvRef = idx("ref") >= 0 ? L.csvUnguardText(String(r[idx("ref")] || "").trim()) : "";
         if ((csvId && existingIds[csvId]) || (csvRef && existingRefs[csvRef])) { dup++; continue; }
         var fee = L.parseQtcToPlanck(r[idx("fee_qtc")] || "") || 0n;
         if (fee > L.MAX_SUPPLY_PLANCKS) fee = 0n;
@@ -591,8 +596,8 @@ function importEventsCsv(file) {
         state.events.push({ id: newId, dateMs: dm, type: t,
           address: csvAddr, qtyPlanck: qty,
           priceMicro: L.parseUsdPerQtcToMicro(r[idx("price_usd_per_qtc")] || ""),
-          feePlanck: fee, note: String(r[idx("note")] || "").slice(0, 500),
-          source: (idx("source") >= 0 && String(r[idx("source")] || "").trim()) || "csv-import",
+          feePlanck: fee, note: L.csvUnguardText(String(r[idx("note")] || "")).slice(0, 500),
+          source: (idx("source") >= 0 && L.csvUnguardText(String(r[idx("source")] || "").trim())) || "csv-import",
           ref: csvRef, internal: /^y/i.test(r[idx("internal")] || ""), flags: [] });
         existingIds[newId] = 1;
         if (csvRef) existingRefs[csvRef] = 1;

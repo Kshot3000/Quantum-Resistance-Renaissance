@@ -129,6 +129,19 @@ eq("countdown negative", P.fmtCountdown(-5), "expired");
 eq("csv plain", P.csvEscape("abc"), "abc");
 eq("csv comma", P.csvEscape("a,b"), '"a,b"');
 eq("csv quotes doubled", P.csvEscape('a"b'), '"a""b"');
+/* Formula injection (2026-10-15): a reference cell a spreadsheet would
+ * evaluate is quote-guarded; producer cells (ids, amounts, addresses,
+ * statuses) can never start with a formula starter and stay untouched. */
+eq("csv formula = guarded", P.csvEscape("=2+5+cmd|' /C calc'!A0"), "'=2+5+cmd|' /C calc'!A0");
+eq("csv formula + guarded", P.csvEscape("+2+2"), "'+2+2");
+eq("csv formula - guarded", P.csvEscape("-2+2"), "'-2+2");
+eq("csv formula @ guarded", P.csvEscape("@SUM(1+1)"), "'@SUM(1+1)");
+eq("csv formula space-led guarded", P.csvEscape(" =cmd"), "' =cmd");
+eq("csv formula tab-led guarded", P.csvEscape("\t@x"), "'\t@x");
+eq("csv guard leaves mid-string = alone", P.csvEscape("a=b"), "a=b");
+eq("csv guard leaves invoice id alone", P.csvEscape("INV-20261015-041900-ABC"), "INV-20261015-041900-ABC");
+eq("csv guard leaves zero alone", P.csvEscape("0"), "0");
+eq("csv guardText exported", P.csvGuardText("=x"), "'=x");
 
 /* ---- tip snippet ---- */
 (function () {

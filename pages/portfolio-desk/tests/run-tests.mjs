@@ -343,6 +343,23 @@ test("csvExport produces a parseable holdings CSV", () => {
   assert.ok(lines[1].includes("1.000000"));
 });
 
+test("csvExport guards formula-leading nicknames and quotes nicknames as real CSV", () => {
+  // Formula injection (2026-10-15): a nickname a spreadsheet would
+  // evaluate (=, +, -, @ led) is quote-guarded; JSON.stringify was not
+  // CSV quoting and mangled nicknames carrying quotes/commas.
+  assert.equal(P.csvTextCell("=2+5+cmd|' /C calc'!A0"), "'=2+5+cmd|' /C calc'!A0");
+  assert.equal(P.csvTextCell("+miner"), "'+miner");
+  assert.equal(P.csvTextCell("@rig"), "'@rig");
+  assert.equal(P.csvTextCell("-cold"), "'-cold");
+  assert.equal(P.csvTextCell("Mining rig 1"), "Mining rig 1");
+  assert.equal(P.csvTextCell('rig "A", west'), '"rig ""A"", west"');
+  const pf = { rows: [{ nick: "=cmd|' /C calc'!A0", address: "qzA",
+    free: 1000000000000n, claimable: 0n, locked: 0n, controlled: 1000000000000n,
+    txIn: 1, txOut: 0, minedBlocks: 3, balanceKnown: true }] };
+  const lines = P.csvExport(pf).split("\n");
+  assert.ok(lines[1].startsWith("'=cmd|' /C calc'!A0,qzA,1.000000,"), lines[1]);
+});
+
 test("round 3 relations: mined counts are contained by the chain they claim", () => {
   const MA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7",
         MB = "qzo9ddk2km1qqAmXNiwo55vs5LNTU851mSQc8ufBwkQygHRBv";

@@ -692,7 +692,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Portfolio Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Command your whole QTC estate: add every address you control to one vault, read live-first balances, split liquid holdings from vesting-locked allocations with claimable-now math, see the allocation donut, transfer activity and mining attribution — each address carrying its human checkphrase. 100% client-side; never signs, never moves funds.</p>
-        <div class="meta">21/21 logic tests green · live-first balance rollup on real indexer rows · mined counts held to the chain height and vesting schedules deduped by producer id · browser QA green</div>
+        <div class="meta">22/22 logic tests green · CSV export guards formula-leading nicknames · live-first balance rollup on real indexer rows · mined counts held to the chain height and vesting schedules deduped by producer id · browser QA green</div>
       </a>
       <a class="app-card mempool" href="pages/mempool-desk/">
         <div class="icon-row">
@@ -728,7 +728,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Ledger Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The miner &amp; holder tax ledger: watch your addresses with checkphrase read-back, auto-detect mining income from real chain snapshots via the verified emission model, run exact FIFO/LIFO/HIFO cost basis to the planck, keep your own price table (no market price exists yet — nothing invented), and export accountant-ready tax-year reports with CSV. 100% client-side.</p>
-        <div class="meta">45/45 ledger tests green · internal-move browser QA 14/14 · zero console errors · Oct 14: an internal transfer between your own wallets no longer mints a phantom zero-basis lot</div>
+        <div class="meta">47/47 ledger tests green · internal-move browser QA 14/14 · zero console errors · Oct 14: an internal transfer between your own wallets no longer mints a phantom zero-basis lot · Oct 15: CSV exports guard formula-leading text cells — a shared ledger file can no longer execute as a spreadsheet formula</div>
       </a>
       <a class="app-card consensus" href="pages/consensus-lab/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+444,102% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+444,282% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -800,7 +800,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Pay Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The merchant acceptance toolkit: invoice builder with exact planck amounts and checksum-verified addresses, QR payment requests, a point-of-sale screen, an invoice register with CSV export, confirmation guidance, and an embeddable tip-button generator. Now with an optional, plainly disclosed Pay Desk service fee (0.25–1%, or None) the customer pays as a second transfer — the two legs always sum exactly to the invoice total. No custody, no price oracle — honest limits throughout.</p>
-        <div class="meta">141/141 logic tests green · full browser QA green · zero console errors</div>
+        <div class="meta">151/151 logic tests green · register CSV guards formula-leading references · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card cli" href="pages/cli-forge/">
         <div class="icon-row">

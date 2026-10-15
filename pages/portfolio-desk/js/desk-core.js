@@ -510,12 +510,35 @@ function parseVaultJson(text, opts) {
   return { version: 1, addresses: sanitizeVaultEntries(v.addresses, opts) };
 }
 
+/* Spreadsheet formula injection (white-hat round, 2026-10-15): a CSV cell
+ * whose parsed value begins — after leading spaces/tabs, which Excel /
+ * Sheets skip — with =, +, - or @ (or begins with a tab/CR) is EVALUATED
+ * as a formula when the file is opened. The nickname column is free text
+ * (and importable inside a shared vault JSON), so a nick like
+ * "=2+5+cmd|' /C calc'!A0" would run on the machine of whoever opens this
+ * export. Guard text cells with a leading single quote — spreadsheet
+ * apps render the text without it and never evaluate it. The old code
+ * "quoted" the nick with JSON.stringify, which is not CSV quoting: a
+ * nick containing a quote parsed back mangled (rig "A", west -> rig \A\,
+ * west). csvTextCell is real CSV quoting (double the quotes, wrap when
+ * the value carries a quote/comma/newline) with the formula guard in
+ * front of it. Producer numeric cells are not guarded — they must stay
+ * numbers. */
+function csvGuardText(s) {
+  var t = String(s == null ? "" : s);
+  return /^[ \t]*[=+@-]/.test(t) || /^[\t\r]/.test(t) ? "'" + t : t;
+}
+function csvTextCell(s) {
+  var t = csvGuardText(s);
+  return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+
 function csvExport(portfolio) {
   var lines = ["nickname,address,free_qtc,vesting_claimable_qtc,vesting_locked_qtc,controlled_qtc,tx_in,tx_out,mined_blocks,balance_known"];
   portfolio.rows.forEach(function (r) {
     function q(p) { return p == null ? "" : (Number(p) / 1e12).toFixed(6); }
     lines.push([
-      JSON.stringify(r.nick || ""), r.address,
+      csvTextCell(r.nick || ""), r.address,
       q(r.free), q(r.claimable), q(r.locked), q(r.controlled),
       r.txIn, r.txOut, r.minedBlocks, r.balanceKnown ? "yes" : "no"
     ].join(","));
@@ -541,6 +564,7 @@ var api = {
   blankVault: blankVault, normalizeAddress: normalizeAddress,
   addToVault: addToVault, removeFromVault: removeFromVault,
   parseVaultJson: parseVaultJson, csvExport: csvExport,
+  csvGuardText: csvGuardText, csvTextCell: csvTextCell,
 };
 
 if (typeof module !== "undefined" && module.exports) module.exports = api;

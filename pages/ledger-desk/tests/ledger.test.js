@@ -245,6 +245,42 @@ t("eventsToCsv escapes and parses back", () => {
   assert.equal(rows[1][5], "1.500000");
 });
 
+// --- CSV formula injection (2026-10-15): text cells a spreadsheet would
+// evaluate (=, +, -, @ led, incl. after spaces/tabs) are quote-guarded at
+// export; producer numeric cells are never guarded; the importer's
+// unguard restores the original text so round trips stay byte-identical.
+t("csvGuardText guards only formula-leading text", () => {
+  assert.equal(L.csvGuardText("=2+5+cmd|' /C calc'!A0"), "'=2+5+cmd|' /C calc'!A0");
+  assert.equal(L.csvGuardText("+2+2"), "'+2+2");
+  assert.equal(L.csvGuardText("-2+2"), "'-2+2");
+  assert.equal(L.csvGuardText("@SUM(1+1)"), "'@SUM(1+1)");
+  assert.equal(L.csvGuardText("  =HYPERLINK(x)"), "'  =HYPERLINK(x)");
+  assert.equal(L.csvGuardText("\t@x"), "'\t@x");
+  assert.equal(L.csvGuardText("pool alpha"), "pool alpha");
+  assert.equal(L.csvGuardText("a=b"), "a=b"); // only a LEADING starter is a formula
+  assert.equal(L.csvGuardText(""), "");
+  assert.equal(L.csvUnguardText("'=2+2"), "=2+2");
+  assert.equal(L.csvUnguardText("'  @x"), "  @x");
+  assert.equal(L.csvUnguardText("'quoted note"), "'quoted note"); // foreign quote kept
+  assert.equal(L.csvUnguardText("plain"), "plain");
+});
+t("eventsToCsv guards formula-leading text cells and unguard restores them", () => {
+  const e = ev({ id: "=inj-id", type: "buy", source: "@csv-import", ref: "+order-1",
+    note: "=2+5+cmd|' /C calc'!A0", priceMicro: P(1.5) });
+  const rows = L.parseCsv(L.eventsToCsv([e]));
+  assert.equal(rows[1][0], "'=inj-id");
+  assert.equal(rows[1][8], "'@csv-import");
+  assert.equal(rows[1][9], "'+order-1");
+  assert.equal(rows[1][10], "'=2+5+cmd|' /C calc'!A0");
+  assert.equal(L.csvUnguardText(rows[1][0]), "=inj-id");
+  assert.equal(L.csvUnguardText(rows[1][9]), "+order-1");
+  assert.equal(L.csvUnguardText(rows[1][10]), "=2+5+cmd|' /C calc'!A0");
+  // numeric columns keep their plain, unguarded form
+  assert.equal(rows[1][4], "1.000000000000");
+  assert.equal(rows[1][5], "1.500000");
+  assert.equal(rows[1][6], "0.000000000000");
+});
+
 // --- stored-state boundary (sanitizeState / toBigIntOrNull) ---
 t("toBigIntOrNull accepts only exact integers", () => {
   assert.equal(L.toBigIntOrNull(5n), 5n);

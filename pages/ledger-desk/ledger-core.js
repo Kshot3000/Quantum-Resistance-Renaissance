@@ -257,16 +257,41 @@ function taxYearReport(events, method, priceForEvent, year, longTermDays) {
 }
 
 // ---- CSV -------------------------------------------------------------------
+/* Spreadsheet formula injection (white-hat round, 2026-10-15): a CSV cell
+ * whose parsed value begins — after any leading spaces/tabs, which Excel /
+ * Sheets / LibreOffice skip — with =, +, - or @ (or begins with a tab/CR)
+ * is EVALUATED as a formula/DDE when the file is opened, and the quoting
+ * below does not prevent it (quotes are file syntax, stripped before the
+ * value reaches the cell). The free-text columns here (id, source, ref,
+ * note) are exactly the fields a shared ledger file or a CSV import from
+ * someone else can poison: a note like "=2+5+cmd|' /C calc'!A0" would run
+ * on the machine of whoever opens the export. Guard TEXT cells by
+ * prefixing a single quote — spreadsheet apps render the text without the
+ * quote and never evaluate it. Producer numeric cells are NOT guarded:
+ * they are formatted from BigInts by this file, and a genuine negative
+ * figure must stay a number. csvUnguardText is the exact inverse, applied
+ * by the CSV importer so an exported file round-trips byte-identically
+ * (the round-trip dedupe keys on id/ref depend on it). */
+function csvGuardText(s) {
+  var t = String(s == null ? "" : s);
+  return /^[ \t]*[=+@-]/.test(t) || /^[\t\r]/.test(t) ? "'" + t : t;
+}
+function csvUnguardText(s) {
+  var t = String(s == null ? "" : s);
+  if (t.charAt(0) !== "'") return t;
+  var rest = t.slice(1);
+  return /^[ \t]*[=+@-]/.test(rest) || /^[\t\r]/.test(rest) ? rest : t;
+}
 function eventsToCsv(events) {
   var rows = [["id", "date", "type", "address", "amount_qtc", "price_usd_per_qtc",
     "fee_qtc", "internal", "source", "ref", "note"]];
   events.map(normEvent).forEach(function (e) {
-    rows.push([e.id, new Date(e.dateMs).toISOString(), e.type, e.address,
+    rows.push([csvGuardText(e.id), new Date(e.dateMs).toISOString(), e.type, e.address,
       (Number(e.qtyPlanck) / 1e12).toFixed(12),
       e.priceMicro === null ? "" : (Number(e.priceMicro) / 1e6).toFixed(6),
       (Number(e.feePlanck) / 1e12).toFixed(12),
-      e.internal ? "yes" : "no", e.source, e.ref,
-      (e.note || "").replace(/[\r\n]+/g, " ")]);
+      e.internal ? "yes" : "no", csvGuardText(e.source), csvGuardText(e.ref),
+      csvGuardText((e.note || "").replace(/[\r\n]+/g, " "))]);
   });
   return rows.map(function (r) {
     return r.map(function (c) { return "\"" + String(c).replace(/"/g, "\"\"") + "\""; }).join(",");
@@ -613,7 +638,8 @@ var api = {
   INFLOW: INFLOW, OUTFLOW: OUTFLOW, INCOME_TYPES: INCOME_TYPES,
   normEvent: normEvent, methodSort: methodSort,
   runLedger: runLedger, taxYearReport: taxYearReport,
-  eventsToCsv: eventsToCsv, parseCsv: parseCsv
+  eventsToCsv: eventsToCsv, parseCsv: parseCsv,
+  csvGuardText: csvGuardText, csvUnguardText: csvUnguardText
 };
 global.QTCLedger = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;
