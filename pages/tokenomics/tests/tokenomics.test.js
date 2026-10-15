@@ -287,3 +287,28 @@ t("formatters", () => {
   assert.equal(A.fmtInt(null), "—");
   assert.equal(A.fmtDate(Date.parse("2026-09-09T00:00:00Z")), "Sep 9, 2026");
 });
+
+t("fmtQTC carries a fraction that rounds up to a whole unit", () => {
+  // The fraction used to be rounded independently of the floored
+  // integer part: 1.999 painted "1.00", 999999.9999 "999,999.00".
+  assert.equal(A.fmtQTC(1.999), "2.00");
+  assert.equal(A.fmtQTC(5.995), "6.00");
+  assert.equal(A.fmtQTC(0.9999), "1.00");
+  assert.equal(A.fmtQTC(999999.9999), "1,000,000.00");
+  assert.equal(A.fmtQTC(0.99999, 4), "1.0000");
+  assert.equal(A.fmtQTC(9.9, 0), "10");
+});
+
+t("fmtQTC negatives and plain values stay well-formed", () => {
+  // Pre-fix a negative painted the malformed "-2..50" (floor steps
+  // down, % keeps the sign, the sliced fraction kept its own minus).
+  assert.equal(A.fmtQTC(-1.5), "-1.50");
+  assert.equal(A.fmtQTC(-1.999), "-2.00");
+  assert.equal(A.fmtQTC(5), "5");
+  assert.equal(A.fmtQTC(5.5), "5.50");
+  assert.equal(A.fmtQTC(1234.5678), "1,234.57");
+  assert.equal(A.fmtQTC(5.994), "5.99");
+  assert.equal(A.fmtQTC(1.00005, 4), "1.0001");
+  assert.equal(A.fmtQTC(null), "—");
+  assert.equal(A.fmtQTC(NaN), "—");
+});

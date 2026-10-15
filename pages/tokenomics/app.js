@@ -54,7 +54,23 @@ function fmtInt(n){
 function fmtQTC(n, digits){
   if (n === null || n === undefined || !isFinite(n)) return "—";
   var d = (digits == null ? 2 : digits);
-  return fmtInt(Math.floor(n)) + (n % 1 !== 0 ? "." + (Math.round((n % 1) * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d).slice(2) : "");
+  /* Round the fraction WITH carry into the integer part: the old form
+   * rounded (n % 1) independently of Math.floor(n), so 1.999 painted
+   * "1.00" and 999999.9999 "999,999.00" (a fraction rounding up to a
+   * whole unit never carried), and negatives were malformed outright
+   * (-1.5 -> "-2..50": floor steps down while % keeps the sign, and
+   * the sliced fraction kept its own minus). Work on the magnitude,
+   * carry explicitly, then re-apply the sign. */
+  var pow = Math.pow(10, d);
+  var sign = n < 0 ? "-" : "";
+  var mag = Math.abs(n);
+  var whole = Math.floor(mag);
+  var frac = Math.round((mag - whole) * pow);
+  if (frac >= pow){ whole += 1; frac = 0; }
+  var out = sign + fmtInt(whole);
+  if (d > 0 && (mag % 1 !== 0 || frac !== 0))
+    out += "." + String(frac).padStart(d, "0");
+  return out;
 }
 function fmtDate(ms){
   var d = new Date(ms);
