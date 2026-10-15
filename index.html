@@ -628,8 +628,8 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Brandable addresses</span>
         </div>
         <h3>QTC Vanity Forge <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>Grind a brandable Quantus address — <span class="mono">qzkshot…</span>, <span class="mono">qzmint…</span> — with real in-browser ML-DSA-65/87 keypairs on the exact upstream address derivation (Poseidon2 account-ID + SS58-189). Honest difficulty math (expected/median/luck percentiles), a machine benchmark that grounds every ETA, a responsive forge console with a luck meter, a localStorage results vault with export, and a no-illusions safety brief — 100% client-side, keys never leave the page.</p>
-        <div class="meta">20/20 logic tests green · browser QA green</div>
+        <p>Grind a brandable Quantus address — <span class="mono">qzkshot…</span>, <span class="mono">qzmint…</span> — with real in-browser ML-DSA-65/87 keypairs on the exact upstream address derivation (Poseidon2 account-ID + SS58-189). Honest difficulty math (expected/median/luck percentiles), a machine benchmark that grounds every ETA, a responsive forge console with a luck meter, a localStorage results vault with export — creation-capped at its own 200-find limit, so a find at a full vault stays on its card with a plain NOT-saved warning instead of silently evicting the oldest stored secret key — and a no-illusions safety brief — 100% client-side, keys never leave the page.</p>
+        <div class="meta">26/26 logic tests green · browser QA green (vault-cap suite 15/15)</div>
       </a>
       <a class="app-card contactvault" href="pages/contact-vault/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+442,084% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+438,399% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">

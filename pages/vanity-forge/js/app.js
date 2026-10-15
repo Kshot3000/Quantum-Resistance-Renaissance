@@ -10,7 +10,7 @@ import {
   validatePattern, expectedAttempts, probFoundBy,
   attemptsForQuantile, medianAttempts, expectedSeconds,
   fmtInt, fmtDuration, difficultyLadder, addressMatches,
-  sanitizeVault, sanitizeBench,
+  sanitizeVault, sanitizeBench, vaultRoom, MAX_VAULT_RECORDS,
 } from './vanity.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { pubkeyToAddress, hexEncode, ss58Decode } from '../../key-forge/js/quantus-crypto.js';
@@ -315,8 +315,19 @@ function onFound({ address, secretKey, attempts, ms, cfg }) {
     attempts, ms: Math.round(ms), date: new Date().toISOString(),
     secretHex: store ? hexEncode(secretKey) : null,
   };
-  vault.unshift(rec);
-  saveVault();
+  /* Vault creation cap: sanitizeVault caps the vault at MAX_VAULT_RECORDS
+   * at load (first/newest wins), but this unshift — the only creation
+   * path — had no cap check: at a full vault the find persisted over-cap
+   * and the NEXT load silently evicted the OLDEST find, stored secret key
+   * included. Ask the gate first; at the cap skip ONLY the vault write.
+   * The find still lands on its card below — that card is the keypair's
+   * only other copy, so it must never be dropped, only honestly flagged
+   * as not vaulted. */
+  const vaulted = vaultRoom(vault.length) > 0;
+  if (vaulted) {
+    vault.unshift(rec);
+    saveVault();
+  }
   renderVault();
 
   const card = document.createElement('div');
@@ -326,6 +337,7 @@ function onFound({ address, secretKey, attempts, ms, cfg }) {
     <div class="fc-head">⚒ VANITY FOUND <span class="fc-scheme">${SCHEMES[cfg.scheme].label}</span></div>
     <div class="fc-addr mono">${highlight(address, cfg)}</div>
     <div class="fc-meta">pattern "${cfg.pattern}" ${cfg.position} · ${cfg.caseSensitive ? 'case-sensitive' : 'case-insensitive'} · found on attempt <b>${fmtInt(attempts)}</b> after ${fmtClock(ms)}</div>
+    ${vaulted ? '' : `<div class="fc-capwarn">⚠ Vault is full — the cap is ${MAX_VAULT_RECORDS} finds, so this find was NOT saved to the vault. This card is its only copy: copy the secret now, and delete an old vault entry to make room for future finds.</div>`}
     <div class="fc-secret" hidden>
       <div class="dl">Secret key (hex) — fund nothing until this is backed up</div>
       <div class="mono secret">${secs}</div>
@@ -347,7 +359,9 @@ function onFound({ address, secretKey, attempts, ms, cfg }) {
   });
   $('foundList').prepend(card);
   card.scrollIntoView({ behavior: (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: 'nearest' });
-  $('forgeStatus').textContent = `Found it — ${address.slice(0, 14)}… on attempt ${fmtInt(attempts)}.`;
+  $('forgeStatus').textContent = vaulted
+    ? `Found it — ${address.slice(0, 14)}… on attempt ${fmtInt(attempts)}.`
+    : `Found it — ${address.slice(0, 14)}… on attempt ${fmtInt(attempts)} — but the vault is full (cap ${MAX_VAULT_RECORDS} finds), so it was NOT saved there. Back up the secret from its card now.`;
 }
 
 function renderVault() {

@@ -97,6 +97,7 @@ table.ladder tr:hover td{background:#1c130a}
 .fc-addr{font-size:1rem;word-break:break-all;line-height:1.7}
 .fc-addr .hl{color:var(--gold-hi);text-shadow:0 0 14px rgba(245,166,35,.8)}
 .fc-meta{color:var(--mut);font-size:.88rem;margin:.5rem 0}
+.fc-capwarn{margin:.6rem 0;padding:.6rem .8rem;border:1px solid var(--red);border-radius:var(--radius-sm);background:rgba(248,113,113,.1);color:#ffb3b3;font-weight:600;font-size:.9rem;line-height:1.55}
 .fc-secret{margin:.6rem 0}
 .secret{word-break:break-all;font-size:.82rem;color:#ffb3b3;background:#160b06;border:1px dashed var(--ember-dim);border-radius:var(--radius-sm);padding:.7rem;line-height:1.7}
 .fc-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.6rem}

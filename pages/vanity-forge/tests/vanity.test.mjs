@@ -6,6 +6,7 @@ import {
   probFoundBy, attemptsForQuantile, medianAttempts,
   expectedSeconds, fmtInt, fmtDuration, difficultyLadder,
   addressMatches, SS58_189_RE, sanitizeVault, sanitizeBench,
+  vaultRoom, MAX_VAULT_RECORDS,
 } from '../js/vanity.js';
 
 test('base58 alphabet has 58 chars and excludes 0/O/I/l', () => {
@@ -227,6 +228,18 @@ test('sanitizeBench: only plausible measured rates survive', () => {
   assert.equal(sanitizeBench({ '65': -3 })['65'], undefined);
   assert.deepEqual(sanitizeBench('junk'), {});
   assert.equal(sanitizeBench({ '87': 12, evil: 5 }).evil, undefined);
+});
+
+test('vaultRoom: creation gate arithmetic, fail-closed (onFound must not unshift past the load cap)', () => {
+  assert.equal(MAX_VAULT_RECORDS, 200);
+  assert.equal(vaultRoom(0), 200);
+  assert.equal(vaultRoom(199), 1);
+  assert.equal(vaultRoom(199.9), 1); // floored
+  assert.equal(vaultRoom(200), 0);
+  assert.equal(vaultRoom(5000), 0); // never negative
+  assert.equal(vaultRoom(NaN), 0);
+  assert.equal(vaultRoom('x'), 0);
+  assert.equal(vaultRoom(-3), 0); // fail closed on garbage
 });
 
 test('addressMatches: suffix mode', () => {

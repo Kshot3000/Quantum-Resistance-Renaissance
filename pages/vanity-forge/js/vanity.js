@@ -258,6 +258,19 @@ export function sanitizeVault(raw, opts = {}) {
   return out;
 }
 
+/* Room left in the vault for one more find, asked by onFound — the ONLY
+ * creation path — BEFORE it unshifts. sanitizeVault keeps the FIRST
+ * MAX_VAULT_RECORDS at load and the vault is unshift-ordered (newest
+ * first), so an uncapped unshift at a full vault persisted over-cap and
+ * the next load silently evicted the OLDEST find — stored secret key
+ * included, stranding any funds that address held. Fail closed on a
+ * garbage count (the Notary/Mempool gate arithmetic). */
+export function vaultRoom(currentCount) {
+  const n = Math.floor(Number(currentCount));
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.max(0, MAX_VAULT_RECORDS - n);
+}
+
 export function sanitizeBench(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const out = {};
