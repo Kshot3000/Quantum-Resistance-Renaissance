@@ -87,7 +87,20 @@ function compactLenU128(v) {
 /* ---------- recipient list parsing ----------
  * Accepts, per line: "<address> <amount>", "<address>,<amount>",
  * "<address>\t<amount>", or a CSV with a header row containing
- * "address" and "amount". Blank lines and "#" comments are skipped. */
+ * "address" and "amount". Blank lines and "#" comments are skipped.
+ *
+ * RELATION: the amount parser accepts comma thousand separators
+ * ("1,000.25" is a pinned grammar), so the field splitter must deliver
+ * the WHOLE amount token to it in every separator form. The old
+ * splitter cut the line at EVERY comma: a CSV row "addr,1,500" planned
+ * 1 QTC instead of 1,500 (the ",500" field was silently dropped), a
+ * spaced/tabbed "addr 1,500" glued the fragment onto the address and
+ * failed with a base58 error, and any extra field ("addr 10 extra")
+ * was silently ignored. Now: a comma that separates the fields (it
+ * directly follows the address token, modulo spaces) splits the line
+ * at the FIRST comma only — the remainder is the amount, commas and
+ * all — and extra whitespace-separated fields are an explicit error
+ * row, never a silent drop in a money plan. */
 function parseInput(text) {
   var rows = [];
   var lines = String(text == null ? "" : text).split(/\r?\n/);
@@ -97,16 +110,16 @@ function parseInput(text) {
     var line = lines[i].trim();
     if (!line || line.charAt(0) === "#") continue;
     var parts;
-    if (line.indexOf(",") >= 0) parts = line.split(",").map(function (x) { return x.trim(); });
-    else parts = line.split(/\s+/);
-    parts = parts.filter(function (x) { return x !== ""; });
+    var csv = /^([^,\s]+)\s*,\s*(.+)$/.exec(line);
+    if (csv) parts = [csv[1], csv[2].trim()];
+    else parts = line.split(/\s+/).filter(function (x) { return x !== ""; });
     if (!headerSeen && parts.length >= 2 &&
         /address/i.test(parts[0]) && /amount/i.test(parts[1])) {
       headerSeen = true;
       continue;
     }
-    if (parts.length < 2) {
-      rows.push({ line: ln, raw: lines[i], address: parts[0] || "", amountStr: "",
+    if (parts.length !== 2) {
+      rows.push({ line: ln, raw: lines[i], address: parts[0] || "", amountStr: parts[1] || "",
                   error: "expected \"<address> <amount>\" (got " + parts.length + " field(s))" });
       continue;
     }

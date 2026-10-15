@@ -117,6 +117,33 @@ t("parseInput handles space, comma, tab, header, comments", function () {
   assert.ok(/expected/.test(rows[3].error), "single-field row errors");
 });
 
+t("parseInput: comma thousand-separator amounts survive every separator form", function () {
+  // parseAmountToPlancks accepts "1,000.25" (pinned above), so the field
+  // splitter must deliver the whole amount token in CSV, space and tab
+  // forms alike — the old every-comma split planned 1 QTC for ",1,500"
+  // and glued ",500" onto the address in the spaced/tabbed forms.
+  var cases = [
+    [POOL + ",1,500", "1500000000000000"],
+    [POOL + ", 1,500.25", "1500250000000000"],
+    [POOL + " 1,500", "1500000000000000"],
+    [POOL + "\t1,500", "1500000000000000"],
+    [POOL + " 1,000.25", "1000250000000000"]
+  ];
+  cases.forEach(function (c) {
+    var v = DistCore.validateRows(DistCore.parseInput(c[0]), ss58, check, WORDLIST);
+    assert.strictEqual(v[0].ok, true, c[0]);
+    assert.strictEqual(v[0].plancks, BigInt(c[1]), c[0]);
+  });
+});
+t("parseInput: extra fields are an error row, never silently dropped", function () {
+  [POOL + ",10,extra", POOL + " 10 extra", POOL + ",10 extra"].forEach(function (line) {
+    var v = DistCore.validateRows(DistCore.parseInput(line), ss58, check, WORDLIST);
+    assert.strictEqual(v[0].ok, false, line);
+  });
+  var rows = DistCore.parseInput(POOL + " 10 extra");
+  assert.ok(/expected/.test(rows[0].error), "extra field names the expected shape");
+});
+
 /* ---------- address validation ---------- */
 t("validateAddress accepts real Quantus addresses", function () {
   [POOL, MSIG, MINER, SMALL].forEach(function (a) {
