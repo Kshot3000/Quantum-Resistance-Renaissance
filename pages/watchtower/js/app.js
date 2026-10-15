@@ -104,6 +104,31 @@ function derivePhrase(addr) {
   return QTC_CHECK.addressToChecksumAsync(addr, QTC_WORDLIST).catch(function () { return null; });
 }
 
+/* Checkphrase fills run ONE AT A TIME through this chain. A derivation is
+ * 40,000 PBKDF2 iterations chunked over timers; launching one per
+ * phrase-less entry all at once (the import and init backfills used to)
+ * makes hundreds of chunk loops starve each other and the tab — the
+ * Contact Vault thundering herd. Deduped by address; verify=true also
+ * corrects a stored phrase that does not match its address (init check). */
+var phraseChain = Promise.resolve();
+var phraseQueued = {};
+function queuePhraseFill(entry, verify) {
+  if (!entry || phraseQueued[entry.address]) return;
+  phraseQueued[entry.address] = true;
+  phraseChain = phraseChain.then(function () {
+    return derivePhrase(entry.address).then(function (w) {
+      delete phraseQueued[entry.address];
+      if (!w) return;
+      if (!entry.checkphrase) { entry.checkphrase = w; save(); renderWatchlist(); return; }
+      if (verify && entry.checkphrase.join(" ") !== w.join(" ")) {
+        entry.checkphrase = w;
+        save(); renderWatchlist();
+        toast("Corrected a stored checkphrase that did not match its address — the derived words are shown now.", "err");
+      }
+    });
+  });
+}
+
 /* A stored rule is only safe if every field the rule FORM validates also
  * validates here. The form checks type, watched address, and threshold
  * before a rule exists; anything that bypasses the form — a backup import,
@@ -571,6 +596,10 @@ $("watch-form").addEventListener("submit", function (ev) {
   if (state.watchlist.some(function (x) { return x.address === v.address; })) {
     toast("That address is already under watch.", "err"); return;
   }
+  if (!QWATCH.watchRoom(state.watchlist.length)) {
+    toast("Watchlist is full — the watchlist cap of " + QWATCH.MAX_WATCHLIST + " addresses is reached. Remove an address before adding another.", "err");
+    return;
+  }
   var entry = {
     address: v.address,
     nick: $("watch-nick").value.trim(),
@@ -582,9 +611,7 @@ $("watch-form").addEventListener("submit", function (ev) {
   save(); renderAll();
   toast("Watching " + (entry.nick || QWATCH.shortAddr(entry.address)) + " — deriving checkphrase…", "ok");
   $("watch-address").value = ""; $("watch-nick").value = ""; $("watch-note").value = "";
-  derivePhrase(entry.address).then(function (w) {
-    entry.checkphrase = w; save(); renderWatchlist();
-  });
+  queuePhraseFill(entry);
 });
 
 /* ---------- rule form ---------- */
@@ -686,12 +713,13 @@ $("file-import").addEventListener("change", function (ev) {
     try {
       var p = JSON.parse(rd.result);
       if (!p || p.app !== "qtc-watchtower" || !Array.isArray(p.watchlist)) throw new Error("not a Watchtower backup");
-      var added = 0;
+      var added = 0, capped = 0;
       p.watchlist.forEach(function (x) {
         if (!x || typeof x !== "object") return; // one poisoned row must not fail the whole import
         var v = validateQuantusAddress(x.address);
         if (!v.ok) return;
         if (!state.watchlist.some(function (y) { return y.address === v.address; })) {
+          if (!QWATCH.watchRoom(state.watchlist.length)) { capped++; return; }
           state.watchlist.push({ address: v.address, nick: typeof x.nick === "string" ? x.nick.slice(0, 40) : "", note: typeof x.note === "string" ? x.note.slice(0, 140) : "", addedAt: new Date().toISOString(), checkphrase: null });
           added++;
         }
@@ -715,13 +743,15 @@ $("file-import").addEventListener("change", function (ev) {
         addedRules++;
       });
       save(); renderAll();
-      // backfill checkphrases for imported entries
+      // backfill checkphrases for imported entries — serialized through
+      // the queue, never one derivation per entry all at once
       state.watchlist.filter(function (x) { return !x.checkphrase; }).forEach(function (x) {
-        derivePhrase(x.address).then(function (w) { x.checkphrase = w; save(); renderWatchlist(); });
+        queuePhraseFill(x);
       });
       toast("Imported " + added + " new address" + (added === 1 ? "" : "es") + " and " +
         addedRules + " rules" +
-        (skippedRules ? " (" + skippedRules + " skipped — invalid or duplicate)" : "") + ".", "ok");
+        (skippedRules ? " (" + skippedRules + " skipped — invalid or duplicate)" : "") +
+        (capped ? " (" + capped + " not imported — watchlist cap of " + QWATCH.MAX_WATCHLIST + " addresses reached)" : "") + ".", "ok");
     } catch (e) { toast("Import failed: " + e.message, "err"); }
     ev.target.value = "";
   };
@@ -790,18 +820,7 @@ document.querySelectorAll("[data-copy]").forEach(function (btn) {
   // verify every stored one against a fresh derivation — a mismatch is
   // replaced with the derived words, persisted and announced, never
   // painted as the address's phrase (the Ledger/Contact rule).
-  var correctedPhrases = 0;
-  state.watchlist.forEach(function (x) {
-    derivePhrase(x.address).then(function (w) {
-      if (!w) return;
-      if (!x.checkphrase) { x.checkphrase = w; save(); renderWatchlist(); return; }
-      if (x.checkphrase.join(" ") !== w.join(" ")) {
-        x.checkphrase = w; correctedPhrases++;
-        save(); renderWatchlist();
-        toast("Corrected a stored checkphrase that did not match its address — the derived words are shown now.", "err");
-      }
-    });
-  });
+  state.watchlist.forEach(function (x) { queuePhraseFill(x, true); });
   var startTab = (location.hash || "").replace("#", "");
   if (["dash", "watch", "rules", "alerts", "data"].indexOf(startTab) >= 0) {
     var btn = document.querySelector('.tab[data-tab="' + startTab + '"]');

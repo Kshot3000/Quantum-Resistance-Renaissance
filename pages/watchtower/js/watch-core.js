@@ -486,6 +486,18 @@ function sanitizeWatchlist(rows, validateFn) {
   return out.slice(0, MAX_WATCHLIST);
 }
 
+/* Room left under the watchlist cap. The cap must hold at CREATION, not
+ * only in sanitizeWatchlist at load: the add form and the backup importer
+ * both create entries, and an entry created past the cap is silently
+ * trimmed on the next load — after the import toast claimed it, and after
+ * the app paid a 40,000-iteration checkphrase derivation for it. Every
+ * creation path asks this gate first (the Ledger eventRoom rule). */
+function watchRoom(currentCount) {
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) n = 0;
+  return Math.max(0, MAX_WATCHLIST - n);
+}
+
 /* ---------- rules ---------- */
 
 var RULE_TYPES = {
@@ -843,6 +855,7 @@ var api = {
   sanitizeBaselines: sanitizeBaselines,
   sanitizeAlerts: sanitizeAlerts,
   sanitizeWatchlist: sanitizeWatchlist,
+  watchRoom: watchRoom, MAX_WATCHLIST: MAX_WATCHLIST,
   advanceAddressBaseline: advanceAddressBaseline,
   blankChainBaseline: blankChainBaseline,
   blankAddressBaseline: blankAddressBaseline,

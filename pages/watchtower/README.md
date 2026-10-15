@@ -25,7 +25,7 @@ Stored state is treated as an untrusted boundary and sanitized against what the 
 
 ## Tests
 
-`node tests/run-tests.mjs` — 36 logic tests (planck math, rule transitions, per-transfer dedupe, self-test fixtures, stored-state boundary + relations rounds 1–5; round 4 era-holds the producer stamps — watchlist addedAt, stored lastScan, snapshot fetched_at — to the chain-era window, so a 2020/2999 stamp nulls instead of painting as fact; round 5 counts referenda by distinct referendum_index, not lifecycle-event rows, reads governance counts with any malformed row as unknown instead of guessed, and holds runtime-upgrade rows to their producer grammar with duplicates deduped).
+`node tests/run-tests.mjs` — 37 logic tests (planck math, rule transitions, per-transfer dedupe, self-test fixtures, stored-state boundary + relations rounds 1–5, watchRoom cap arithmetic; round 4 era-holds the producer stamps — watchlist addedAt, stored lastScan, snapshot fetched_at — to the chain-era window, so a 2020/2999 stamp nulls instead of painting as fact; round 5 counts referenda by distinct referendum_index, not lifecycle-event rows, reads governance counts with any malformed row as unknown instead of guessed, and holds runtime-upgrade rows to their producer grammar with duplicates deduped).
 
 ## Built by
 

@@ -522,6 +522,16 @@ test("evaluateRules survives poisoned stored baselines", () => {
   assert.equal(out.baselines.addresses[ADDR].balance, (100n * P).toString());
 });
 
+test("watchRoom holds the watchlist cap at creation, not only at load", () => {
+  assert.equal(W.MAX_WATCHLIST, 500);
+  assert.equal(W.watchRoom(0), 500);
+  assert.equal(W.watchRoom(499), 1);
+  assert.equal(W.watchRoom(500), 0);
+  assert.equal(W.watchRoom(5000), 0); // never negative
+  assert.equal(W.watchRoom("x"), 500); // garbage counts as an empty list
+  assert.equal(W.watchRoom(-3), 500);
+});
+
 test("ruleLabel renders human descriptions", () => {
   assert.equal(W.ruleLabel({ type: "whale_ge", threshold: "50000" }), "Whale transfer ≥ 50000 QTC");
   assert.equal(W.ruleLabel({ type: "balance_change", changeMode: "pct", threshold: "10" }), "Balance moves by 10%");
