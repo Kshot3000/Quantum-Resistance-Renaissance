@@ -166,6 +166,35 @@ t("internal transfer is neither disposal nor acquisition", () => {
   assert.equal(r.matches.length, 0);
   assert.equal(r.lots[0].qtyPlanck, 5n * L.PLANCK);
 });
+t("internal transfer_in is neither acquisition nor income (scan both-mine shape)", () => {
+  // The scan emits ONE event for a transfer between two vault addresses:
+  // type transfer_in, internal:true. It must not mint a lot.
+  const evs = [
+    ev({ type: "buy", qtyPlanck: 5n * L.PLANCK, priceMicro: P(1) }),
+    ev({ type: "transfer_in", qtyPlanck: 5n * L.PLANCK, internal: true,
+         source: "detect", dateMs: D("2026-01-02T00:00:00Z") }),
+  ];
+  const r = L.runLedger(evs, "FIFO", noPrice);
+  assert.equal(r.lots.length, 1);
+  assert.equal(r.lots[0].qtyPlanck, 5n * L.PLANCK);
+  assert.equal(r.income.length, 0);
+  assert.ok(!r.errors.some((e) => e.kind === "review-basis"));
+});
+t("internal transfer_in phantom lot cannot absorb a later sale", () => {
+  const evs = [
+    ev({ type: "buy", qtyPlanck: 5n * L.PLANCK, priceMicro: P(1) }),
+    ev({ type: "transfer_in", qtyPlanck: 5n * L.PLANCK, internal: true, dateMs: D("2026-01-02T00:00:00Z") }),
+    ev({ type: "sell", qtyPlanck: 5n * L.PLANCK, priceMicro: P(9), dateMs: D("2026-01-03T00:00:00Z") }),
+    ev({ type: "sell", qtyPlanck: 5n * L.PLANCK, priceMicro: P(9), dateMs: D("2026-01-04T00:00:00Z") }),
+  ];
+  const r = L.runLedger(evs, "FIFO", noPrice);
+  assert.equal(r.matches.length, 1); // only the real lot is sold
+  assert.equal(r.matches[0].gainMicro, 40000000n); // 5 x ($9 - $1)
+  assert.ok(r.errors.some((e) => e.kind === "shortfall"));
+  const rep = L.taxYearReport(evs.slice(0, 2), "FIFO", noPrice, 2026);
+  assert.equal(rep.inventory.qty, 5n * L.PLANCK);
+  assert.equal(rep.inventory.basis, 5000000n);
+});
 t("gift_out removes basis with no gain", () => {
   const evs = [
     ev({ type: "buy", qtyPlanck: 5n * L.PLANCK, priceMicro: P(2) }),

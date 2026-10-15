@@ -137,6 +137,14 @@ function runLedger(events, method, priceForEvent) {
     var price = ev.priceMicro !== null ? ev.priceMicro :
       (priceForEvent ? priceForEvent(ev.dateMs) : null);
     if (INFLOW[ev.type]) {
+      // An internal move is neither an acquisition nor income: the QTC
+      // was already in a lot and stays in one. The scan's both-mine
+      // detection emits exactly ONE event for such a transfer — a
+      // transfer_in flagged internal (app.js) — so honoring the flag
+      // only on outflows (below) minted a phantom zero-basis lot here:
+      // inventory doubled, and a later sale matched the phantom at $0
+      // basis, booking the full proceeds as a gain that never happened.
+      if (ev.internal) return;
       var unitCost = null, priced = price !== null;
       if (ev.type === "buy" || ev.type === "mining_income" || ev.type === "airdrop") {
         unitCost = price; // buys/mining/airdrop: basis = FMV (price required or flagged)
