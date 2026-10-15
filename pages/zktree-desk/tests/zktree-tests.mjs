@@ -339,5 +339,50 @@ function throws(name, fn) {
   eq("compact mode1", c2.value, BigInt((0xa9 >> 2) | (0x07 << 6)));
 }
 
+// --- 11. proof bounds: untrusted RPC bodies + pasted proofs (white-hat) ---
+// decodeMerkleProofRpc reads a response from a user-supplied endpoint and
+// verifyProof folds pasted JSON. The pallet caps depth at MAX_TREE_DEPTH
+// (32); every level is exactly 3 siblings of 32 bytes. Both entry points
+// now hold that grammar BEFORE looping/hashing: an absurd level count in
+// a 14-byte body used to build millions of empty triples (slices past
+// the end) before the trailing check fired, a pasted 2,000-level proof
+// folded Poseidon for seconds, a truncated leaf_index died as a
+// BigInt(undefined) TypeError, and a 1-byte sibling zero-padded into
+// its hash slot instead of being rejected as malformed.
+{
+  const sib = "00".repeat(32);
+  const bodyFor = (levels, extraBytes) => {
+    const body = [0x01, 0, 0, 0, 0, 0, 0, 0, 0];
+    if (levels < 64) body.push(levels << 2);
+    else { const w = (levels << 2) | 2; body.push(w & 0xff, (w >> 8) & 0xff, (w >> 16) & 0xff, (w >>> 24) & 0xff); }
+    for (let i = 0; i < extraBytes; i++) body.push(0);
+    return "0x" + body.map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  throws("RPC proof declaring 2,000,000 levels in 14 bytes rejected", () =>
+    ZK.decodeMerkleProofRpc(bodyFor(2000000, 0)));
+  throws("RPC proof with 33 levels (full budget) rejected — chain max is 32", () =>
+    ZK.decodeMerkleProofRpc(bodyFor(33, 33 * 96 + 33)));
+  throws("RPC proof with truncated leaf_index rejected cleanly", () =>
+    ZK.decodeMerkleProofRpc("0x010203"));
+  throws("RPC proof with a truncated root rejected", () =>
+    ZK.decodeMerkleProofRpc(bodyFor(1, 96 + 20)));
+  throws("compact read past end rejected", () => ZK.decodeCompact(new Uint8Array([0x01]), 5));
+  throws("compact mode-3 read past end rejected", () =>
+    ZK.decodeCompact(new Uint8Array([0xff, 0x01]), 0));
+
+  const leaf = {
+    to: hexDecode(ZK.GOLDEN_LEAF.toHex), transferCount: 0n, assetId: 5n,
+    amountPlancks: ZK.AMOUNT_SCALE_DOWN_FACTOR,
+  };
+  throws("pasted proof with 33 levels rejected before hashing", () =>
+    ZK.verifyProof(leaf, { siblings: Array.from({ length: 33 }, () => [sib, sib, sib]) }, sib));
+  throws("pasted proof with a 1-byte sibling rejected as malformed", () =>
+    ZK.verifyProof(leaf, { siblings: [["ab", sib, sib]] }, sib));
+  throws("pasted proof with a 2-sibling level rejected as malformed", () =>
+    ZK.verifyProof(leaf, { siblings: [[sib, sib]] }, sib));
+  throws("pasted proof with non-array siblings rejected as malformed", () =>
+    ZK.verifyProof(leaf, { siblings: "nope" }, sib));
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

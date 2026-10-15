@@ -22,5 +22,5 @@ This desk recomputes hashes and verifies proofs — it does not generate ZK proo
 
 ## Tests
 
-- `node tests/zktree-tests.mjs` — 83/83 logic tests green, including the upstream `hash_leaf` golden vector, canonicalization vectors, quantization/saturation semantics, capacity math, settled-tree root semantics, proof generation/verification round-trips (incl. tamper resistance), SCALE leaf + proof-RPC codec round-trips, storage-key structure, and exhaustion projections
+- `node tests/zktree-tests.mjs` — 93/93 logic tests green, including the upstream `hash_leaf` golden vector, canonicalization vectors, quantization/saturation semantics, capacity math, settled-tree root semantics, proof generation/verification round-trips (incl. tamper resistance), SCALE leaf + proof-RPC codec round-trips, storage-key structure, exhaustion projections, and the proof-bounds matrix: RPC bodies and pasted proofs are held to the producer grammar (levels ≤ the pallet's MAX_TREE_DEPTH 32, exact byte budget of 96 bytes/level + root + depth, per-level arity 3, 32-byte siblings, no compact reads past the end) before any looping or hashing
 - Browser QA: real-browser verification of all six tabs, the simulator, proof flows, and attribution — zero console errors

@@ -311,12 +311,31 @@ export function generateProof(leafIndex, depth, getLeafHash, getNodeHash) {
  * Mirrors tree.rs::verify_proof.
  */
 export function verifyProof(leafFields, proof, expectedRootHex) {
+  // Shape-gate BEFORE any hashing: proofs come from pasted JSON and from
+  // RPC responses — both untrusted. The pallet caps tree depth at
+  // MAX_TREE_DEPTH, every level of a 4-ary proof carries exactly
+  // ARITY-1 siblings, and every sibling is a Hash256 (32 bytes). An
+  // unbounded level count would fold Poseidon hashes until the tab
+  // dies; a short sibling used to zero-pad into its hash slot and the
+  // proof merely "failed" instead of being rejected as malformed.
+  if (!proof || !Array.isArray(proof.siblings))
+    throw new Error("malformed proof: siblings must be an array of levels");
+  if (proof.siblings.length > MAX_TREE_DEPTH)
+    throw new Error(
+      "malformed proof: " + proof.siblings.length + " levels exceeds the chain max depth " + MAX_TREE_DEPTH
+    );
+  const levels = proof.siblings.map((levelSiblings, li) => {
+    if (!Array.isArray(levelSiblings) || levelSiblings.length !== ARITY - 1)
+      throw new Error("malformed proof: level " + li + " must carry exactly " + (ARITY - 1) + " siblings");
+    return levelSiblings.map((s) => {
+      const b = hexDecode(typeof s === "string" ? s : hexEncode(s));
+      if (b.length !== 32) throw new Error("malformed proof: sibling at level " + li + " must be 32 bytes");
+      return b;
+    });
+  });
   const { hash } = hashLeaf(leafFields);
   let current = hash;
-  for (const levelSiblings of proof.siblings) {
-    const sibs = levelSiblings.map((s) => hexDecode(typeof s === "string" ? s : hexEncode(s)));
-    current = hashNode([current, ...sibs]);
-  }
+  for (const sibs of levels) current = hashNode([current, ...sibs]);
   return hexEncode(current) === hexEncode(hexDecode(expectedRootHex));
 }
 
@@ -391,19 +410,23 @@ export function decodeU64LeHex(hex) {
 
 /** Decode a SCALE compact integer at offset. Returns {value: BigInt, bytesRead}. */
 export function decodeCompact(bytes, offset) {
+  if (offset >= bytes.length) throw new Error("truncated compact integer");
   const b0 = bytes[offset];
   const mode = b0 & 0x03;
   if (mode === 0) return { value: BigInt(b0 >> 2), bytesRead: 1 };
   if (mode === 1) {
+    if (offset + 2 > bytes.length) throw new Error("truncated compact integer");
     const v = BigInt(b0 >> 2) | (BigInt(bytes[offset + 1]) << 6n);
     return { value: v, bytesRead: 2 };
   }
   if (mode === 2) {
+    if (offset + 4 > bytes.length) throw new Error("truncated compact integer");
     let v = BigInt(b0 >> 2);
     for (let i = 1; i < 4; i++) v |= BigInt(bytes[offset + i]) << BigInt(6 + 8 * (i - 1));
     return { value: v, bytesRead: 4 };
   }
   const len = Number(b0 >> 2);
+  if (offset + 1 + len > bytes.length) throw new Error("truncated compact integer");
   let v = 0n;
   for (let i = 0; i < len; i++) v |= BigInt(bytes[offset + 1 + i]) << BigInt(8 * i);
   return { value: v, bytesRead: 1 + len };
@@ -414,12 +437,28 @@ export function decodeMerkleProofRpc(hex) {
   if (b.length < 1) throw new Error("empty proof response");
   if (b[0] === 0x00) return null; // None: leaf not provable (out of bounds / not yet settled)
   if (b[0] !== 0x01) throw new Error("bad Option prefix");
+  if (b.length < 9) throw new Error("truncated proof response: missing leaf_index");
   let o = 1;
   let leafIndex = 0n;
   for (let i = 0; i < 8; i++) leafIndex |= BigInt(b[o + i]) << BigInt(8 * i);
   o += 8;
   const { value: levels, bytesRead } = decodeCompact(b, o);
   o += bytesRead;
+  // Bound the level count BEFORE the loop, from the producer grammar:
+  // the pallet caps tree depth at MAX_TREE_DEPTH, and every level is
+  // exactly 3 x 32 sibling bytes followed by a 32-byte root and 1 depth
+  // byte. The response comes from a user-supplied node endpoint — a
+  // 14-byte body declaring millions of levels used to loop building
+  // empty triples (slices past the end) until the tab died, and the
+  // trailing-bytes check only fired after the loop finished.
+  if (levels > BigInt(MAX_TREE_DEPTH))
+    throw new Error("proof declares " + levels + " levels — exceeds the chain max depth " + MAX_TREE_DEPTH);
+  const levelsNum = Number(levels);
+  const need = o + levelsNum * 96 + 32 + 1;
+  if (b.length < need)
+    throw new Error(
+      "truncated proof response: " + levelsNum + " levels need " + need + " bytes, got " + b.length
+    );
   const siblings = [];
   for (let l = 0n; l < levels; l++) {
     const triple = [];
