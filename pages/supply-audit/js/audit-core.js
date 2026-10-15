@@ -23,16 +23,34 @@ var LEAF_QUANTUM = 10000000000n;
 var MINT_SENTINEL = "qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc";
 var ENDPOINT = "https://sqm.quantus.com/v1/graphql";
 
-/* Exact decimal formatting from BigInt plancks. No floats touch the money. */
+/* Exact decimal formatting from BigInt plancks. No floats touch the money.
+ * Truncation, never rounding (the audit paints exact figures or none).
+ * The decimals argument is a contract, 0..12: the old form appended
+ * "." + frac unconditionally, so dec=0 — the supply-curve canvas labels
+ * call it on every load — painted "5,818,356." with a bare trailing
+ * dot, a negative dec sliced the fraction away to the same bare dot,
+ * and NaN produced "1,234,567." too. dec is now floored and clamped
+ * to 0..12 (non-finite falls back to the default 4), and dec=0 omits
+ * the dot entirely (the Vesting Desk fmtQTC precedent). */
 function fmtQtc(p, dec){
   dec = (dec === undefined) ? 4 : dec;
+  if (typeof dec !== "number" || !isFinite(dec)) dec = 4;
+  dec = Math.max(0, Math.min(12, Math.floor(dec)));
   var neg = p < 0n;
   if (neg) p = -p;
   var s = p.toString();
   while (s.length <= 12) s = "0" + s;
   var int = s.slice(0, s.length - 12), frac = s.slice(s.length - 12, s.length - 12 + dec);
   int = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return (neg ? "-" : "") + int + "." + frac;
+  return (neg ? "-" : "") + int + (dec > 0 ? "." + frac : "");
+}
+/* Signed delta formatting for the audit's difference figures (the
+ * balance gap, the fee wedge): the sign comes from the value itself.
+ * The renderers used to hard-prefix "+" — but gap and feeWedge are
+ * differences of independent aggregates with no sanitize relation
+ * forcing them positive, so a negative delta painted "+-1,000.0000". */
+function fmtSignedQtc(p, dec){
+  return (p >= 0n ? "+" : "") + fmtQtc(p, dec);
 }
 function fmtInt(n){
   return Number(n).toLocaleString("en-US");
@@ -329,7 +347,7 @@ function computeAudit(raw){
 return {
   PLANCK: PLANCK, MAX_SUPPLY: MAX_SUPPLY, EMISSION_DIVISOR: EMISSION_DIVISOR,
   LEAF_QUANTUM: LEAF_QUANTUM, MINT_SENTINEL: MINT_SENTINEL, ENDPOINT: ENDPOINT,
-  fmtQtc: fmtQtc, fmtInt: fmtInt, esc: esc,
+  fmtQtc: fmtQtc, fmtSignedQtc: fmtSignedQtc, fmtInt: fmtInt, esc: esc,
   quantize: quantize, baseline: baseline, subsidyAt: subsidyAt,
   nonNegInt: nonNegInt, validPlancks: validPlancks, validAddress: validAddress,
   validBlockHeight: validBlockHeight, validFetchedAt: validFetchedAt,

@@ -115,12 +115,12 @@ function renderHero(a, d){
   $("f-protocol").textContent = A.fmtQtc(a.base.supply) + " QTC";
   $("f-recorded").textContent = A.fmtQtc(a.recorded) + " QTC";
   $("f-reported").textContent = A.fmtQtc(a.bal) + " QTC";
-  $("f-gap").textContent = "+" + A.fmtQtc(a.gap) + " QTC";
+  $("f-gap").textContent = A.fmtSignedQtc(a.gap) + " QTC";
   $("f-height").textContent = A.fmtInt(a.h);
   $("data-mode").textContent = (d.live ? "live · " : "snapshot · ") + new Date(d.fetched_at).toLocaleString();
 }
 function renderVerdict(a, d){
-  var gapTxt = "+" + A.fmtQtc(a.gap) + " QTC";
+  var gapTxt = A.fmtSignedQtc(a.gap) + " QTC";
   $("v-gap-inline").textContent = gapTxt;
   $("v-gap2").textContent = gapTxt;
   $("v-gap-pct").textContent = (Number(a.gap * 1000000n / a.bal) / 10000).toFixed(3) + "%";
@@ -142,14 +142,14 @@ function renderLedgers(a, d){
   $("l2-genesis").textContent = A.fmtQtc(a.s0) + " QTC";
   $("l2-n").textContent = A.fmtInt(d.mined.reward_events);
   $("l2-mined").textContent = A.fmtQtc(a.mined) + " QTC";
-  $("l2-fees").textContent = "+" + A.fmtQtc(a.feeWedge) + " QTC";
+  $("l2-fees").textContent = A.fmtSignedQtc(a.feeWedge) + " QTC";
   $("l2-total").textContent = A.fmtQtc(a.recorded) + " QTC";
   $("l3-free").textContent = A.fmtQtc(BigInt(d.balances_plancks.free)) + " QTC";
   $("l3-res").textContent = A.fmtQtc(BigInt(d.balances_plancks.reserved)) + " QTC";
   $("l3-fro").textContent = A.fmtQtc(BigInt(d.balances_plancks.frozen)) + " QTC";
   $("l3-acct").textContent = A.fmtInt(d.accounts_total);
   $("l3-total").textContent = A.fmtQtc(a.bal) + " QTC";
-  $("r-gap").textContent = "+" + A.fmtQtc(a.gap) + " QTC";
+  $("r-gap").textContent = A.fmtSignedQtc(a.gap) + " QTC";
   $("r-pct").textContent = (Number(a.gap * 1000000n / a.bal) / 10000).toFixed(3) + "%";
   $("r-rate").textContent = "≈ " + A.fmtQtc(a.subsidy) + " QTC / block (one reward per block)";
   $("r-mult").textContent = (Number(a.sentinelOut * 1000n / a.mined) / 1000).toFixed(3) + "×";
@@ -234,7 +234,7 @@ function drawCurve(a){
   $("curve-stats").innerHTML =
     stat("Baseline mining (fee-free)", A.fmtQtc(a.baselineMined) + " QTC") +
     stat("Recorded mining", A.fmtQtc(a.mined) + " QTC") +
-    stat("Fee wedge", "+" + A.fmtQtc(a.feeWedge) + " QTC") +
+    stat("Fee wedge", A.fmtSignedQtc(a.feeWedge) + " QTC") +
     stat("Wedge share of mining", (Number(a.feeWedge * 10000n / a.mined) / 100).toFixed(2) + "%");
 }
 function drawRewards(a, blocks){

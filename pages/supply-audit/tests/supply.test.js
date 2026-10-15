@@ -70,6 +70,24 @@ ok("fmtQtc truncates (no rounding)", A.fmtQtc(999999999999n) === "0.9999", A.fmt
 ok("fmtQtc negative", A.fmtQtc(-1500000000000n) === "-1.5000");
 ok("fmtQtc custom decimals", A.fmtQtc(1234567890123456789n, 2) === "1,234,567.89");
 ok("fmtInt", A.fmtInt(139887) === "139,887");
+// Decimals contract (0..12): dec=0 — the supply-curve canvas labels —
+// must not paint a bare trailing dot; out-of-contract dec values are
+// floored/clamped, never sliced into a wrong or empty fraction.
+ok("fmtQtc dec=0 has no trailing dot", A.fmtQtc(5818356000000000000n, 0) === "5,818,356", A.fmtQtc(5818356000000000000n, 0));
+ok("fmtQtc dec=0 zero", A.fmtQtc(0n, 0) === "0", A.fmtQtc(0n, 0));
+ok("fmtQtc dec=0 negative", A.fmtQtc(-1500000000000n, 0) === "-1", A.fmtQtc(-1500000000000n, 0));
+ok("fmtQtc dec=12 full precision", A.fmtQtc(1234567890123456789n, 12) === "1,234,567.890123456789", A.fmtQtc(1234567890123456789n, 12));
+ok("fmtQtc dec=13 clamps to 12", A.fmtQtc(1000000000001n, 13) === "1.000000000001", A.fmtQtc(1000000000001n, 13));
+ok("fmtQtc dec=-1 behaves as dec=0", A.fmtQtc(1500000000000n, -1) === "1", A.fmtQtc(1500000000000n, -1));
+ok("fmtQtc dec=2.5 floors to 2", A.fmtQtc(1234567890123456789n, 2.5) === "1,234,567.89", A.fmtQtc(1234567890123456789n, 2.5));
+ok("fmtQtc dec=NaN falls back to 4", A.fmtQtc(1234567890123456789n, NaN) === "1,234,567.8901", A.fmtQtc(1234567890123456789n, NaN));
+// Signed deltas: the sign comes from the value — a negative gap or fee
+// wedge (differences of independent aggregates) paints one minus,
+// never the old hard-prefixed "+-…".
+ok("fmtSignedQtc positive", A.fmtSignedQtc(50000000000n) === "+0.0500", A.fmtSignedQtc(50000000000n));
+ok("fmtSignedQtc zero", A.fmtSignedQtc(0n) === "+0.0000", A.fmtSignedQtc(0n));
+ok("fmtSignedQtc negative", A.fmtSignedQtc(-1000000000000n) === "-1.0000", A.fmtSignedQtc(-1000000000000n));
+ok("fmtSignedQtc negative dec=0", A.fmtSignedQtc(-5818356000000000000n, 0) === "-5,818,356", A.fmtSignedQtc(-5818356000000000000n, 0));
 
 // ---------- computeAudit on a synthetic fixture ----------
 const POOL_ADDR = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7"; // real genesis pool (snapshot)
