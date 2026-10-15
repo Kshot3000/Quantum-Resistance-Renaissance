@@ -450,6 +450,28 @@ test('activity boundary: future and pre-genesis timestamps drop, missing is allo
   assert.equal(sanitizeActivityRows([aRow({ timestamp: null })], WALLET, NOW).length, 1);
 });
 
+test('activity round 3: a timestamp must fit the era its block height can occupy', () => {
+  // Genesis 2026-09-09; sustained average block interval band 6–30 s ± 1 day.
+  assert.equal(sanitizeActivityRows([aRow({ block_height: 1, timestamp: '2026-10-11T04:20:31Z' })], WALLET, NOW).length, 0);
+  assert.equal(sanitizeActivityRows([aRow({ block_height: 100, timestamp: '2026-10-11T04:20:31Z' })], WALLET, NOW).length, 0);
+  assert.equal(sanitizeActivityRows([aRow({ timestamp: '2026-09-20T00:00:00Z' })], WALLET, NOW).length, 0);
+  assert.equal(sanitizeActivityRows([aRow({ timestamp: '2026-09-09T00:00:01Z' })], WALLET, NOW).length, 0);
+  assert.equal(sanitizeActivityRows([aRow({ block_height: 100, timestamp: '2026-09-09T01:00:00Z' })], WALLET, NOW).length, 1);
+});
+
+test('activity round 3: timestamp order must not contradict height order', () => {
+  const inverted = sanitizeActivityRows([
+    aRow({ id: 'a', block_height: 203723, timestamp: '2026-10-11T04:00:00Z' }),
+    aRow({ id: 'b', block_height: 203700, timestamp: '2026-10-11T05:00:00Z' }),
+  ], WALLET, NOW);
+  assert.equal(inverted, null);
+  const equal = sanitizeActivityRows([
+    aRow({ id: 'a', block_height: 203723, timestamp: '2026-10-11T04:20:31Z' }),
+    aRow({ id: 'b', block_height: 203722, timestamp: '2026-10-11T04:20:31Z' }),
+  ], WALLET, NOW);
+  assert.equal(equal.length, 2);
+});
+
 test('activity boundary: duplicate ids render once; ascending and over-limit payloads are malformed', () => {
   const dup = sanitizeActivityRows([aRow(), aRow({ block_height: 203722 })], WALLET, NOW);
   assert.equal(dup.length, 1);

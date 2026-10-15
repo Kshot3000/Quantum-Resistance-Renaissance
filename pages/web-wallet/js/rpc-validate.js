@@ -116,14 +116,38 @@ function activityAmount(v) {
   return null;
 }
 
+/* ---- Round 3: a timestamp must agree with its BLOCK HEIGHT ----
+ * Round 2 held a timestamp only against the calendar (genesis floor,
+ * now+1h): a transfer at block 1 dated today, or at height 203,723
+ * dated the chain's first week, passed and painted as this wallet's
+ * history at a time that block never existed. Block times are chain
+ * facts: genesis was 2026-09-09 (fleet-verified) and the observed
+ * average block interval is ~14 s (sync-fallbacks capture 2026-10-15:
+ * avgBlockMs 14,342; the design target is 12 s). The gate is a GROSS
+ * band — a sustained average anywhere in [6 s, 30 s] per block since
+ * genesis, plus a day of slack at both ends — so it only refuses
+ * timestamps no real block at that height can carry. */
+export const CHAIN_GENESIS_MS = Date.UTC(2026, 8, 9);
+export const MIN_AVG_BLOCK_MS = 6000;
+export const MAX_AVG_BLOCK_MS = 30000;
+export const HEIGHT_ERA_SLACK_MS = 86400000;
+
+function timestampFitsHeight(t, height) {
+  const lo = CHAIN_GENESIS_MS + height * MIN_AVG_BLOCK_MS - HEIGHT_ERA_SLACK_MS;
+  const hi = CHAIN_GENESIS_MS + height * MAX_AVG_BLOCK_MS + HEIGHT_ERA_SLACK_MS;
+  return t >= lo && t <= hi;
+}
+
 /* A present timestamp must be a real chain time: parseable, not before
- * the genesis floor, not more than an hour in the future. A missing
- * timestamp is allowed — the row renders by block height instead. */
-function activityTimestampOk(v, nowMs) {
+ * the genesis floor, not more than an hour in the future, and inside
+ * the era its block height can occupy. A missing timestamp is allowed
+ * — the row renders by block height instead. */
+function activityTimestampOk(v, nowMs, height) {
   if (v === null || v === undefined) return true;
   if (typeof v !== "string") return false;
   const t = Date.parse(v);
-  return Number.isFinite(t) && t >= GENESIS_FLOOR_MS && t <= nowMs + 3600000;
+  return Number.isFinite(t) && t >= GENESIS_FLOOR_MS && t <= nowMs + 3600000
+    && timestampFitsHeight(t, height);
 }
 
 /* Validate the activity payload's RELATIONS for the wallet that asked.
@@ -150,7 +174,7 @@ export function sanitizeActivityRows(raw, address, nowMs = Date.now()) {
     if (height === null) continue;
     const amount = activityAmount(t.amount);
     if (amount === null) continue;
-    if (!activityTimestampOk(t.timestamp, nowMs)) continue;
+    if (!activityTimestampOk(t.timestamp, nowMs, height)) continue;
     if (!(t.extrinsic_id === null || t.extrinsic_id === undefined || typeof t.extrinsic_id === "string")) continue;
     seen.add(t.id);
     rows.push({
@@ -165,6 +189,18 @@ export function sanitizeActivityRows(raw, address, nowMs = Date.now()) {
    * oldest-first under a "Recent transfers" heading. */
   for (let i = 1; i < rows.length; i++) {
     if (rows[i].block_height > rows[i - 1].block_height) return null;
+  }
+  /* Round 3: timestamps are block times, so they must not contradict
+   * that order either — a higher block carrying an EARLIER timestamp
+   * than a lower block below it means the list is not the ordered
+   * answer the UI claims to show (equal timestamps on adjacent
+   * heights are fine; rows without a timestamp take no part). */
+  let lastTs = null;
+  for (const r of rows) {
+    if (r.timestamp === null) continue;
+    const t = Date.parse(r.timestamp);
+    if (lastTs !== null && t > lastTs) return null;
+    lastTs = t;
   }
   return rows;
 }
