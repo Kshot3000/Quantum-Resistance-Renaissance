@@ -263,14 +263,49 @@ test("sanitizeTransfers drops poisoned rows, keeps valid ones verbatim", () => {
   assert.deepEqual(W.sanitizeTransfers({}), []);
 });
 
+const GOV_EVT = (idx, type) => ({ referendum_index: idx, type: type || "SUBMITTED", timestamp: "2026-09-23T08:14:24.319+00:00" });
+const GOV_UPG = (patch) => Object.assign({ id: "0000097141-94b40-000002", block_id: "0000097141-94b40", timestamp: "2026-09-23T14:49:17.407+00:00" }, patch);
+
 test("sanitizeGovernance: malformed counts are unknown (null), never 0", () => {
-  const g = W.sanitizeGovernance({ referenda: [{}, {}], upgrades: [{ spec_version: 42 }, { spec_version: "x" }, "junk"] });
+  const g = W.sanitizeGovernance({ referenda: [GOV_EVT(0), GOV_EVT(1)], upgrades: [GOV_UPG({ spec_version: 42 }), GOV_UPG({ id: "0000097142-94b40-000003", block_id: "0000097142-94b40", spec_version: "x" })] });
   assert.equal(g.referenda, 2);
-  assert.equal(g.upgrades, 2); // the "junk" string row is not an upgrade
+  assert.equal(g.upgrades, 2);
   assert.equal(g.upgradesList[0].spec_version, 42);
+  assert.equal(g.upgradesList[1].spec_version, null); // producer writes no spec_version; a junk one nulls, never paints
   assert.equal(W.sanitizeGovernance({ referenda: "oops", upgrades: [] }), null);
   assert.equal(W.sanitizeGovernance({}), null); // failed load: counts unknown
   assert.equal(W.sanitizeGovernance(null), null);
+});
+
+test("sanitizeGovernance counts distinct referenda, not lifecycle events (round 5)", () => {
+  // The producer writes one row per lifecycle event: ref 0 alone has 4.
+  const events = [GOV_EVT(0, "SUBMITTED"), GOV_EVT(0, "DECISION_STARTED"), GOV_EVT(0, "CONFIRM_STARTED"), GOV_EVT(0, "CONFIRMED")];
+  const g = W.sanitizeGovernance({ referenda: events, upgrades: [] });
+  assert.equal(g.referenda, 1); // 4 events, ONE referendum (the real snapshot's shape)
+  const staged = W.sanitizeGovernance({ referenda: events.concat([GOV_EVT(0, "EXECUTED")]), upgrades: [] });
+  assert.equal(staged.referenda, 1); // a stage transition is not a new referendum
+  const grown = W.sanitizeGovernance({ referenda: events.concat([GOV_EVT(1, "SUBMITTED")]), upgrades: [] });
+  assert.equal(grown.referenda, 2); // a new index is
+  const empty = W.sanitizeGovernance({ referenda: [], upgrades: [] });
+  assert.equal(empty.referenda, 0); // empty is a known 0, not unknown
+});
+
+test("sanitizeGovernance: an index-less event row makes the count unknown (round 5)", () => {
+  assert.equal(W.sanitizeGovernance({ referenda: [{}, {}], upgrades: [] }), null);
+  assert.equal(W.sanitizeGovernance({ referenda: [GOV_EVT(0), { type: "SUBMITTED" }], upgrades: [] }), null);
+  assert.equal(W.sanitizeGovernance({ referenda: ["junk"], upgrades: [] }), null);
+  assert.equal(W.sanitizeGovernance({ referenda: [GOV_EVT(-1)], upgrades: [] }), null);
+  assert.equal(W.sanitizeGovernance({ referenda: [GOV_EVT(2000000)], upgrades: [] }), null); // past the gov ceiling
+});
+
+test("sanitizeGovernance: upgrade rows held to the producer grammar, duplicates deduped (round 5)", () => {
+  const dup = W.sanitizeGovernance({ referenda: [], upgrades: [GOV_UPG({}), GOV_UPG({})] });
+  assert.equal(dup.upgrades, 1); // the same upgrade restated is one upgrade
+  assert.equal(W.sanitizeGovernance({ referenda: [], upgrades: [GOV_UPG({ id: "garbage" })] }), null);
+  assert.equal(W.sanitizeGovernance({ referenda: [], upgrades: [GOV_UPG({ block_id: "0000099999-abcde" })] }), null); // block_id must be the id's prefix
+  assert.equal(W.sanitizeGovernance({ referenda: [], upgrades: [GOV_UPG({ timestamp: "2999-01-01T00:00:00.000Z" })] }), null);
+  assert.equal(W.sanitizeGovernance({ referenda: [], upgrades: [{}] }), null);
+  assert.equal(W.sanitizeGovernance({ referenda: [], upgrades: ["junk"] }), null);
 });
 
 test("sanitizeBaselines coerces poison instead of wedging every scan", () => {

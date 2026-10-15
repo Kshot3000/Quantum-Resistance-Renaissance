@@ -295,19 +295,56 @@ function sanitizeTransfers(rows, maxHeight) {
   return out;
 }
 
+var UPGRADE_ID_RE = /^\d{10}-[0-9a-f]{5}-\d{6}$/; // runtime_upgrade id (extrinsic-id grammar)
+var UPGRADE_BLOCK_RE = /^\d{10}-[0-9a-f]{5}$/;    // its block_id prefix
+
 function sanitizeGovernance(data) {
   // Returns { referenda, upgrades, upgradesList } or null when the
   // payload's counts cannot be known. A FAILED governance load must read
   // as UNKNOWN — counting it as 0 resets the chain baselines, and the
   // next good scan then fires false "new referendum" alerts.
+  // Round 5 (governance-count relations): the producer
+  // (fetch-governance-data.mjs) writes data.referenda as
+  // tech_referendum_event LIFECYCLE rows — SUBMITTED, DECISION_STARTED,
+  // CONFIRM_STARTED, CONFIRMED, ... — so one referendum produces many
+  // rows (verified on the real snapshot: 4 event rows, distinct
+  // referendum_index {0} — ONE referendum). Counting rows painted
+  // "Referenda: 4" and armed the new_referendum baseline with the EVENT
+  // count, so a stage transition of an existing referendum (a 5th event
+  // row) fired a false "new referendum" alert, indistinguishable from a
+  // genuinely new referendum's SUBMITTED row. The count is now the
+  // DISTINCT referendum_index set. Every event row must carry a valid
+  // index (non-negative, under the gov ceiling): a row without one is
+  // evidence the payload is not the producer's, so the count is UNKNOWN
+  // (null), never a guess — guessing low resets the baseline and the
+  // next good scan fires falsely, the exact failure this boundary
+  // exists to prevent. Upgrades get the same treatment: a
+  // runtime_upgrade row is {id, block_id, timestamp} in the extrinsic-id
+  // grammar with block_id the id's own prefix and a chain-era timestamp;
+  // any other row makes the count unknown, and exact duplicate ids
+  // dedupe first-wins (the same upgrade restated is one upgrade).
   if (!data || typeof data !== "object") return null;
   if (!Array.isArray(data.referenda) || !Array.isArray(data.upgrades)) return null;
-  var refs = data.referenda.filter(function (r) { return !!r && typeof r === "object"; }).length;
-  var ups = [];
-  data.upgrades.forEach(function (u) {
-    if (!u || typeof u !== "object") return;
+  var seenRef = {}, refs = 0;
+  for (var i = 0; i < data.referenda.length; i++) {
+    var r = data.referenda[i];
+    if (!r || typeof r !== "object" || Array.isArray(r)) return null;
+    var idx = nonNegInt(r.referendum_index);
+    if (idx === null || idx > MAX_GOV_COUNT) return null;
+    if (!seenRef[idx]) { seenRef[idx] = true; refs++; }
+  }
+  var ups = [], seenUp = {};
+  for (var j = 0; j < data.upgrades.length; j++) {
+    var u = data.upgrades[j];
+    if (!u || typeof u !== "object" || Array.isArray(u)) return null;
+    if (typeof u.id !== "string" || !UPGRADE_ID_RE.test(u.id)) return null;
+    if (typeof u.block_id !== "string" || !UPGRADE_BLOCK_RE.test(u.block_id)) return null;
+    if (u.id.slice(0, u.block_id.length + 1) !== u.block_id + "-") return null;
+    if (chainTimeMs(u.timestamp) === null) return null;
+    if (seenUp[u.id]) continue;
+    seenUp[u.id] = true;
     ups.push({ spec_version: nonNegInt(u.spec_version) });
-  });
+  }
   return { referenda: refs, upgrades: ups.length, upgradesList: ups };
 }
 
