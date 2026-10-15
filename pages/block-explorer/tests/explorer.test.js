@@ -286,6 +286,21 @@ t("round3 cleanExtrinsicEvents: events must belong to the queried extrinsic", fu
   assert.strictEqual(A.cleanExtrinsicEvents({}, xid), null); // non-array is malformed
   assert.deepStrictEqual(A.cleanExtrinsicEvents([], xid), []);
 });
+/* --- round 4: the block row's own producer identity (verified live 2026-10-15) --- */
+t("round4 cleanBlock: block id must restate its own height", function(){
+  var raw = { id: "0000135568-ab123", height: 135568, hash: "0x" + "ab".repeat(32), timestamp: TS_OLD, reward: "310000000000", mined_by_id: GOOD_MINER, extrinsics: [], events: [] };
+  var b = A.cleanBlock(raw);
+  assert.ok(b && b.id === "0000135568-ab123");
+  assert.ok(A.cleanBlock({ ...raw, id: "0000000001-cb81a", height: 1 })); // genesis form
+  assert.ok(A.cleanBlock({ ...raw, id: undefined })); // absent keeps the old path (home rows carry no id)
+  assert.strictEqual(A.cleanBlock({ ...raw, id: "0000135569-ab123" }), null); // segment names another block
+  assert.strictEqual(A.cleanBlock({ ...raw, id: "0000000001-cb81a" }), null); // genesis id at a later height
+  assert.strictEqual(A.cleanBlock({ ...raw, id: "135568-ab123" }), null); // unpadded segment
+  assert.strictEqual(A.cleanBlock({ ...raw, id: "0000135568-AB123" }), null); // producer hex is lowercase
+  assert.strictEqual(A.cleanBlock({ ...raw, id: "b1" }), null); // free-form id
+  assert.strictEqual(A.cleanBlock({ ...raw, id: "0000135568-ab123-000001" }), null); // transfer form, not block form
+  assert.strictEqual(A.cleanBlock({ ...raw, id: 135568 }), null); // non-string id
+});
 t("round2 blockMatchesKey", function(){
   var b = { height: 135568, hash: "0x" + "AB".repeat(32) };
   assert.ok(A.blockMatchesKey(b, "135568"));

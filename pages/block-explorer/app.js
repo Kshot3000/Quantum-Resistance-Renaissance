@@ -311,6 +311,23 @@ function cleanBlock(raw){
   var base = cleanBlockRow(raw);
   if (!base) return null;
   if (!Array.isArray(raw.extrinsics) || !Array.isArray(raw.events)) return null;
+  /* Round 4 (the block row's own producer identity): qBlock selects the
+   * block's indexer id, and that id is the same producer form the
+   * extrinsic's block_id carries — <10-digit zero-padded height>-<5
+   * lowercase hex> — with the segment restating THIS block's height
+   * (verified live 2026-10-15: 0000227858-c315a at height 227,858, and
+   * genesis 0000000001-cb81a at height 1). Rounds 1-3 held transfer ids
+   * and extrinsic block_ids to that grammar but never looked at the
+   * block's own id, so a block answer whose identity named a different
+   * block — or no producer form at all — painted as the requested
+   * block. When the field is present it must match (the cleanExtrinsic
+   * block_id rule); absent keeps the old path, as the home query's
+   * block rows carry no id. */
+  if (raw.id !== null && raw.id !== undefined){
+    var bidm = (typeof raw.id === "string") ? BLOCK_ID_RE.exec(raw.id) : null;
+    if (!bidm || Number(bidm[1]) !== base.height) return null;
+    base.id = raw.id;
+  }
   /* Relations inside the block: extrinsic indices are the block's
    * ordering (the query asks index-ascending) — a duplicate or
    * descending index is a second, conflicting claim about the same
