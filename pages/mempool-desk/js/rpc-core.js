@@ -163,6 +163,19 @@ function sanitizeWatchers(raw, decodeFn) {
   return out;
 }
 
+/* Room left under the watcher cap, for CREATION paths: sanitizeWatchers
+ * caps the list at load, but addWatcher is the path that actually creates
+ * watchers in-session (and each one opens a live txWatch subscription) —
+ * a cap that lives only in the load sanitizer let the form grow the list
+ * past 50 in-session, with the excess silently trimmed on the next load
+ * after the UI had claimed it was added and subscribed. Creation paths
+ * ask here first; non-finite counts get no room. */
+function watcherRoom(currentCount) {
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) return 0;
+  return Math.max(0, MAX_WATCHERS - n);
+}
+
 /* ---------- txWatch notifications ---------- */
 
 var HEX_RE = /^0x[0-9a-fA-F]+$/;
@@ -384,7 +397,7 @@ var api = {
   normalizeEndpoint: normalizeEndpoint,
   checkAddress: checkAddress,
   sanitizeWatchers: sanitizeWatchers,
-  MAX_WATCHERS: MAX_WATCHERS,
+  MAX_WATCHERS: MAX_WATCHERS, watcherRoom: watcherRoom,
   parseBlockNumber: parseBlockNumber,
   isHash32: isHash32,
   validSubscriptionId: validSubscriptionId,

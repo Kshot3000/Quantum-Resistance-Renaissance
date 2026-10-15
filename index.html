@@ -701,7 +701,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Mempool Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Read the pool before the block does: connect to any node and watch live pending-extrinsic gauges, get txWatch zero-confirmation signals the second a transfer requests your address, and estimate node-quoted fees on what's actually waiting. No node, no data — nothing simulated, 100% client-side.</p>
-        <div class="meta">11/11 logic tests green · live pool gauge + txWatch signals + fee desk · browser QA green</div>
+        <div class="meta">18/18 logic tests green · live pool gauge + txWatch signals + fee desk · watcher creation gated at the same 50 cap the load sanitizer enforces — the 51st add is refused with a cap-named message instead of opening a subscription that silently vanishes on reload · browser QA green (watch-cap suite 7/7)</div>
       </a>
       <a class="app-card wallet" href="pages/web-wallet/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+448,440% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+445,139% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">

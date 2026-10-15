@@ -750,6 +750,15 @@ function addWatcher() {
     msg.className = "form-msg err";
     return;
   }
+  // The load sanitizer caps the list at MAX_WATCHERS, but this form is the
+  // creation path — without this gate it grew the list past the cap
+  // in-session (each watcher a live node subscription) and the excess was
+  // silently trimmed on the next load after "Added" had been claimed.
+  if (C.watcherRoom(state.watchers.length) <= 0) {
+    msg.textContent = "The watch list is full — the cap is " + C.MAX_WATCHERS + " addresses (each watcher is a live node subscription). Remove one before adding another.";
+    msg.className = "form-msg err";
+    return;
+  }
   state.watchers.push({ address: addr, label: labelEl.value.trim().slice(0, 40), status: "waiting", subId: null, note: "" });
   saveWatchers();
   addrEl.value = "";

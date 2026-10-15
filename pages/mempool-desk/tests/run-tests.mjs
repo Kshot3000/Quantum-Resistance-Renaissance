@@ -112,6 +112,18 @@ test("sanitizeWatchers caps label and list, tolerates non-arrays", () => {
   assert.deepEqual(C.sanitizeWatchers([{ address: good, label: "x" }], null), []);
 });
 
+test("watcherRoom gates watcher creation at the load cap", () => {
+  // sanitizeWatchers caps at load; addWatcher (the creation path, each
+  // watcher a live subscription) must stop at the same cap in-session.
+  assert.equal(C.watcherRoom(0), C.MAX_WATCHERS);
+  assert.equal(C.watcherRoom(49), 1);
+  assert.equal(C.watcherRoom(50), 0);
+  assert.equal(C.watcherRoom(5000), 0);
+  assert.equal(C.watcherRoom(NaN), 0);
+  assert.equal(C.watcherRoom("x"), 0);
+  assert.equal(C.watcherRoom(-3), 0);
+});
+
 test("parseTxWatchNotification validates upstream shape", () => {
   const raw = {
     tx_hash: "0x9a3cb7f1" + "ab".repeat(28),
