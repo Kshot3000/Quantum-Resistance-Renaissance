@@ -2185,7 +2185,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(app.includes('data-id="\' + esc(c.id)'), "contactvault: contact id escaped in the card attribute");
   const html = read("pages/contact-vault/index.html");
   ok(html.includes("js/vault-logic.js?v=1.28.0"), "contactvault: vault-logic cache key bumped for the boundary fix (1.28.0)");
-  ok(html.includes("js/app.js?v=1.28.0"), "contactvault: app.js cache key bumped for the boundary fix (1.28.0)");
+  ok(html.includes("js/app.js?v=1.29.0"), "contactvault: app.js cache key bumped for the boundary fix (1.29.0)");
   ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.82"), "contactvault: miningcalc sync patch-bump pin");
   ok(read("pages/pool-desk/index.html").includes("app.js?v=1.48.82"), "contactvault: pooldesk sync patch-bump pin");
   ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.82"), "contactvault: energy sync patch-bump pin");
@@ -4015,11 +4015,32 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
   ok(read("pages/contact-vault/js/app.js").includes("vault.length >= LOGIC.MAX_CONTACTS"), "importcap: app importer refuses to derive past a full vault");
   ok(read("pages/contact-vault/js/app.js").includes("not imported — vault cap of "), "importcap: import summary reports the capped count");
   ok(read("pages/contact-vault/index.html").includes("js/vault-logic.js?v=1.28.0"), "importcap: vault-logic cache key bumped (1.28.0)");
-  ok(read("pages/contact-vault/index.html").includes("js/app.js?v=1.28.0"), "importcap: contact-vault app.js cache key bumped (1.28.0)");
+  ok(read("pages/contact-vault/index.html").includes("js/app.js?v=1.29.0"), "importcap: contact-vault app.js cache key bumped (1.29.0)");
   ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.82"), "importcap: miningcalc sync patch-bump pin (.82)");
   ok(read("pages/pool-desk/index.html").includes("js/app.js?v=1.48.82"), "importcap: pool-desk sync patch-bump pin (.82)");
   ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.82"), "importcap: energy sync patch-bump pin (.82)");
   ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.82"), "importcap: lucklab sync patch-bump pin (.82)");
+}
+
+// Batch 127 (2026-10-15 11:19, follow-up): Contact Vault checkphrase-fill
+// serialization — renderVaultList launched one 40k-iteration PBKDF2
+// derivation per missing-phrase contact ALL AT ONCE (and again per
+// re-render; derivePhrase caches only on completion). The import-cap
+// browser QA exposed it: a vault seeded with 499 phrase-less contacts left
+// an import derivation unfinished after 97s (~500 interleaved chunk loops;
+// a single derivation alone takes ~1.6s). The lazy fill now goes through
+// queuePhraseFill — one at a time, deduped by contact id, like the boot
+// backfill — so at most the backfill's + the filler's derivations run
+// concurrently.
+{
+  ok(read("pages/contact-vault/js/app.js").includes("function queuePhraseFill(c)"), "fillqueue: serialized fill entry present");
+  ok(read("pages/contact-vault/js/app.js").includes("list.forEach(function (c) { if (!c.checkphrase) queuePhraseFill(c); });"), "fillqueue: renderVaultList routes the lazy fill through the queue");
+  ok(read("pages/contact-vault/js/app.js").includes("phraseFillActive[c.id]"), "fillqueue: fill deduped by contact id");
+  ok(read("pages/contact-vault/index.html").includes("js/app.js?v=1.29.0"), "fillqueue: contact-vault app.js cache key bumped (1.29.0)");
+  ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.82"), "fillqueue: miningcalc sync patch-bump pin (.82)");
+  ok(read("pages/pool-desk/index.html").includes("js/app.js?v=1.48.82"), "fillqueue: pool-desk sync patch-bump pin (.82)");
+  ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.82"), "fillqueue: energy sync patch-bump pin (.82)");
+  ok(read("pages/luck-lab/index.html").includes("app.js?v=1.48.82"), "fillqueue: lucklab sync patch-bump pin (.82)");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

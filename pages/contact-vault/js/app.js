@@ -120,6 +120,38 @@ function derivePhrase(addr, onProgress) {
     .then(function (words) { phraseCache.set(addr, words); return words; });
 }
 
+/* ---------- serialized checkphrase fill ----------
+ * One derivation at a time, deduped by contact id: the boot backfill below
+ * already walks the vault one-at-a-time, and the renderer's lazy fill now
+ * does the same instead of launching the whole vault's derivations at once. */
+var phraseFillQueue = [], phraseFillActive = {};
+function queuePhraseFill(c) {
+  if (!c || c.checkphrase || phraseFillActive[c.id]) return;
+  phraseFillActive[c.id] = true;
+  phraseFillQueue.push(c);
+  pumpPhraseFill();
+}
+function pumpPhraseFill() {
+  if (pumpPhraseFill.running) return;
+  var c = phraseFillQueue.shift();
+  if (!c) return;
+  if (c.checkphrase || vault.indexOf(c) === -1) {
+    delete phraseFillActive[c.id];
+    pumpPhraseFill();
+    return;
+  }
+  pumpPhraseFill.running = true;
+  derivePhrase(c.address).then(function (words) {
+    c.checkphrase = words; saveVault();
+    var card = document.querySelector('.contact[data-id="' + c.id + '"] .chips');
+    if (card) card.outerHTML = chipsHTML(words);
+  }).catch(function () { /* keep spinner */ }).then(function () {
+    delete phraseFillActive[c.id];
+    pumpPhraseFill.running = false;
+    pumpPhraseFill();
+  });
+}
+
 /* ---------- vault store ---------- */
 function loadVault() {
   try {
@@ -179,16 +211,13 @@ function renderVaultList() {
       "</div></div>";
   }).join("");
   $("vaultList").innerHTML = html;
-  // lazy checkphrase fill for contacts missing one
-  list.forEach(function (c) {
-    if (!c.checkphrase) {
-      derivePhrase(c.address).then(function (words) {
-        c.checkphrase = words; saveVault();
-        var card = document.querySelector('.contact[data-id="' + c.id + '"] .chips');
-        if (card) card.outerHTML = chipsHTML(words);
-      }).catch(function () { /* keep spinner */ });
-    }
-  });
+  // lazy checkphrase fill for contacts missing one — SERIALIZED through
+  // queuePhraseFill: this used to launch one 40k-iteration PBKDF2 derivation
+  // per missing-phrase contact ALL AT ONCE (and again on every re-render,
+  // since derivePhrase caches only on completion). A large phrase-less
+  // vault — e.g. a restored backup — meant ~500 interleaved chunk loops
+  // starving each other (and any import derivation) for tens of minutes.
+  list.forEach(function (c) { if (!c.checkphrase) queuePhraseFill(c); });
   refreshContactSelects();
 }
 function refreshContactSelects() {
