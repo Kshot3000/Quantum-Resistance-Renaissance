@@ -642,13 +642,24 @@ function sanitizeBoard(raw){
   return out;
 }
 
+/* Creation-path gate for the board cap: sanitizeBoard enforces
+ * MAX_BOARD_ENTRIES at load, but the add form is a second writer — it
+ * must ask how much room is left BEFORE pushing, or the push silently
+ * exceeds the cap and the load-time trim drops an entry. Fail-closed:
+ * a non-finite or negative count leaves no room. */
+function boardRoom(currentCount){
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) return 0;
+  return Math.max(0, MAX_BOARD_ENTRIES - n);
+}
+
 var MsigCore = {
   SS58_PREFIX: SS58_PREFIX, DECIMALS: DECIMALS,
   PALLET_INDEX: PALLET_INDEX, BALANCES_PALLET_INDEX: BALANCES_PALLET_INDEX,
   CALL_IDX: CALL_IDX, MAX_SIGNERS: MAX_SIGNERS, MAX_CALL_SIZE: MAX_CALL_SIZE,
   MAX_EXPIRY_DURATION: MAX_EXPIRY_DURATION, BLOCK_MS: BLOCK_MS,
   MAX_BOARD_ENTRIES: MAX_BOARD_ENTRIES, MAX_BOARD_BLOCK: MAX_BOARD_BLOCK,
-  BOARD_STATUSES: BOARD_STATUSES, sanitizeBoard: sanitizeBoard,
+  BOARD_STATUSES: BOARD_STATUSES, sanitizeBoard: sanitizeBoard, boardRoom: boardRoom,
   MULTISIG_FEE: MULTISIG_FEE, PROPOSAL_DEPOSIT: PROPOSAL_DEPOSIT,
   PROPOSAL_FEE: PROPOSAL_FEE, SIGNER_STEP_PERMILL: SIGNER_STEP_PERMILL,
   blake2b: blake2b, ss58Encode: ss58Encode, ss58Decode: ss58Decode,

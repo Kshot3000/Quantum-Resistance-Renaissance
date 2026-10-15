@@ -291,6 +291,17 @@ eq(C.feeBpsLabel(100), "1%", "label 100");
   eq(S([{ ...good, status: "executed" }])[0].status, "executed", "board: known status kept");
   const many = Array.from({ length: 600 }, (_, i) => ({ ...good, id: i }));
   eq(S(many).length, C.MAX_BOARD_ENTRIES, "board: capped at MAX_BOARD_ENTRIES");
+  /* boardRoom: the creation-path gate the add form asks before pushing —
+   * sanitize alone dropped an appended 501st entry (the NEW proposal) in
+   * the same paint that toasted "Proposal logged". */
+  eq(typeof C.boardRoom, "function", "board: boardRoom exported from core");
+  eq(C.boardRoom(0), 500, "board: boardRoom(0) = full cap");
+  eq(C.boardRoom(499), 1, "board: boardRoom(499) = 1");
+  eq(C.boardRoom(500), 0, "board: boardRoom(500) = 0 (at cap)");
+  eq(C.boardRoom(5000), 0, "board: boardRoom never negative");
+  eq(C.boardRoom(NaN), 0, "board: boardRoom(non-finite) = 0 (fail-closed)");
+  eq(C.boardRoom(-3), 0, "board: boardRoom(negative) = 0 (fail-closed)");
+  eq(C.boardRoom(499.9), 1, "board: boardRoom floors fractional counts");
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

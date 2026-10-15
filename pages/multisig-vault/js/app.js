@@ -330,6 +330,16 @@ $("bp-save").addEventListener("click", function(){
   var expiry = Number($("bp-expiry").value);
   if (!(expiry >= 1)){ err.textContent = "Expiry block required."; return; }
   var items = loadBoard();
+  /* Creation-path cap (white-hat track): sanitizeBoard caps the board at
+   * MAX_BOARD_ENTRIES at load, first-wins — but this handler APPENDS, so
+   * at a full board the push made 501, saveBoard persisted 501, and
+   * renderBoard's loadBoard kept the first 500: the NEW proposal vanished
+   * in the same paint under a "Proposal logged" toast. Refuse at the cap
+   * and name it instead; the form stays open with the entry intact. */
+  if (C.boardRoom(items.length) <= 0) {
+    err.textContent = "Board is full — the cap is " + C.MAX_BOARD_ENTRIES + " proposals. Remove one before logging another.";
+    return;
+  }
   items.push({
     vault: v, id: Number($("bp-id").value) || 0, callHex: callHex,
     expiry: expiry, threshold: Math.max(1, Number($("bp-thr").value) || 1),
