@@ -158,11 +158,35 @@ export function buildNodeCommand(o = {}) {
       "--node-addr", `127.0.0.1:${mp}`,
       "--auth-token-file", shq((m.authTokenFile || "<base-path>/chains/mainnet/miner-auth-token").trim()),
       "--tls-cert-sha256-file", shq((m.tlsCertFile || "<base-path>/chains/mainnet/miner-tls-cert-sha256").trim())];
-    if (m.cpuWorkers) mc.push("--cpu-workers", String(Math.max(1, Math.floor(m.cpuWorkers))));
-    if (m.gpuDevices) mc.push("--gpu-devices", String(Math.max(1, Math.floor(m.gpuDevices))));
+    /* Round 2 — every value interpolated into a command the operator is
+     * told to copy and RUN must be validated or shell-quoted, no
+     * exceptions. The counts and the metrics port were the exceptions:
+     * cpuWorkers/gpuDevices went through Math.floor, so prose painted
+     * "--cpu-workers NaN" into a runnable command and a negative count
+     * silently became 1; metricsPort was String()-interpolated RAW —
+     * "9900; curl …|sh", "9900 --cuda-gpu" or "$(id)" landed verbatim
+     * after --metrics-port (shell injection / flag smuggling), while
+     * every other port in this builder (miner listen, Prometheus) is
+     * held to validatePortNumber. Counts are positive integers or an
+     * error; the metrics port gets the same port validation as the
+     * rest. An invalid miner option blocks BOTH commands (errors),
+     * exactly like a bad Prometheus port. */
+    const posCount = (v, label) => {
+      if (v === undefined || v === null || v === "") return null;
+      const n = Number(v);
+      if (!Number.isSafeInteger(n) || n < 1) { errors.push(`${label}: must be a positive integer`); return null; }
+      return n;
+    };
+    const cw = posCount(m.cpuWorkers, "CPU workers");
+    if (cw !== null) mc.push("--cpu-workers", String(cw));
+    const gd = posCount(m.gpuDevices, "GPU devices");
+    if (gd !== null) mc.push("--gpu-devices", String(gd));
     if (m.cuda) mc.push("--cuda-gpu");
-    if (m.metricsPort) mc.push("--metrics-port", String(m.metricsPort));
-    minerCmd = mc.join(" ");
+    if (m.metricsPort !== undefined && m.metricsPort !== null && m.metricsPort !== "") {
+      const xp = validatePortNumber(m.metricsPort, "Miner metrics port");
+      if (!xp.ok) errors.push(xp.error); else mc.push("--metrics-port", String(xp.value));
+    }
+    minerCmd = errors.length === 0 ? mc.join(" ") : null;
   }
 
   return { cmd: errors.length ? null : parts.join(" "), minerCmd, warnings, errors };
@@ -280,10 +304,36 @@ export function analyzeLog(text) {
 }
 
 /* ---------- sync progress ---------- */
+/* The fleet ceiling for a height that could name a block on this chain
+ * (the chain is at ~227k; Chain Console's validChainHeight uses the
+ * same 10,000,000 bound). */
+export const MAX_CHAIN_HEIGHT = 10000000;
+
+/* A height argument is a non-negative safe integer, as a JSON integer
+ * or a pure-digit string (the form fields hand over strings). Number()
+ * coercion is NOT a height grammar: it accepts fractions ("142000.5"
+ * painted a fractional percent and a floored behind), scientific
+ * spellings and absurd magnitudes as chain fact. */
+function heightArg(v) {
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 && v <= MAX_CHAIN_HEIGHT ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v.trim())) {
+    const n = Number(v.trim());
+    return Number.isSafeInteger(n) && n <= MAX_CHAIN_HEIGHT ? n : null;
+  }
+  return null;
+}
+
+/* syncProgress is a relation, not two independent numbers: a local head
+ * ABOVE the network head it is measured against cannot be "caught up"
+ * — one of the two figures is wrong (a mistyped local height, a stale
+ * network figure), and painting "synced ✓" from it tells an operator
+ * the freshness gate story backwards. Round 2: local <= network or
+ * the pair is no measurement at all (null — the monitor falls back to
+ * its honest prompt). */
 export function syncProgress(localHeight, networkHeight) {
-  const l = Number(localHeight), n = Number(networkHeight);
-  if (!Number.isFinite(l) || !Number.isFinite(n) || l < 0 || n <= 0) return null;
-  const behind = Math.max(0, Math.floor(n - l));
+  const l = heightArg(localHeight), n = heightArg(networkHeight);
+  if (l === null || n === null || n <= 0 || l > n) return null;
+  const behind = n - l;
   const pct = Math.min(100, (l / n) * 100);
   const etaMin = behind > 0 ? Math.ceil((behind * 12) / 60) : 0; // 12 s target block time
   return { behind, pct, etaMin, synced: behind === 0 };
@@ -301,16 +351,19 @@ export function syncProgress(localHeight, networkHeight) {
  * genesis floor 2026-09-01, now+1h ceiling): a pre-genesis stamp is not
  * a capture of this chain, and a far-future stamp used to clamp to
  * "0m old" — a poisoned snapshot masquerading as brand new. A stamp
- * within the 1h clock-skew ceiling still clamps to 0m. Returns
- * { head, ageMin } or null. */
+ * within the 1h clock-skew ceiling still clamps to 0m. Round 2: the
+ * head is also held to the fleet ceiling (MAX_CHAIN_HEIGHT) — a
+ * poisoned head of 999,999,999,999 is a safe integer and passed the
+ * round-1 shape checks, painting an absurd network head into the hero
+ * and the sync monitor. Returns { head, ageMin } or null. */
 const GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
 export function parseSnapshot(S, nowMs) {
   if (!S || typeof S !== "object") return null;
   let head = null;
-  if (typeof S.head === "number" && Number.isInteger(S.head) && S.head > 0) head = S.head;
+  if (typeof S.head === "number" && Number.isInteger(S.head) && S.head > 0 && S.head <= MAX_CHAIN_HEIGHT) head = S.head;
   else if (typeof S.head === "string" && /^\d+$/.test(S.head.trim())) {
     const n = Number(S.head.trim());
-    if (Number.isSafeInteger(n) && n > 0) head = n;
+    if (Number.isSafeInteger(n) && n > 0 && n <= MAX_CHAIN_HEIGHT) head = n;
   }
   if (head === null) return null;
   const t = Date.parse(S.fetched_at);

