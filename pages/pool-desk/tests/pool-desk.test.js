@@ -114,6 +114,21 @@ t("quanpool warns to re-copy", r.warn.some((w) => /re-copy/i.test(w)));
 t("unknown pool fails", !P.buildCommand("nosuch", "official", "qzA", "").ok);
 t("unknown miner fails", !P.buildCommand("ariapool", "nosuch", "qzA", "").ok);
 
+// --- command builder gate: the validators are enforced, not just shown.
+// The address/worker are interpolated raw into copy-paste shell code, so a
+// hard-invalid value must build NO command in any branch; the soft length
+// warning stays a warning (pure-Base58 values are shell-safe).
+t("builder rejects semicolon address", !P.buildCommand("ariapool", "official", "qzX;touch /tmp/x;#", "rig1").ok);
+t("builder rejects substitution address", !P.buildCommand("ariapool", "ariaminer", "qzX$(touch /tmp/x)", "rig1").ok);
+t("builder rejects backtick address (quanpool)", !P.buildCommand("quanpool", "quanpoolminer", "qzX`id`", "w1").ok);
+t("builder rejects empty address", !P.buildCommand("ariapool", "official", "", "rig1").ok);
+t("builder rejection carries no command", P.buildCommand("ariapool", "official", "qzX|sh", "rig1").cmd === undefined);
+t("builder rejects semicolon worker", !P.buildCommand("ariapool", "official", "qzTESTADDRESS", "rig1;id").ok);
+t("builder rejects flag-smuggle worker", !P.buildCommand("ariapool", "ariaminer", "qzTESTADDRESS", "--gpu-devices").ok);
+t("builder still builds soft-length address", P.buildCommand("ariapool", "official", "qzTESTADDRESS", "rig1").ok);
+t("worker may start with a digit", P.validateWorker("1rig").ok);
+t("worker may not start with a dash", !P.validateWorker("-rig").ok);
+
 // --- data integrity: every published fact well-formed
 t("two pools listed", P.POOLS.length === 2);
 P.POOLS.forEach((p) => {

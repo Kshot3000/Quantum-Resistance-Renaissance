@@ -20,14 +20,14 @@ const NETWORK_DEFAULTS = {
   // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
   // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
   // and dated for the no-fetch path (file://, offline). All four figures come from
-  // ONE capture (2026-10-15 07:22Z): consensus difficulty @228,119 and total
-  // issuance @228,119, 1 seconds apart — never mix snapshot dates in one bundle
+  // ONE capture (2026-10-15 08:24Z): consensus difficulty @228,383 and total
+  // issuance @228,384, 16 seconds apart — never mix snapshot dates in one bundle
   // (the Sept-30 bundle survived to Oct 2 at half the real hashrate and skewed
   // every fallback-path earnings figure ~2x; guarded in tests).
-  blockRewardQTC: 0.3036074, // emission formula: (21M − 5,819,627.6934 total issuance) / 50M, data/supply.json @228119, 2026-10-15
-  blockRewardLabel: "0.3036 QTC · emission formula @ height 228119, 2026-10-15",
-  netHashHS: 36858444128444, // difficulty 442301329541328 / 12s, data/consensus.json @228119, 2026-10-15
-  netHashLabel: "≈36.86 TH/s · from difficulty 442301329541328 @ height 228119, 2026-10-15",
+  blockRewardQTC: 0.3036037, // emission formula: (21M − 5,819,813.1522 total issuance) / 50M, data/supply.json @228384, 2026-10-15
+  blockRewardLabel: "0.3036 QTC · emission formula @ height 228384, 2026-10-15",
+  netHashHS: 37091228014687, // difficulty 445094736176253 / 12s, data/consensus.json @228383, 2026-10-15
+  netHashLabel: "≈37.09 TH/s · from difficulty 445094736176253 @ height 228383, 2026-10-15",
 };
 
 const SOURCES = [
@@ -430,7 +430,7 @@ function validateAddress(addr) {
 function validateWorker(w) {
   const s = String(w || "").trim();
   if (!s) return { ok: true, msg: "Worker is optional — omit it or append .name to your address." };
-  if (!/^[a-z0-9.\-_]{1,32}$/.test(s)) return { ok: false, msg: "Worker: a-z 0-9 . - _ only, max 32 chars (Quanpool's rule — safe everywhere)." };
+  if (!/^[a-z0-9][a-z0-9.\-_]{0,31}$/.test(s)) return { ok: false, msg: "Worker: starts with a-z or 0-9, then a-z 0-9 . - _ only, max 32 chars (Quanpool's rule — safe everywhere)." };
   return { ok: true, msg: "Worker name OK." };
 }
 
@@ -447,6 +447,18 @@ function buildCommand(poolId, minerId, address, worker) {
   const miner = pool.miners.find((m) => m.id === minerId);
   if (!miner) return { ok: false, msg: "Unknown miner for this pool." };
   const addr = String(address || "").trim();
+  /* The command built below is copy-paste code — the address and worker
+   * are interpolated RAW into it, so the builder itself enforces the
+   * validators the page only used to display as warnings: a hard-invalid
+   * address (empty, non-qz, or carrying characters outside Base58 — the
+   * ';', '$()', backtick, pipe and space forms that break out of a shell
+   * line or smuggle a flag) or an invalid worker builds NO command at
+   * all. The soft length warning stays a warning: a short qz… address is
+   * shell-safe (pure Base58) and still builds, exactly as before. */
+  const va = validateAddress(addr);
+  if (!va.ok && !va.soft) return { ok: false, msg: va.msg };
+  const vw = validateWorker(worker);
+  if (!vw.ok) return { ok: false, msg: vw.msg };
   const token = authToken(addr, worker);
   const warn = [];
 
