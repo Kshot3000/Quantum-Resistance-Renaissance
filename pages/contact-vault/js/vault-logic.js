@@ -175,7 +175,17 @@ function parseImportPayload(obj) {
   if (!Array.isArray(obj.contacts))
     return { ok: false, contacts: [], errors: ["Backup has no contacts array."] };
   var contacts = [];
+  var excess = 0;
   obj.contacts.forEach(function (c, i) {
+    // CAP (white-hat, 2026-10-15): the vault's producer cap is MAX_CONTACTS
+    // (sanitizeVault enforces it on load, and an export can only ever hold
+    // a vault's contacts) — but this gate kept EVERY valid row, and the app
+    // then runs a 40,000-iteration PBKDF2 checkphrase derivation PER kept
+    // contact (~2.2s each in Node): a pasted 5,000-contact "backup" meant
+    // ~3 hours of derivations and a vault far beyond its own cap, silently
+    // trimmed back to the FIRST 500 on the next load. Once the cap is met,
+    // stop validating (bounded work) and report the excess ONCE.
+    if (contacts.length >= MAX_CONTACTS) { if (!excess) excess = obj.contacts.length - i; return; }
     if (!c || typeof c.address !== "string" || typeof c.label !== "string") {
       errors.push("Row " + (i + 1) + ": missing label/address — skipped.");
       return;
@@ -187,6 +197,10 @@ function parseImportPayload(obj) {
                     checkphrase: cleanCheckphrase(c.checkphrase),
                     addedAt: cleanAddedAt(c.addedAt) });
   });
+  if (excess > 0)
+    errors.push("Backup has " + excess + " more row" + (excess === 1 ? "" : "s") +
+      " beyond the vault cap of " + MAX_CONTACTS + " contacts — only the first " +
+      MAX_CONTACTS + " valid contacts were imported.");
   return { ok: true, contacts: contacts, errors: errors };
 }
 

@@ -644,12 +644,13 @@ $("iRun").addEventListener("click", function () {
 });
 function importContacts(contacts, warnings, msg) {
   msg.innerHTML = '<span class="spinner"></span>Re-validating ' + contacts.length + " checkphrases…";
-  var added = 0, skipped = 0, rejected = 0, i = 0;
+  var added = 0, skipped = 0, rejected = 0, capped = 0, i = 0;
   (function next() {
     if (i >= contacts.length) {
       saveVault(); renderVaultList();
       var parts = ["Import complete: <strong>" + added + "</strong> added",
         skipped + " duplicates skipped", rejected + " rejected"];
+      if (capped) parts.push(capped + " not imported — vault cap of " + LOGIC.MAX_CONTACTS + " contacts reached");
       if (warnings.length) parts.push(warnings.length + " row warnings");
       msg.className = "msg " + (rejected ? "err" : "ok");
       msg.innerHTML = parts.join(" · ") +
@@ -659,6 +660,17 @@ function importContacts(contacts, warnings, msg) {
     }
     var c = contacts[i++];
     if (findByAddress(c.address)) { skipped++; next(); return; }
+    // Vault cap: never derive a checkphrase (40k PBKDF2 iterations) for a
+    // contact the vault cannot hold — sanitizeVault would silently trim
+    // the overflow on the next load. Count the rest and finish.
+    if (vault.length >= LOGIC.MAX_CONTACTS) {
+      capped++;
+      while (i < contacts.length) {
+        var rest = contacts[i++];
+        if (findByAddress(rest.address)) skipped++; else capped++;
+      }
+      next(); return;
+    }
     if (c.checkphrase) {
       derivePhrase(c.address).then(function (words) {
         if (JSON.stringify(words) === JSON.stringify(c.checkphrase)) {

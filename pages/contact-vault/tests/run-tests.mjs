@@ -140,6 +140,22 @@ ok("deterministic", JSON.stringify(CHECK.addressToChecksum(KYLE, WORDS)) === JSO
     contacts: [{ label: "Good", address: KYLE }, { label: "Bad", address: "not-an-address" }, { label: "NoAddr" }] });
   ok("bad rows skipped with errors", withBad.ok && withBad.contacts.length === 1 && withBad.errors.length === 2,
     JSON.stringify(withBad.errors));
+  // Import cap: a backup can only ever hold a vault's contacts (<= MAX_CONTACTS),
+  // and the app derives a 40k-iteration PBKDF2 checkphrase per imported contact —
+  // an oversized pasted backup must be capped here, with one truncation notice.
+  const genAddr = (i) => SS58.ss58Encode(Array.from({ length: 32 }, (_, j) => (j < 4 ? (i >> (8 * j)) & 255 : j)), 189);
+  const mkBackup = (n) => ({ app: "qtc-contact-vault", version: 1,
+    contacts: Array.from({ length: n }, (_, i) => ({ label: "C" + i, address: genAddr(i + 1) })) });
+  const cappedImp = LOGIC.parseImportPayload(mkBackup(LOGIC.MAX_CONTACTS + 100));
+  ok("import caps contacts at MAX_CONTACTS with one truncation notice",
+    cappedImp.ok && cappedImp.contacts.length === LOGIC.MAX_CONTACTS &&
+    cappedImp.contacts[LOGIC.MAX_CONTACTS - 1].label === "C" + (LOGIC.MAX_CONTACTS - 1) &&
+    cappedImp.errors.length === 1 && /only the first/.test(cappedImp.errors[0]),
+    JSON.stringify(cappedImp.errors).slice(0, 160) + " kept=" + cappedImp.contacts.length);
+  const exactImp = LOGIC.parseImportPayload(mkBackup(LOGIC.MAX_CONTACTS));
+  ok("import at exactly MAX_CONTACTS carries no truncation notice",
+    exactImp.contacts.length === LOGIC.MAX_CONTACTS && exactImp.errors.length === 0,
+    JSON.stringify(exactImp.errors));
 }
 
 /* 6. encrypted backup (WebCrypto) */
