@@ -265,5 +265,21 @@ for (const [n, t, len] of combos) {
     LOGIC.holdingRoom(NaN) === 0 && LOGIC.holdingRoom(undefined) === 0 && LOGIC.holdingRoom(-3) === 0);
 }
 
+{
+  // plan-file gate: sanitizePlan caps everything an import can keep at
+  // ~0.70M chars, so the file gate derived from it (8 MiB, ~2x the
+  // worst-case serialization) must hold exactly, fail-closed.
+  ok("plan file cap is 8 MiB", LOGIC.MAX_PLAN_FILE_BYTES === 8 * 1024 * 1024);
+  ok("planFileRoom arithmetic",
+    LOGIC.planFileRoom(0) === true && LOGIC.planFileRoom(709961) === true &&
+    LOGIC.planFileRoom(LOGIC.MAX_PLAN_FILE_BYTES) === true &&
+    LOGIC.planFileRoom(LOGIC.MAX_PLAN_FILE_BYTES + 1) === false &&
+    LOGIC.planFileRoom(20 * 1024 * 1024) === false);
+  ok("planFileRoom fails closed",
+    LOGIC.planFileRoom(NaN) === false && LOGIC.planFileRoom(-1) === false &&
+    LOGIC.planFileRoom("100") === false && LOGIC.planFileRoom(undefined) === false &&
+    LOGIC.planFileRoom(Infinity) === false);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log("FAILURES:\n" + failures.join("\n")); process.exit(1); }

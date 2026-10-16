@@ -74,6 +74,23 @@
   function beneficiaryRoom(currentCount) { return room(MAX_BENEFICIARIES, currentCount); }
   function holdingRoom(currentCount) { return room(MAX_HOLDINGS, currentCount); }
 
+  // Plan-file import gate: the import handler used to readAsText and
+  // JSON.parse the WHOLE picked file before sanitizePlan was consulted
+  // — yet the sanitizer caps everything it keeps: 100 beneficiaries x
+  // 3,532 chars + 100 holdings x 3,000 chars + deadmanText/extra at
+  // 20,000 each + owner 500 = ~0.70M chars (~710 KB as the app's own
+  // export serializes it, under ~4.3 MB even at JSON's worst
+  // 6-bytes-per-char escaping). Any larger pick was guaranteed to be
+  // sanitized down to that bound, but only after its full text and
+  // parse tree were allocated. File.size is known before a byte is
+  // read, so the import asks this gate first and refuses over-cap
+  // picks unread. Fail-closed: a size that is not a finite
+  // non-negative number earns no room (a sizeless file refuses too).
+  const MAX_PLAN_FILE_BYTES = 8 * 1024 * 1024;
+  function planFileRoom(size) {
+    return typeof size === "number" && Number.isFinite(size) && size >= 0 && size <= MAX_PLAN_FILE_BYTES;
+  }
+
   function sanitizePlan(raw) {
     const p = isEntry(raw) ? raw : {};
     const beneficiaries = (Array.isArray(p.beneficiaries) ? p.beneficiaries : [])
@@ -264,5 +281,5 @@ then move the rest.</div>
 </body></html>`;
   }
 
-  return { esc, sanitizePlan, validateBeneficiaries, validateHoldings, CHECKLIST, readinessScore, buildLetter, MAX_BENEFICIARIES, MAX_HOLDINGS, beneficiaryRoom, holdingRoom };
+  return { esc, sanitizePlan, validateBeneficiaries, validateHoldings, CHECKLIST, readinessScore, buildLetter, MAX_BENEFICIARIES, MAX_HOLDINGS, beneficiaryRoom, holdingRoom, MAX_PLAN_FILE_BYTES, planFileRoom };
 });

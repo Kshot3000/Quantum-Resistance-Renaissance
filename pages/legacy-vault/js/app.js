@@ -323,6 +323,16 @@
   $("plan-import").addEventListener("change", (e) => {
     const f = e.target.files[0];
     if (!f) return;
+    // Plan-file size gate: File.size is known before a byte is read, and
+    // sanitizePlan caps every field it keeps (~0.70M chars), so an
+    // over-cap pick can never import as more than that bound — refuse
+    // it unread instead of allocating its full text + parse tree first.
+    if (!LOGIC.planFileRoom(f.size)) {
+      alert("That file is " + f.size + " bytes — a Legacy Vault plan file is at most " +
+        LOGIC.MAX_PLAN_FILE_BYTES + " bytes (8 MiB); the file was not read and your current plan is unchanged.");
+      e.target.value = "";
+      return;
+    }
     const r = new FileReader();
     r.onload = () => {
       try {
