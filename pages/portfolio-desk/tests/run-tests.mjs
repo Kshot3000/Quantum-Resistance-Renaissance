@@ -231,6 +231,51 @@ test("parseVaultJson drops poison entries and duplicates instead of throwing or 
   assert.throws(() => P.parseVaultJson('{"addresses":{}}'), /not a Portfolio Desk vault/);
 });
 
+test("vaultFileRoom: the file gate holds at the cap and fails closed", () => {
+  // The sanitizer caps everything a vault file can keep (200 entries x
+  // 49-char address + 40-char nick + a timestamp), so the largest
+  // acceptable file is arithmetic — measured 34,469 bytes as exported,
+  // 74,469 at JSON's worst escaping; the gate is 128 KiB.
+  assert.equal(P.MAX_VAULT_FILE_BYTES, 128 * 1024);
+  assert.equal(P.vaultFileRoom(0), true);
+  assert.equal(P.vaultFileRoom(34469), true);
+  assert.equal(P.vaultFileRoom(74469), true);
+  assert.equal(P.vaultFileRoom(P.MAX_VAULT_FILE_BYTES), true);
+  assert.equal(P.vaultFileRoom(P.MAX_VAULT_FILE_BYTES + 1), false);
+  assert.equal(P.vaultFileRoom(20 * 1024 * 1024), false);
+  assert.equal(P.vaultFileRoom(NaN), false);
+  assert.equal(P.vaultFileRoom(-1), false);
+  assert.equal(P.vaultFileRoom("100"), false);
+  assert.equal(P.vaultFileRoom(undefined), false);
+  assert.equal(P.vaultFileRoom(null), false);
+  assert.equal(P.vaultFileRoom(Infinity), false);
+});
+
+test("vaultFileRoom: the largest sanitizer-acceptable vault fits under the cap", () => {
+  const cs = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const addr = (i) => {
+    let tail = "", m = i + 1;
+    while (m > 0) { tail = cs[m % 58] + tail; m = Math.floor(m / 58); }
+    return "qz" + ("1".repeat(47 - tail.length) + tail).slice(-47);
+  };
+  const rows = Array.from({ length: 200 }, (_, i) => ({ address: addr(i), nick: "\u0001".repeat(40), addedAt: PLAUSIBLE_TS }));
+  const clean = P.sanitizeVaultEntries(rows);
+  assert.equal(clean.length, 200);
+  const bytes = Buffer.byteLength(JSON.stringify({ version: 1, addresses: clean, createdAt: PLAUSIBLE_TS }, null, 2));
+  assert.ok(bytes < P.MAX_VAULT_FILE_BYTES, bytes + " < cap");
+  assert.equal(P.vaultFileRoom(bytes), true);
+});
+
+test("vaultFileRoom: a genuine vault padded to exactly the cap still parses", () => {
+  const base = JSON.stringify({ version: 1, addresses: [{ address: ADDR_A, nick: "Cold", addedAt: PLAUSIBLE_TS }], pad: "" });
+  const padded = JSON.stringify({ version: 1, addresses: [{ address: ADDR_A, nick: "Cold", addedAt: PLAUSIBLE_TS }], pad: "x".repeat(P.MAX_VAULT_FILE_BYTES - base.length) });
+  assert.equal(Buffer.byteLength(padded), P.MAX_VAULT_FILE_BYTES);
+  assert.equal(P.vaultFileRoom(Buffer.byteLength(padded)), true);
+  const parsed = P.parseVaultJson(padded);
+  assert.equal(parsed.addresses.length, 1);
+  assert.equal(parsed.addresses[0].address, ADDR_A);
+});
+
 test("vault sanitizer enforces producer relations (shape floor, validator gate, addedAt window)", () => {
   // Shape floor: strings no producer could write (the add form requires a
   // full SS58 decode) never survive, even though they are non-empty strings.

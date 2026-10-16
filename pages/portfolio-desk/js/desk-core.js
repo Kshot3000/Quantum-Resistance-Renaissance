@@ -510,6 +510,24 @@ function parseVaultJson(text, opts) {
   return { version: 1, addresses: sanitizeVaultEntries(v.addresses, opts) };
 }
 
+/* Vault-file size gate (white-hat round, 2026-10-16): the import path
+ * used to readAsText the WHOLE picked file and JSON.parse it before
+ * sanitizeVaultEntries was consulted — yet that sanitizer caps
+ * everything it keeps: at most MAX_ADDRESSES (200) entries, each an
+ * SS58-189 address (exactly 49 chars), a nick sliced to 40 chars and a
+ * numeric addedAt. The largest vault this desk can ever accept
+ * therefore serializes to 34,469 bytes as exportJson writes it, and
+ * 74,469 bytes even when every nick character needs JSON's worst
+ * 6-byte \uXXXX escaping (both measured) — so any larger file was
+ * guaranteed-sanitized-away only after its full text and parse tree
+ * were allocated. File.size is known before a byte is read: the
+ * importer asks this fail-closed gate first and refuses over-cap
+ * picks unread. 128 KiB is ~2x the worst-escaping maximum. */
+var MAX_VAULT_FILE_BYTES = 128 * 1024;
+function vaultFileRoom(size) {
+  return typeof size === "number" && isFinite(size) && size >= 0 && size <= MAX_VAULT_FILE_BYTES;
+}
+
 /* Spreadsheet formula injection (white-hat round, 2026-10-15): a CSV cell
  * whose parsed value begins — after leading spaces/tabs, which Excel /
  * Sheets skip — with =, +, - or @ (or begins with a tab/CR) is EVALUATED
@@ -564,6 +582,7 @@ var api = {
   blankVault: blankVault, normalizeAddress: normalizeAddress,
   addToVault: addToVault, removeFromVault: removeFromVault,
   parseVaultJson: parseVaultJson, csvExport: csvExport,
+  MAX_VAULT_FILE_BYTES: MAX_VAULT_FILE_BYTES, vaultFileRoom: vaultFileRoom,
   csvGuardText: csvGuardText, csvTextCell: csvTextCell,
 };
 

@@ -603,6 +603,17 @@ function exportJson() {
 }
 
 function importJson(file) {
+  // Size gate BEFORE reading a byte: File.size is known up front, and
+  // the sanitizer caps everything a vault file can keep (200 entries x
+  // 49-char address + 40-char nick + a timestamp — 74,469 bytes even at
+  // JSON's worst escaping), so an over-cap pick was guaranteed-reject
+  // only after its full text + parse tree were allocated. Refuse
+  // over-cap picks unread, with the size and cap named.
+  if (!QPORT.vaultFileRoom(file.size)) {
+    toast("Not imported: the picked file is " + file.size + " bytes — a Portfolio Desk vault file is at most " +
+      QPORT.MAX_VAULT_FILE_BYTES + " bytes (128 KiB); the file was not read and your vault is unchanged.", "err");
+    return;
+  }
   var rd = new FileReader();
   rd.onload = function () {
     try {

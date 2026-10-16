@@ -10,7 +10,7 @@ Command your whole QTC estate from one desk: add every Quantus address you contr
 - **Allocation donut** — canvas-rendered, no external libraries.
 - **Recent activity** — transfers touching your addresses from the real transfer snapshot, with explorer block links.
 - **Mining attribution** — addresses that mined blocks in the observed window are tagged.
-- **Vault tools** — CSV export of holdings, JSON export/import of the vault, clear-vault.
+- **Vault tools** — CSV export of holdings, JSON export/import of the vault, clear-vault. The import refuses picks over 128 KiB unread: `File.size` is gated before the read (`vaultFileRoom` in the core), because the sanitizer caps everything a vault file can keep — 200 entries × (49-char address + 40-char nick + timestamp) is 34,469 bytes as exported, 74,469 bytes even at JSON's worst escaping — so a larger file was guaranteed-reject only after its full text and parse tree had been allocated.
 
 ## Never moves funds
 
@@ -23,7 +23,7 @@ Read-only by design. The desk never asks for keys, seeds, or signatures and neve
 
 ## Tests
 
-- `node tests/run-tests.mjs` — 22/22 logic tests (vesting math, rollups, vault, CSV export incl. the formula-guard for nicknames, boundary sanitizers, vault producer relations, mined-count chain containment + schedule identity relations)
+- `node tests/run-tests.mjs` — 25/25 logic tests (vesting math, rollups, vault, CSV export incl. the formula-guard for nicknames, boundary sanitizers, vault producer relations, mined-count chain containment + schedule identity relations, the vault-file size gate)
 - Browser QA: real-browser verification of the add/validate/checkphrase flow, donut render, and live-first data load
 
 ---
