@@ -250,5 +250,20 @@ for (const [n, t, len] of combos) {
     ["bogus", "LAWYER", " trusted", 42, null, {}].every((v) => dm(v) === ""));
 }
 
+{
+  // creation gates: sanitizePlan caps both lists at load, so the Add
+  // buttons must refuse at the same cap instead of persisting a row the
+  // next load silently trims. Exact arithmetic, fail-closed.
+  ok("caps exported as 100", LOGIC.MAX_BENEFICIARIES === 100 && LOGIC.MAX_HOLDINGS === 100);
+  ok("beneficiaryRoom arithmetic",
+    LOGIC.beneficiaryRoom(0) === 100 && LOGIC.beneficiaryRoom(99) === 1 && LOGIC.beneficiaryRoom(100) === 0);
+  ok("holdingRoom arithmetic",
+    LOGIC.holdingRoom(0) === 100 && LOGIC.holdingRoom(99) === 1 && LOGIC.holdingRoom(100) === 0);
+  ok("rooms never go negative", LOGIC.beneficiaryRoom(5000) === 0 && LOGIC.holdingRoom(5000) === 0);
+  ok("rooms fail closed on a bad count",
+    LOGIC.beneficiaryRoom(NaN) === 0 && LOGIC.beneficiaryRoom("x") === 0 && LOGIC.beneficiaryRoom(-3) === 0 &&
+    LOGIC.holdingRoom(NaN) === 0 && LOGIC.holdingRoom(undefined) === 0 && LOGIC.holdingRoom(-3) === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log("FAILURES:\n" + failures.join("\n")); process.exit(1); }

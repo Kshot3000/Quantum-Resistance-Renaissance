@@ -60,6 +60,20 @@
   const MAX_BENEFICIARIES = 100;
   const MAX_HOLDINGS = 100;
 
+  // Creation gates: sanitizePlan caps both lists at load (first-wins),
+  // but a creation path that pushes past the cap persists the over-cap
+  // plan and the next load silently trims the NEW row — in an inheritance
+  // plan, a beneficiary or holding the owner just added. The Add buttons
+  // ask these gates first and refuse at the cap. Fail-closed: a count
+  // that is not a finite non-negative number earns no room.
+  function room(cap, currentCount) {
+    const n = Math.floor(Number(currentCount));
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.max(0, cap - n);
+  }
+  function beneficiaryRoom(currentCount) { return room(MAX_BENEFICIARIES, currentCount); }
+  function holdingRoom(currentCount) { return room(MAX_HOLDINGS, currentCount); }
+
   function sanitizePlan(raw) {
     const p = isEntry(raw) ? raw : {};
     const beneficiaries = (Array.isArray(p.beneficiaries) ? p.beneficiaries : [])
@@ -250,5 +264,5 @@ then move the rest.</div>
 </body></html>`;
   }
 
-  return { esc, sanitizePlan, validateBeneficiaries, validateHoldings, CHECKLIST, readinessScore, buildLetter };
+  return { esc, sanitizePlan, validateBeneficiaries, validateHoldings, CHECKLIST, readinessScore, buildLetter, MAX_BENEFICIARIES, MAX_HOLDINGS, beneficiaryRoom, holdingRoom };
 });

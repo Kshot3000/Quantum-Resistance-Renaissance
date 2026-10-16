@@ -647,7 +647,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Legacy Vault <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The inheritance desk for the quantum era: split any secret with real Shamir's Secret Sharing over GF(2⁸) — 45 known-answer vectors cross-checked against an independent Python implementation — build a beneficiary plan with a weighted readiness score, and print a letter of instruction your heirs can actually follow. Honest method comparison with real on-chain costs (multisig pallet 19: 0.03 QTC burn), off-chain dead-man designs, and the plain truth that no dead-man pallet exists on Quantus. 100% client-side — never moves funds.</p>
-        <div class="meta">87/87 logic tests green · 45/45 Python vectors green · 23/23 browser checks green</div>
+        <div class="meta">92/92 logic tests green · 45/45 Python vectors green · 15/15 plan-cap browser checks green — plan creation caps enforced: at 100 beneficiaries or 100 items the Add buttons refuse with the cap named instead of saving a row the next load would silently trim</div>
       </a>
       <a class="app-card audit" href="pages/supply-audit/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+424,594% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+423,337% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">

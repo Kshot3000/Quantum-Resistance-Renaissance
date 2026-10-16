@@ -218,6 +218,12 @@
     });
   }
   $("ben-add").addEventListener("click", () => {
+    if (LOGIC.beneficiaryRoom(plan.beneficiaries.length) <= 0) {
+      const bm = $("ben-msg");
+      bm.className = "msg err";
+      bm.textContent = "Plan is full — the cap is 100 beneficiaries. Remove one before adding another.";
+      return;
+    }
     plan.beneficiaries.push({ name: "", relation: "", sharePct: "", contact: "", notes: "" });
     savePlan(); renderBens(); validatePlan();
   });
@@ -243,6 +249,12 @@
     });
   }
   $("hold-add").addEventListener("click", () => {
+    if (LOGIC.holdingRoom(plan.holdings.length) <= 0) {
+      const hm = $("hold-msg");
+      hm.className = "msg err";
+      hm.textContent = "Plan is full — the cap is 100 items. Remove one before adding another.";
+      return;
+    }
     plan.holdings.push({ item: "", location: "", access: "" });
     savePlan(); renderHoldings(); validatePlan();
   });
