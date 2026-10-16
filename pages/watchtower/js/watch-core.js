@@ -498,6 +498,23 @@ function watchRoom(currentCount) {
   return Math.max(0, MAX_WATCHLIST - n);
 }
 
+var MAX_RULES = 500;
+
+/* Room left under the rule cap. Rules had NO cap on any path while the
+ * watchlist beside them was capped everywhere: the load repair sanitized
+ * and deduped stored rules but never sliced, the backup importer pushed
+ * every distinct rule (with an O(n*m) dedupe scan over the growing list —
+ * a 20,000-rule backup burned ~2s in Node before the browser even
+ * rendered), and the rule form pushed uncapped. Every scan then ran
+ * evaluateRules over all rules and renderRules mapped all of them to
+ * DOM. The cap must hold at CREATION (form + importer) and at LOAD
+ * (repair slice), exactly like watchRoom (the Ledger eventRoom rule). */
+function ruleRoom(currentCount) {
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) n = 0;
+  return Math.max(0, MAX_RULES - n);
+}
+
 /* ---------- rules ---------- */
 
 var RULE_TYPES = {
@@ -856,6 +873,7 @@ var api = {
   sanitizeAlerts: sanitizeAlerts,
   sanitizeWatchlist: sanitizeWatchlist,
   watchRoom: watchRoom, MAX_WATCHLIST: MAX_WATCHLIST,
+  ruleRoom: ruleRoom, MAX_RULES: MAX_RULES,
   advanceAddressBaseline: advanceAddressBaseline,
   blankChainBaseline: blankChainBaseline,
   blankAddressBaseline: blankAddressBaseline,

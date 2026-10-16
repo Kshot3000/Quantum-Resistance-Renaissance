@@ -195,7 +195,10 @@ function sanitizeRule(r) {
     seenSig[sig] = true;
     kept.push(clean);
   });
-  state.rules = kept;
+  // First-wins slice to the rule cap: sanitize+dedupe alone left a
+  // hand-edited or pre-cap backup's rules unbounded in storage, and
+  // every scan/render paid for all of them forever.
+  state.rules = kept.slice(0, QWATCH.MAX_RULES);
   if (JSON.stringify(state.rules) !== before) save();
 })();
 
@@ -636,6 +639,10 @@ $("rule-form").addEventListener("submit", function (ev) {
     rule.threshold = thr;
     if (type === "balance_change") rule.changeMode = $("rule-mode").value;
   }
+  if (!QWATCH.ruleRoom(state.rules.length)) {
+    toast("Rule list is full — the cap is " + QWATCH.MAX_RULES + " rules. Delete a rule before arming another.", "err");
+    return;
+  }
   state.rules.push(rule);
   save(); renderAll();
   toast("Rule armed: " + QWATCH.ruleLabel(rule), "ok");
@@ -724,7 +731,7 @@ $("file-import").addEventListener("change", function (ev) {
           added++;
         }
       });
-      var addedRules = 0, skippedRules = 0;
+      var addedRules = 0, skippedRules = 0, cappedRules = 0;
       (p.rules || []).forEach(function (r) {
         var clean = sanitizeRule(r);
         if (!clean) { skippedRules++; return; }
@@ -738,6 +745,10 @@ $("file-import").addEventListener("change", function (ev) {
             x.severity === clean.severity && !!x.enabled === clean.enabled;
         });
         if (dup) { skippedRules++; return; }
+        // The rule cap holds at import too: past it, stop paying the
+        // dedupe scan (and the SS58 decode in sanitizeRule) for rules
+        // that can never be kept, and count them for the toast.
+        if (!QWATCH.ruleRoom(state.rules.length)) { cappedRules++; return; }
         clean.id = nextRuleId();
         state.rules.push(clean);
         addedRules++;
@@ -751,7 +762,8 @@ $("file-import").addEventListener("change", function (ev) {
       toast("Imported " + added + " new address" + (added === 1 ? "" : "es") + " and " +
         addedRules + " rules" +
         (skippedRules ? " (" + skippedRules + " skipped — invalid or duplicate)" : "") +
-        (capped ? " (" + capped + " not imported — watchlist cap of " + QWATCH.MAX_WATCHLIST + " addresses reached)" : "") + ".", "ok");
+        (capped ? " (" + capped + " not imported — watchlist cap of " + QWATCH.MAX_WATCHLIST + " addresses reached)" : "") +
+        (cappedRules ? " (" + cappedRules + " rules not imported — rule cap of " + QWATCH.MAX_RULES + " rules reached)" : "") + ".", "ok");
     } catch (e) { toast("Import failed: " + e.message, "err"); }
     ev.target.value = "";
   };
