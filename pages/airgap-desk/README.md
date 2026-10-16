@@ -40,13 +40,18 @@ Sign QTC transfers on a machine that never touches the network.
   cold machine; the decoded bitmap is closed after use.
 - QR decode via vendored jsQR 1.4.0 (Apache-2.0), lazy-loaded by `js/qr.js` on first
   scan/upload-decode use — the 251 KB decoder is not part of the initial page load.
+- Package assembly merges collected + pasted lines through `mergePackageLines`
+  (Set-based, first-wins): the previous per-token `includes()` rescan was
+  O(n²) in pasted tokens and froze the cold machine ~17s on a 20k-token
+  paste; the dedupe itself is load-bearing — a lone 0x… extrinsic
+  assembles only when exactly one distinct line remains.
 - Optional builder service fee (2026-10-12): the cold desk can add a disclosed fee
   (None / 0.25% / 0.5% default / 1%, capped at 100 bps) ON TOP of the amount as a
   second `transfer_keep_alive` leg to the builder's QTC address inside one atomic
   `Utility.batch_all` — one signature, recipient leg first and untouched. The hot
   decoder accepts exactly that 2-leg batch shape and renders both legs, warning
   when the second leg does not pay the disclosed builder address.
-- `tests/run-tests.mjs`: 43/43 protocol tests (ticket/chunk/era codecs, full cold-sign →
+- `tests/run-tests.mjs`: 47/47 protocol tests (ticket/chunk/era codecs, full cold-sign →
   hot-verify round trip incl. tamper and wrong-ticket failures, ML-DSA-87 path,
   service-fee math/batch/decode-whitelist tests; the ticket nonce is held to the
   issuer's u32 grammar — a nonce ≥ 2³² or a non-safe integer the JSON text could

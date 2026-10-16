@@ -302,6 +302,33 @@ export function decodeChunks(lines) {
   return { sessionId: sid, hex: '0x' + hexEncode(out) };
 }
 
+/* ---------------- package-line merge ----------------
+ * The hot desk assembles a signed package from chunk texts collected via
+ * QR/file PLUS whatever is in the paste box, deduped first-wins (collected
+ * order first). The merge used to test each pasted token with
+ * Array.includes over the growing merged list — O(n^2) in pasted tokens,
+ * run synchronously on the "Assemble & verify" click: the paste box
+ * accepts arbitrary text, and 20k unique tokens froze the air-gapped
+ * machine for ~17s (40k for ~2 minutes) in Node timings. A Set keeps the
+ * exact same result in linear time. Non-iterable inputs fail soft to an
+ * empty list; inputs are never mutated. The dedupe itself is load-
+ * bearing, not cosmetic: the assembler accepts a lone 0x… extrinsic only
+ * when exactly ONE distinct line remains, so pasting the same line
+ * twice must still assemble. */
+export function mergePackageLines(collected, pasted) {
+  const out = [];
+  const seen = new Set();
+  for (const part of [collected, pasted]) {
+    if (!part || typeof part[Symbol.iterator] !== 'function') continue;
+    for (const s of part) {
+      if (seen.has(s)) continue;
+      seen.add(s);
+      out.push(s);
+    }
+  }
+  return out;
+}
+
 /* ---------------- era decode (mirror of scale.js encodeMortalEra) -------- */
 
 export function decodeMortalEra(twoBytes) {

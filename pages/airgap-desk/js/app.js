@@ -8,7 +8,7 @@
 import {
   makeTicket, encodeTicket, decodeTicket, encodeChunks, decodeChunks,
   decodeForVerify, reverifySigned, buildColdPayload, buildColdExtrinsic,
-  computeServiceFee, feeBpsLabel, SERVICE_FEE_ADDRESS,
+  computeServiceFee, feeBpsLabel, SERVICE_FEE_ADDRESS, mergePackageLines,
   DEFAULT_ERA_PERIOD,
 } from './airgap.js';
 import { drawQR, decodeQRImage, mountChunkStepper, startCameraScan } from './qr.js';
@@ -259,11 +259,10 @@ $('btn-pkg-camera-stop').addEventListener('click', () => {
 });
 
 function collectPackageLines() {
-  const lines = [];
-  for (const s of pkgChunkTexts) lines.push(s);
   const pasted = $('pkg-paste').value.split(/\s+/).map((s) => s.trim()).filter(Boolean);
-  for (const s of pasted) if (!lines.includes(s)) lines.push(s);
-  return lines;
+  // Set-based merge (airgap.js): the includes() rescan this replaces was
+  // O(n^2) in pasted tokens and froze the cold machine on a large paste.
+  return mergePackageLines(pkgChunkTexts, pasted);
 }
 
 $('btn-pkg-paste').addEventListener('click', () => {

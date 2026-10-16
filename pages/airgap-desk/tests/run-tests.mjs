@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import {
   b64urlEncode, b64urlDecode,
   makeTicket, encodeTicket, decodeTicket,
-  encodeChunks, decodeChunks,
+  encodeChunks, decodeChunks, mergePackageLines,
   decodeMortalEra, decodeSignedExtrinsic, decodeForVerify,
   buildColdPayload, buildColdExtrinsic, reverifySigned,
   computeServiceFee, feeBpsLabel, serviceFeeAccountId,
@@ -185,6 +185,36 @@ test('chunks: absurd count rejected instantly (round 2)', () => {
 test('chunks: single-chunk payload works', () => {
   const { hex } = decodeChunks(encodeChunks('1', '0x010203', 900));
   assert.equal(hex, '0x010203');
+});
+
+/* ---------------- package-line merge ---------------- */
+test('mergePackageLines: first-wins dedupe, collected order first', () => {
+  assert.deepEqual(mergePackageLines(['a', 'b'], ['b', 'c', 'c', 'a', 'd']), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(mergePackageLines(['x', 'x', 'y'], []), ['x', 'y']);
+  assert.deepEqual(mergePackageLines([], []), []);
+});
+
+test('mergePackageLines: repeated lone 0x line still merges to exactly one line', () => {
+  // The assembler accepts a lone 0x… extrinsic only when one distinct
+  // line remains — dedupe is load-bearing, not cosmetic.
+  assert.deepEqual(mergePackageLines([], ['0xabc', '0xabc', '0xabc']), ['0xabc']);
+});
+
+test('mergePackageLines: accepts the collected Set, fails soft, never mutates', () => {
+  assert.deepEqual(mergePackageLines(new Set(['q1', 'q2']), ['q2', 'q3']), ['q1', 'q2', 'q3']);
+  assert.deepEqual(mergePackageLines(null, undefined), []);
+  assert.deepEqual(mergePackageLines(null, ['a']), ['a']);
+  const c = ['a'], p = ['b', 'a'];
+  mergePackageLines(c, p);
+  assert.deepEqual(c, ['a']);
+  assert.deepEqual(p, ['b', 'a']);
+});
+
+test('mergePackageLines: linear on large pastes (100k tokens, 99% duplicates)', () => {
+  const big = Array.from({ length: 100000 }, (_, i) => 'tok' + i);
+  assert.equal(mergePackageLines([], big).length, 100000);
+  const dup = Array.from({ length: 100000 }, (_, i) => 'tok' + (i % 1000));
+  assert.deepEqual(mergePackageLines([], dup), Array.from({ length: 1000 }, (_, i) => 'tok' + i));
 });
 
 /* ---------------- era ---------------- */
