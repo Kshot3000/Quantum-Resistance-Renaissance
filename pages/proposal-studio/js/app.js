@@ -448,6 +448,18 @@
   });
   $("dv-import").addEventListener("change", function (e) {
     var f = e.target.files[0]; if (!f) return;
+    // Size gate BEFORE reading a byte: sanitizeDrafts caps everything
+    // an import can keep (100 drafts, bounded fields — the largest
+    // vault the exporter can produce is 2,166,002 bytes even at JSON's
+    // worst escaping), and File.size is known up front — the old path
+    // read and JSON.parse'd the whole file before that cap was
+    // consulted. Refuse over-cap picks unread, with size + cap named.
+    if (!C.draftFileRoom(f && f.size)) {
+      toast("Not imported: " + f.name + " is " + f.size + " bytes — over the draft vault file cap of " +
+        C.MAX_DRAFT_FILE_BYTES + " bytes (4 MiB); the file was not read and your current drafts are unchanged.");
+      e.target.value = "";
+      return;
+    }
     var r = new FileReader();
     r.onload = function () {
       try {

@@ -226,5 +226,37 @@ eq("fileRoom('100') fail-closed (no string coercion)", C.fileRoom("100", 4096), 
 eq("fileRoom(size, NaN cap) fail-closed", C.fileRoom(100, NaN), false);
 eq("fileRoom(undefined) fail-closed", C.fileRoom(undefined, 4096), false);
 
+// --- draftFileRoom draft-vault file gate: dv-import used to readAsText
+// and JSON.parse the WHOLE picked file before sanitizeDrafts was
+// consulted; the sanitizer's own producer bound (100 drafts, bounded
+// fields) makes every larger file guaranteed-sanitized-away, so the
+// import now refuses over-cap picks unread.
+eq("draftFileRoom: cap is 4 MiB", C.MAX_DRAFT_FILE_BYTES, 4 * 1024 * 1024);
+eq("draftFileRoom(at cap) passes", C.draftFileRoom(C.MAX_DRAFT_FILE_BYTES), true);
+eq("draftFileRoom(cap + 1) fails", C.draftFileRoom(C.MAX_DRAFT_FILE_BYTES + 1), false);
+eq("draftFileRoom(0) passes", C.draftFileRoom(0), true);
+eq("draftFileRoom(NaN) fail-closed", C.draftFileRoom(NaN), false);
+eq("draftFileRoom(-1) fail-closed", C.draftFileRoom(-1), false);
+eq("draftFileRoom('1024') fail-closed (no string coercion)", C.draftFileRoom("1024"), false);
+eq("draftFileRoom(undefined) fail-closed (sizeless file)", C.draftFileRoom(undefined), false);
+eq("draftFileRoom(null) fail-closed", C.draftFileRoom(null), false);
+eq("draftFileRoom(Infinity) fail-closed", C.draftFileRoom(Infinity), false);
+{
+  const maxCallB = new Array(4096).fill(0xab); maxCallB[0] = 0; maxCallB[1] = 0;
+  const mkMax = (fill) => Array.from({ length: 100 }, (_, i) => ({
+    id: (fill.repeat(60) + String(i).padStart(4, "0")).slice(0, 64),
+    name: fill.repeat(120), notes: fill.repeat(2000), trackId: 0,
+    callHex: C.bytesToHex(maxCallB), hash: hashOf(maxCallB), enactKind: "after",
+    enactVal: 4294967295, created: "2026-10-01T00:00:00.000Z",
+    checks: [true, true, true, true, true]
+  }));
+  const plainMax = C.sanitizeDrafts(mkMax("a"), hashOf);
+  eq("producer-maximum plain draft vault fits the gate",
+    C.draftFileRoom(Buffer.byteLength(JSON.stringify(plainMax, null, 2))), true);
+  const escMax = C.sanitizeDrafts(mkMax(""), hashOf);
+  eq("producer-maximum worst-escaping draft vault fits the gate",
+    C.draftFileRoom(Buffer.byteLength(JSON.stringify(escMax, null, 2))), true);
+}
+
 console.log(pass + "/" + (pass + fail) + " proposal-studio tests green");
 process.exit(fail ? 1 : 0);

@@ -401,6 +401,26 @@
     return size <= max;
   }
 
+  /* ---------------- draft-vault file gate ---------------------------- */
+  /* The draft vault's dv-import handler used to readAsText the WHOLE
+   * picked file and JSON.parse it before sanitizeDrafts was consulted —
+   * yet that sanitizer caps everything it keeps: at most MAX_DRAFTS=100
+   * drafts, each with id <= 64 chars, name sliced to 120, notes sliced
+   * to 2,000, callHex = hex of a call of at most MAX_PROPOSAL bytes
+   * (8,192 hex chars), a 64-char hash and bounded scalars. Measured
+   * with this sanitizer: the largest vault the exporter can produce
+   * serializes to 1,076,002 bytes with plain maxed fields and
+   * 2,166,002 bytes when every free-text char needs JSON's worst
+   * 6-byte \uXXXX escaping — so any larger file was guaranteed to be
+   * sanitized away only after its full text and parse tree were
+   * allocated. File.size is known before a byte is read, so the
+   * importer asks this gate first — cap MAX_DRAFT_FILE_BYTES = 4 MiB,
+   * ~1.9x the worst-escaping largest vault — and refuses over-cap
+   * picks unread with the size and cap named, the current vault
+   * untouched; a sizeless file refuses fail-closed too. */
+  var MAX_DRAFT_FILE_BYTES = 4 * 1024 * 1024;
+  function draftFileRoom(size) { return fileRoom(size, MAX_DRAFT_FILE_BYTES); }
+
   function blocksToClock(b) {
     var s = b * 12;
     if (s < 90) return s + "s";
@@ -428,6 +448,7 @@
     tplAuthorizeUpgrade: tplAuthorizeUpgrade, tplRemark: tplRemark,
     tplSetTreasuryAccount: tplSetTreasuryAccount, tplAddMember: tplAddMember,
     lifecycle: lifecycle, sanitizeDrafts: sanitizeDrafts, MAX_DRAFTS: MAX_DRAFTS,
-    draftRoom: draftRoom, MAX_WASM_BYTES: MAX_WASM_BYTES, fileRoom: fileRoom
+    draftRoom: draftRoom, MAX_WASM_BYTES: MAX_WASM_BYTES, fileRoom: fileRoom,
+    MAX_DRAFT_FILE_BYTES: MAX_DRAFT_FILE_BYTES, draftFileRoom: draftFileRoom
   };
 }));
