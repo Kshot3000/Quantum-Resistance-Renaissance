@@ -542,6 +542,49 @@ test("ruleRoom holds the rule cap at creation, not only at load", () => {
   assert.equal(W.ruleRoom(-3), 500);
 });
 
+test("backupFileRoom admits every backup the exporter can produce, at the cap", () => {
+  assert.equal(W.MAX_BACKUP_FILE_BYTES, 32 * 1024 * 1024);
+  assert.equal(W.backupFileRoom(0), true);
+  assert.equal(W.backupFileRoom(15285312), true); // largest genuine backup, plain
+  assert.equal(W.backupFileRoom(15735312), true); // largest genuine backup, worst JSON escaping
+  assert.equal(W.backupFileRoom(W.MAX_BACKUP_FILE_BYTES), true);
+});
+
+test("backupFileRoom refuses over-cap and sizeless picks, fail-closed", () => {
+  assert.equal(W.backupFileRoom(W.MAX_BACKUP_FILE_BYTES + 1), false);
+  assert.equal(W.backupFileRoom(100 * 1024 * 1024), false);
+  assert.equal(W.backupFileRoom(NaN), false);
+  assert.equal(W.backupFileRoom(-1), false);
+  assert.equal(W.backupFileRoom("100"), false); // no string coercion
+  assert.equal(W.backupFileRoom(undefined), false);
+  assert.equal(W.backupFileRoom(null), false);
+  assert.equal(W.backupFileRoom(Infinity), false);
+});
+
+test("the producer-bounded maximum backup fits the file gate", () => {
+  // Build the largest state the tower can hold with the module's own
+  // sanitizers (500-entry watchlist, 500 baselines x 400+400 distinct
+  // 23-char seen ids, chain seenWhale 400) and serialize it exactly as
+  // the exporter does — it must stay under the cap with ~2x headroom,
+  // because baselines (which the importer drops) dominate the size.
+  const addr = (i) => {
+    const cs = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let tail = "", m = i + 1;
+    while (m > 0) { tail = cs[m % 58] + tail; m = Math.floor(m / 58); }
+    return "qz" + ("1".repeat(47 - tail.length) + tail).slice(-47);
+  };
+  const tid = (i) => "0000237275-cd772-" + String(i).padStart(6, "0");
+  const watchlist = W.sanitizeWatchlist(
+    Array.from({ length: 500 }, (_, i) => ({ address: addr(i), nick: "n".repeat(40), note: "x".repeat(140), addedAt: "2026-10-16T20:23:17.876Z", checkphrase: ["unquestionable", "irreplaceable", "sophisticated", "invulnerable", "unparalleled"] })), null);
+  const rawBase = { addresses: {}, chain: { referenda: 1000000, upgrades: 1000000, stallFiredHead: 10000000, seenWhale: Array.from({ length: 400 }, (_, i) => tid(i)) } };
+  for (let i = 0; i < 500; i++) rawBase.addresses[addr(1000 + i)] = { balance: "21000000000000000000", seenIn: Array.from({ length: 400 }, (_, j) => tid(j)), seenOut: Array.from({ length: 400 }, (_, j) => tid(100000 + j)) };
+  const baselines = W.sanitizeBaselines(rawBase);
+  const rules = Array.from({ length: 500 }, (_, i) => ({ id: "rule-" + (1000000 + i) + "-zzzzzzzz", type: "balance_change", severity: "crit", enabled: true, address: addr(i), changeMode: "pct", threshold: "21000000.000000000001" }));
+  const bytes = Buffer.byteLength(JSON.stringify({ app: "qtc-watchtower", version: 1, exportedAt: "2026-10-16T20:23:17.876Z", watchlist, rules, baselines }, null, 2));
+  assert.equal(bytes, 15285312);
+  assert.equal(W.backupFileRoom(bytes), true);
+});
+
 test("ruleLabel renders human descriptions", () => {
   assert.equal(W.ruleLabel({ type: "whale_ge", threshold: "50000" }), "Whale transfer ≥ 50000 QTC");
   assert.equal(W.ruleLabel({ type: "balance_change", changeMode: "pct", threshold: "10" }), "Balance moves by 10%");

@@ -715,6 +715,16 @@ $("btn-export").addEventListener("click", function () {
 $("file-import").addEventListener("change", function (ev) {
   var f = ev.target.files[0];
   if (!f) return;
+  // File.size is known before a byte is read: a pick larger than the
+  // largest backup this tower can export (32 MiB — baselines and all)
+  // is not a Watchtower backup, so refuse it UNREAD instead of
+  // allocating its whole text + parse tree and SS58-decoding every
+  // row inside it. Current watchlist, rules and baselines untouched.
+  if (!QWATCH.backupFileRoom(f.size)) {
+    toast("Backup not imported: the picked file is " + f.size + " bytes — a Watchtower backup is at most " + QWATCH.MAX_BACKUP_FILE_BYTES + " bytes (32 MiB); the file was not read and your watchlist, rules and baselines are unchanged.", "err");
+    ev.target.value = "";
+    return;
+  }
   var rd = new FileReader();
   rd.onload = function () {
     try {

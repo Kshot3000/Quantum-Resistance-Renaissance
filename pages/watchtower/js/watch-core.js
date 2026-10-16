@@ -515,6 +515,33 @@ function ruleRoom(currentCount) {
   return Math.max(0, MAX_RULES - n);
 }
 
+/* ---------- backup file size gate ----------
+ * The backup importer used to readAsText the WHOLE picked file and
+ * JSON.parse it before any cap was consulted, then pay an SS58 decode
+ * (base58 + blake2b-512) for EVERY watchlist row and rule inside it
+ * before watchRoom/ruleRoom were asked — a wrong pick (a log, a disk
+ * image, a crafted million-row file) froze or OOM-killed the tab.
+ * Everything a genuine backup can carry is producer-bounded: the
+ * exporter writes {watchlist, rules, baselines} where the watchlist
+ * caps at 500 entries (49-char address, nick 40, note 140, a
+ * 5-word checkphrase of at most 14 chars per word), rules cap at
+ * 500, and baselines hold at most 500 address entries whose seenIn /
+ * seenOut lists cap at MAX_SEEN_IDS=400 distinct indexer transfer
+ * ids (23 chars each) plus one chain seenWhale list of the same.
+ * Measured with this module's own sanitizers: the largest backup the
+ * exporter can produce serializes to 15,285,312 bytes as
+ * JSON.stringify(payload, null, 2) writes it, and 15,735,312 bytes
+ * even when every nick/note character needs JSON's worst 6-byte
+ * escaping — so the bound must come from the PRODUCER (baselines
+ * dominate it), not from what the importer keeps (the importer drops
+ * baselines entirely). File.size is known before a byte is read: the
+ * importer asks this fail-closed gate first and refuses over-cap
+ * picks unread. 32 MiB is ~2x the worst-escaping maximum. */
+var MAX_BACKUP_FILE_BYTES = 32 * 1024 * 1024;
+function backupFileRoom(size) {
+  return typeof size === "number" && isFinite(size) && size >= 0 && size <= MAX_BACKUP_FILE_BYTES;
+}
+
 /* ---------- rules ---------- */
 
 var RULE_TYPES = {
@@ -874,6 +901,7 @@ var api = {
   sanitizeWatchlist: sanitizeWatchlist,
   watchRoom: watchRoom, MAX_WATCHLIST: MAX_WATCHLIST,
   ruleRoom: ruleRoom, MAX_RULES: MAX_RULES,
+  backupFileRoom: backupFileRoom, MAX_BACKUP_FILE_BYTES: MAX_BACKUP_FILE_BYTES,
   advanceAddressBaseline: advanceAddressBaseline,
   blankChainBaseline: blankChainBaseline,
   blankAddressBaseline: blankAddressBaseline,
