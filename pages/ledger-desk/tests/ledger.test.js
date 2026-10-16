@@ -559,4 +559,41 @@ t("priceRoom: the creation-path gate arithmetic for MAX_PRICE_DAYS", () => {
   assert.equal(L.priceRoom(-3), 3660);
 });
 
+t("csvFileRoom: the CSV file gate arithmetic for MAX_CSV_FILE_BYTES", () => {
+  // The CSV importer read and parsed the WHOLE picked file before
+  // any cap was consulted; File.size is known before a byte is read,
+  // so the importer asks this fail-closed gate first. The cap
+  // derives from the producer (see the exporter tests below), not
+  // from what a foreign file might contain.
+  assert.equal(L.MAX_CSV_FILE_BYTES, 33554432);
+  assert.equal(L.csvFileRoom(0), true); // empty reaches the normal "Empty CSV" path
+  assert.equal(L.csvFileRoom(33554432), true); // at cap passes
+  assert.equal(L.csvFileRoom(33554433), false); // one byte over refuses
+  assert.equal(L.csvFileRoom(200 * 1024 * 1024), false);
+  assert.equal(L.csvFileRoom(NaN), false); // fail-closed, never coerced
+  assert.equal(L.csvFileRoom(-1), false);
+  assert.equal(L.csvFileRoom("100"), false);
+  assert.equal(L.csvFileRoom(undefined), false); // a sizeless file refuses
+  assert.equal(L.csvFileRoom(null), false);
+  assert.equal(L.csvFileRoom(Infinity), false);
+});
+
+t("csvFileRoom: the largest export the desk can produce fits the gate", () => {
+  // Producer bound, measured with the desk's own exporter: 10,000
+  // sanitizer-maxed events (id 128 generous, note 500, source 64,
+  // ref 128, address 49, qty/fee at the 21M supply) serialize to
+  // 10,040,104 bytes plain and 18,240,104 bytes when every text char
+  // is a quote (CSV quote-doubling worst case) — both under the cap.
+  const mk = (fill) => ({ id: fill(128), dateMs: Date.UTC(2026, 0, 1), type: "transfer_out",
+    address: "qz" + "1".repeat(47), qtyPlanck: 21000000000000000000n,
+    priceMicro: 999999999999999000000n, feePlanck: 21000000000000000000n,
+    note: fill(500), source: fill(64), ref: fill(128), internal: false, flags: [] });
+  const plain = L.eventsToCsv(Array.from({ length: 10000 }, () => mk((n) => "x".repeat(n))));
+  assert.equal(Buffer.byteLength(plain), 10040104);
+  assert.equal(L.csvFileRoom(Buffer.byteLength(plain)), true);
+  const quoted = L.eventsToCsv(Array.from({ length: 10000 }, () => mk((n) => '"'.repeat(n))));
+  assert.equal(Buffer.byteLength(quoted), 18240104);
+  assert.equal(L.csvFileRoom(Buffer.byteLength(quoted)), true);
+});
+
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nAll " + n + " tests passed.");

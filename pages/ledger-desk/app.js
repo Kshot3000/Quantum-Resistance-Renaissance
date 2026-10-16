@@ -591,6 +591,19 @@ function exportEventsCsv() {
   download("qtc-ledger-events.csv", L.eventsToCsv(state.events), "text/csv");
 }
 function importEventsCsv(file) {
+  /* CSV file gate (white-hat): File.size is known before a byte is
+   * read, so ask the core gate first — an over-cap pick (a log, a
+   * disk image, a 60,001-row CSV) is refused UNREAD instead of being
+   * read whole and parsed char-by-char before the ledger cap is
+   * consulted. The cap derives from the producer: the largest CSV
+   * this desk's own exporter can write is ~18.3 MB even at CSV
+   * quote-doubling worst case (see ledger-core csvFileRoom). A
+   * sizeless file refuses fail-closed too. */
+  if (!L.csvFileRoom(file && file.size)) {
+    alert("Not imported: the picked file is " + (file && file.size) + " bytes — a Ledger Desk CSV is at most " +
+      L.MAX_CSV_FILE_BYTES.toLocaleString("en-US") + " bytes (32 MiB); the file was not read and your ledger is unchanged.");
+    return;
+  }
   var rd = new FileReader();
   rd.onload = function () {
     var rows = L.parseCsv(String(rd.result || ""));

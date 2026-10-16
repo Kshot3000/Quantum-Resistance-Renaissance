@@ -402,6 +402,26 @@ function priceRoom(currentCount) {
   if (!isFinite(n) || n < 0) n = 0;
   return Math.max(0, MAX_PRICE_DAYS - n);
 }
+/* CSV file gate (white-hat, 2026-10-16): importEventsCsv read the
+ * WHOLE picked file with readAsText and parseCsv walked it
+ * char-by-char building every row before eventRoom was consulted —
+ * yet the importer can keep at most MAX_LEDGER_EVENTS events and
+ * every kept field is capped (note 500 at import; source 64 / ref
+ * 128 at sanitizeState; address 49; qty/fee within the 21M supply;
+ * desk-minted ids ~16 chars, 128 allowed generously here). Measured
+ * with this file's own exporter, the largest CSV the desk can
+ * produce is 10,040,104 bytes with plain maxed fields and
+ * 18,240,104 bytes when every text char is a quote (CSV
+ * quote-doubling) — any larger file is guaranteed-capped-away only
+ * after its full text and row tree were allocated (parseCsv of a
+ * 26.1 MB / 60,001-row CSV takes ~3.6 s of synchronous work in
+ * Node). File.size is known before a byte is read, so the importer
+ * asks this fail-closed gate first: cap 32 MiB, ~1.8x the
+ * worst-escaping largest export. */
+var MAX_CSV_FILE_BYTES = 32 * 1024 * 1024;
+function csvFileRoom(size) {
+  return typeof size === "number" && isFinite(size) && size >= 0 && size <= MAX_CSV_FILE_BYTES;
+}
 function sanitizeState(raw, opts) {
   var clean = { addresses: [], events: [], prices: [], method: "FIFO" };
   if (!raw || typeof raw !== "object") return clean;
@@ -672,6 +692,7 @@ var api = {
   toBigIntOrNull: toBigIntOrNull, sanitizeState: sanitizeState,
   MAX_VAULT_ADDRESSES: MAX_VAULT_ADDRESSES, MAX_LEDGER_EVENTS: MAX_LEDGER_EVENTS,
   MAX_PRICE_DAYS: MAX_PRICE_DAYS, eventRoom: eventRoom, addressRoom: addressRoom, priceRoom: priceRoom,
+  MAX_CSV_FILE_BYTES: MAX_CSV_FILE_BYTES, csvFileRoom: csvFileRoom,
   rewardModelPlancks: rewardModelPlancks,
   parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc,
   parseUsdPerQtcToMicro: parseUsdPerQtcToMicro, formatUsd: formatUsd,
