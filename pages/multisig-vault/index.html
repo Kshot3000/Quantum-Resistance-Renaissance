@@ -106,7 +106,7 @@
       <div class="f-col">
         <label class="fld-label" for="signer-input">Signer addresses (SS58, prefix 189) — one per line, paste or type</label>
         <textarea id="signer-input" rows="6" spellcheck="false" placeholder="qznY…&#10;qznY…&#10;qznY…"></textarea>
-        <div class="signer-hint" id="signer-hint">Paste 2–100 addresses. Each is checksum-verified as you type.</div>
+        <div class="signer-hint" id="signer-hint">Paste 2–100 addresses. Each is checksum-verified as you type (only the first 500 lines are parsed).</div>
         <div class="threshold-row">
           <div class="fld">
             <label class="fld-label" for="threshold">Threshold — approvals required</label>
@@ -331,8 +331,8 @@
 </main>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="js/msig-core.js?v=1.29.0"></script>
-<script src="js/app.js?v=1.27.0"></script>
+<script src="js/msig-core.js?v=1.30.0"></script>
+<script src="js/app.js?v=1.28.0"></script>
 <script src="../../assets/app-nav.js?v=1.8.0"></script>
 </body>
 </html>

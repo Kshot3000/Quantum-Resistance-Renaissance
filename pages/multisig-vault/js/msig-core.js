@@ -51,6 +51,7 @@ var CALL_IDX = {
 var MAX_SIGNERS = 100;
 var MAX_CALL_SIZE = 10240;
 var MAX_EXPIRY_DURATION = 100800;            // blocks (~14 days at 12s)
+var MAX_SIGNER_LINES = 500;                  // signer-input parse window (parseSigners decodes every parsed line on every keystroke)
 var MAX_BOARD_ENTRIES = 500;                 // proposal-board cap (renderBoard paints + hashes every entry at boot)
 var MAX_BOARD_BLOCK = 10000000;              // plausible chain-height ceiling for a stored expiry (fleet bound)
 var BOARD_STATUSES = ["active", "approved", "executed", "expired"];
@@ -653,6 +654,29 @@ function boardRoom(currentCount){
   return Math.max(0, MAX_BOARD_ENTRIES - n);
 }
 
+/* Parse window for the signer-input box: parseSigners runs on EVERY
+ * 'input' event and SS58-decodes every line it is handed — each decode
+ * is a base58 decode plus a blake2b-512 checksum. Per line the cost is
+ * bounded (ss58Decode refuses inputs over 128 chars up front), but the
+ * LINE COUNT was unbounded: a 20,000-line paste decoded all 20,000 on
+ * the paste and again on every later keystroke, freezing the tab. A
+ * vault can hold at most MAX_SIGNERS signers (the pallet cap —
+ * deriveMultisigAddress refuses more), so lines past the window can
+ * never change a derivable vault; the window gives that cap 5x headroom
+ * for duplicate and invalid lines while bounding the per-keystroke
+ * decode work. Returns { parse, total, skipped }: parse is the prefix
+ * the caller may decode, skipped counts the lines it must DISCLOSE as
+ * not parsed (never silently dropped). Fail-closed: a cap that is not
+ * a non-negative integer parses nothing. */
+function signerParseWindow(lines, cap){
+  if (!Array.isArray(lines)) return { parse: [], total: 0, skipped: 0 };
+  var total = lines.length;
+  if (typeof cap !== "number" || !isFinite(cap) || Math.floor(cap) !== cap || cap < 0)
+    return { parse: [], total: total, skipped: total };
+  var parse = lines.slice(0, cap);
+  return { parse: parse, total: total, skipped: total - parse.length };
+}
+
 var MsigCore = {
   SS58_PREFIX: SS58_PREFIX, DECIMALS: DECIMALS,
   PALLET_INDEX: PALLET_INDEX, BALANCES_PALLET_INDEX: BALANCES_PALLET_INDEX,
@@ -660,6 +684,7 @@ var MsigCore = {
   MAX_EXPIRY_DURATION: MAX_EXPIRY_DURATION, BLOCK_MS: BLOCK_MS,
   MAX_BOARD_ENTRIES: MAX_BOARD_ENTRIES, MAX_BOARD_BLOCK: MAX_BOARD_BLOCK,
   BOARD_STATUSES: BOARD_STATUSES, sanitizeBoard: sanitizeBoard, boardRoom: boardRoom,
+  MAX_SIGNER_LINES: MAX_SIGNER_LINES, signerParseWindow: signerParseWindow,
   MULTISIG_FEE: MULTISIG_FEE, PROPOSAL_DEPOSIT: PROPOSAL_DEPOSIT,
   PROPOSAL_FEE: PROPOSAL_FEE, SIGNER_STEP_PERMILL: SIGNER_STEP_PERMILL,
   blake2b: blake2b, ss58Encode: ss58Encode, ss58Decode: ss58Decode,

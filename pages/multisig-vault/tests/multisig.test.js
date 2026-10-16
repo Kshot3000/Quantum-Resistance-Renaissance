@@ -304,5 +304,39 @@ eq(C.feeBpsLabel(100), "1%", "label 100");
   eq(C.boardRoom(499.9), 1, "board: boardRoom floors fractional counts");
 }
 
+/* signer parse window: parseSigners decodes every parsed line on every
+ * keystroke (base58 + blake2b-512 each), so the line count is windowed
+ * at MAX_SIGNER_LINES — 5x the pallet's MAX_SIGNERS cap, giving duplicate
+ * and invalid lines headroom while bounding the decode work. Lines past
+ * the window are counted as skipped so the hint can disclose them. */
+{
+  const W = C.signerParseWindow;
+  eq(typeof W, "function", "signerwindow: signerParseWindow exported from core");
+  eq(C.MAX_SIGNER_LINES, 500, "signerwindow: line cap constant is 500");
+  const six = ["a", "b", "c", "d", "e", "f"];
+  const w1 = W(six, 500);
+  eq(w1.parse.length, 6, "signerwindow: under cap parses all");
+  eq(w1.skipped, 0, "signerwindow: under cap skips 0");
+  eq(w1.parse.join(","), "a,b,c,d,e,f", "signerwindow: parse is the input prefix");
+  const w2 = W(six, 3);
+  eq(w2.parse.length, 3, "signerwindow: over cap parses exactly cap");
+  eq(w2.total, 6, "signerwindow: total counts every line");
+  eq(w2.skipped, 3, "signerwindow: skipped counts the unparsed tail");
+  eq(w2.parse.join(","), "a,b,c", "signerwindow: over-cap parse keeps the FIRST lines");
+  eq(W(six, 6).skipped, 0, "signerwindow: exactly at cap skips 0");
+  eq(W([], 500).parse.length, 0, "signerwindow: empty input -> empty window");
+  eq(W(six, 0).skipped, 6, "signerwindow: cap 0 parses nothing, skips all");
+  eq(W(six, NaN).parse.length, 0, "signerwindow: NaN cap fails closed");
+  eq(W(six, -1).parse.length, 0, "signerwindow: negative cap fails closed");
+  eq(W(six, 2.5).parse.length, 0, "signerwindow: fractional cap fails closed");
+  eq(W(six, "500").parse.length, 0, "signerwindow: string cap fails closed");
+  eq(W(six, NaN).skipped, 6, "signerwindow: bad cap still reports total/skipped");
+  eq(W(null, 500).total, 0, "signerwindow: non-array input -> empty window");
+  eq(six.length, 6, "signerwindow: input array is not mutated");
+  const big = Array.from({ length: 20000 }, () => "x");
+  eq(W(big, C.MAX_SIGNER_LINES).parse.length, 500, "signerwindow: 20,000 lines window to the cap");
+  eq(W(big, C.MAX_SIGNER_LINES).skipped, 19500, "signerwindow: 20,000 lines skip the tail");
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

@@ -33,10 +33,15 @@ function esc(s){
 /* ---------- 01 factory ---------- */
 var signerState = { valid: [], invalid: [] };  // valid: [{addr, keyHex}]
 function parseSigners(){
-  var lines = $("signer-input").value.split(/\r?\n/).map(function(s){ return s.trim(); })
+  var allLines = $("signer-input").value.split(/\r?\n/).map(function(s){ return s.trim(); })
     .filter(function(s){ return s.length > 0; });
+  // Parse window (white-hat): this handler runs on every keystroke and
+  // SS58-decodes every line it touches — the core window bounds that
+  // work to the first MAX_SIGNER_LINES lines; the rest are counted and
+  // disclosed in the hint below, never silently dropped.
+  var win = C.signerParseWindow(allLines, C.MAX_SIGNER_LINES);
   var valid = [], invalid = [];
-  lines.forEach(function(line, i){
+  win.parse.forEach(function(line, i){
     var d = C.ss58Decode(line);
     if (!d.ok){ invalid.push({ line: i + 1, addr: line, err: d.error }); return; }
     if (d.prefix !== C.SS58_PREFIX){
@@ -55,6 +60,9 @@ function parseSigners(){
   var msg = valid.length + " valid signer" + (valid.length === 1 ? "" : "s");
   if (invalid.length) msg += ' · <span class="bad">' + invalid.length + " invalid</span>";
   if (dupes) msg += ' · <span class="bad">' + dupes + " duplicate" + (dupes === 1 ? "" : "s") + "</span>";
+  if (win.skipped) msg += ' · <span class="bad">' + win.skipped + " line" + (win.skipped === 1 ? "" : "s") +
+    " not parsed — only the first " + C.MAX_SIGNER_LINES + " lines are parsed (a vault takes at most " +
+    C.MAX_SIGNERS + " signers); trim the list to reach them</span>";
   hint.innerHTML = '<span class="ok">' + msg + "</span>";
   var thr = $("threshold");
   thr.max = Math.max(2, valid.length);

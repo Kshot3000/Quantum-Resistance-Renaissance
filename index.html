@@ -611,7 +611,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC MultiSig Vault <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Shared custody on the real custom multisig pallet (index 19): derive exact on-chain vault addresses from <code>blake2b-256(py/mltsg ‖ signers ‖ threshold ‖ nonce)</code> — cross-checked against an independent implementation — price every fee from runtime constants (0.03 QTC creation burn, exact per-signer proposal-fee formula), build byte-exact unsigned payloads for all seven dispatchables (propose / approve / execute / cancel / remove_expired / claim_deposits), and track proposals on a local board — which now refuses new entries at its 500-proposal cap with the cap named, instead of logging a proposal that the board's own load-time trim immediately dropped. Payouts can carry an optional, plainly disclosed vault service fee (0.25–1%, or None) added on top of the recipient amount as a second transfer in one atomic <code>Utility.batch_all</code> inner call — the recipient is never short-changed. Never touches keys.</p>
-        <div class="meta">183/183 logic tests green · browser QA green (board-cap probe 14/14)</div>
+        <div class="meta">204/204 logic tests green · browser QA green (board-cap probe 14/14) · the signer box parses at most the first 500 lines per keystroke (each line is a checksum decode; the count past the window is disclosed in the hint, never silently dropped)</div>
       </a>
       <a class="app-card governance" href="pages/governance-tracker/" style="grid-column:1 / -1">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+420,121% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+413,784% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
