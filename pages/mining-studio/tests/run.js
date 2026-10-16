@@ -239,9 +239,24 @@ ok("fallback curSupply within emission bounds", Number(csVal) >= 5670000 && Numb
 var hintM = html.match(/id="supplyHint"[^>]*>([\s\S]*?)<\/p>/);
 ok("fallback hint cites a dated capture height", !!hintM && /block [0-9]{1,3},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
 ok("fallback hint difficulty matches painted netHash (one capture)",
-   !!hintM && /414,984,259,375,260/.test(hintM[1]) && Math.abs(Number(nhVal) - 414984259375260 / 12 / 1e9) < 1,
+   !!hintM && /416,993,415,037,463/.test(hintM[1]) && Math.abs(Number(nhVal) - 416993415037463 / 12 / 1e9) < 1,
    nhVal);
 ok("stale 45,125 example gone", !/45,125/.test(html));
+
+/* checklist localStorage boundary (white-hat track, 2026-10-16): the old
+ * loaders only caught JSON syntax errors — valid-JSON "null" crashed
+ * renderSec (aborting init before the troubleshooter rendered), "abc"
+ * counted 3 phantom hardened items off its string indices, arrays
+ * counted, and unknown keys were preserved unbounded on every toggle
+ * save. sanitizeSecDone rebuilds: real indices only, strict true only. */
+ok("sec sanitize: null -> empty, no throw", JSON.stringify(Studio.sanitizeSecDone(null)) === "{}");
+ok("sec sanitize: string -> empty (no phantom hardened)", JSON.stringify(Studio.sanitizeSecDone("abc")) === "{}");
+ok("sec sanitize: number/bool -> empty", JSON.stringify(Studio.sanitizeSecDone(123)) === "{}" && JSON.stringify(Studio.sanitizeSecDone(true)) === "{}");
+ok("sec sanitize: array -> empty", JSON.stringify(Studio.sanitizeSecDone([true, true])) === "{}");
+ok("sec sanitize: honest booleans kept, false dropped", JSON.stringify(Studio.sanitizeSecDone({ 0: true, 2: true, 3: false })) === '{"0":true,"2":true}');
+ok("sec sanitize: truthy non-booleans dropped", JSON.stringify(Studio.sanitizeSecDone({ 0: "yes", 1: 1, 2: true })) === '{"2":true}');
+ok("sec sanitize: out-of-range indices + unknown keys dropped", JSON.stringify(Studio.sanitizeSecDone({ 0: true, 8: true, 999: true, poison: true })) === '{"0":true}');
+ok("sec sanitize: fresh object, input unmutated", (function () { var inp = { 0: "yes", 9: true }; var out = Studio.sanitizeSecDone(inp); return out !== inp && inp[0] === "yes" && !("0" in out); })());
 
 console.log("\n" + (n - fails) + "/" + n + " passed" + (fails ? " — FAILURES" : ""));
 process.exit(fails ? 1 : 0);

@@ -295,6 +295,22 @@ Studio.SECURITY = [
   { t: "Node P2P key backed up", d: "node_key.p2p — losing it just means a new peer identity, but keep a copy anyway." },
   { t: "Binaries from official releases, kept updated", d: "Node and miner must stay on the same miner protocol (quantus-miner/2)." }
 ];
+/* The checklist state lives in localStorage — an untrusted boundary:
+ * any earlier bug, extension, or hand edit can leave valid JSON that is
+ * not a checklist object there. The old loaders only caught syntax
+ * errors, so "null" crashed renderSec (aborting the rest of init), a
+ * string like "abc" counted 3 phantom hardened items off its indices,
+ * and unknown keys were preserved unbounded on every toggle save.
+ * Rebuild from scratch: only indices of real SECURITY items, and only
+ * the strict boolean true, survive. */
+Studio.sanitizeSecDone = function (raw) {
+  var out = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (var i = 0; i < Studio.SECURITY.length; i++) {
+    if (raw[i] === true) out[i] = true;
+  }
+  return out;
+};
 Studio.FIXES = [
   { q: "Node won't finish syncing (block numbers stall)", a: "<b>Windows native build?</b> Add the Defender exclusion for your data dir, then restart with <code>--sync full --max-blocks-per-request 64</code>. Real-time scanning on RocksDB causes silent stalls: healthy peers, active downloads, zero block progression.<br><b>Any platform:</b> confirm 3+ Mbps sustained — below that, sync will likely fail. Check the log for <code>Imported #…</code>; if it's absent for minutes while peers are connected, it's an IO or bandwidth problem, not a network problem." },
   { q: "Mining isn't producing anything", a: "Check in order: <b>1.</b> <code>--validator</code> is present. <b>2.</b> The preimage is the exact <code>inner_hash</code> from key generation. <b>3.</b> The node is synced — it refuses to mine until its best block is at most 24 h old (the tip-age freshness gate). <b>4.</b> Node and miner share miner protocol <code>quantus-miner/2</code> — update both together." },
@@ -536,7 +552,7 @@ $("bGo").addEventListener("click", function () {
 var SEC_KEY = "qtc-studio-sec-v1";
 function renderSec() {
   var done = {};
-  try { done = JSON.parse(localStorage.getItem(SEC_KEY) || "{}"); } catch (e) {}
+  try { done = Studio.sanitizeSecDone(JSON.parse(localStorage.getItem(SEC_KEY) || "{}")); } catch (e) {}
   var n = 0;
   $("secList").innerHTML = Studio.SECURITY.map(function (s, i) {
     var d = !!done[i]; if (d) n++;
@@ -549,7 +565,7 @@ function renderSec() {
 $("secList").addEventListener("click", function (e) {
   var li = e.target.closest("li"); if (!li) return;
   var i = li.getAttribute("data-i"), done = {};
-  try { done = JSON.parse(localStorage.getItem(SEC_KEY) || "{}"); } catch (err) {}
+  try { done = Studio.sanitizeSecDone(JSON.parse(localStorage.getItem(SEC_KEY) || "{}")); } catch (err) {}
   done[i] = !done[i];
   try { localStorage.setItem(SEC_KEY, JSON.stringify(done)); } catch (err) {}
   renderSec();
