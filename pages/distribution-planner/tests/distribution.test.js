@@ -358,6 +358,37 @@ t("buildRunScript discloses the service fee; fee-free scripts stay clean", funct
   assert.ok(plain.indexOf(DistCore.SERVICE_FEE_ADDRESS) < 0, "no fee address without a fee");
 });
 
+/* ---------- checkphrase queue bound ---------- */
+t("checkphraseQueue: bounded to the displayed rows, deduped, fail-closed", function () {
+  var stub = { addressToChecksum: function () { return ["stub"]; } };
+  var addrs = [];
+  for (var i = 0; i < 600; i++) {
+    var key = new Array(32).fill(0);
+    key[0] = i & 0xff; key[1] = (i >> 8) & 0xff; key[2] = 0x51;
+    addrs.push(ss58.ss58Encode(key, 189));
+  }
+  var v = DistCore.validateRows(
+    DistCore.parseInput(addrs.map(function (a) { return a + " 1"; }).join("\n")), ss58, stub, WORDLIST);
+  assert.strictEqual(v.length, 600, "full list still validated (exports unaffected)");
+  assert.strictEqual(DistCore.DISPLAY_ROW_CAP, 500);
+  var q = DistCore.checkphraseQueue(v, DistCore.DISPLAY_ROW_CAP);
+  assert.strictEqual(q.length, 500, "queue capped at the rendered-row cap");
+  assert.strictEqual(q[0], addrs[0]);
+  assert.strictEqual(q[499], addrs[499]);
+  assert.ok(q.indexOf(addrs[500]) < 0, "row 501 never queued for derivation");
+  var mixed = DistCore.validateRows(
+    DistCore.parseInput(addrs[0] + " 1\nbad 2\n" + addrs[0] + " 3\n" + addrs[1] + " 1"), ss58, stub, WORDLIST);
+  var qm = DistCore.checkphraseQueue(mixed, 500);
+  assert.strictEqual(qm.length, 2, "deduped, invalid rows skipped (count)");
+  assert.strictEqual(qm[0], addrs[0], "deduped, invalid rows skipped (first)");
+  assert.strictEqual(qm[1], addrs[1], "deduped, invalid rows skipped (second)");
+  assert.strictEqual(DistCore.checkphraseQueue(v, 0).length, 0, "cap 0 fail-closed");
+  assert.strictEqual(DistCore.checkphraseQueue(v, -1).length, 0, "negative cap fail-closed");
+  assert.strictEqual(DistCore.checkphraseQueue(v, NaN).length, 0, "NaN cap fail-closed");
+  assert.strictEqual(DistCore.checkphraseQueue(null, 500).length, 0, "null rows fail-closed");
+  assert.strictEqual(DistCore.checkphraseQueue(v.slice(0, 3), 500).length, 3, "below cap passes through");
+});
+
 /* ---------- summarize ---------- */
 t("summarize counts and totals", function () {
   var rows = DistCore.parseInput(POOL + " 1\n" + MSIG + " 2\n" + "bad 3\n");

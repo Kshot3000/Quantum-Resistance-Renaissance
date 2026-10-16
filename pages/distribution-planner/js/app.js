@@ -120,10 +120,11 @@ function revalidate() {
   validated.forEach(function (v) { v.checkphrase = null; });
   state.validated = validated;
   cpCache = {};
-  cpQueued = [];
-  validated.forEach(function (v) {
-    if (v.ok && !cpQueued.includes(v.address)) cpQueued.push(v.address);
-  });
+  // Derivations are bounded to the rows the review table can display:
+  // a checkphrase is display-only (exports never carry one) and each
+  // costs a 40,000-iteration PBKDF2 — queueing every unique address
+  // in a large plan burned derivations for rows never rendered.
+  cpQueued = core.checkphraseQueue(validated, core.DISPLAY_ROW_CAP);
   renderReview();
   renderPlan();
   pumpCheckphrases();
@@ -147,7 +148,7 @@ function renderReview() {
   function chip(txt, cls) { return '<span class="chip ' + cls + '">' + esc(txt) + "</span>"; }
 
   var body = $("review-body");
-  var CAP = 500;
+  var CAP = core.DISPLAY_ROW_CAP;
   var rows = state.validated.slice(0, CAP);
   if (!rows.length) {
     body.innerHTML = '<tr class="empty"><td colspan="6">Paste a recipient list above to start the review.</td></tr>';
@@ -167,7 +168,7 @@ function renderReview() {
   if (state.validated.length > CAP) {
     cap.hidden = false;
     cap.textContent = "Showing the first " + CAP + " of " + state.validated.length +
-      " rows — the full list is still validated and exported.";
+      " rows — checkphrases are computed for the shown rows only; the full list is still validated and exported.";
   } else cap.hidden = true;
 }
 

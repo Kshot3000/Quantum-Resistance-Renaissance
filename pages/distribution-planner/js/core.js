@@ -366,6 +366,31 @@ function formatQTC6(plancks) {
   return (neg ? "-" : "") + whole + "." + frac;
 }
 
+/* ---------- checkphrase display bound ----------
+ * The review table renders at most DISPLAY_ROW_CAP rows, and a
+ * checkphrase is a display-only aid (batch JSON and the run script
+ * never carry one) — yet each phrase costs a 40,000-iteration PBKDF2
+ * derivation. The derivation queue is therefore built from the rows
+ * that can actually be displayed: deduped valid addresses among the
+ * first `cap` validated rows, in order. Fail-closed: a non-positive
+ * or non-finite cap queues nothing. The full list is still validated
+ * and exported — only the derivations are bounded. */
+var DISPLAY_ROW_CAP = 500;
+function checkphraseQueue(validated, cap) {
+  var n = Math.floor(Number(cap));
+  if (!Array.isArray(validated) || !isFinite(n) || n <= 0) return [];
+  var seen = {}, out = [];
+  var limit = Math.min(validated.length, n);
+  for (var i = 0; i < limit; i++) {
+    var v = validated[i];
+    if (v && v.ok && v.address && !seen[v.address]) {
+      seen[v.address] = 1;
+      out.push(v.address);
+    }
+  }
+  return out;
+}
+
 function summarize(validated) {
   var valid = validated.filter(function (v) { return v.ok; });
   var invalid = validated.filter(function (v) { return !v.ok; });
@@ -400,6 +425,8 @@ var api = {
   formatQTC: formatQTC,
   formatQTC6: formatQTC6,
   wordsFromKey: wordsFromKey,
+  DISPLAY_ROW_CAP: DISPLAY_ROW_CAP,
+  checkphraseQueue: checkphraseQueue,
   summarize: summarize
 };
 
