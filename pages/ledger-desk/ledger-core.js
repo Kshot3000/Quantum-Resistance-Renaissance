@@ -388,6 +388,20 @@ function addressRoom(currentCount) {
   if (!isFinite(n) || n < 0) n = 0;
   return Math.max(0, MAX_VAULT_ADDRESSES - n);
 }
+/* How many more DISTINCT days fit under MAX_PRICE_DAYS. The price form
+ * — the only path that CREATES price days — must hold itself to this
+ * room, not just the load-time sanitizer: a cap enforced only in
+ * sanitizeState is a silent data-loss rule (the form filtered out the
+ * same day, pushed a brand-new day as row 3,661, save() persisted it,
+ * and the next load trimmed exactly that NEW price — the one the user
+ * had just typed — while the form cleared as if it had been kept).
+ * Replacing an existing day never consumes room: it does not grow the
+ * table, so the form gates on NEW days only. */
+function priceRoom(currentCount) {
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) n = 0;
+  return Math.max(0, MAX_PRICE_DAYS - n);
+}
 function sanitizeState(raw, opts) {
   var clean = { addresses: [], events: [], prices: [], method: "FIFO" };
   if (!raw || typeof raw !== "object") return clean;
@@ -657,7 +671,7 @@ var api = {
   validateFlowsMeta: validateFlowsMeta,
   toBigIntOrNull: toBigIntOrNull, sanitizeState: sanitizeState,
   MAX_VAULT_ADDRESSES: MAX_VAULT_ADDRESSES, MAX_LEDGER_EVENTS: MAX_LEDGER_EVENTS,
-  MAX_PRICE_DAYS: MAX_PRICE_DAYS, eventRoom: eventRoom, addressRoom: addressRoom,
+  MAX_PRICE_DAYS: MAX_PRICE_DAYS, eventRoom: eventRoom, addressRoom: addressRoom, priceRoom: priceRoom,
   rewardModelPlancks: rewardModelPlancks,
   parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc,
   parseUsdPerQtcToMicro: parseUsdPerQtcToMicro, formatUsd: formatUsd,

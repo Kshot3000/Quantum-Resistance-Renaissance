@@ -686,6 +686,18 @@ function handlePriceSubmit(ev) {
   if (micro === null) { alert("Enter a valid USD price."); return; }
   var day = $("pxDate").value;
   if (!day) { alert("Pick a date."); return; }
+  /* Price cap: the form creates price days too — refuse a NEW day at
+   * the MAX_PRICE_DAYS the load-time sanitizer enforces, instead of
+   * persisting a 3,661st day the next load would silently trim (the
+   * new price, the one just typed). Replacing an existing day does
+   * not grow the table, so it stays open at a full table. */
+  var isNewDay = !state.prices.some(function (p) { return p.day === day; });
+  if (isNewDay && !L.priceRoom(state.prices.length)) {
+    alert("Price table is full — the cap of " +
+      L.MAX_PRICE_DAYS.toLocaleString("en-US") +
+      " price days is reached. Remove a price day before adding a new one (re-saving an existing day still works).");
+    return;
+  }
   state.prices = state.prices.filter(function (p) { return p.day !== day; });
   state.prices.push({ day: day, micro: micro });
   $("pxValue").value = "";

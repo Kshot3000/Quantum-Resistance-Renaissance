@@ -544,4 +544,19 @@ t("addressRoom: the creation-path gate arithmetic for MAX_VAULT_ADDRESSES", () =
   assert.equal(L.addressRoom(-3), 500);
 });
 
+t("priceRoom: the creation-path gate arithmetic for MAX_PRICE_DAYS", () => {
+  // The load-time sanitizer caps the price table at 3,660 DISTINCT
+  // days; the price form — the only path that CREATES price days —
+  // asks priceRoom first for a NEW day, so an in-session table can
+  // never outgrow the cap its next load would silently trim back to
+  // (the trimmed row was the new price, the one just typed).
+  // Replacing an existing day consumes no room and stays ungated.
+  assert.equal(L.priceRoom(0), 3660);
+  assert.equal(L.priceRoom(3659), 1);
+  assert.equal(L.priceRoom(3660), 0);
+  assert.equal(L.priceRoom(9000), 0); // never negative
+  assert.equal(L.priceRoom("garbage"), 3660); // uncountable = empty, never a crash
+  assert.equal(L.priceRoom(-3), 3660);
+});
+
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nAll " + n + " tests passed.");
