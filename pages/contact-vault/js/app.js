@@ -287,9 +287,20 @@ $("addForm").addEventListener("submit", function (ev) {
   var v = LOGIC.validateQuantusAddress(addr);
   if (!v.ok) return fail(v.message);
   if (findByAddress(v.address)) return fail("That address is already in your vault as “" + findByAddress(v.address).label + "”.");
+  // Vault cap: sanitizeVault caps the vault at MAX_CONTACTS at load,
+  // but this form APPENDS — at a full vault the push persisted 501 and
+  // the next load silently trimmed the NEW contact, under a "✓ Saved"
+  // message. Ask the gate BEFORE the 40k-iteration derivation (a full
+  // vault refuses without burning the KDF) and again inside the
+  // callback, authoritatively, before the push.
+  if (!LOGIC.contactRoom(vault.length)) return fail("Vault is full — the cap is " + LOGIC.MAX_CONTACTS + " contacts. Remove one before adding another.");
   msg.className = "msg"; msg.innerHTML = '<span class="spinner"></span>Checksum OK — deriving checkphrase…';
   btn.disabled = true;
   derivePhrase(v.address).then(function (words) {
+    if (!LOGIC.contactRoom(vault.length)) {
+      btn.disabled = false;
+      return fail("Vault is full — the cap is " + LOGIC.MAX_CONTACTS + " contacts. Remove one before adding another.");
+    }
     vault.push({ id: uid(), label: label, address: v.address, note: note,
                  trusted: false, addedAt: new Date().toISOString(), checkphrase: words });
     saveVault(); renderVaultList();

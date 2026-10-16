@@ -272,5 +272,16 @@ ok("deterministic", JSON.stringify(CHECK.addressToChecksum(KYLE, WORDS)) === JSO
     JSON.stringify(exp.contacts));
 }
 
+/* 9. add-path creation gate (contactRoom): the Add form is a creation
+ * path the load cap alone cannot protect — it must ask for room before
+ * deriving/pushing, with exact fail-closed arithmetic. */
+ok("contactRoom exact arithmetic",
+  LOGIC.contactRoom(0) === 500 && LOGIC.contactRoom(499) === 1 &&
+  LOGIC.contactRoom(500) === 0 && LOGIC.contactRoom(5000) === 0 &&
+  LOGIC.contactRoom(499.9) === 1);
+ok("contactRoom fail-closed on a bad count",
+  LOGIC.contactRoom(NaN) === 0 && LOGIC.contactRoom("x") === 0 &&
+  LOGIC.contactRoom(undefined) === 0 && LOGIC.contactRoom(-3) === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

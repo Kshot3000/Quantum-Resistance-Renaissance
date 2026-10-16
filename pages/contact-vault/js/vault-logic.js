@@ -138,6 +138,21 @@ function sanitizeVault(raw) {
   }
   return out;
 }
+/* Room left in the vault under the load cap sanitizeVault enforces.
+ * The Add form is a creation path the load cap alone cannot protect:
+ * it pushed with no cap check, so at a full vault the push persisted
+ * 501 and the next load silently trimmed the NEW contact — the one
+ * whose checkphrase had just been derived (40,000 PBKDF2 iterations)
+ * and shown under a "✓ Saved" message. The form asks this gate twice:
+ * early, before the derivation (a full vault refuses without burning
+ * the KDF), and authoritatively inside the derivation callback,
+ * before the push. Fail-closed: a count that is not a finite
+ * non-negative number earns no room. */
+function contactRoom(currentCount) {
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) return 0;
+  return Math.max(0, MAX_CONTACTS - n);
+}
 
 /* ---------- export / import ---------- */
 var EXPORT_APP = "qtc-contact-vault";
@@ -272,7 +287,7 @@ var api = {
   sharedSuffixLen: sharedSuffixLen,
   closestContact: closestContact,
   mutateMiddleChar: mutateMiddleChar,
-  sanitizeVault: sanitizeVault, MAX_CONTACTS: MAX_CONTACTS,
+  sanitizeVault: sanitizeVault, MAX_CONTACTS: MAX_CONTACTS, contactRoom: contactRoom,
   cleanAddedAt: cleanAddedAt, cleanCheckphrase: cleanCheckphrase,
   buildExportPayload: buildExportPayload,
   parseImportPayload: parseImportPayload,
