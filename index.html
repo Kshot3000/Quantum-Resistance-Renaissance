@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+421,332% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+425,661% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -781,8 +781,8 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Governance</span>
         </div>
         <h3>QTC Proposal Studio <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The governance drafting desk: pick your track, compose the proposal call from verified templates, and walk away with byte-exact unsigned extrinsics — the encoder reproduces referendum #0's real on-chain submit call byte-for-byte. Preimage desk, cost ledger, and a draft vault included — whose save and import paths now refuse at the 100-draft cap with the cap named and any unimported drafts counted, instead of silently evicting the oldest drafts on the next load. Never signs.</p>
-        <div class="meta">92/92 codec tests green · draft-cap browser QA 17/17 · zero console errors</div>
+        <p>The governance drafting desk: pick your track, compose the proposal call from verified templates, and walk away with byte-exact unsigned extrinsics — the encoder reproduces referendum #0's real on-chain submit call byte-for-byte. Preimage desk, cost ledger, and a draft vault included — whose save and import paths now refuse at the 100-draft cap with the cap named and any unimported drafts counted, instead of silently evicting the oldest drafts on the next load. Both file picks are size-gated before a byte is read (4 KiB preimage cap, 16 MiB wasm cap), so a wrong pick can't freeze the tab. Never signs.</p>
+        <div class="meta">103/103 codec tests green · draft-cap browser QA 17/17 · zero console errors</div>
       </a>
       <a class="app-card pool" href="pages/pool-desk/">
         <div class="icon-row">

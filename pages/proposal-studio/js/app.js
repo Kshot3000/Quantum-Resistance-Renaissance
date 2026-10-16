@@ -107,9 +107,19 @@
         "<p class='fine'>The hash commits to the exact runtime blob. The wasm itself is submitted later via <code>apply_authorized_upgrade</code> (permissionless) and version-checked on-chain.</p>";
       $("cmp-wasm").addEventListener("change", function (e) {
         var f = e.target.files[0]; if (!f) return;
+        // Size gate BEFORE reading a byte: File.size is known up front,
+        // and the old read-then-Array.from path converted the whole file
+        // into a plain array of numbers (20 MB -> ~2.5 s, +348 MB heap)
+        // with no cap at all. Refuse over-cap picks unread, cap named.
+        if (!C.fileRoom(f.size, C.MAX_WASM_BYTES)) {
+          toast("Not hashed: " + f.name + " is " + f.size + " bytes — over the wasm file cap of " +
+            C.MAX_WASM_BYTES + " bytes (16 MiB). The file was not read.");
+          e.target.value = "";
+          return;
+        }
         var r = new FileReader();
         r.onload = function () {
-          var bytes = Array.from(new Uint8Array(r.result));
+          var bytes = new Uint8Array(r.result);
           var hh = CR.toHex(blake256(bytes));
           $("cmp-hash").value = hh;
           toast("Hashed " + f.name + " (" + bytes.length + " bytes)");
@@ -374,6 +384,19 @@
   });
   $("pd-file").addEventListener("change", function (e) {
     var f = e.target.files[0]; if (!f) return;
+    // Size gate BEFORE reading a byte: a preimage can never exceed the
+    // chain's 4 KiB proposal cap, and File.size is known up front — the
+    // old path read and Array.from-converted the whole file (20 MB ->
+    // ~2.5 s, +348 MB heap) only for pdRender to refuse it afterwards.
+    // Refuse over-cap picks unread, with the size and cap named. (The
+    // bounded conversion below stays: buildNotePreimage concats the
+    // bytes, so pdBytes is a plain array — at most 4,096 entries now.)
+    if (!C.fileRoom(f.size, C.MAX_PROPOSAL)) {
+      toast("Not loaded: " + f.name + " is " + f.size + " bytes — over the 4 KiB proposal cap (" +
+        C.MAX_PROPOSAL + " bytes). The chain would reject this as a referendum preimage; the file was not read.");
+      e.target.value = "";
+      return;
+    }
     var r = new FileReader();
     r.onload = function () { pdBytes = Array.from(new Uint8Array(r.result)); pdRender(); toast("Loaded " + f.name); };
     r.readAsArrayBuffer(f);

@@ -210,5 +210,21 @@ eq("draftRoom(undefined) = 0 (fail-closed)", C.draftRoom(undefined), 0);
 eq("draftRoom(-3) = 0", C.draftRoom(-3), 0);
 eq("draftRoom(99.9) floors", C.draftRoom(99.9), 1);
 
+// --- fileRoom file-pick gate: both file inputs used to read and
+// Array.from-convert the whole picked file before any size check ran
+// (the wasm path had no cap at all); File.size is known before a byte
+// is read, so over-cap picks are now refused unread.
+eq("fileRoom: wasm cap is 16 MiB", C.MAX_WASM_BYTES, 16 * 1024 * 1024);
+eq("fileRoom(4096, MAX_PROPOSAL) at cap passes", C.fileRoom(4096, C.MAX_PROPOSAL), true);
+eq("fileRoom(4097, MAX_PROPOSAL) over cap fails", C.fileRoom(4097, C.MAX_PROPOSAL), false);
+eq("fileRoom(16 MiB, MAX_WASM_BYTES) at cap passes", C.fileRoom(C.MAX_WASM_BYTES, C.MAX_WASM_BYTES), true);
+eq("fileRoom(16 MiB + 1, MAX_WASM_BYTES) fails", C.fileRoom(C.MAX_WASM_BYTES + 1, C.MAX_WASM_BYTES), false);
+eq("fileRoom(0) passes (empty file reaches the normal empty path)", C.fileRoom(0, C.MAX_PROPOSAL), true);
+eq("fileRoom(NaN) fail-closed", C.fileRoom(NaN, 4096), false);
+eq("fileRoom(-1) fail-closed", C.fileRoom(-1, 4096), false);
+eq("fileRoom('100') fail-closed (no string coercion)", C.fileRoom("100", 4096), false);
+eq("fileRoom(size, NaN cap) fail-closed", C.fileRoom(100, NaN), false);
+eq("fileRoom(undefined) fail-closed", C.fileRoom(undefined, 4096), false);
+
 console.log(pass + "/" + (pass + fail) + " proposal-studio tests green");
 process.exit(fail ? 1 : 0);

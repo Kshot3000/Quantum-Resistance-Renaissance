@@ -379,6 +379,28 @@
     return Math.max(0, MAX_DRAFTS - n);
   }
 
+  /* ---------------- file-pick size gate ------------------------------- */
+  /* Both file inputs (the preimage desk's pd-file and the composer's
+   * cmp-wasm) used to readAsArrayBuffer the WHOLE picked file and then
+   * Array.from-convert it into a plain JS array of numbers before any
+   * size check ran — pdRender's 4 KiB cap was consulted only after the
+   * conversion, and the wasm path had no cap at all. Array.from on a
+   * typed array is quadratic-class in practice (Node: 20 MB -> ~2.5 s
+   * and +348 MB heap; 50 MB -> ~8.6 s and +900 MB), so a wrong pick
+   * (a log, a disk image) froze or OOM-killed the tab. File.size is
+   * known BEFORE a single byte is read, so the handlers ask this gate
+   * first and refuse over-cap picks unread, naming the cap.
+   * MAX_WASM_BYTES: real Substrate runtime blobs run ~1-5 MiB; 16 MiB
+   * is generous headroom that still bounds the read + hash allocation.
+   * Fail-closed: a non-number, NaN, negative or non-finite size (or a
+   * bad cap) reads as no room — never coerce strings. */
+  var MAX_WASM_BYTES = 16 * 1024 * 1024;
+  function fileRoom(size, max) {
+    if (typeof size !== "number" || typeof max !== "number") return false;
+    if (!isFinite(size) || !isFinite(max) || size < 0 || max < 0) return false;
+    return size <= max;
+  }
+
   function blocksToClock(b) {
     var s = b * 12;
     if (s < 90) return s + "s";
@@ -406,6 +428,6 @@
     tplAuthorizeUpgrade: tplAuthorizeUpgrade, tplRemark: tplRemark,
     tplSetTreasuryAccount: tplSetTreasuryAccount, tplAddMember: tplAddMember,
     lifecycle: lifecycle, sanitizeDrafts: sanitizeDrafts, MAX_DRAFTS: MAX_DRAFTS,
-    draftRoom: draftRoom
+    draftRoom: draftRoom, MAX_WASM_BYTES: MAX_WASM_BYTES, fileRoom: fileRoom
   };
 }));
