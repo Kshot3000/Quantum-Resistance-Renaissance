@@ -401,6 +401,10 @@
     if (!packState || !packState.callBytes) { $("dv-save-note").textContent = "Compose a proposal and send it to the Submission Pack first."; return; }
     var name = $("dv-name").value.trim() || ("Draft " + new Date().toLocaleString());
     var d = loadDrafts();
+    if (C.draftRoom(d.length) <= 0) {
+      $("dv-save-note").textContent = "Draft vault is full — the cap is 100 drafts. Delete one before saving another.";
+      return;
+    }
     d.unshift({
       id: "d" + Date.now(), name: name, notes: $("dv-notes").value.trim(),
       trackId: packState.trackId, callHex: C.bytesToHex(packState.callBytes),
@@ -429,8 +433,15 @@
         // Sanitize BEFORE persisting: an import that saves what it parsed
         // turns one malformed file into a permanently crashing vault.
         var clean = C.sanitizeDrafts(arr, draftHashOf);
-        saveDrafts(clean.concat(loadDrafts()));
-        renderVault(); toast("Imported " + clean.length + " of " + arr.length + " draft(s)");
+        // Take only what fits: an uncapped concat persisted past the
+        // 100-draft cap and the next load silently evicted the existing
+        // drafts past it while the toast claimed every cleaned draft.
+        var existing = loadDrafts();
+        var take = clean.slice(0, C.draftRoom(existing.length));
+        var capped = clean.length - take.length;
+        saveDrafts(take.concat(existing));
+        renderVault(); toast("Imported " + take.length + " of " + arr.length + " draft(s)" +
+          (capped > 0 ? " — " + capped + " not imported — draft vault cap of 100 drafts reached" : ""));
       } catch (err) { toast("Import failed: " + err.message); }
     };
     r.readAsText(f);

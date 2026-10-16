@@ -366,6 +366,19 @@
     return out;
   }
 
+  /* Creation gate for the vault's two write paths (dv-save's unshift and
+   * dv-import's concat): sanitizeDrafts enforces MAX_DRAFTS only at LOAD,
+   * so an uncapped create persisted an over-cap list whose next load
+   * silently evicted the tail — the oldest draft on save, and on import
+   * every existing draft past the cap, while the toast claimed them all.
+   * Writers ask draftRoom(currentCount) first and refuse / take only what
+   * fits. Fail-closed: a non-finite or negative count reads as no room. */
+  function draftRoom(currentCount) {
+    var n = Math.floor(Number(currentCount));
+    if (!isFinite(n) || n < 0) return 0;
+    return Math.max(0, MAX_DRAFTS - n);
+  }
+
   function blocksToClock(b) {
     var s = b * 12;
     if (s < 90) return s + "s";
@@ -392,6 +405,7 @@
     buildCollectiveVote: buildCollectiveVote,
     tplAuthorizeUpgrade: tplAuthorizeUpgrade, tplRemark: tplRemark,
     tplSetTreasuryAccount: tplSetTreasuryAccount, tplAddMember: tplAddMember,
-    lifecycle: lifecycle, sanitizeDrafts: sanitizeDrafts, MAX_DRAFTS: MAX_DRAFTS
+    lifecycle: lifecycle, sanitizeDrafts: sanitizeDrafts, MAX_DRAFTS: MAX_DRAFTS,
+    draftRoom: draftRoom
   };
 }));

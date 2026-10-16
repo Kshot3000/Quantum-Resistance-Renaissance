@@ -195,5 +195,20 @@ eq("relations: plausible created kept verbatim",
 const many = Array.from({ length: 150 }, (_, i) => Object.assign({}, goodDraft, { id: "m" + i }));
 eq("sanitizer caps at MAX_DRAFTS", C.sanitizeDrafts(many, hashOf).length, C.MAX_DRAFTS);
 
+// --- draftRoom creation gate: sanitizeDrafts enforces the cap only at
+// load, so dv-save's unshift and dv-import's concat ask this gate first —
+// an uncapped create persisted past the cap and the next load silently
+// evicted the tail (oldest draft on save; every existing draft past the
+// cap on import) under a success message.
+eq("draftRoom(0) = full cap", C.draftRoom(0), 100);
+eq("draftRoom(99) = 1", C.draftRoom(99), 1);
+eq("draftRoom(100) = 0", C.draftRoom(100), 0);
+eq("draftRoom(5000) = 0 (never negative)", C.draftRoom(5000), 0);
+eq("draftRoom(NaN) = 0 (fail-closed)", C.draftRoom(NaN), 0);
+eq("draftRoom('x') = 0 (fail-closed)", C.draftRoom("x"), 0);
+eq("draftRoom(undefined) = 0 (fail-closed)", C.draftRoom(undefined), 0);
+eq("draftRoom(-3) = 0", C.draftRoom(-3), 0);
+eq("draftRoom(99.9) floors", C.draftRoom(99.9), 1);
+
 console.log(pass + "/" + (pass + fail) + " proposal-studio tests green");
 process.exit(fail ? 1 : 0);
