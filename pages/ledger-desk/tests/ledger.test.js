@@ -528,4 +528,20 @@ t("eventRoom: the creation-path gate arithmetic for MAX_LEDGER_EVENTS", () => {
   assert.equal(L.eventRoom(-3), 10000);
 });
 
+t("addressRoom: the creation-path gate arithmetic for MAX_VAULT_ADDRESSES", () => {
+  // The load-time sanitizer caps the vault at 500 addresses; the
+  // add-address flow — the only path that CREATES addresses — asks
+  // addressRoom first (early, before the 40k-round checkphrase
+  // derivation, and again authoritatively at the confirm push), so a
+  // full vault refuses instead of persisting a 501st address the next
+  // load silently trims — the address whose checkphrase was just read
+  // back and confirmed.
+  assert.equal(L.addressRoom(0), 500);
+  assert.equal(L.addressRoom(499), 1);
+  assert.equal(L.addressRoom(500), 0);
+  assert.equal(L.addressRoom(1500), 0); // never negative
+  assert.equal(L.addressRoom("garbage"), 500); // uncountable = empty, never a crash
+  assert.equal(L.addressRoom(-3), 500);
+});
+
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nAll " + n + " tests passed.");

@@ -374,6 +374,20 @@ function eventRoom(currentCount) {
   if (!isFinite(n) || n < 0) n = 0;
   return Math.max(0, MAX_LEDGER_EVENTS - n);
 }
+/* How many more addresses fit under MAX_VAULT_ADDRESSES. The add-address
+ * flow — the only path that CREATES addresses — must hold itself to this
+ * room, not just the load-time sanitizer: a cap enforced only in
+ * sanitizeState is a silent data-loss rule (the confirm handler pushed a
+ * 501st address, save() persisted it, and the next load trimmed it away
+ * — the address whose checkphrase the user had just read back and
+ * confirmed, gone under a "✓ added to vault" message; and every stored
+ * address costs a 40,000-round PBKDF2 derivation in the boot checkphrase
+ * verify, so an unbounded vault is a boot-time herd too). */
+function addressRoom(currentCount) {
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) n = 0;
+  return Math.max(0, MAX_VAULT_ADDRESSES - n);
+}
 function sanitizeState(raw, opts) {
   var clean = { addresses: [], events: [], prices: [], method: "FIFO" };
   if (!raw || typeof raw !== "object") return clean;
@@ -643,7 +657,7 @@ var api = {
   validateFlowsMeta: validateFlowsMeta,
   toBigIntOrNull: toBigIntOrNull, sanitizeState: sanitizeState,
   MAX_VAULT_ADDRESSES: MAX_VAULT_ADDRESSES, MAX_LEDGER_EVENTS: MAX_LEDGER_EVENTS,
-  MAX_PRICE_DAYS: MAX_PRICE_DAYS, eventRoom: eventRoom,
+  MAX_PRICE_DAYS: MAX_PRICE_DAYS, eventRoom: eventRoom, addressRoom: addressRoom,
   rewardModelPlancks: rewardModelPlancks,
   parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc,
   parseUsdPerQtcToMicro: parseUsdPerQtcToMicro, formatUsd: formatUsd,

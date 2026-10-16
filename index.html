@@ -728,7 +728,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Ledger Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The miner &amp; holder tax ledger: watch your addresses with checkphrase read-back, auto-detect mining income from real chain snapshots via the verified emission model, run exact FIFO/LIFO/HIFO cost basis to the planck, keep your own price table (no market price exists yet — nothing invented), and export accountant-ready tax-year reports with CSV. 100% client-side.</p>
-        <div class="meta">48/48 ledger tests green · import-cap browser QA 9/9 · zero console errors · Oct 15: CSV imports, the manual form and scan adds all stop at the ledger's 10,000-event cap and count the capped rows — a large import can no longer outgrow the cap the next load silently trimmed back to · Oct 15: CSV exports guard formula-leading text cells — a shared ledger file can no longer execute as a spreadsheet formula</div>
+        <div class="meta">49/49 ledger tests green · address-cap browser QA 12/12 · import-cap browser QA 9/9 · zero console errors · Oct 15: the address vault holds its 500-address cap on the creation path too — the add form refuses early, before the 40k-round checkphrase derivation, and again at confirm, so an address whose checkphrase was just read back can no longer vanish on the next load · Oct 15: CSV imports, the manual form and scan adds all stop at the ledger's 10,000-event cap and count the capped rows — a large import can no longer outgrow the cap the next load silently trimmed back to · Oct 15: CSV exports guard formula-leading text cells — a shared ledger file can no longer execute as a spreadsheet formula</div>
       </a>
       <a class="app-card consensus" href="pages/consensus-lab/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+423,197% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+424,594% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">

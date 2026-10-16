@@ -177,6 +177,16 @@ function handleAddrSubmit(ev) {
   if (state.addresses.some(function (a) { return a.address === input; })) {
     line.innerHTML = '<span class="bad">Already in your vault.</span>'; return;
   }
+  /* Vault cap, early (white-hat, 2026-10-15): refuse BEFORE the 40,000-
+   * round checkphrase derivation — a full vault cannot hold the address
+   * anyway (the confirm handler re-checks authoritatively via
+   * L.addressRoom), and deriving first would burn ~seconds of KDF to
+   * produce words for an address that can never be vaulted. */
+  if (!L.addressRoom(state.addresses.length)) {
+    line.innerHTML = '<span class="bad">Vault is full \u2014 the cap is ' + L.MAX_VAULT_ADDRESSES +
+      ' addresses. Remove one before adding another.</span>';
+    return;
+  }
   line.innerHTML = '<span class="muted">deriving checkphrase (40k PBKDF2 rounds)\u2026</span>';
   window.QTC_CHECK.addressToChecksumAsync(input, window.QTC_WORDLIST).then(function (words) {
     if (seq !== addrDeriveSeq) return; // a newer derivation superseded this one
@@ -194,6 +204,18 @@ function handleAddrSubmit(ev) {
     $("addrConfirm").addEventListener("click", function () {
       if (!addrPin || addrPin.address !== input) return;
       if ($("addrInput").value.trim() !== input) { voidAddrPin(ADDR_CHANGED_MSG); return; }
+      /* Vault cap (white-hat, 2026-10-15): sanitizeState caps the vault
+       * at MAX_VAULT_ADDRESSES at load (first-wins), but this confirm
+       * pushed with no cap check — at a full vault the push persisted
+       * 501 and the next load silently trimmed the NEW address, the one
+       * whose checkphrase was just read back and confirmed, under a
+       * "✓ added to vault" message. Refuse at the cap instead; the pin
+       * is voided with the reason, the form fields stay filled. */
+      if (!L.addressRoom(state.addresses.length)) {
+        voidAddrPin("Vault is full \\u2014 the cap is " + L.MAX_VAULT_ADDRESSES +
+          " addresses. Remove one before adding another.");
+        return;
+      }
       state.addresses.push({ address: input, label: $("addrLabel").value.trim(), words: words, addedAt: Date.now() });
       addrPin = null;
       $("addrInput").value = ""; $("addrLabel").value = "";
