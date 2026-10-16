@@ -21,6 +21,7 @@ import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } fro
 import { keypairFromSeed } from '../js/lib/mnemonic.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { xxhash128, SYSTEM_ACCOUNT_KEY } from '../js/lib/xxhash.js';
+import { qrCanvasSize, MAX_QR_DIM } from '../js/qr.js';
 
 const te = new TextEncoder();
 const GENESIS = '0x' + 'ab'.repeat(32);
@@ -487,4 +488,28 @@ test('xxhash128: canonical Substrate vector (chain-verified 2026-09-30)', () => 
   const key = SYSTEM_ACCOUNT_KEY(new Uint8Array(32).fill(7));
   assert.equal(Buffer.from(key.slice(0, 32)).toString('hex'),
     '26aa394eea5630e07c48ae0c9558cef7' + Buffer.from(xxhash128(te.encode('Account'))).toString('hex'));
+});
+
+test('qrCanvasSize: frames at or under the cap pass through unscaled', () => {
+  assert.deepEqual(qrCanvasSize(800, 600), { width: 800, height: 600, scaled: false });
+  assert.deepEqual(qrCanvasSize(MAX_QR_DIM, MAX_QR_DIM), { width: 2048, height: 2048, scaled: false });
+});
+
+test('qrCanvasSize: oversize frames scale to fit, aspect preserved, allocation bounded', () => {
+  const s = qrCanvasSize(20000, 20000);
+  assert.deepEqual(s, { width: 2048, height: 2048, scaled: true });
+  assert.ok(s.width * s.height * 4 <= 2048 * 2048 * 4);
+  const wide = qrCanvasSize(12000, 3000);
+  assert.equal(wide.width, 2048);
+  assert.equal(wide.height, 512);
+  assert.equal(wide.scaled, true);
+});
+
+test('qrCanvasSize: fail-closed on bad dimensions and bad caps', () => {
+  assert.equal(qrCanvasSize(0, 600), null);
+  assert.equal(qrCanvasSize(800, -1), null);
+  assert.equal(qrCanvasSize(NaN, 600), null);
+  assert.equal(qrCanvasSize(Infinity, 600), null);
+  assert.equal(qrCanvasSize(800, 600, 0), null);
+  assert.equal(qrCanvasSize(800, 600, NaN), null);
 });

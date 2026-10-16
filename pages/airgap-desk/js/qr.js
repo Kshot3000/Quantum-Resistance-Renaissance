@@ -56,28 +56,59 @@ export function drawQR(canvas, text, { ecLevel = 'M', dark = '#0a0618', light = 
       if (qr.isDark(r, c)) ctx.fillRect(Math.floor(c * cell), Math.floor(r * cell), Math.ceil(cell), Math.ceil(cell));
 }
 
+/* Decode-side canvas bound. An uploaded image's natural size is attacker-
+ * chosen (a small PNG can declare — and decompress to — enormous
+ * dimensions), and the old code sized the canvas to the bitmap and then
+ * copied it again with getImageData: a 20000x20000 image forces ~1.6 GB of
+ * canvas allocation plus a second ~1.6 GB copy, freezing or killing the
+ * tab on the machine that is supposed to stay air-gapped and reliable.
+ * QR payloads stay perfectly decodable far below this cap, so oversize
+ * frames are drawn scaled to fit inside MAX_QR_DIM on each side (aspect
+ * preserved), bounding canvas + ImageData at ~2 x 2048x2048x4 = ~33 MB.
+ * Returns null on non-positive / non-finite dimensions or a bad cap
+ * (fail-closed: the caller throws rather than allocating unbounded). */
+export const MAX_QR_DIM = 2048;
+export function qrCanvasSize(w, h, cap = MAX_QR_DIM) {
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+  if (!Number.isFinite(cap) || cap <= 0) return null;
+  const scale = Math.min(1, cap / w, cap / h);
+  return {
+    width: Math.max(1, Math.floor(w * scale)),
+    height: Math.max(1, Math.floor(h * scale)),
+    scaled: scale < 1,
+  };
+}
+
 /* Decode the first QR found in an image File/Blob. Returns the payload text. */
 export async function decodeQRImage(file) {
   await ensureJsQR();
   const bmp = await createImageBitmap(file);
-  const canvas = document.createElement('canvas');
-  canvas.width = bmp.width; canvas.height = bmp.height;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(bmp, 0, 0);
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const res = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
-  if (!res || !res.data) throw new Error('no QR code found in that image');
-  return res.data;
+  try {
+    const size = qrCanvasSize(bmp.width, bmp.height);
+    if (!size) throw new Error('that image has no readable dimensions');
+    const canvas = document.createElement('canvas');
+    canvas.width = size.width; canvas.height = size.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(bmp, 0, 0, size.width, size.height);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const res = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
+    if (!res || !res.data) throw new Error('no QR code found in that image');
+    return res.data;
+  } finally {
+    if (typeof bmp.close === 'function') bmp.close();
+  }
 }
 
 /* Decode a QR from a <video> frame (camera scanning). Returns text or null. */
 export function decodeVideoFrame(video) {
   if (typeof window.jsQR !== 'function') throw new Error('QR decoder not loaded');
   if (!video.videoWidth) return null;
+  const size = qrCanvasSize(video.videoWidth, video.videoHeight);
+  if (!size) return null;
   const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.width = size.width; canvas.height = size.height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(video, 0, 0);
+  ctx.drawImage(video, 0, 0, size.width, size.height);
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const res = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
   return res && res.data ? res.data : null;

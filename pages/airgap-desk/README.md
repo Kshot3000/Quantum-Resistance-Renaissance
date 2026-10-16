@@ -34,6 +34,10 @@ Sign QTC transfers on a machine that never touches the network.
   from the shared vendor tree (`assets/vendor/`), byte-identical to what was verified against
   Quantus-Network/chain + sp-runtime source — one shared copy instead of per-app duplicates
   since the 2026-10-01 vendor consolidation.
+- QR decode canvas is bounded by `qrCanvasSize` (`MAX_QR_DIM` 2048): oversize
+  uploaded images and camera frames are drawn scaled to fit, so a crafted
+  huge-dimension image cannot force a multi-GB canvas allocation on the
+  cold machine; the decoded bitmap is closed after use.
 - QR decode via vendored jsQR 1.4.0 (Apache-2.0), lazy-loaded by `js/qr.js` on first
   scan/upload-decode use — the 251 KB decoder is not part of the initial page load.
 - Optional builder service fee (2026-10-12): the cold desk can add a disclosed fee
@@ -42,7 +46,7 @@ Sign QTC transfers on a machine that never touches the network.
   `Utility.batch_all` — one signature, recipient leg first and untouched. The hot
   decoder accepts exactly that 2-leg batch shape and renders both legs, warning
   when the second leg does not pay the disclosed builder address.
-- `tests/run-tests.mjs`: 40/40 protocol tests (ticket/chunk/era codecs, full cold-sign →
+- `tests/run-tests.mjs`: 43/43 protocol tests (ticket/chunk/era codecs, full cold-sign →
   hot-verify round trip incl. tamper and wrong-ticket failures, ML-DSA-87 path,
   service-fee math/batch/decode-whitelist tests; the ticket nonce is held to the
   issuer's u32 grammar — a nonce ≥ 2³² or a non-safe integer the JSON text could
