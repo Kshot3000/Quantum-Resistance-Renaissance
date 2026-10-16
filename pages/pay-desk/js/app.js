@@ -288,6 +288,21 @@ function sanitizeRegister(raw, isValidAddress, nowMs) {
   return out;
 }
 
+/* Room left in the register under the load cap sanitizeRegister
+ * enforces. createInvoice is the only creation path, and it UNSHIFTS:
+ * the register is newest-first, so at a full register the uncapped
+ * unshift persisted 501 and the next load's first-wins trim silently
+ * evicted the OLDEST invoice — a merchant's payment record — while the
+ * new invoice's payment request painted as if everything was kept.
+ * createInvoice asks this gate before building anything and refuses
+ * with the cap named. Fail-closed: a count that is not a finite
+ * non-negative number earns no room. */
+function registerRoom(currentCount) {
+  var n = Math.floor(Number(currentCount));
+  if (!isFinite(n) || n < 0) return 0;
+  return Math.max(0, REGISTER_CAP - n);
+}
+
 function feeBpsLabel(bps) {
   var b = Math.floor(Number(bps) || 0);
   var whole = Math.floor(b / 100), rem = b % 100;
@@ -540,6 +555,7 @@ function drawQRInto(el, text, px) {
 function createInvoice() {
   var err = $("inv-error");
   err.textContent = "";
+  if (!registerRoom(state.register.length)) { err.textContent = "Register is full — the cap is " + REGISTER_CAP + " invoices. Export the register as CSV and clear it before creating another."; return; }
   if (!state.rate) { err.textContent = "Set a QTC/USD rate first — invoices cannot price without one."; return; }
   var addrOk = validateAddress($("inv-addr").value);
   if (!addrOk.ok) { err.textContent = "Fix the receiving address: " + addrOk.error; return; }
@@ -894,6 +910,8 @@ if (typeof module !== "undefined" && module.exports) {
     tipSnippet: tipSnippet,
     splitServiceFee: splitServiceFee,
     sanitizeRegister: sanitizeRegister,
+    registerRoom: registerRoom,
+    REGISTER_CAP: REGISTER_CAP,
     loadRate: loadRate,
     feeBpsLabel: feeBpsLabel,
     SERVICE_FEE_ADDRESS: SERVICE_FEE_ADDRESS,

@@ -392,6 +392,22 @@ eq("csv guardText exported", P.csvGuardText("=x"), "'=x");
   eq("rate grammar: register exponent bomb dropped", S([good({ rate: "1e100000000" })]).length, 0);
 })();
 
+/* ---- register creation cap (2026-10-15, white-hat track) ----
+ * sanitizeRegister caps the register at REGISTER_CAP=500 at load
+ * (first-wins; the register is newest-first), but createInvoice
+ * unshifted with no cap check: at a full register the unshift persisted
+ * 501 and the next load silently evicted the OLDEST invoice.
+ * createInvoice now asks registerRoom first and refuses with the cap
+ * named. The gate's arithmetic is exact and fail-closed. */
+eq("register cap is 500", P.REGISTER_CAP, 500);
+eq("registerRoom(0) === 500", P.registerRoom(0), 500);
+eq("registerRoom(499) === 1", P.registerRoom(499), 1);
+eq("registerRoom(500) === 0", P.registerRoom(500), 0);
+eq("registerRoom(5000) === 0 (never negative)", P.registerRoom(5000), 0);
+t("registerRoom(non-finite) === 0 (fail-closed)", P.registerRoom(NaN) === 0 && P.registerRoom("x") === 0 && P.registerRoom(undefined) === 0);
+eq("registerRoom(-3) === 0 (fail-closed)", P.registerRoom(-3), 0);
+eq("registerRoom(499.9) === 1 (floor)", P.registerRoom(499.9), 1);
+
 /* ---- constants ---- */
 eq("plancks per QTC", P.PLANCKS_PER_QTC, 1000000000000n);
 

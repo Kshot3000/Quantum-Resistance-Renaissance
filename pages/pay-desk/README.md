@@ -28,7 +28,10 @@ confirmation guidance, and an embeddable tip-button generator.
   floored so it never exceeds the quoted percentage). The fee is shown in
   the builder totals, the payment request, the POS screen, and the CSV
   export — never hidden, and this page never holds or forwards funds.
-- **Invoice register** — localStorage ledger of every request with statuses
+- **Invoice register** — capped at 500 invoices: creation asks the core
+  `registerRoom` gate first and refuses with the cap named (the uncapped
+  unshift persisted 501 and the next load silently evicted the oldest
+  invoice). localStorage ledger of every request with statuses
   (pending / paid / expired / cancelled), "mark paid" confirmation prompt,
   CSV export. **Statuses are merchant attestations, not chain truth** — you
   verify payment in your wallet or the explorer before marking paid.
@@ -53,11 +56,11 @@ existential deposit are flagged in the playbook.
 - `js/ss58.js` — SS58 codec extracted verbatim from `../address-toolkit/app.js`
   (blake2b + base58 + ss58Decode), exposed as `window.QTC_SS58`
 - `js/qrcode.js` — vendored QR generator (shared copy from Key Forge)
-- `tests/pay-desk.test.js` — 151 node tests, all green
+- `tests/pay-desk.test.js` — 159 node tests, all green
 
 ## Verification
 
-- `node pages/pay-desk/tests/pay-desk.test.js` — 151/151 pass
+- `node pages/pay-desk/tests/pay-desk.test.js` — 159/159 pass
 - Headless-Chromium browser QA (`hidden_files/qa-paydesk-browser.mjs`) —
   full user flow exercised, zero console/page errors
 - Service-fee browser QA (`hidden_files/qa-paydesk-fee.mjs`) — 17/17:
