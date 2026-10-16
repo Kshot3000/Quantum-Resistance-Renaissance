@@ -81,6 +81,25 @@ const IV_HEX_LEN = 24;
  * 64 KiB of ciphertext is a generous ceiling that still refuses absurd
  * blobs before they are persisted or fed to the decryptor. */
 const MAX_CIPHERTEXT_HEX_LEN = 131072;
+/* A vault backup FILE is bounded by that same ciphertext cap: the blob
+ * JSON around a max-size ciphertext (salt 32 + iv 24 + field names and
+ * punctuation) totals under ~132 KiB, so 256 KiB is ~2x the largest
+ * backup saveVault can ever produce. importVaultFile used to
+ * `await file.text()` and JSON.parse the WHOLE picked file before
+ * validateVaultBlob was consulted — a wrong pick (a log, a disk image)
+ * was read and parsed in full, allocating its text and parse tree,
+ * before the ciphertext cap finally rejected it. file.size is known
+ * before a single byte is read, so the import now asks vaultFileRoom
+ * first and refuses over-cap picks unread, with size + cap named. */
+export const MAX_VAULT_FILE_BYTES = 256 * 1024;
+/* How much room a vault backup file of `size` bytes has: true only for
+ * a finite, non-negative number at or under MAX_VAULT_FILE_BYTES.
+ * Fail-closed — NaN, negative, infinite, string, and missing sizes all
+ * refuse, matching the fleet's other *Room gates. */
+export function vaultFileRoom(size) {
+  return typeof size === 'number' && Number.isFinite(size) &&
+    size >= 0 && size <= MAX_VAULT_FILE_BYTES;
+}
 
 export function validateVaultBlob(blob) {
   if (!blob || typeof blob !== 'object' || Array.isArray(blob))
@@ -168,6 +187,13 @@ export function exportVaultFile() {
 }
 
 export async function importVaultFile(file) {
+  /* Size gate BEFORE reading a byte: every legitimate backup is under
+   * the cap by construction (see MAX_VAULT_FILE_BYTES), so an over-cap
+   * pick is refused unread and the stored vault is never touched. */
+  if (!file || !vaultFileRoom(file.size)) {
+    throw new Error('vault file is ' + (file && typeof file.size === 'number' ? file.size : 'an unknown number of') +
+      ' bytes — a QTC vault backup is at most ' + MAX_VAULT_FILE_BYTES + ' bytes (256 KiB); the file was not read');
+  }
   const text = await file.text();
   /* Validate the WHOLE blob before persisting anything: the import
    * replaces the stored vault, so a shaped-but-garbage file must never

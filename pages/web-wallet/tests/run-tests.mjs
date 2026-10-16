@@ -749,8 +749,8 @@ test('keystore: corrupt stored blob says corrupted, never wrong password / TypeE
 test('keystore: garbage import is rejected and the existing vault survives', async () => {
   const before = vaultStore.get(VAULT_KEY);
   const garbage = { v: 1, scheme: 99, salt: 'zzzz', iv: 'nope', ciphertext: 'abc' };
-  await assert.rejects(() => ks.importVaultFile({ text: async () => JSON.stringify(garbage) }));
-  await assert.rejects(() => ks.importVaultFile({ text: async () => 'not json' }), /not a QTC web-wallet vault file/);
+  await assert.rejects(() => ks.importVaultFile({ size: JSON.stringify(garbage).length, text: async () => JSON.stringify(garbage) }));
+  await assert.rejects(() => ks.importVaultFile({ size: 8, text: async () => 'not json' }), /not a QTC web-wallet vault file/);
   assert.equal(vaultStore.get(VAULT_KEY), before, 'a rejected import must not touch the stored vault');
   const data = await ks.openVault('correct horse battery');
   assert.equal(data.scheme, 87, 'the surviving vault still opens');
@@ -760,9 +760,54 @@ test('keystore: valid import round-trips and persists only the known fields', as
   const exported = vaultStore.get(VAULT_KEY);
   const withStray = JSON.stringify({ ...JSON.parse(exported), stray: 'drop me', nested: { x: 1 } });
   vaultStore.clear();
-  await ks.importVaultFile({ text: async () => withStray });
+  await ks.importVaultFile({ size: withStray.length, text: async () => withStray });
   const persisted = JSON.parse(vaultStore.get(VAULT_KEY));
   assert.deepEqual(Object.keys(persisted).sort(), ['cipher', 'ciphertext', 'iterations', 'iv', 'kdf', 'salt', 'scheme', 'v']);
   const data = await ks.openVault('correct horse battery');
   assert.equal(data.scheme, 87);
+});
+
+/* ---------- keystore vault-file size gate (white-hat, 2026-10-16) -----
+ * importVaultFile used to file.text() + JSON.parse the WHOLE picked
+ * backup before validateVaultBlob ran — yet that validator caps
+ * ciphertext at 131,072 hex chars, so every legitimate backup is
+ * < ~132 KiB and any larger file was guaranteed-reject, but only after
+ * its full text + parse tree were allocated. The import now asks the
+ * fail-closed vaultFileRoom(file.size) gate first (cap 256 KiB, ~2x
+ * the largest backup saveVault can produce) and refuses over-cap
+ * picks unread, naming size + cap, with the stored vault untouched. */
+test('keystore: vaultFileRoom arithmetic is fail-closed at the 256 KiB cap', () => {
+  assert.equal(ks.MAX_VAULT_FILE_BYTES, 256 * 1024);
+  assert.equal(ks.vaultFileRoom(0), true);
+  assert.equal(ks.vaultFileRoom(131072), true, 'a max-ciphertext backup fits');
+  assert.equal(ks.vaultFileRoom(ks.MAX_VAULT_FILE_BYTES), true);
+  assert.equal(ks.vaultFileRoom(ks.MAX_VAULT_FILE_BYTES + 1), false);
+  assert.equal(ks.vaultFileRoom(20 * 1024 * 1024), false);
+  for (const bad of [NaN, -1, Infinity, '100', undefined, null, {}]) {
+    assert.equal(ks.vaultFileRoom(bad), false, 'fail-closed: ' + String(bad));
+  }
+});
+
+test('keystore: over-cap import is refused unread and the vault survives', async () => {
+  const before = vaultStore.get(VAULT_KEY);
+  let reads = 0;
+  await assert.rejects(
+    () => ks.importVaultFile({ size: 20 * 1024 * 1024, text: async () => { reads++; return '{}'; } }),
+    (e) => /20971520/.test(e.message) && /262144/.test(e.message) && /not read/.test(e.message),
+  );
+  assert.equal(reads, 0, 'an over-cap file must never be read');
+  assert.equal(vaultStore.get(VAULT_KEY), before, 'a refused import must not touch the stored vault');
+  // a sizeless file is fail-closed too, also unread
+  await assert.rejects(() => ks.importVaultFile({ text: async () => { reads++; return '{}'; } }), /not read/);
+  assert.equal(reads, 0);
+  assert.equal(vaultStore.get(VAULT_KEY), before);
+});
+
+test('keystore: at-cap import (genuine blob padded to exactly the cap) succeeds', async () => {
+  const genuine = JSON.stringify(genuineBlob());
+  const padded = genuine + ' '.repeat(ks.MAX_VAULT_FILE_BYTES - genuine.length);
+  assert.equal(padded.length, ks.MAX_VAULT_FILE_BYTES);
+  await ks.importVaultFile({ size: padded.length, text: async () => padded });
+  const persisted = JSON.parse(vaultStore.get(VAULT_KEY));
+  assert.equal(persisted.ciphertext, genuineBlob().ciphertext);
 });
