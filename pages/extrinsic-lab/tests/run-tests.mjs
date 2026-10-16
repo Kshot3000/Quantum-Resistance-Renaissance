@@ -358,5 +358,49 @@ test('a signed extrinsic carrying a poisoned bool byte fails decode', () => {
   assert(threw, 'poisoned keep_alive must fail the whole decode');
 });
 
+/* ---------- 12: checkphrase derivation budget (white-hat) ----------
+ * A checkphrase is display-only, but each derivation is a synchronous
+ * 40,000-iteration PBKDF2 (~0.6 s in Node). accountDisplay derived one
+ * for EVERY decoded account with no dedupe: a crafted batch_all of 30
+ * distinct dests burned 30 sequential KDFs (~21 s measured) on the
+ * Autopsy click, and a duplicated dest paid twice. Derivations are now
+ * capped per top-level decode and memoized across decodes. */
+test('checkphraseRoom arithmetic is exact and fail-closed', () => {
+  assertEq(D.MAX_CHECKPHRASE_DERIVATIONS, 10, 'cap is 10');
+  assertEq(D.checkphraseRoom(0), 10, 'full budget at 0 used');
+  assertEq(D.checkphraseRoom(9), 1, 'one left at 9');
+  assertEq(D.checkphraseRoom(10), 0, 'zero at cap');
+  assertEq(D.checkphraseRoom(99), 0, 'zero past cap');
+  for (const bad of [-1, NaN, 1.5, '3', null, undefined]) {
+    assertEq(D.checkphraseRoom(bad), 0, 'fail-closed for ' + JSON.stringify(bad));
+  }
+});
+test('a duplicated dest derives once and both rows keep the phrase', () => {
+  const inner = buildCallTransfer(rand32(950), 1000000000000n);
+  const batch = D.concatBytes([Uint8Array.of(9, 2), compactEncode(2), inner, inner]);
+  const c = D.decodeCallBytes(batch);
+  assert(c.checkphrases && c.checkphrases.derived === 1 && c.checkphrases.skipped === 0,
+    'one derivation for two identical dests, got ' + JSON.stringify(c.checkphrases));
+  const items = c.args[0].decoded.items;
+  assert(items[0].value.call.args[0].decoded.account.checkphrase, 'first dest phrased');
+  assertEq(items[1].value.call.args[0].decoded.account.checkphrase,
+           items[0].value.call.args[0].decoded.account.checkphrase, 'second dest reuses the phrase');
+});
+test('derivations stop at the cap and skipped accounts stay honest', () => {
+  const inners = [];
+  for (let i = 0; i < 12; i++) inners.push(buildCallTransfer(rand32(900 + i), 1000000000000n));
+  const batchCall = D.concatBytes([Uint8Array.of(9, 2), compactEncode(inners.length), ...inners]);
+  const body = D.concatBytes([Uint8Array.of(0x04), batchCall]);
+  const hex = '0x' + D.bytesToHex(D.concatBytes([compactEncode(body.length), body]));
+  const d = D.decodeExtrinsic(hex);
+  assert(d.checkphrases && d.checkphrases.derived === 10 && d.checkphrases.skipped === 2 && d.checkphrases.cap === 10,
+    'stats report the bound, got ' + JSON.stringify(d.checkphrases));
+  const items = d.call.args[0].decoded.items;
+  assert(items[0].value.call.args[0].decoded.account.checkphrase, 'first dest within budget is phrased');
+  const past = items[11].value.call.args[0].decoded.account;
+  assert(past.checkphrase === null && past.checkphraseSkipped === true && past.ss58.startsWith('qz'),
+    'past-budget account keeps its address, phrase honestly skipped');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

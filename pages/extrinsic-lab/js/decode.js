@@ -84,18 +84,72 @@ function ss58Of(bytes32) {
   } catch (e) {}
   return null;
 }
+/* ---------- checkphrase derivation budget ----------
+ * A checkphrase is a DISPLAY aid only: nothing in the decode, the byte
+ * map, or signature verification reads it. Yet deriving one costs a
+ * synchronous 40,000-iteration PBKDF2-HMAC-SHA256 in pure JS (~0.6 s
+ * measured in Node) — and accountDisplay derived one for EVERY account
+ * a decode touched, with no dedupe: signer, signature account, and
+ * every call argument, so a crafted extrinsic carrying 60 distinct
+ * accounts (a batch_all of 60 transfers, a 60-signer create_multisig)
+ * burned 60 sequential KDFs (~21 s measured for 30) on the Autopsy
+ * click before a single byte rendered, and the same address pasted
+ * twice paid twice. Derivations are now budgeted per top-level decode
+ * and memoized across decodes: at most MAX_CHECKPHRASE_DERIVATIONS new
+ * derivations per decodeExtrinsic/decodeCallBytes, repeats served from
+ * a bounded cache, and accounts past the budget keep their SS58 + hex
+ * with checkphraseSkipped set so the UI can say so honestly. The
+ * decode result reports { derived, skipped, cap } as `checkphrases`. */
+var MAX_CHECKPHRASE_DERIVATIONS = 10;
+var MAX_CHECKPHRASE_CACHE = 200;
+var cpCache = new Map();   // ss58 -> phrase, shared across decodes (FIFO-bounded)
+var cpSession = null;      // { derived, skipped, skippedFor } while a top-level decode runs
+var cpDepth = 0;           // nested decodes (callbytes) share the outer session
+function checkphraseRoom(used) {
+  if (!Number.isSafeInteger(used) || used < 0) return 0;
+  return Math.max(0, MAX_CHECKPHRASE_DERIVATIONS - used);
+}
+function cpEnter() {
+  if (cpDepth === 0) cpSession = { derived: 0, skipped: 0, skippedFor: null };
+  cpDepth++;
+}
+function cpExit(out) {
+  cpDepth--;
+  if (cpDepth <= 0) {
+    cpDepth = 0;
+    if (out && cpSession) {
+      out.checkphrases = { derived: cpSession.derived, skipped: cpSession.skipped, cap: MAX_CHECKPHRASE_DERIVATIONS };
+    }
+    cpSession = null;
+  }
+}
 function checkphraseOf(ss58) {
+  if (cpCache.has(ss58)) return cpCache.get(ss58);
+  if (cpSession && checkphraseRoom(cpSession.derived) <= 0) {
+    cpSession.skipped++;
+    cpSession.skippedFor = ss58;
+    return null;
+  }
+  var phrase = null;
   try {
     if (global.QTC_CHECK && global.QTC_WORDLIST) {
       var w = global.QTC_CHECK.addressToChecksum(ss58, global.QTC_WORDLIST);
-      return Array.isArray(w) ? w.join(' ') : String(w);
+      phrase = Array.isArray(w) ? w.join(' ') : String(w);
     }
   } catch (e) {}
-  return null;
+  if (phrase !== null) {
+    if (cpSession) cpSession.derived++;
+    if (cpCache.size >= MAX_CHECKPHRASE_CACHE) cpCache.delete(cpCache.keys().next().value);
+    cpCache.set(ss58, phrase);
+  }
+  return phrase;
 }
 function accountDisplay(bytes32) {
   var ss58 = ss58Of(bytes32);
-  return { kind: 'account', hex: '0x' + bytesToHex(bytes32), ss58: ss58, checkphrase: ss58 ? checkphraseOf(ss58) : null };
+  var phrase = ss58 ? checkphraseOf(ss58) : null;
+  var out = { kind: 'account', hex: '0x' + bytesToHex(bytes32), ss58: ss58, checkphrase: phrase };
+  if (ss58 && phrase === null && cpSession && cpSession.skippedFor === ss58) out.checkphraseSkipped = true;
+  return out;
 }
 function utf8Try(bytes) {
   try {
@@ -249,14 +303,26 @@ function decodeCall(r, depth) {
   return res;
 }
 function decodeCallBytes(bytes) {
-  var r = new Reader(bytes);
-  var c = decodeCall(r, 0);
-  if (r.left() > 0) c.trailing = { bytes: r.left(), hex: '0x' + bytesToHex(r.take(r.left())) };
-  return c;
+  cpEnter();
+  try {
+    var r = new Reader(bytes);
+    var c = decodeCall(r, 0);
+    if (r.left() > 0) c.trailing = { bytes: r.left(), hex: '0x' + bytesToHex(r.take(r.left())) };
+    cpExit(c);
+    return c;
+  } catch (e) { cpExit(null); throw e; }
 }
 
 /* ---------------- top-level extrinsic ---------------- */
 function decodeExtrinsic(hexInput) {
+  cpEnter();
+  try {
+    var out = decodeExtrinsicInner(hexInput);
+    cpExit(out);
+    return out;
+  } catch (e) { cpExit(null); throw e; }
+}
+function decodeExtrinsicInner(hexInput) {
   var bytes = hexToBytes(hexInput);
   var r = new Reader(bytes);
   var sections = [];
@@ -350,6 +416,7 @@ var api = {
   hexToBytes: hexToBytes, bytesToHex: bytesToHex, concatBytes: concatBytes,
   Reader: Reader, plancksToQtc: plancksToQtc, ss58Of: ss58Of, checkphraseOf: checkphraseOf,
   decodeExtrinsic: decodeExtrinsic, decodeCall: decodeCall, decodeCallBytes: decodeCallBytes,
+  MAX_CHECKPHRASE_DERIVATIONS: MAX_CHECKPHRASE_DERIVATIONS, checkphraseRoom: checkphraseRoom,
   decodeEra: decodeEra, eraBirth: eraBirth, decodeMultiAddress: decodeMultiAddress,
   decodeSignature: decodeSignature, buildSigningPayload: buildSigningPayload,
   SIG_SIZES: SIG_SIZES,

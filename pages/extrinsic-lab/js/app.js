@@ -81,7 +81,8 @@
 
   function renderAccount(acct) {
     if (!acct) return '<span class="warnline">no account</span>';
-    var words = acct.checkphrase ? '<span class="words" title="Human checkphrase — 4 words derived from the address">' + esc(acct.checkphrase) + '</span>' : '';
+    var words = acct.checkphrase ? '<span class="words" title="Human checkphrase — 4 words derived from the address">' + esc(acct.checkphrase) + '</span>'
+      : (acct.checkphraseSkipped ? '<span class="words" title="Each checkphrase costs a 40,000-iteration PBKDF2 derivation, so a single decode derives at most ' + (D.MAX_CHECKPHRASE_DERIVATIONS || 10) + ' new ones. The address above is complete; only the word aid was skipped.">checkphrase not computed — derivation budget reached</span>' : '');
     return '<div class="addrline"><span class="mono">' + esc(acct.ss58 || acct.hex) + '</span>' +
       '<button class="copybtn" data-copy="' + esc(acct.ss58 || acct.hex) + '" data-copylabel="Address">copy</button></div>' +
       '<div class="hexprev">' + esc(acct.hex) + '</div>' + words;
@@ -286,7 +287,8 @@
         '<span class="ar">bytes ' + s.start + '–' + s.end + ' · ' + len + ' B</span>' +
         '<span class="ad">' + esc(s.note || '') + '</span></div>';
     }).join('') + '</div>' +
-      (d.trailing ? '<div class="warnline" style="margin-top:8px">⚠ ' + d.trailing + ' trailing byte(s) after the decoded call — the length prefix covers more than the decoder consumed. The extrinsic may use a layout this table does not know.</div>' : '');
+      (d.trailing ? '<div class="warnline" style="margin-top:8px">⚠ ' + d.trailing + ' trailing byte(s) after the decoded call — the length prefix covers more than the decoder consumed. The extrinsic may use a layout this table does not know.</div>' : '') +
+      (d.checkphrases && d.checkphrases.skipped ? '<div class="warnline" style="margin-top:8px">⚠ Checkphrases computed for ' + d.checkphrases.derived + ' account(s) only — ' + d.checkphrases.skipped + ' skipped past the per-decode budget of ' + d.checkphrases.cap + ' derivations (each costs a 40,000-iteration PBKDF2). Addresses, byte ranges and signature verification are unaffected.</div>' : '');
   }
 
   $('decode-btn').addEventListener('click', function () { doDecode(); });

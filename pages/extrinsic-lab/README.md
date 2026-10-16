@@ -26,4 +26,4 @@ ML-DSA comes from the vendored `@noble/post-quantum` modules (same tree the web 
 
 ## Tests
 
-`node tests/run-tests.mjs` — 14 tests, all green: real signed extrinsics built with noble ML-DSA, decoded and verified; tamper rejection; both signature schemes; mortal-era birth computation; the >256-byte blake2 hashing rule; a compact-codec round-trip regression suite (all four modes); unknown pallet/call honesty; malformed-input errors.
+`node tests/run-tests.mjs` — 27 tests, all green: real signed extrinsics built with noble ML-DSA, decoded and verified; tamper rejection; both signature schemes; mortal-era birth computation; the >256-byte blake2 hashing rule; a compact-codec round-trip regression suite (all four modes); unknown pallet/call honesty; malformed-input errors; RPC answer validators; the SCALE bool discriminant; and the checkphrase derivation budget — a checkphrase is display-only but each derivation is a synchronous 40,000-iteration PBKDF2, so the decoder now derives at most 10 new phrases per decode (repeats memoized across decodes), with accounts past the budget keeping their SS58 address and the skip disclosed in the anatomy.
