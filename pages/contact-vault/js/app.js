@@ -11,7 +11,6 @@
 
 var LOGIC = QTC_VAULT_LOGIC;
 var STORE_KEY = "qcv-vault-v1";
-var MAX_BATCH = 200;
 
 /* ---------- tiny utils ---------- */
 function $(id) { return document.getElementById(id); }
@@ -568,11 +567,23 @@ $("avRun").addEventListener("click", function () {
 
 /* ---------- batch verify ---------- */
 $("bRun").addEventListener("click", function () {
-  var lines = $("bAddrs").value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+  var parsed = LOGIC.parseBatchInput($("bAddrs").value);
+  var lines = parsed.lines;
   var body = $("bBody"), table = $("bTable"), summary = $("bSummary"), prog = $("bProg");
   body.innerHTML = ""; summary.innerHTML = "";
-  if (!lines.length) { prog.textContent = "Paste at least one address."; return; }
-  if (lines.length > MAX_BATCH) lines = lines.slice(0, MAX_BATCH);
+  /* The scan disclosures ride into the completion line (and the empty
+   * message): prog is overwritten per row while verifying, so a note
+   * written before the run would never survive to be read. */
+  var scanNote = "";
+  if (parsed.droppedLines > 0)
+    scanNote += " Only the first " + LOGIC.MAX_BATCH + " addresses were verified — " +
+      parsed.droppedLines.toLocaleString("en-US") + " more line" +
+      (parsed.droppedLines === 1 ? "" : "s") + " in the scanned window were not verified.";
+  if (parsed.skippedChars > 0)
+    scanNote += " Only the first " + LOGIC.MAX_BATCH_SCAN_CHARS.toLocaleString("en-US") +
+      " characters of the paste were scanned — " + parsed.skippedChars.toLocaleString("en-US") +
+      " characters were not scanned; trim the paste to reach them.";
+  if (!lines.length) { prog.textContent = "Paste at least one address." + scanNote; return; }
   table.hidden = false;
   var btn = $("bRun");
   btn.disabled = true;
@@ -580,7 +591,7 @@ $("bRun").addEventListener("click", function () {
   (function next() {
     if (i >= lines.length) {
       btn.disabled = false;
-      prog.textContent = "Done.";
+      prog.textContent = "Done." + scanNote;
       summary.innerHTML =
         '<span>✓ matched <b>' + counts.match + '</b></span>' +
         '<span>? unknown <b>' + counts.unknown + '</b></span>' +

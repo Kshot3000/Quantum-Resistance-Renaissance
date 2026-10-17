@@ -283,5 +283,54 @@ ok("contactRoom fail-closed on a bad count",
   LOGIC.contactRoom(NaN) === 0 && LOGIC.contactRoom("x") === 0 &&
   LOGIC.contactRoom(undefined) === 0 && LOGIC.contactRoom(-3) === 0);
 
+/* 10. batch-verify scan window (batchTextWindow / parseBatchInput): the
+ * handler verifies at most MAX_BATCH addresses, but it used to split the
+ * WHOLE paste first — a 20,000,000-char / 400,000-line paste built all
+ * 400,000 strings in ~1,231 ms in Node (probe qa-contactvault-batchscan)
+ * to verify 200, and dropped lines were never disclosed. The core now
+ * windows the raw text at MAX_BATCH_SCAN_CHARS with cut-back to the last
+ * newline, caps the lines, and reports droppedLines + skippedChars. */
+ok("batch caps exported (MAX_BATCH 200, MAX_BATCH_SCAN_CHARS 32768)",
+  LOGIC.MAX_BATCH === 200 && LOGIC.MAX_BATCH_SCAN_CHARS === 32768);
+ok("batchTextWindow small paste scans fully",
+  (() => { const w = LOGIC.batchTextWindow(KYLE + "\n" + KYLE);
+    return w.lines.length === 2 && w.skippedChars === 0 && w.scannedChars === w.totalChars; })());
+ok("batchTextWindow at exactly the cap scans all, skips 0",
+  (() => { const w = LOGIC.batchTextWindow("a".repeat(32768));
+    return w.scannedChars === 32768 && w.skippedChars === 0; })());
+ok("batchTextWindow at cap+1 with no newline scans empty, skips all (no partial line)",
+  (() => { const w = LOGIC.batchTextWindow("a".repeat(32769));
+    return w.scannedChars === 0 && w.skippedChars === 32769 && w.lines.length === 0; })());
+ok("batchTextWindow fail-closed on non-strings",
+  [null, undefined, 42, NaN, {}, []].every((v) => {
+    const w = LOGIC.batchTextWindow(v);
+    return w.lines.length === 0 && w.skippedChars === 0 && w.totalChars === 0;
+  }));
+ok("parseBatchInput small paste semantics unchanged (trim, blanks dropped)",
+  (() => { const r = LOGIC.parseBatchInput(KYLE + "\n  " + KYLE + "  \n\nnot-an-address\n");
+    return r.lines.length === 3 && r.lines[2] === "not-an-address" &&
+      r.skippedChars === 0 && r.droppedLines === 0; })());
+ok("parseBatchInput 300 in-window lines -> 200 kept, 100 dropped, 0 skipped",
+  (() => { const r = LOGIC.parseBatchInput((KYLE + "\n").repeat(300));
+    return r.lines.length === 200 && r.droppedLines === 100 && r.skippedChars === 0; })());
+ok("parseBatchInput 200 max-length 128-char lines scan fully",
+  (() => { const r = LOGIC.parseBatchInput(("x".repeat(128) + "\n").repeat(200));
+    return r.skippedChars === 0 && r.lines.length === 200 && r.droppedLines === 0; })());
+ok("parseBatchInput giant paste windows to 200 complete lines with the tail skipped",
+  (() => { const r = LOGIC.parseBatchInput((KYLE + "\n").repeat(400000));
+    return r.lines.length === 200 && r.skippedChars > 19000000 &&
+      r.lines.every((l) => l === KYLE); })());
+ok("parseBatchInput straddling line dropped whole, never truncated",
+  (() => { const r = LOGIC.parseBatchInput((KYLE + "\n").repeat(655) + "z".repeat(100) + "\n" + KYLE);
+    return r.lines.every((l) => l === KYLE) && r.skippedChars > 0; })());
+ok("parseBatchInput single over-window line scans as empty, all chars skipped",
+  (() => { const r = LOGIC.parseBatchInput("q".repeat(100000));
+    return r.lines.length === 0 && r.skippedChars === 100000; })());
+ok("parseBatchInput fail-closed on non-strings",
+  [null, undefined, 42, NaN, {}, []].every((v) => {
+    const r = LOGIC.parseBatchInput(v);
+    return r.lines.length === 0 && r.skippedChars === 0 && r.droppedLines === 0;
+  }));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -154,6 +154,53 @@ function contactRoom(currentCount) {
   return Math.max(0, MAX_CONTACTS - n);
 }
 
+/* ---------- batch-verify input scan window ---------- */
+/* The Batch tab verifies at most MAX_BATCH addresses, but the app used
+ * to split/trim/filter the WHOLE textarea value to build the line array
+ * it then sliced: a 20,000,000-char paste of 400,000 lines built all
+ * 400,000 strings in ~1,231 ms in Node (probe qa-contactvault-batchscan)
+ * on every Verify click, all to verify 200 — and the 399,800 dropped
+ * lines were never disclosed. batchTextWindow owns the raw text: it
+ * scans only the first MAX_BATCH_SCAN_CHARS characters and backs the
+ * cut off to the last newline, so no truncated partial line is ever
+ * verified. The cap is derived from the largest legitimate batch: a
+ * Quantus address is 49 chars, and lines up to 128 chars still earn a
+ * verdict (a near-miss or garbage line is reported invalid, not
+ * pre-filtered), so a full batch is 200 x (128 + 1 separator) = 25,800
+ * chars — the 32,768 window holds it intact, plus ~660 real addresses.
+ * parseBatchInput then applies the MAX_BATCH line cap and reports
+ * droppedLines (in-window lines past the cap) and skippedChars
+ * (characters past the window), both of which the app discloses in the
+ * completion line. Non-string input fails closed as empty. */
+var MAX_BATCH = 200;
+var MAX_BATCH_SCAN_CHARS = 32768;
+function batchTextWindow(text) {
+  if (typeof text !== "string")
+    return { lines: [], totalChars: 0, scannedChars: 0, skippedChars: 0 };
+  var totalChars = text.length;
+  var scanned = text;
+  if (totalChars > MAX_BATCH_SCAN_CHARS) {
+    scanned = text.slice(0, MAX_BATCH_SCAN_CHARS);
+    var nextCh = text.charAt(MAX_BATCH_SCAN_CHARS);
+    var lastCh = scanned.charAt(scanned.length - 1);
+    if (nextCh && nextCh !== "\n" && nextCh !== "\r" && lastCh !== "\n" && lastCh !== "\r") {
+      var cut = Math.max(scanned.lastIndexOf("\n"), scanned.lastIndexOf("\r"));
+      scanned = cut >= 0 ? scanned.slice(0, cut + 1) : "";
+    }
+  }
+  var lines = scanned.split(/\r?\n/).map(function (s) { return s.trim(); })
+    .filter(function (s) { return s.length > 0; });
+  return { lines: lines, totalChars: totalChars, scannedChars: scanned.length,
+           skippedChars: totalChars - scanned.length };
+}
+function parseBatchInput(text) {
+  var w = batchTextWindow(text);
+  var lines = w.lines.slice(0, MAX_BATCH);
+  return { lines: lines, droppedLines: w.lines.length - lines.length,
+           totalLines: w.lines.length, totalChars: w.totalChars,
+           scannedChars: w.scannedChars, skippedChars: w.skippedChars };
+}
+
 /* ---------- export / import ---------- */
 var EXPORT_APP = "qtc-contact-vault";
 var ENC_APP = "qtc-contact-vault-enc";
@@ -288,6 +335,8 @@ var api = {
   closestContact: closestContact,
   mutateMiddleChar: mutateMiddleChar,
   sanitizeVault: sanitizeVault, MAX_CONTACTS: MAX_CONTACTS, contactRoom: contactRoom,
+  MAX_BATCH: MAX_BATCH, MAX_BATCH_SCAN_CHARS: MAX_BATCH_SCAN_CHARS,
+  batchTextWindow: batchTextWindow, parseBatchInput: parseBatchInput,
   cleanAddedAt: cleanAddedAt, cleanCheckphrase: cleanCheckphrase,
   buildExportPayload: buildExportPayload,
   parseImportPayload: parseImportPayload,
