@@ -641,6 +641,14 @@ async function processBlock(blockHash, expectedNum) {
   if (evRes === null || evRes === undefined) return;
   if (typeof evRes !== "string" || !/^0x(?:[0-9a-fA-F]{2})+$/.test(evRes))
     throw new Error("node returned malformed System.Events data");
+  /* The shape regex above has no length bound, and the codec parser
+   * used to strip/regex/loop the whole string before any length was
+   * checked — a hostile or broken node could hand this desk a
+   * multi-megabyte "events" value to parse per block. Ask the gate
+   * first and refuse oversized values unread, naming size + cap. */
+  if (C.hexInputRoom(evRes.length) === 0)
+    throw new Error("node returned oversized System.Events data (" + evRes.length.toLocaleString("en-US") +
+      " characters — the cap is " + C.MAX_HEX_INPUT_CHARS.toLocaleString("en-US") + " characters; refused before parsing)");
   const evBytes = C.hexToBytes(evRes);
   if (!evBytes) throw new Error("node returned malformed System.Events data");
   const dec = C.decodeSystemEvents(evBytes);

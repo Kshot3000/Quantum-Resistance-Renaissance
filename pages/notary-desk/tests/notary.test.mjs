@@ -275,6 +275,55 @@ t("events reject a Remarked record under the Finalization phase",
   codec.decodeSystemEvents([0x04, 0x01, 0x00, 0x05,
     ...new Array(32).fill(0x11), ...new Array(32).fill(0x22), 0x00]).ok === false);
 
+/* --- hex-parse bound (white-hat track): hexToBytes used to strip,
+ * regex-test and parseInt-loop the WHOLE string before any caller
+ * checked a length, and its callers hand it untrusted strings: the
+ * node's System.Events value + per-block extrinsics and the vault
+ * sanitizer's stored callHex/envelopeHex on every load. A
+ * 20,000,000-char string built a 10,000,000-byte array in ~584 ms in
+ * Node. The cap sits above every legitimate input measured with the
+ * codec's own producers: digest 64 chars, max envelope 210 chars,
+ * max vault call 8,200 chars, largest signed ML-DSA-87 remark
+ * extrinsic 22,728 chars (0x-prefixed), and a 7,000-record
+ * System.Events blob at 1,008,006 chars (the cap admits 7,281
+ * records). --- */
+t("hexInputRoom at 0 is the whole cap",
+  codec.hexInputRoom(0) === codec.MAX_HEX_INPUT_CHARS && codec.MAX_HEX_INPUT_CHARS === 1048576);
+t("hexInputRoom arithmetic below the cap", codec.hexInputRoom(48576) === 1000000);
+t("hexInputRoom is 0 at and past the cap",
+  codec.hexInputRoom(1048576) === 0 && codec.hexInputRoom(2000000) === 0);
+t("hexInputRoom fail-closed on NaN/negative/fraction/string/undefined/null/Infinity",
+  codec.hexInputRoom(NaN) === 0 && codec.hexInputRoom(-1) === 0 &&
+  codec.hexInputRoom(1.5) === 0 && codec.hexInputRoom("10") === 0 &&
+  codec.hexInputRoom(undefined) === 0 && codec.hexInputRoom(null) === 0 &&
+  codec.hexInputRoom(Infinity) === 0);
+t("hexToBytes refuses a 2,000,002-char input unparsed",
+  codec.hexToBytes("aa".repeat(1000001)) === null);
+t("hexToBytes refuses cap+2 chars", codec.hexToBytes("a".repeat(1048578)) === null);
+t("hexToBytes still parses exactly-cap input to 524,288 bytes",
+  (() => { const b = codec.hexToBytes("ab".repeat(524288)); return Array.isArray(b) && b.length === 524288; })());
+t("hexToBytes still parses a 0x-prefixed input at exactly the cap",
+  (() => { const b = codec.hexToBytes("0x" + "ab".repeat(524287)); return Array.isArray(b) && b.length === 524287; })());
+t("hexToBytes parses the largest envelope (210 chars) unchanged",
+  (() => { const e = codec.buildEnvelope(1, new Array(32).fill(1), "x".repeat(64));
+    return e.hex.length === 210 && JSON.stringify(codec.hexToBytes(e.hex)) === JSON.stringify(e.bytes); })());
+t("hexToBytes parses the largest vault call (8,200 chars) unchanged",
+  (() => { const c = codec.buildRemarkCall(new Array(4096).fill(0x61), true);
+    const b = codec.hexToBytes(c.callHex); return c.callHex.length === 8200 && b && b.length === 4100; })());
+t("a 7,000-record System.Events blob still parses and decodes under the cap",
+  (() => { const rec = [0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x05,
+      ...new Array(32).fill(0x11), ...new Array(32).fill(0x22), 0x00];
+    const blob = codec.compactU32(7000).concat(Array.from({ length: 7000 }, () => rec).flat());
+    const hex = "0x" + codec.bytesToHex(blob);
+    if (hex.length > codec.MAX_HEX_INPUT_CHARS) return false;
+    const d = codec.decodeSystemEvents(codec.hexToBytes(hex));
+    return d.ok && d.records.length === 7000; })());
+t("sanitizeVault drops an anchor whose callHex is over the hex cap",
+  codec.sanitizeVault([{ ...GOOD_MSG2, callHex: "0007" + "aa".repeat(1000000) }]).length === 0);
+t("hexToBytes still rejects malformed hex below the cap",
+  codec.hexToBytes("zz") === null && codec.hexToBytes("abc") === null &&
+  codec.hexToBytes(null) === null);
+
 /* --- storage key --- */
 const evKey = codec.systemEventsKey((b) => twox.twox128bytes(b));
 t("System.Events key shape",

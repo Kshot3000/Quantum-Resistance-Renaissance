@@ -61,8 +61,34 @@
   var MAX_LABEL_BYTES = 64;
   var MAX_MESSAGE_BYTES = 4096; // raw message mode cap (keeps fees sane)
 
-  /* ---------------- Byte helpers ---------------- */
+  /* ---------------- Byte helpers ----------------
+   * hexToBytes refuses over-cap inputs BEFORE any parsing: it used to
+   * strip, regex-test and parseInt-loop the WHOLE string first, and
+   * its callers hand it untrusted strings — the node's System.Events
+   * storage value and per-block extrinsics (app.js processBlock /
+   * spotRemarkCall, shape-checked only by a regex with no length
+   * bound) and the vault sanitizer's stored callHex/envelopeHex on
+   * every load. A 20,000,000-char string built a 10,000,000-byte array
+   * in ~584 ms in Node before any caller could check a length. The
+   * cap is derived from the largest legitimate inputs, measured with
+   * this codec's own producers: a digest is 64 chars; the largest
+   * envelope (64-byte label) is 210 chars; the largest vault call
+   * (4,096-byte payload) is 8,200 chars; the largest signed ML-DSA-87
+   * remark extrinsic is 11,363 bytes = 22,728 chars (0x-prefixed); and
+   * a whole block's System.Events blob — the one whole-block input —
+   * at 7,000 Remarked records is 504,002 bytes = 1,008,006 chars.
+   * MAX_HEX_INPUT_CHARS = 1,048,576 (524,288 bytes) admits all of
+   * them — the events cap admits up to 7,281 Remarked records — while
+   * refusing anything larger unparsed. hexInputRoom is the pure
+   * fail-closed gate (a non-integer, negative, or non-number count
+   * gets no room), mirroring the fleet's Extrinsic Lab hex bound. */
+  var MAX_HEX_INPUT_CHARS = 1048576;
+  function hexInputRoom(chars) {
+    if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+    return Math.max(0, MAX_HEX_INPUT_CHARS - chars);
+  }
   function hexToBytes(h) {
+    if (typeof h === "string" && h.length > MAX_HEX_INPUT_CHARS) return null;
     h = String(h).replace(/^0x/i, "").replace(/\s+/g, "").toLowerCase();
     if (!/^[0-9a-f]*$/.test(h) || h.length % 2 !== 0) return null;
     var out = new Array(h.length / 2);
@@ -555,6 +581,7 @@
     SIG_SCHEMES: SIG_SCHEMES, ALGOS: ALGOS, MAX_LABEL_BYTES: MAX_LABEL_BYTES,
     MAX_MESSAGE_BYTES: MAX_MESSAGE_BYTES,
     hexToBytes: hexToBytes, bytesToHex: bytesToHex,
+    MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom,
     utf8ToBytes: utf8ToBytes, bytesToUtf8: bytesToUtf8,
     compactU32: compactU32, readCompact: readCompact,
     buildEnvelope: buildEnvelope, parseRemark: parseRemark,
