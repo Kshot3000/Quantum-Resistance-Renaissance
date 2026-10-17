@@ -374,9 +374,21 @@
     $("pd-copy-un").addEventListener("click", function () { copyText(un.hex, "unnote_preimage hex copied"); });
   }
   $("pd-hex").addEventListener("input", function (e) {
-    var b = C.hexToBytes(e.target.value.trim());
+    var raw = e.target.value.trim();
+    // Parse bound BEFORE parsing (white-hat track): this handler runs
+    // on every keystroke and hexToBytes used to parse the whole paste
+    // before pdRender's 4 KiB check could reject it. Refuse over-cap
+    // pastes unread with size + cap named; the codec gate refuses too.
+    if (raw.length > C.MAX_HEX_INPUT_CHARS) {
+      pdBytes = null;
+      $("pd-out").innerHTML = "<p class='err'>Hex input too long (" + raw.length.toLocaleString("en-US") +
+        " characters) — inputs over the " + C.MAX_HEX_INPUT_CHARS.toLocaleString("en-US") +
+        "-character cap are refused before parsing. A 4 KiB preimage is at most 12,289 characters byte-spaced.</p>";
+      return;
+    }
+    var b = C.hexToBytes(raw);
     pdBytes = b; pdRender();
-    if (e.target.value.trim() && !b) $("pd-out").innerHTML = "<p class='err'>Not valid hex.</p>";
+    if (raw && !b) $("pd-out").innerHTML = "<p class='err'>Not valid hex.</p>";
   });
   $("pd-text").addEventListener("input", function (e) {
     var t = e.target.value;

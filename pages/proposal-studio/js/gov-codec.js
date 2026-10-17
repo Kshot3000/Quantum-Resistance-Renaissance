@@ -74,7 +74,28 @@
   /* Byte helpers                                                        */
   /* ------------------------------------------------------------------ */
 
+  /* Hex-input parse bound (white-hat track): hexToBytes used to strip,
+   * regex-test and parseInt-loop the WHOLE string before any caller
+   * checked a length, and its live callers parse on every keystroke —
+   * the Preimage Desk's pd-hex handler and the composer's custom-call
+   * path via inspectCall — while inspectCall and sanitizeDrafts bound
+   * only the PARSED result (MAX_PROPOSAL checked after the parse). A
+   * 20,000,000-char paste built a 10,000,000-byte array in ~905 ms in
+   * Node per keystroke, only to be rejected as over the 4 KiB cap.
+   * The largest legitimate input is a MAX_PROPOSAL-byte proposal,
+   * measured with this codec's own helpers: 8,194 chars plain hex
+   * (with 0x) and 12,289 chars byte-spaced. MAX_HEX_INPUT_CHARS =
+   * 16,384 admits both with margin while refusing anything larger
+   * unparsed. hexInputRoom is the pure fail-closed gate (a
+   * non-integer, negative, or non-number count gets no room),
+   * mirroring the fleet's Scale Lab / Multisig hex bounds. */
+  var MAX_HEX_INPUT_CHARS = 16384;
+  function hexInputRoom(chars) {
+    if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+    return Math.max(0, MAX_HEX_INPUT_CHARS - chars);
+  }
   function hexToBytes(h) {
+    if (typeof h === "string" && h.length > MAX_HEX_INPUT_CHARS) return null;
     h = String(h).replace(/^0x/i, "").replace(/\s+/g, "").toLowerCase();
     if (!/^[0-9a-f]*$/.test(h) || h.length % 2 !== 0) return null;
     var out = new Array(h.length / 2);
@@ -134,6 +155,8 @@
   };
 
   function inspectCall(hex) {
+    if (typeof hex === "string" && hex.length > MAX_HEX_INPUT_CHARS)
+      return { ok: false, error: "Hex input too long (" + hex.length + " characters) — the cap is " + MAX_HEX_INPUT_CHARS + " characters; refused before parsing." };
     var b = hexToBytes(hex);
     if (!b) return { ok: false, error: "Not valid hex." };
     if (b.length === 0) return { ok: false, error: "Empty call." };
@@ -438,6 +461,7 @@
     MIN_MEMBERS: MIN_MEMBERS, MAX_MEMBERS: MAX_MEMBERS,
     LENGTH_FEE_PER_BYTE: LENGTH_FEE_PER_BYTE, REF0: REF0,
     hexToBytes: hexToBytes, bytesToHex: bytesToHex, u32le: u32le,
+    MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom,
     compactU32: compactU32, utf8: utf8, qtc: qtc, blocksToClock: blocksToClock,
     inspectCall: inspectCall, preimageDeposit: preimageDeposit,
     buildNotePreimage: buildNotePreimage, buildUnnotePreimage: buildUnnotePreimage,

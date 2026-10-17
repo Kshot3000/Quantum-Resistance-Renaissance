@@ -258,5 +258,35 @@ eq("draftFileRoom(Infinity) fail-closed", C.draftFileRoom(Infinity), false);
     C.draftFileRoom(Buffer.byteLength(JSON.stringify(escMax, null, 2))), true);
 }
 
+// --- hexInputRoom hex-parse bound: hexToBytes used to strip, regex-test
+// and parseInt-loop the whole string before any caller checked a length,
+// and its live callers parse on every keystroke (pd-hex, inspectCall via
+// the composer's custom path) while inspectCall/sanitizeDrafts bound
+// only the parsed result. The largest legitimate input is a 4,096-byte
+// proposal: 8,194 chars plain, 12,289 chars byte-spaced (measured above
+// with this codec's own helpers) — a 16,384-char cap admits both.
+eq("hexbound: cap is 16,384 chars", C.MAX_HEX_INPUT_CHARS, 16384);
+eq("hexbound: room(0) = cap", C.hexInputRoom(0), 16384);
+eq("hexbound: room(cap) = 0", C.hexInputRoom(16384), 0);
+eq("hexbound: room(cap+1) = 0", C.hexInputRoom(16385), 0);
+eq("hexbound: room(NaN) fail-closed", C.hexInputRoom(NaN), 0);
+eq("hexbound: room(-1) fail-closed", C.hexInputRoom(-1), 0);
+eq("hexbound: room(2.5) fail-closed", C.hexInputRoom(2.5), 0);
+eq("hexbound: room('100') fail-closed", C.hexInputRoom("100"), 0);
+eq("hexbound: room(undefined) fail-closed", C.hexInputRoom(undefined), 0);
+eq("hexbound: room(null) fail-closed", C.hexInputRoom(null), 0);
+eq("hexbound: room(Infinity) fail-closed", C.hexInputRoom(Infinity), 0);
+t("hexbound: cap+2 chars refused unparsed (null)", C.hexToBytes("ab".repeat(8193)) === null);
+t("hexbound: 2,000,000 chars refused unparsed (null)", C.hexToBytes("ab".repeat(1000000)) === null);
+eq("hexbound: exactly-cap 16,384 chars still parses", C.hexToBytes("ab".repeat(8192)).length, 8192);
+t("hexbound: byte-spaced max proposal still inspects ok", C.inspectCall(maxSpacedHex()).ok);
+t("hexbound: inspectCall over-cap names the cap", /too long/.test(C.inspectCall("ab".repeat(1000000)).error) && C.inspectCall("ab".repeat(1000000)).error.includes("16384"));
+t("hexbound: sanitizer drops an over-cap callHex draft",
+  C.sanitizeDrafts([Object.assign({}, goodDraft, { id: "hx1", callHex: "ab".repeat(10000) })], hashOf).length === 0);
+function maxSpacedHex() {
+  const mc = new Array(4096).fill(0); mc[0] = 0; mc[1] = 9;
+  return "0x" + mc.map((b) => ("0" + b.toString(16)).slice(-2)).join(" ");
+}
+
 console.log(pass + "/" + (pass + fail) + " proposal-studio tests green");
 process.exit(fail ? 1 : 0);
