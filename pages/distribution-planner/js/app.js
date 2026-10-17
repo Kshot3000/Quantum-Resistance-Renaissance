@@ -360,6 +360,15 @@ function init() {
   $("file-input").addEventListener("change", function (e) {
     var f = e.target.files && e.target.files[0];
     if (!f) return;
+    // Size gate BEFORE any read (see core.js listFileRoom): a genuine
+    // list — even one paying every account on chain — is under half
+    // this cap; anything larger is refused unread, list untouched.
+    if (!core.listFileRoom(f.size)) {
+      toast("List not loaded: the picked file is " + f.size + " bytes — a recipient list is at most " +
+        core.MAX_LIST_FILE_BYTES + " bytes (4 MiB); the file was not read and your current list is unchanged.");
+      e.target.value = "";
+      return;
+    }
     var r = new FileReader();
     r.onload = function () {
       $("recipients").value = String(r.result || "");

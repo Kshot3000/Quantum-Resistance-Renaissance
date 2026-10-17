@@ -389,6 +389,32 @@ t("checkphraseQueue: bounded to the displayed rows, deduped, fail-closed", funct
   assert.strictEqual(DistCore.checkphraseQueue(v.slice(0, 3), 500).length, 3, "below cap passes through");
 });
 
+/* ---------- recipient-list file gate ---------- */
+t("listFileRoom: cap arithmetic at 4 MiB", function () {
+  assert.strictEqual(DistCore.MAX_LIST_FILE_BYTES, 4 * 1024 * 1024);
+  assert.strictEqual(DistCore.listFileRoom(0), true);
+  assert.strictEqual(DistCore.listFileRoom(4194304), true, "exactly at cap loads");
+  assert.strictEqual(DistCore.listFileRoom(4194305), false, "one byte over refuses");
+});
+t("listFileRoom: fail-closed on non-numeric sizes", function () {
+  [NaN, -1, "100", undefined, null, Infinity].forEach(function (v) {
+    assert.strictEqual(DistCore.listFileRoom(v), false, String(v));
+  });
+});
+t("listFileRoom: the largest genuine list fits — every chain account, max-length amount", function () {
+  // Legitimate-scale bound (see core.js): 27,008 accounts at the
+  // 2026-10-16 supply capture x a 75-byte max-length line (49-char
+  // address + ", " + the longest supply-valid amount, 23 chars, + \n)
+  // serializes to exactly 2,025,600 bytes; every row validates.
+  var line = POOL + ", 20,999,999.999999999999\n";
+  assert.strictEqual(Buffer.byteLength(line), 75);
+  assert.strictEqual(27008 * 75, 2025600);
+  assert.strictEqual(DistCore.listFileRoom(2025600), true, "whole-chain payout list loads");
+  var v = DistCore.validateRows(DistCore.parseInput(line), ss58, check, WORDLIST);
+  assert.strictEqual(v[0].ok, true, "the max-length line itself is a valid row");
+  assert.strictEqual(v[0].plancks, BigInt("20999999999999999999"));
+});
+
 /* ---------- summarize ---------- */
 t("summarize counts and totals", function () {
   var rows = DistCore.parseInput(POOL + " 1\n" + MSIG + " 2\n" + "bad 3\n");

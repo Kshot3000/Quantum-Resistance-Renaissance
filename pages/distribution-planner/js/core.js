@@ -391,6 +391,30 @@ function checkphraseQueue(validated, cap) {
   return out;
 }
 
+/* ---------- recipient-list file bound ----------
+ * The file picker used to readAsText the WHOLE picked file into the
+ * recipients textarea, where revalidate() parses and SS58-validates
+ * EVERY line (a base58 + blake2b-512 decode per row) with no cap
+ * anywhere: a 20 MiB pick is 403,299 rows and ~13 s of synchronous
+ * validation in Node, after its full text was allocated. There is no
+ * producer for this file (it is a hand-made list), so the bound is a
+ * legitimate-scale argument, measured with this module's own parser:
+ * a list paying EVERY account on chain (27,008 accounts at the
+ * 2026-10-16 supply capture) one max-length valid amount per line —
+ * a 49-char address, ", ", and "20,999,999.999999999999" (the longest
+ * amount string the supply-capped parser accepts) — serializes to
+ * exactly 2,025,600 bytes, and every row validates. The cap is
+ * 4 MiB, ~2x that maximum: any larger file is beyond a whole-chain
+ * payout and is refused UNREAD. File.size is known before a byte is
+ * read. Fail-closed: a sizeless or non-numeric size refuses too.
+ * (The paste path is deliberately NOT gated — large-list paste
+ * support is intentional, and typing/pasting is the user's own pace;
+ * only the one-click file read needed the gate.) */
+var MAX_LIST_FILE_BYTES = 4 * 1024 * 1024;
+function listFileRoom(size) {
+  return typeof size === "number" && isFinite(size) && size >= 0 && size <= MAX_LIST_FILE_BYTES;
+}
+
 function summarize(validated) {
   var valid = validated.filter(function (v) { return v.ok; });
   var invalid = validated.filter(function (v) { return !v.ok; });
@@ -427,6 +451,8 @@ var api = {
   wordsFromKey: wordsFromKey,
   DISPLAY_ROW_CAP: DISPLAY_ROW_CAP,
   checkphraseQueue: checkphraseQueue,
+  MAX_LIST_FILE_BYTES: MAX_LIST_FILE_BYTES,
+  listFileRoom: listFileRoom,
   summarize: summarize
 };
 
