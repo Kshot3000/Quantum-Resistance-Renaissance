@@ -39,12 +39,27 @@
 
   /* ---------- byte map ---------- */
   var PALETTE = ['#4ade80', '#7cc4ff', '#fbbf24', '#f472b6', '#a78bfa', '#34d399', '#fb923c', '#22d3ee'];
+  /* Over-cap hex is refused BEFORE parsing with the cap named, instead
+   * of surfacing as a misleading "not valid hex" / wrong-length error
+   * after fromHex has already done (or refused) the work. */
+  function hexTooLong(raw) {
+    return typeof raw === 'string' && CC.hexInputRoom(raw.length) === 0 && raw.length > CC.MAX_HEX_INPUT_CHARS
+      ? 'Hex input too long — inputs over the ' + CC.MAX_HEX_INPUT_CHARS.toLocaleString('en-US') +
+        '-character cap are refused before parsing (got ' + raw.length.toLocaleString('en-US') + ' characters).'
+      : null;
+  }
   function renderByteMap(mapEl, legendEl, bytes, spans) {
     mapEl.innerHTML = ''; if (legendEl) legendEl.innerHTML = '';
     if (!bytes || !bytes.length) return;
+    /* Display window: one live DOM cell per byte froze the tab on large
+     * pastes (a 48-byte struct + 100,000 trailing bytes = 100,048
+     * cells). Draw at most CC.byteMapWindow's shown count and disclose
+     * the rest — the hex and decode output above cover every byte. */
+    var win = CC.byteMapWindow(bytes.length);
+    var drawn = bytes.slice(0, win.shown);
     var colorOf = {};
     (spans || []).forEach(function (sp, i) { if (!(sp.label in colorOf)) colorOf[sp.label] = PALETTE[i % PALETTE.length]; });
-    bytes.forEach(function (b, i) {
+    drawn.forEach(function (b, i) {
       var cell = document.createElement('span');
       cell.className = 'byte';
       var owners = (spans || []).filter(function (sp) { return i >= sp.start && i < sp.end; });
@@ -59,6 +74,14 @@
       });
       mapEl.appendChild(cell);
     });
+    if (win.skipped > 0) {
+      var note = document.createElement('div');
+      note.className = 'map-window-note';
+      note.textContent = 'Byte map windowed — the first ' + win.shown.toLocaleString('en-US') + ' of ' +
+        win.total.toLocaleString('en-US') + ' bytes are drawn; ' + win.skipped.toLocaleString('en-US') +
+        ' more bytes are not drawn (one live cell per byte). The hex and decode above cover every byte.';
+      mapEl.appendChild(note);
+    }
     var seen = {};
     if (legendEl) {
       var items = (spans || []).filter(function (sp) { if (seen[sp.label]) return false; seen[sp.label] = 1; return true; });
@@ -103,6 +126,8 @@
     $('ce-go').click();
   });
   function decodeCompactUI() {
+    var tooLong = hexTooLong($('cd-in').value);
+    if (tooLong) { $('cd-out').innerHTML = '<span class="e">Error: ' + esc(tooLong) + '</span>'; return; }
     var bytes = CC.fromHex($('cd-in').value);
     if (!bytes) { $('cd-out').innerHTML = '<span class="e">Error: not valid hex</span>'; return; }
     var strict = $('cd-strict').checked;
@@ -161,6 +186,8 @@
     }
     if (t === 'str') return s;
     if (t === 'bytes' || t === 'accountid' || t === 'vec_u8') {
+      var tl = hexTooLong(s);
+      if (tl) throw new Error(tl);
       var b = CC.fromHex(s);
       if (!b) throw new Error('not valid hex');
       return b;
@@ -255,6 +282,8 @@
   $('tb-decode').addEventListener('click', function () {
     try {
       var schema = currentSchema();
+      var tl2 = hexTooLong($('tb-dec-in').value);
+      if (tl2) throw new Error(tl2);
       var bytes = CC.fromHex($('tb-dec-in').value);
       if (!bytes) throw new Error('not valid hex');
       var strict = $('tb-strict').checked;
@@ -278,6 +307,8 @@
   /* ================= ADDRESS CODER ================= */
   $('ad-enc-go').addEventListener('click', function () {
     try {
+      var tl3 = hexTooLong($('ad-pub').value);
+      if (tl3) throw new Error(tl3);
       var pub = CC.fromHex($('ad-pub').value);
       if (!pub || pub.length !== 32) throw new Error('need exactly 32 bytes (64 hex chars), got ' + (pub ? pub.length : 0));
       var addr = CR.ss58Encode(pub, CR.QUANTUS_PREFIX);
@@ -325,6 +356,8 @@
   $('skm-go').addEventListener('click', function () {
     try {
       var pallet = $('sk-pallet').value.trim(), item = $('sk-item').value.trim();
+      var tl4 = hexTooLong($('skm-key').value);
+      if (tl4) throw new Error(tl4);
       var kb = CC.fromHex($('skm-key').value);
       if (!pallet || !item) throw new Error('set pallet + item on the left card first');
       if (!kb || !kb.length) throw new Error('map key bytes required (hex)');

@@ -285,5 +285,39 @@ test("spans cover every byte exactly once (struct)", () => {
   assert(covered.every((c) => c === 1), "each byte owned by exactly one span");
 });
 
+console.log("— hex-input bound + byte-map window (white-hat) —");
+test("hexInputRoom: arithmetic at the cap", () => {
+  eq(C.MAX_HEX_INPUT_CHARS, 65536);
+  eq(C.hexInputRoom(0), 65536);
+  eq(C.hexInputRoom(65536), 0);
+  eq(C.hexInputRoom(65537), 0);
+  eq(C.hexInputRoom(1000000), 0);
+});
+test("hexInputRoom: fail-closed on non-counts", () => {
+  for (const bad of [NaN, -1, 1.5, "10", undefined, null, Infinity, {}]) eq(C.hexInputRoom(bad), 0);
+});
+test("fromHex: refuses over-cap inputs unparsed (null, not a giant array)", () => {
+  eq(C.fromHex("ab".repeat(32769)), null);        // 65,538 chars
+  eq(C.fromHex("ab".repeat(1000000)), null);      // 2,000,000 chars
+});
+test("fromHex: still parses exactly at the cap (65,536 chars = 32,768 bytes)", () => {
+  eq((C.fromHex("ab".repeat(32768)) || []).length, 32768);
+});
+test("fromHex: byte-spaced and 0x-prefixed small inputs unchanged", () => {
+  eq(C.fromHex("0x" + Array.from({ length: 32 }, () => "ab").join(" ")).length, 32);
+  eq(C.fromHex("abc"), null); eq(C.fromHex("zz"), null);
+});
+test("byteMapWindow: arithmetic at the cap", () => {
+  eq(C.MAX_MAP_BYTES, 1024);
+  const a = C.byteMapWindow(48); eq(a.total, 48); eq(a.shown, 48); eq(a.skipped, 0);
+  const b = C.byteMapWindow(1024); eq(b.shown, 1024); eq(b.skipped, 0);
+  const c = C.byteMapWindow(100048); eq(c.total, 100048); eq(c.shown, 1024); eq(c.skipped, 99024);
+});
+test("byteMapWindow: fail-closed on non-counts", () => {
+  for (const bad of [NaN, -1, 1.5, "100", undefined, null, Infinity]) {
+    const w = C.byteMapWindow(bad); eq(w.total, 0); eq(w.shown, 0); eq(w.skipped, 0);
+  }
+});
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

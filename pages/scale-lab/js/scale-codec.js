@@ -31,12 +31,50 @@
   function hexOf(bytes) {
     return bytes.map(function (b) { return ("0" + (b & 0xff).toString(16)).slice(-2); }).join("");
   }
+  /* Hex-input bound BEFORE parsing (white-hat): every hex field in this
+   * lab feeds fromHex, and fromHex whitespace-stripped, regex-tested and
+   * parseInt-looped the WHOLE string before any caller could check a
+   * length — a 20,000,000-char paste built a 10,000,000-element array
+   * (~0.9 s in Node, far worse in a tab) only for the Address Coder to
+   * then reject it for not being 32 bytes. The cap is derived from the
+   * largest inputs the lab can legitimately use: the codec's own decode
+   * refuses Vec lengths over 100,000 items, and the biggest real wire
+   * object a workbench struct models is a signed ML-DSA-87 extrinsic
+   * (~7,300 bytes). 65,536 raw chars admits 32,768 bytes of plain hex —
+   * over 4x that extrinsic — and a fully byte-spaced 16 KiB payload
+   * (~49,151 chars), while refusing anything larger unread.
+   * hexInputRoom is the pure fail-closed gate (non-integer, negative,
+   * or non-number counts get no room), mirroring the fleet's
+   * Address Toolkit hex bound. */
+  var MAX_HEX_INPUT_CHARS = 65536;
+  function hexInputRoom(chars) {
+    if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+    return Math.max(0, MAX_HEX_INPUT_CHARS - chars);
+  }
   function fromHex(s) {
+    if (typeof s === "string" && s.length > MAX_HEX_INPUT_CHARS) return null;
     s = String(s).replace(/^0x/i, "").replace(/\s+/g, "").toLowerCase();
     if (!/^[0-9a-f]*$/.test(s) || s.length % 2 !== 0) return null;
     var out = [];
     for (var i = 0; i < s.length; i += 2) out.push(parseInt(s.substr(i, 2), 16));
     return out;
+  }
+  /* Byte-map render window (white-hat): the byte map is a DISPLAY aid —
+   * the hex output and the decode above it cover every byte — yet
+   * renderByteMap built one live DOM cell (with its own click listener)
+   * per byte, so a 48-byte struct pasted with 100,000 trailing bytes
+   * made the Decode click construct 100,048 cells and froze the tab.
+   * Display-only work is bounded by the display: at most MAX_MAP_BYTES
+   * cells are ever drawn, and byteMapWindow (pure, fail-closed) reports
+   * { total, shown, skipped } so the UI can disclose the window instead
+   * of silently truncating. 1,024 cells is already a large clickable
+   * grid; every legitimate lab map (compact ≤ 67 B, transfer struct
+   * 48 B, ML-DSA anatomy by section) fits far below it. */
+  var MAX_MAP_BYTES = 1024;
+  function byteMapWindow(total) {
+    if (!Number.isSafeInteger(total) || total < 0) return { total: 0, shown: 0, skipped: 0 };
+    var shown = Math.min(total, MAX_MAP_BYTES);
+    return { total: total, shown: shown, skipped: total - shown };
   }
 
   function CodecError(msg, offset) {
@@ -339,7 +377,9 @@
     intEncode: intEncode, intDecode: intDecode,
     encode: encode, decode: decode,
     qtcOf: qtcOf, prettyValue: prettyValue,
-    PLANCKS_PER_QTC: PLANCKS_PER_QTC
+    PLANCKS_PER_QTC: PLANCKS_PER_QTC,
+    MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom,
+    MAX_MAP_BYTES: MAX_MAP_BYTES, byteMapWindow: byteMapWindow
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.QSL_CODEC = api;
