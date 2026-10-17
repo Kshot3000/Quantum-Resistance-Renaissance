@@ -46,6 +46,50 @@
       count >= 0 && count <= MAX_SHARE_LINES;
   }
 
+  /* Combine-paste scan window: combineLinesRoom bounds the PARSE, but
+   * the caller used to split/trim/filter the WHOLE pasted text to build
+   * the line array that check counts — a 20,400,000-char paste of
+   * 400,000 lines built all 400,000 strings (~166 ms in Node) on every
+   * Recover click, all to be refused at 256 lines. combineTextWindow
+   * owns the raw text: it scans only the first MAX_COMBINE_SCAN_CHARS
+   * characters and reports skippedChars so the UI can disclose the
+   * unscanned tail. The cap is derived from the largest legitimate
+   * paste: a full MAX_SHARES set of max-secret shares is 255 lines of
+   * at most 1,042 chars (18-char header at the widest t/n/index digits
+   * + 1,024 payload hex) plus 254 separators = 265,964 chars (measured
+   * 265,346 for a real 255-share split), so the 524,288 window holds
+   * that set intact nearly twice over — room for CRLF endings and
+   * blank lines between shares — and no legitimate paste changes
+   * outcome. When the cut lands inside a line, the scan backs off to
+   * the last newline so no truncated partial line is ever parsed as if
+   * it were a pasted share; a single line longer than the window scans
+   * as empty (it can never be a valid <=1,042-char share). Fail-closed:
+   * a non-string input scans as empty. Returns { lines, totalChars,
+   * scannedChars, skippedChars } with lines trimmed and non-empty,
+   * matching the caller's previous semantics. */
+  const MAX_COMBINE_SCAN_CHARS = 524288;
+
+  function combineTextWindow(text) {
+    if (typeof text !== "string") {
+      return { lines: [], totalChars: 0, scannedChars: 0, skippedChars: 0 };
+    }
+    const totalChars = text.length;
+    let scanned = text;
+    if (totalChars > MAX_COMBINE_SCAN_CHARS) {
+      scanned = text.slice(0, MAX_COMBINE_SCAN_CHARS);
+      const nextCh = text.charAt(MAX_COMBINE_SCAN_CHARS);
+      const lastCh = scanned.charAt(scanned.length - 1);
+      if (nextCh && nextCh !== "\n" && nextCh !== "\r" && lastCh !== "\n" && lastCh !== "\r") {
+        const cut = Math.max(scanned.lastIndexOf("\n"), scanned.lastIndexOf("\r"));
+        scanned = cut >= 0 ? scanned.slice(0, cut + 1) : "";
+      }
+    }
+    const lines = scanned.split(/\r?\n/).map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    return { lines, totalChars, scannedChars: scanned.length,
+      skippedChars: totalChars - scanned.length };
+  }
+
   function shamirError(code, message) {
     const e = new Error(message);
     e.code = code;
@@ -250,6 +294,7 @@
 
   return {
     VERSION, MAX_SECRET_BYTES, MAX_SHARES, MAX_SHARE_LINES, combineLinesRoom,
+    MAX_COMBINE_SCAN_CHARS, combineTextWindow,
     gfMul, gfInv, gfDiv,
     split, combine, splitText, combineText,
     parseShare, formatShare,

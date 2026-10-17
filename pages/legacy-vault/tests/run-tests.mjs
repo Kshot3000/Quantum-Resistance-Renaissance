@@ -145,6 +145,46 @@ for (const [n, t, len] of combos) {
   throwsCode("256 share lines refused at the cap", () => SHAMIR.combine(full.concat([full[0]])), "TOO_MANY_SHARES");
   throwsCode("over-cap refusal precedes parsing (bad tail still yields the cap error)",
     () => SHAMIR.combine(full.concat(["LV1-bogus"])), "TOO_MANY_SHARES");
+  // combine paste scan window: the app used to split the WHOLE textarea
+  // value before the line cap above was consulted. The core now owns
+  // the raw text behind MAX_COMBINE_SCAN_CHARS, derived from the
+  // largest genuine paste (255 max-size shares = 265,346 chars
+  // measured, 265,964 at the widest header digits).
+  const W = SHAMIR.combineTextWindow;
+  ok("combine window cap arithmetic",
+    SHAMIR.MAX_COMBINE_SCAN_CHARS === 524288 && SHAMIR.MAX_COMBINE_SCAN_CHARS > 265964);
+  const smallShares = SHAMIR.splitText("window secret", 4, 2, seededRng(3));
+  const smallWin = W(smallShares.join("\n"));
+  ok("small paste scans intact and combines",
+    smallWin.skippedChars === 0 && smallWin.lines.length === 4 &&
+    SHAMIR.combineText(smallWin.lines) === "window secret");
+  const fullWin = W(full.join("\n"));
+  ok("largest genuine paste (255 max-size shares) scans fully",
+    fullWin.skippedChars === 0 && fullWin.lines.length === 255 &&
+    SHAMIR.combine(fullWin.lines).length === 512);
+  const blankyWin = W("\n\n" + full.join("\r\n\r\n") + "\n");
+  ok("CRLF + blank-line paste scans fully",
+    blankyWin.skippedChars === 0 && blankyWin.lines.length === 255);
+  const exactWin = W("x".repeat(SHAMIR.MAX_COMBINE_SCAN_CHARS));
+  ok("exactly-cap text scans intact",
+    exactWin.skippedChars === 0 && exactWin.scannedChars === SHAMIR.MAX_COMBINE_SCAN_CHARS);
+  const overWin = W("x".repeat(SHAMIR.MAX_COMBINE_SCAN_CHARS + 1));
+  ok("single line longer than the window scans as empty",
+    overWin.lines.length === 0 && overWin.skippedChars === SHAMIR.MAX_COMBINE_SCAN_CHARS + 1);
+  const midWin = W(("a".repeat(100) + "\n").repeat(6000));
+  ok("mid-line cut backs off to the last newline",
+    midWin.scannedChars % 101 === 0 && midWin.lines.every((l) => l.length === 100) &&
+    midWin.skippedChars === 606000 - midWin.scannedChars);
+  ok("combine window fails closed on non-strings",
+    W(null).lines.length === 0 && W(undefined).lines.length === 0 &&
+    W(42).lines.length === 0 && W(null).skippedChars === 0);
+  const line50 = "LV1-2of3-#1-" + "ab".repeat(19);
+  const giantWin = W((line50 + "\n").repeat(400000));
+  ok("giant paste windowed with the tail reported",
+    giantWin.scannedChars <= SHAMIR.MAX_COMBINE_SCAN_CHARS &&
+    giantWin.skippedChars > 19000000 && giantWin.lines.length > 255);
+  throwsCode("windowed giant lines still refused by the 255-line cap",
+    () => SHAMIR.combineText(giantWin.lines), "TOO_MANY_SHARES");
 }
 
 // ---------- plan-logic ----------

@@ -135,15 +135,24 @@
   });
 
   $("sh-combine").addEventListener("click", () => {
-    const lines = $("sh-combine-in").value.split("\n").map((l) => l.trim()).filter(Boolean);
+    // The core owns the raw paste behind its scan window: only the
+    // first MAX_COMBINE_SCAN_CHARS characters are split, and any
+    // unscanned tail is disclosed under the result instead of being
+    // silently dropped (a full genuine set scans intact — see
+    // combineTextWindow in shamir.js).
+    const win = SHAMIR.combineTextWindow($("sh-combine-in").value);
     const box = $("sh-recovered");
+    const note = (msg) => {
+      if (!win.skippedChars) return msg;
+      return msg + `\n(${win.skippedChars.toLocaleString("en-US")} characters were not scanned — only the first ${SHAMIR.MAX_COMBINE_SCAN_CHARS.toLocaleString("en-US")} characters of a combine paste are read.)`;
+    };
     try {
-      const rec = SHAMIR.combineText(lines);
-      $("sh-recovered-text").textContent = rec;
+      const rec = SHAMIR.combineText(win.lines);
+      $("sh-recovered-text").textContent = note(rec);
       box.hidden = false;
     } catch (e) {
       box.hidden = false;
-      $("sh-recovered-text").textContent = "Could not recover: " + e.message;
+      $("sh-recovered-text").textContent = note("Could not recover: " + e.message);
     }
   });
   $("sh-copyrec").addEventListener("click", (e) => copyText($("sh-recovered-text").textContent, e.target));
