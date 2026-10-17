@@ -311,9 +311,54 @@ export function logParseWindow(lines, cap) {
   return { parse, total, skipped: total - parse.length };
 }
 
+/* Log-forensics TEXT scan window (white-hat): logParseWindow bounds the
+ * CLASSIFICATION, but analyzeLog still split/trim/filtered the WHOLE
+ * textarea value to build the line array it windows — a 50,399,999-char
+ * paste of 800,000 lines built all 800,000 strings on every keystroke
+ * (158.5 ms per scan in Node, 2,075 ms per 20 keystrokes), all to
+ * classify 10,000 lines. This is the split-before-window gap closed for
+ * Multisig signers (signerTextWindow) and Contact Vault batch verify.
+ * logTextWindow owns the raw text: it scans only the first
+ * MAX_LOG_SCAN_CHARS characters and reports skippedChars so the UI can
+ * disclose the unscanned tail. The cap is derived from the largest
+ * legitimate paste the line window can ever consume: MAX_LOG_LINES
+ * lines of the longest realistic node log line — a block import naming
+ * three extrinsic hashes and the serving peer measures 405 chars — plus
+ * a separator each are 10,000 x 419 = 4,190,000 chars, so the 4 MiB
+ * window holds that paste intact with headroom, and no legitimate paste
+ * changes outcome. When the cut lands inside a line, the scan backs off
+ * to the last newline so no truncated partial line is ever classified
+ * as if it were a pasted log line; a single line longer than the window
+ * scans as empty (its untrimmed bulk is disclosed in skippedChars).
+ * Fail-closed: a non-string input scans as empty. Returns
+ * { lines, totalChars, scannedChars, skippedChars } with lines trimmed
+ * and non-empty, matching the caller's previous semantics. Totals from
+ * analyzeLog describe the scanned window; the tail is disclosed in
+ * characters, never silently dropped. */
+export const MAX_LOG_SCAN_CHARS = 4194304;
+
+export function logTextWindow(text) {
+  if (typeof text !== "string")
+    return { lines: [], totalChars: 0, scannedChars: 0, skippedChars: 0 };
+  const totalChars = text.length;
+  let scanned = text;
+  if (totalChars > MAX_LOG_SCAN_CHARS) {
+    scanned = text.slice(0, MAX_LOG_SCAN_CHARS);
+    const nextCh = text.charAt(MAX_LOG_SCAN_CHARS);
+    const lastCh = scanned.charAt(scanned.length - 1);
+    if (nextCh && nextCh !== "\n" && nextCh !== "\r" && lastCh !== "\n" && lastCh !== "\r") {
+      const cut = Math.max(scanned.lastIndexOf("\n"), scanned.lastIndexOf("\r"));
+      scanned = cut >= 0 ? scanned.slice(0, cut + 1) : "";
+    }
+  }
+  const lines = scanned.split("\n").map(l => l.trim()).filter(Boolean);
+  return { lines, totalChars, scannedChars: scanned.length,
+           skippedChars: totalChars - scanned.length };
+}
+
 export function analyzeLog(text) {
-  const lines = String(text || "").split("\n").map(l => l.trim()).filter(Boolean);
-  const win = logParseWindow(lines, MAX_LOG_LINES);
+  const textWin = logTextWindow(typeof text === "string" ? text : String(text || ""));
+  const win = logParseWindow(textWin.lines, MAX_LOG_LINES);
   const seen = new Map();
   for (const l of win.parse) {
     const c = classifyLogLine(l);
@@ -324,7 +369,8 @@ export function analyzeLog(text) {
     e.count++;
     if (e.samples.length < 2) e.samples.push(c.line);
   }
-  return { total: win.total, scanned: win.parse.length, skipped: win.skipped, findings: [...seen.values()] };
+  return { total: win.total, scanned: win.parse.length, skipped: win.skipped,
+           skippedChars: textWin.skippedChars, findings: [...seen.values()] };
 }
 
 /* ---------- sync progress ---------- */

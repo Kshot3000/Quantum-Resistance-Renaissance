@@ -26,7 +26,7 @@ All operational facts read from Quantus-Network source on 2026-09-30: `chain/MIN
 
 ## Tests
 
-- `node tests/run.mjs` — 147/147 logic tests (validators, command builder, firewall rules, log forensics incl. the 10,000-line parse window, sync math; round 2: miner metrics-port/worker-count validation, sync height relations, snapshot head ceiling).
+- `node tests/run.mjs` — 173/173 logic tests (validators, command builder, firewall rules, log forensics incl. the 10,000-line parse window and the 4,194,304-character text scan window (logTextWindow — only the scanned window is split, the unscanned tail is disclosed in characters), sync math; round 2: miner metrics-port/worker-count validation, sync height relations, snapshot head ceiling).
 - Real-browser QA via `~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-nodedesk-browser.mjs` (headless Chromium, file:// + CDP, zero console errors).
 
 100% client-side. Built by [@kshot9000](https://x.com/kshot9000) · QTC donations: `qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau`

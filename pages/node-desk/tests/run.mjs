@@ -7,6 +7,7 @@ import {
   BOOTNODES, PORTS, CHAIN_SPECS,
   validateInnerHash, validateNodeName, validatePortNumber, validateBootnode, shq,
   buildNodeCommand, firewallRules, classifyLogLine, analyzeLog, logParseWindow, MAX_LOG_LINES,
+  logTextWindow, MAX_LOG_SCAN_CHARS,
   syncProgress, fmtEta, parseSnapshot,
 } from "../node-core.js";
 
@@ -159,6 +160,45 @@ eq("analyze big skipped disclosed", bigA.skipped, 15000);
 eq("analyze big counts window only", bigA.findings.find(f => f.level === "info").count, 10000);
 eq("analyze small scanned", a.scanned, 4);
 eq("analyze small skipped", a.skipped, 0);
+
+/* --- log text scan window (white-hat: split-before-window bound) --- */
+eq("log scan cap", MAX_LOG_SCAN_CHARS, 4194304);
+const tw = logTextWindow("a\n\n b \nc");
+eq("text window lines trimmed non-empty", tw.lines.join("|"), "a|b|c");
+eq("text window under-cap skips none", tw.skippedChars, 0);
+eq("text window under-cap scans all", tw.scannedChars, tw.totalChars);
+const giantLine = "2026-10-17 11:23:45 INFO sync: Syncing 12.3 bps, best: #243231";
+const giantText = Array.from({ length: 800000 }, () => giantLine).join("\n");
+const gw = logTextWindow(giantText);
+eq("text window reports totalChars", gw.totalChars, giantText.length);
+ok("text window scans at most the cap", gw.scannedChars <= MAX_LOG_SCAN_CHARS);
+eq("text window skippedChars arithmetic", gw.skippedChars, gw.totalChars - gw.scannedChars);
+ok("text window backs off to a line boundary", gw.lines.every(l => l === giantLine));
+const exactTw = logTextWindow("x".repeat(MAX_LOG_SCAN_CHARS));
+eq("text window exactly-cap scans fully", exactTw.scannedChars, MAX_LOG_SCAN_CHARS);
+eq("text window exactly-cap skips none", exactTw.skippedChars, 0);
+const oneBigTw = logTextWindow("y".repeat(MAX_LOG_SCAN_CHARS + 500000));
+eq("text window single over-window line scans empty", oneBigTw.lines.length, 0);
+eq("text window single over-window line discloses all", oneBigTw.skippedChars, MAX_LOG_SCAN_CHARS + 500000);
+for (const bad of [undefined, null, 42, {}, []]) {
+  const bw2 = logTextWindow(bad);
+  ok("text window fail-closed non-string " + String(bad), bw2.lines.length === 0 && bw2.totalChars === 0 && bw2.skippedChars === 0);
+}
+const gA = analyzeLog(giantText);
+eq("analyze giant scanned capped", gA.scanned, MAX_LOG_LINES);
+eq("analyze giant total describes scanned window", gA.total, gw.lines.length);
+eq("analyze giant skipped arithmetic", gA.skipped, gA.total - gA.scanned);
+eq("analyze giant discloses skippedChars", gA.skippedChars, gw.skippedChars);
+const legitLine = "2026-10-17 11:23:45.123  INFO sync: Imported #243231 (0x" + "ab".repeat(32) +
+  ") with extrinsics [0x" + "cd".repeat(32) + ", 0x" + "ef".repeat(32) + ", 0x" + "12".repeat(32) +
+  "] from peer 12D3KooWRuvDjYBPxJJaBjpJFBMKkGNw3XfgJcBfRyGR7PQvxP9a";
+ok("legit line within per-line allowance", legitLine.length <= 419, String(legitLine.length));
+const legitA = analyzeLog(Array.from({ length: 10000 }, () => legitLine).join("\n"));
+eq("analyze legit 10k longest lines scans fully", legitA.scanned, 10000);
+eq("analyze legit paste skips no characters", legitA.skippedChars, 0);
+const oneBigA = analyzeLog("z".repeat(5000000));
+eq("analyze single over-window line scans none", oneBigA.scanned, 0);
+eq("analyze single over-window line discloses chars", oneBigA.skippedChars, 5000000);
 
 /* --- sync progress --- */
 let s = syncProgress(142000, 142417);

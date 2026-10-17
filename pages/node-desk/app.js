@@ -2,7 +2,7 @@
 import {
   BOOTNODES, PORTS, CHAIN_SPECS, PUBLIC_RPC,
   validateInnerHash, validateNodeName, validatePortNumber,
-  buildNodeCommand, firewallRules, analyzeLog, MAX_LOG_LINES, syncProgress, fmtEta, parseSnapshot,
+  buildNodeCommand, firewallRules, analyzeLog, MAX_LOG_LINES, MAX_LOG_SCAN_CHARS, syncProgress, fmtEta, parseSnapshot,
 } from "./node-core.js";
 
 const $ = (id) => document.getElementById(id);
@@ -255,10 +255,16 @@ $("inNetH").addEventListener("input", () => { netHeadEdited = true; networkHead 
 /* ---------- log forensics ---------- */
 function renderLog() {
   const a = analyzeLog($("logInput").value);
-  $("logSummary").textContent = a.total === 0
+  $("logSummary").textContent = a.total === 0 && !a.skippedChars
     ? "No input yet."
     : `Scanned ${a.scanned.toLocaleString()} line${a.scanned === 1 ? "" : "s"} — ${a.findings.length} known pattern${a.findings.length === 1 ? "" : "s"} matched.` +
-      (a.skipped ? ` ${a.skipped.toLocaleString()} more line${a.skipped === 1 ? "" : "s"} not scanned — the forensics window is the first ${MAX_LOG_LINES.toLocaleString()} lines; trim the paste to reach them.` : "");
+      (a.skipped ? ` ${a.skipped.toLocaleString()} more line${a.skipped === 1 ? "" : "s"} not scanned — the forensics window is the first ${MAX_LOG_LINES.toLocaleString()} lines; trim the paste to reach them.` : "") +
+      /* Scan window (white-hat): the core reads only the first
+       * MAX_LOG_SCAN_CHARS characters of the paste — splitting the whole
+       * value built every line string on every keystroke before the line
+       * window above ever bounded the classification. The unscanned tail
+       * is disclosed here, never silently dropped. */
+      (a.skippedChars ? ` ${a.skippedChars.toLocaleString()} characters were not scanned — only the first ${MAX_LOG_SCAN_CHARS.toLocaleString()} characters of the paste are read; trim the paste to reach them.` : "");
   const sevName = { ok: "ok", info: "info", warn: "warn", error: "error" };
   $("logFindings").innerHTML = a.findings.map(f => `
     <div class="finding">
