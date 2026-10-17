@@ -16,6 +16,7 @@ import {
   computeServiceFee, feeBpsLabel, serviceFeeAccountId,
   SERVICE_FEE_ADDRESS, SERVICE_FEE_MAX_BPS,
   packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
+  packagePasteRoom, splitPackagePaste, MAX_PACKAGE_PASTE_CHARS,
 } from '../js/airgap.js';
 import { encodeMortalEra, qtcToPlancks, buildTransferCall, buildBatchAllCall, buildSigningPayload, buildExtrinsic } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
@@ -254,6 +255,41 @@ test('file gates: producer maxima fit (largest ticket + largest package at any c
     assert.equal(packageFileRoom(fileBytes), true, 'chunkBytes ' + cb + ' file of ' + fileBytes + ' bytes fits');
   }
   assert.equal(te.encode(encodeChunks('ffff', maxHex, 1).join('\n')).length, 168103);
+});
+
+/* ---------------- package-paste length gate ---------------- */
+test('paste gate: cap arithmetic + fail-closed sizes', () => {
+  assert.equal(MAX_PACKAGE_PASTE_CHARS, 256 * 1024);
+  assert.equal(MAX_PACKAGE_PASTE_CHARS, MAX_PACKAGE_FILE_BYTES); // a paste carries what a file carries
+  assert.equal(packagePasteRoom(0), true);
+  assert.equal(packagePasteRoom(MAX_PACKAGE_PASTE_CHARS), true);
+  assert.equal(packagePasteRoom(MAX_PACKAGE_PASTE_CHARS + 1), false);
+  assert.equal(packagePasteRoom(20000000), false);
+  for (const bad of [NaN, -1, '100', undefined, null, Infinity])
+    assert.equal(packagePasteRoom(bad), false, 'fail-closed on ' + String(bad));
+});
+
+test('paste gate: split refuses over-cap before splitting, genuine maxima still assemble', () => {
+  // Small pastes split exactly like the old app path (split/trim/filter).
+  assert.deepEqual(splitPackagePaste('  QAGX:a:1/1:xx \n 0xabc '), ['QAGX:a:1/1:xx', '0xabc']);
+  assert.deepEqual(splitPackagePaste('   '), []);
+  // Exactly-cap still splits; cap+1 refuses with size + cap named.
+  assert.equal(splitPackagePaste('a'.repeat(MAX_PACKAGE_PASTE_CHARS)).length, 1);
+  assert.throws(() => splitPackagePaste('a'.repeat(MAX_PACKAGE_PASTE_CHARS + 1)), /262145.*262144/);
+  assert.throws(() => splitPackagePaste('x '.repeat(10000000)), /20000000.*262144/);
+  // Non-strings refuse fail-closed instead of being coerced.
+  for (const bad of [42, null, undefined]) assert.throws(() => splitPackagePaste(bad), /not text — refused by the signed-package paste gate \(cap 262144/);
+  // The largest genuine paste in every form splits fully; the chunked
+  // forms reassemble through decodeChunks, whose own string form is
+  // gated by the same cap before its split.
+  const maxHex = '0x' + 'ab'.repeat(7357);
+  assert.deepEqual(splitPackagePaste(maxHex), [maxHex]);
+  for (const cb of [800, 1]) {
+    const paste = encodeChunks('ffff', maxHex, cb).join('\n');
+    assert.equal(decodeChunks(splitPackagePaste(paste)).hex, maxHex, 'chunkBytes ' + cb);
+    assert.equal(decodeChunks(paste).hex, maxHex, 'string form, chunkBytes ' + cb);
+  }
+  assert.throws(() => decodeChunks('x '.repeat(10000000)), /20000000.*262144/);
 });
 
 /* ---------------- era ---------------- */

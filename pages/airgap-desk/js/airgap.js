@@ -258,6 +258,14 @@ export const MAX_CHUNKS = 10000;
  * slices uniformly), so a short middle chunk means the reassembled
  * bytes shift — refuse it instead of assembling a different payload. */
 export function decodeChunks(lines) {
+  // String form only: the paste gate (below) refuses an over-cap string
+  // BEFORE its whitespace split materializes every token — the split of
+  // a 20,000,000-char string alone costs ~1 s in Node, paid here before
+  // the first chunk line is ever regex-tested. Array inputs are already
+  // token lists built by gated paths (splitPackagePaste, the file gate).
+  if (typeof lines === 'string' && !packagePasteRoom(lines.length)) {
+    throw new Error(`chunk text is ${lines.length} characters — over the signed-package paste cap of ${MAX_PACKAGE_PASTE_CHARS} characters (256 KiB); refused before splitting`);
+  }
   const arr = (Array.isArray(lines) ? lines : String(lines).split(/\s+/))
     .map((l) => l.trim()).filter(Boolean);
   if (!arr.length) throw new Error('no chunks provided');
@@ -361,6 +369,41 @@ export function packageFileRoom(size) {
 
 export function ticketFileRoom(size) {
   return typeof size === 'number' && isFinite(size) && size >= 0 && size <= MAX_TICKET_FILE_BYTES;
+}
+
+/* ---------------- package-paste length gate ----------------
+ * The file gates above never covered the paste box: collectPackageLines
+ * in app.js whitespace-split the WHOLE pkg-paste value (split + trim +
+ * filter, then the Set merge) on the Assemble click before any cap was
+ * consulted — a 20,000,000-char paste built all 1,000,000 token strings
+ * in ~0.7 s in Node on the air-gapped machine, all to assemble a package
+ * whose genuine maximum is 168,103 chars. A paste carries exactly what
+ * a package file carries (the same chunk lines, or one 0x extrinsic),
+ * so the cap is the file cap: MAX_PACKAGE_PASTE_CHARS = 256 KiB admits
+ * every genuine paste — the largest package measures 14,716 chars as a
+ * single 0x line, 9,973 chars chunked at this desk's own 800 bytes, and
+ * 168,103 chars even at the degenerate 1-byte chunking, with roomy
+ * separators to spare — while an over-cap paste is refused on its
+ * length alone, before a single token is built. splitPackagePaste owns
+ * the split behind the gate (the app no longer splits the raw value),
+ * and decodeChunks' string form asks the same gate before its own
+ * split. Fail-closed, matching the file gates: a length that is not a
+ * finite, non-negative number refuses, and a non-string paste refuses
+ * instead of being coerced. */
+export const MAX_PACKAGE_PASTE_CHARS = 256 * 1024;
+
+export function packagePasteRoom(chars) {
+  return typeof chars === 'number' && isFinite(chars) && chars >= 0 && chars <= MAX_PACKAGE_PASTE_CHARS;
+}
+
+export function splitPackagePaste(text) {
+  if (typeof text !== 'string') {
+    throw new Error(`package paste is not text — refused by the signed-package paste gate (cap ${MAX_PACKAGE_PASTE_CHARS} characters, 256 KiB) before splitting`);
+  }
+  if (!packagePasteRoom(text.length)) {
+    throw new Error(`package paste is ${text.length} characters — over the signed-package paste cap of ${MAX_PACKAGE_PASTE_CHARS} characters (256 KiB); refused before splitting`);
+  }
+  return text.split(/\s+/).map((s) => s.trim()).filter(Boolean);
 }
 
 /* ---------------- era decode (mirror of scale.js encodeMortalEra) -------- */

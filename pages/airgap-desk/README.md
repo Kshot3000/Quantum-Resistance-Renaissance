@@ -45,13 +45,21 @@ Sign QTC transfers on a machine that never touches the network.
   O(n²) in pasted tokens and froze the cold machine ~17s on a 20k-token
   paste; the dedupe itself is load-bearing — a lone 0x… extrinsic
   assembles only when exactly one distinct line remains.
+- Package paste is length-gated before any token is split (Oct 17, 2026):
+  `splitPackagePaste` in `js/airgap.js` refuses a paste over
+  `MAX_PACKAGE_PASTE_CHARS` (256 KiB — the package file cap, since a paste
+  carries exactly what a file carries) on its length alone, with size + cap
+  named; `decodeChunks`' string form asks the same `packagePasteRoom` gate
+  before its own split. The largest genuine paste (168,103 chars at the
+  degenerate 1-byte chunking) fits with headroom; the ungated split alone
+  cost ~1 s on a 20M-char paste.
 - Optional builder service fee (2026-10-12): the cold desk can add a disclosed fee
   (None / 0.25% / 0.5% default / 1%, capped at 100 bps) ON TOP of the amount as a
   second `transfer_keep_alive` leg to the builder's QTC address inside one atomic
   `Utility.batch_all` — one signature, recipient leg first and untouched. The hot
   decoder accepts exactly that 2-leg batch shape and renders both legs, warning
   when the second leg does not pay the disclosed builder address.
-- `tests/run-tests.mjs`: 50/50 protocol tests (ticket/chunk/era codecs, full cold-sign →
+- `tests/run-tests.mjs`: 52/52 protocol tests (ticket/chunk/era codecs, full cold-sign →
   hot-verify round trip incl. tamper and wrong-ticket failures, ML-DSA-87 path,
   service-fee math/batch/decode-whitelist tests; the ticket nonce is held to the
   issuer's u32 grammar — a nonce ≥ 2³² or a non-safe integer the JSON text could

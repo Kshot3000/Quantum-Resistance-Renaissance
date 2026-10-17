@@ -10,6 +10,7 @@ import {
   decodeForVerify, reverifySigned, buildColdPayload, buildColdExtrinsic,
   computeServiceFee, feeBpsLabel, SERVICE_FEE_ADDRESS, mergePackageLines,
   packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
+  splitPackagePaste,
   DEFAULT_ERA_PERIOD,
 } from './airgap.js';
 import { drawQR, decodeQRImage, mountChunkStepper, startCameraScan } from './qr.js';
@@ -270,7 +271,12 @@ $('btn-pkg-camera-stop').addEventListener('click', () => {
 });
 
 function collectPackageLines() {
-  const pasted = $('pkg-paste').value.split(/\s+/).map((s) => s.trim()).filter(Boolean);
+  // Paste-length gate (airgap.js): splitPackagePaste refuses a paste
+  // over the 256 KiB package cap on its length alone, before a single
+  // token is built — the raw split this replaces materialized every
+  // token of an arbitrary paste on the Assemble click. The refusal
+  // propagates to the click handler's error line, size + cap named.
+  const pasted = splitPackagePaste($('pkg-paste').value);
   // Set-based merge (airgap.js): the includes() rescan this replaces was
   // O(n^2) in pasted tokens and froze the cold machine on a large paste.
   return mergePackageLines(pkgChunkTexts, pasted);
