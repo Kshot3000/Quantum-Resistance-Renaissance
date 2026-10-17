@@ -285,7 +285,28 @@ export function hexEncode(bytes) {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/* Hex-input bound BEFORE parsing (white-hat): hexDecode regex-tested
+ * and parseInt-looped the WHOLE string before any caller checked a
+ * length — a 20,000,000-char paste built a 10,000,000-byte array
+ * (~0.41–0.47 s measured in Node per copy, far worse in a tab) only for
+ * the caller to then reject it as the wrong size. Every caller of this
+ * shared module accepts only small fixed structs or producer-bounded
+ * packages: the largest legitimate input is a signed ML-DSA-87
+ * extrinsic (~7,357 bytes = 14,714 hex chars, measured with Airgap
+ * Desk's own producers), then an ML-DSA-87 secret key (4,896 bytes)
+ * and signature (4,627 bytes). MAX_HEX_INPUT_CHARS = 65,536 admits
+ * 32,768 bytes of plain hex — over 4x that extrinsic — while refusing
+ * anything larger unread. hexInputRoom is the pure fail-closed gate
+ * (non-integer, negative, or non-number counts get no room), mirroring
+ * the ss58 length bound above and the Scale Lab codec bound. */
+export const MAX_HEX_INPUT_CHARS = 65536;
+export function hexInputRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_HEX_INPUT_CHARS - chars);
+}
 export function hexDecode(hex) {
+  if (typeof hex === 'string' && hex.length > MAX_HEX_INPUT_CHARS)
+    throw new Error('Hex input too long (' + hex.length + ' characters) — the cap is ' + MAX_HEX_INPUT_CHARS + ' characters; refused before parsing');
   const h = hex.trim().replace(/^0x/, '');
   if (!/^[0-9a-fA-F]*$/.test(h) || h.length % 2 !== 0)
     throw new Error('Invalid hex');

@@ -25,6 +25,8 @@ import {
   pubkeyToAddress,
   hexEncode,
   hexDecode,
+  hexInputRoom,
+  MAX_HEX_INPUT_CHARS,
   QUANTUS_SS58_PREFIX,
 } from '../js/quantus-crypto.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
@@ -161,6 +163,22 @@ const KYLE_QTC = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
   let threw = false;
   try { hexDecode('zz'); } catch { threw = true; }
   ok('hexDecode rejects garbage', threw);
+}
+
+// ---- 8. hex input bound (white-hat: refuse before parsing) ----
+{
+  eq('hex cap is 65,536 chars', MAX_HEX_INPUT_CHARS, 65536);
+  eq('hexInputRoom(0)', hexInputRoom(0), 65536);
+  eq('hexInputRoom at cap', hexInputRoom(65536), 0);
+  eq('hexInputRoom over cap', hexInputRoom(65537), 0);
+  for (const bad of [NaN, -1, 1.5, '10', undefined, null, Infinity])
+    eq('hexInputRoom fail-closed ' + String(bad), hexInputRoom(bad), 0);
+  let msg = '';
+  try { hexDecode('ab'.repeat(40000)); } catch (e) { msg = e.message; }
+  ok('hexDecode refuses 80,000 chars naming size + cap', /80000/.test(msg) && /65536/.test(msg), msg);
+  eq('hexDecode exactly-cap parses', hexDecode('ab'.repeat(32768)).length, 32768);
+  eq('hexDecode ML-DSA-87 signature hex parses', hexDecode('cd'.repeat(4627)).length, 4627);
+  eq('hexDecode largest signed extrinsic hex parses', hexDecode('ef'.repeat(7357)).length, 7357);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
