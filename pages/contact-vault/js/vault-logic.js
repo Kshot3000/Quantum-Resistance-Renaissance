@@ -268,7 +268,7 @@ function parseImportPayload(obj) {
 
 /* ---------- backup-import paste length gate ---------- */
 /* The Import tab JSON.parse'd the WHOLE pasted backup before any
- * length was consulted: a 20,000,066-char backup-shaped paste built
+ * length was consulted: a 20,000,062-char backup-shaped paste built
  * its full parse tree in ~76 ms in Node (probe
  * qa-contactvault-importgate) on every Import click, all to import at
  * most MAX_CONTACTS contacts. The core now owns the parse behind
