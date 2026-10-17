@@ -5240,6 +5240,7 @@ console.log(`\n${pass} passed, ${fail} failed`);
   const html = read("pages/proposal-studio/index.html");
   ok(html.includes("js/gov-codec.js?v=1.48.0"), "ps-hexbound: gov-codec cache key bumped (1.47.0)");
   ok(html.includes("js/app.js?v=1.48.0"), "ps-hexbound: app cache key bumped (1.47.0)");
+  ok(html.includes("<div class=\"stat-v\">132/132</div>"), "ps-hexbound: in-page codec-test stat corrected to the current 132/132 count (was a stale 75/75)");
   ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.11.122"), "ps-hexbound: miningcalc sync patch-bump pin (.122)");
   ok(read("pages/pool-desk/index.html").includes("js/app.js?v=1.48.122"), "ps-hexbound: pool-desk sync patch-bump pin (.122)");
   ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.51.122"), "ps-hexbound: energy sync patch-bump pin (.122)");
