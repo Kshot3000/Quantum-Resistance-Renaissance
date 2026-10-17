@@ -15,7 +15,7 @@ The homepage recomputes three runtime rules in the browser from `data/supply.jso
 - `command-center/` — The same briefing as a local TanStack Start app. GitHub Pages does not serve this folder.
 - `pages/` — Each shipped app gets its own folder, verified in a real browser before it goes live:
   - `mining-calculator/` — QTC reward estimator + emission chart + mining quickstart (network hashrate / total-issuance / observed-pace defaults derive live from the hourly chain snapshots, with a dated fallback bundle; the observed pace anchors only when avg_ms recomputes exactly from the snapshot's own block-time window — round 3, Oct 14, 2026)
-  - `address-toolkit/` — SS58 prefix-189 address inspector/encoder
+  - `address-toolkit/` — SS58 prefix-189 address inspector/encoder (36/36 logic tests; the SS58 decoder refuses inputs over 128 characters before decoding, and the key-hex parser refuses inputs over 256 characters before its per-keystroke parse — the largest key the encoder accepts is 66 hex digits)
   - `network-dashboard/` — live mainnet telemetry from the public Subsquid indexer (indexer/snapshot payloads relation-validated before anything renders: block head vs status, rewards vs the emission schedule, the daily series must be consecutive UTC days whose newest row belongs to the capture's era, and its per-day block counts must never sum past the chain height they partition)
   - `quantum-shield/` — interactive post-quantum explainer (ML-DSA, signature math, exposure demo)
   - `tokenomics/` — QTC tokenomics explorer (verified genesis vesting, unlock simulator, emission tail, fee-burn calculator, funding; the shared exact decimal parser refuses exponent/length bombs instead of computing them; fmtQTC rounds with carry — 1.999 paints 2.00, not 1.00)

@@ -458,7 +458,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Address Toolkit <span class="arrow" aria-hidden="true">→</span></h3>
         <p>Decode any SS58 address, re-compute the blake2b checksum, and encode 32-byte keys into prefix-189 <code style="font-size:12px;color:#34ff88">qz…</code> addresses — 100% client-side.</p>
-        <div class="meta">29/29 logic tests green · SS58 decoder refuses inputs over 128 chars before decoding</div>
+        <div class="meta">36/36 logic tests green · SS58 decoder refuses inputs over 128 chars before decoding · key-hex parser refuses inputs over 256 chars before parsing</div>
       </a>
       <a class="app-card network" href="pages/network-dashboard/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+435,082% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+432,728% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">

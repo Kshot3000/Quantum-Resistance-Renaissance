@@ -96,5 +96,29 @@ check("direct b58decode(20,000) throws badLength", threwLong);
 check("100-char garbage still gets an ordinary (non-length) rejection",
       C.ss58Decode("z".repeat(100)).kind !== "length");
 
+/* Hex-input bound (white-hat): encode() re-runs fromHex on every
+ * keystroke, so fromHex must refuse over-cap input BEFORE its
+ * strip/regex/parse loop — the largest key encode() accepts is
+ * 33 bytes = 66 hex digits (100 raw chars 0x-prefixed and byte-spaced),
+ * and the cap is 256. */
+check("MAX_HEX_INPUT_CHARS is 256", C.MAX_HEX_INPUT_CHARS === 256);
+check("hexInputRoom arithmetic at the cap",
+      C.hexInputRoom(0) === true && C.hexInputRoom(100) === true &&
+      C.hexInputRoom(256) === true && C.hexInputRoom(257) === false &&
+      C.hexInputRoom(100000) === false);
+check("hexInputRoom fails closed",
+      C.hexInputRoom(NaN) === false && C.hexInputRoom(-1) === false &&
+      C.hexInputRoom("256") === false && C.hexInputRoom(undefined) === false &&
+      C.hexInputRoom(Infinity) === false && C.hexInputRoom(null) === false);
+check("fromHex refuses a 100,000-char input unparsed (null, not a 50,000-byte array)",
+      C.fromHex("ab".repeat(50000)) === null);
+check("fromHex refuses a 258-char even input unparsed",
+      C.fromHex("ab".repeat(129)) === null);
+check("fromHex still parses exactly 256 chars (128 bytes)",
+      (C.fromHex("ab".repeat(128)) || []).length === 128);
+var spaced33 = "0x" + k.concat([0xab]).map(function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
+check("largest legitimate raw input (100 chars, byte-spaced 33-byte key) still parses",
+      spaced33.length === 100 && JSON.stringify(C.fromHex(spaced33)) === JSON.stringify(k.concat([0xab])));
+
 console.log(fails === 0 ? "ALL GREEN" : fails + " FAILURES");
 process.exit(fails ? 1 : 0);

@@ -206,7 +206,28 @@ function ss58Decode(addr){
 function toHex(bytes){
   return bytes.map(function(b){ return ("0" + b.toString(16)).slice(-2); }).join("");
 }
+/* Hex-input bound BEFORE parsing (white-hat): encode() re-runs fromHex
+ * on EVERY keystroke of the key field, and fromHex whitespace-strips,
+ * regex-tests and parseInt-loops the whole string before encode() ever
+ * checks the key length — yet the only keys encode() can accept are
+ * 1/2/4/8/32/33 bytes: at most 66 hex digits, 100 raw characters with a
+ * 0x prefix and a space between every byte. Any longer input was
+ * guaranteed to be rejected by that size check, only after paying the
+ * full parse per keystroke (a 1,000,000-char paste: ~40 ms per keystroke
+ * in Node, ~800 ms over 20 keystrokes). Same shape as the ss58Decode
+ * length bound above: refuse over-cap input up front, cap named.
+ * MAX_HEX_INPUT_CHARS = 256 is ~2.5x the largest legitimate raw input. */
+var MAX_HEX_INPUT_CHARS = 256;
+/* Room for a raw hex input of `len` chars under the parse bound: true
+ * only for a finite, non-negative number at or under the cap.
+ * Fail-closed — NaN, negative, infinite, string, and missing lengths
+ * all refuse, matching the fleet's other *Room gates. */
+function hexInputRoom(len){
+  return typeof len === "number" && isFinite(len) &&
+    len >= 0 && len <= MAX_HEX_INPUT_CHARS;
+}
 function fromHex(s){
+  if (typeof s !== "string" || !hexInputRoom(s.length)) return null;
   s = s.replace(/^0x/i, "").replace(/\s+/g, "").toLowerCase();
   if (!/^[0-9a-f]*$/.test(s) || s.length % 2 !== 0) return null;
   var out = [];
@@ -329,6 +350,13 @@ function init(){
   // encode
   var inHex = $("in-hex"), inPrefix = $("in-prefix"), encOut = $("enc-out");
   function encode(){
+    if (!hexInputRoom(inHex.value.length)){
+      setVerdict(encOut, "err", "&#10007; Key hex too long",
+        "Too long (" + inHex.value.length.toLocaleString("en-US") + " characters) — a key is at most 33 bytes " +
+        "(66 hex characters; 100 with a 0x prefix and a space between every byte), so inputs over the " +
+        "256-character cap are refused before parsing.");
+      return;
+    }
     var key = fromHex(inHex.value);
     var prefix = parseInt(inPrefix.value, 10);
     if (!inHex.value.trim()){
@@ -398,6 +426,7 @@ if (typeof module !== "undefined" && module.exports){
                      ss58Encode: ss58Encode, ss58Decode: ss58Decode,
                      isQuantusAddress: isQuantusAddress,
                      QUANTUS_PREFIX: QUANTUS_PREFIX, QUANTUS_KEY_LEN: QUANTUS_KEY_LEN,
-                     toHex: toHex, fromHex: fromHex };
+                     toHex: toHex, fromHex: fromHex,
+                     MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom };
 }
 })();
