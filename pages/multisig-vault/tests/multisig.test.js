@@ -338,5 +338,35 @@ eq(C.feeBpsLabel(100), "1%", "label 100");
   eq(W(big, C.MAX_SIGNER_LINES).skipped, 19500, "signerwindow: 20,000 lines skip the tail");
 }
 
+/* hexInputRoom + fromHex bound: fromHex parsed the WHOLE string before
+ * any caller checked a length (every encode* bounds only the parsed
+ * result; sanitizeBoard and the board form parse first, check after) —
+ * a 20,000,000-char paste built a 10,000,000-element array (~3.4 s in
+ * Node) only to be rejected. The gate refuses over-cap inputs unparsed;
+ * the cap (32,768) sits above the largest legitimate input, a
+ * byte-spaced MAX_CALL_SIZE call at 30,721 chars incl. the 0x prefix. */
+{
+  eq(typeof C.hexInputRoom, "function", "hexbound: hexInputRoom exported from core");
+  eq(C.MAX_HEX_INPUT_CHARS, 32768, "hexbound: cap constant is 32768");
+  eq(C.hexInputRoom(0), 32768, "hexbound: room(0) = cap");
+  eq(C.hexInputRoom(32768), 0, "hexbound: room(cap) = 0");
+  eq(C.hexInputRoom(32769), 0, "hexbound: room(cap+1) = 0");
+  eq(C.hexInputRoom(NaN), 0, "hexbound: room(NaN) fails closed");
+  eq(C.hexInputRoom(-1), 0, "hexbound: room(-1) fails closed");
+  eq(C.hexInputRoom(2.5), 0, "hexbound: room(2.5) fails closed");
+  eq(C.hexInputRoom("100"), 0, "hexbound: room(string) fails closed");
+  eq(C.hexInputRoom(undefined), 0, "hexbound: room(undefined) fails closed");
+  eq(C.hexInputRoom(null), 0, "hexbound: room(null) fails closed");
+  eq(C.hexInputRoom(Infinity), 0, "hexbound: room(Infinity) fails closed");
+  eq(C.fromHex("ab".repeat(20000)), null, "hexbound: 40,000-char input refused unparsed");
+  eq(C.fromHex("ab".repeat(1000000)), null, "hexbound: 2,000,000-char input refused unparsed");
+  const atCap = C.fromHex("ab".repeat(16384));
+  eq(atCap && atCap.length, 16384, "hexbound: exactly-cap 32,768 chars still parses");
+  const spacedMax = C.fromHex("0x" + "ab ".repeat(C.MAX_CALL_SIZE).trimEnd());
+  eq(spacedMax && spacedMax.length, C.MAX_CALL_SIZE, "hexbound: byte-spaced max call (30,721 chars) still parses to MAX_CALL_SIZE bytes");
+  const key = C.fromHex("0x" + "ab".repeat(32));
+  eq(key && key.length, 32, "hexbound: ordinary 32-byte key hex still parses");
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

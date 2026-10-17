@@ -52,6 +52,7 @@ var MAX_SIGNERS = 100;
 var MAX_CALL_SIZE = 10240;
 var MAX_EXPIRY_DURATION = 100800;            // blocks (~14 days at 12s)
 var MAX_SIGNER_LINES = 500;                  // signer-input parse window (parseSigners decodes every parsed line on every keystroke)
+var MAX_HEX_INPUT_CHARS = 32768;             // hex-input parse bound (fromHex refuses longer inputs before parsing)
 var MAX_BOARD_ENTRIES = 500;                 // proposal-board cap (renderBoard paints + hashes every entry at boot)
 var MAX_BOARD_BLOCK = 10000000;              // plausible chain-height ceiling for a stored expiry (fleet bound)
 var BOARD_STATUSES = ["active", "approved", "executed", "expired"];
@@ -272,8 +273,28 @@ function ss58Decode(addr){
 function toHex(bytes){
   return bytes.map(function(b){ return ("0" + b.toString(16)).slice(-2); }).join("");
 }
+/* Hex-input bound BEFORE parsing (white-hat): fromHex whitespace-stripped,
+ * regex-tested and parseInt-looped the WHOLE string before any caller
+ * checked a length — every consumer bounds only the RESULT (the encode*
+ * builders reject bytes over MAX_CALL_SIZE after the parse, sanitizeBoard
+ * parses a stored callHex then drops it if long, the board form parses
+ * the user's paste then checks it), so a 20,000,000-char paste built a
+ * 10,000,000-element array (~3.4 s measured in Node) only to be rejected
+ * as too long. The largest legitimate input is a byte-spaced
+ * MAX_CALL_SIZE call: 10,240 bytes x 3 chars, plus a 0x prefix = 30,721
+ * chars (measured with this core's own parser). MAX_HEX_INPUT_CHARS =
+ * 32,768 admits that with margin while refusing anything larger
+ * unparsed. hexInputRoom is the pure fail-closed gate (a non-integer,
+ * negative, or non-number count gets no room), mirroring the
+ * quantus-crypto / Scale Lab hex bounds. */
+function hexInputRoom(chars){
+  if (typeof chars !== "number" || !isFinite(chars) || Math.floor(chars) !== chars || chars < 0) return 0;
+  return Math.max(0, MAX_HEX_INPUT_CHARS - chars);
+}
 function fromHex(s){
-  s = String(s).replace(/^0x/i, "").replace(/\s+/g, "").toLowerCase();
+  s = String(s);
+  if (s.length > MAX_HEX_INPUT_CHARS) return null;
+  s = s.replace(/^0x/i, "").replace(/\s+/g, "").toLowerCase();
   if (!/^[0-9a-f]*$/.test(s) || s.length % 2 !== 0) return null;
   var out = [];
   for (var i = 0; i < s.length; i += 2) out.push(parseInt(s.substr(i, 2), 16));
@@ -688,7 +709,8 @@ var MsigCore = {
   MULTISIG_FEE: MULTISIG_FEE, PROPOSAL_DEPOSIT: PROPOSAL_DEPOSIT,
   PROPOSAL_FEE: PROPOSAL_FEE, SIGNER_STEP_PERMILL: SIGNER_STEP_PERMILL,
   blake2b: blake2b, ss58Encode: ss58Encode, ss58Decode: ss58Decode,
-  toHex: toHex, fromHex: fromHex, u32le: u32le, u64le: u64le,
+  toHex: toHex, fromHex: fromHex, MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS,
+  hexInputRoom: hexInputRoom, u32le: u32le, u64le: u64le,
   compactU128: compactU128, vecAccountId: vecAccountId, boundedBytes: boundedBytes,
   qtcToPlancks: qtcToPlancks, plancksToQtc: plancksToQtc,
   deriveMultisigAddress: deriveMultisigAddress, sortKeyHex: sortKeyHex,

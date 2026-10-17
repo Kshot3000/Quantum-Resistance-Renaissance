@@ -334,7 +334,29 @@ $("bp-save").addEventListener("click", function(){
   var d = C.ss58Decode(v);
   if (!d.ok || d.prefix !== C.SS58_PREFIX || d.key.length !== 32){ err.textContent = "Vault address is not a valid prefix-189 SS58 address."; return; }
   var callHex = $("bp-call").value.trim().replace(/^0x/i, "");
-  if (!C.fromHex(callHex) || !callHex.length){ err.textContent = "Inner call must be hex."; return; }
+  // Parse bound (white-hat): fromHex parses the whole paste before any
+  // length check, so refuse over-cap pastes unread with the cap named —
+  // the core gate refuses them too, this just gives the refusal words.
+  if (callHex.length > C.MAX_HEX_INPUT_CHARS){
+    err.textContent = "Inner call too long (" + callHex.length.toLocaleString("en-US") +
+      " characters) — inputs over the " + C.MAX_HEX_INPUT_CHARS.toLocaleString("en-US") +
+      "-character cap are refused before parsing.";
+    return;
+  }
+  var callBytes = C.fromHex(callHex);
+  if (!callBytes || !callHex.length){ err.textContent = "Inner call must be hex."; return; }
+  /* Creation-path size cap (white-hat track): sanitizeBoard drops stored
+   * calls over MAX_CALL_SIZE at load — but this handler APPENDS, so an
+   * over-size call was pushed, toasted as logged, and then dropped by
+   * renderBoard's loadBoard in the same paint: the proposal vanished
+   * under a success toast (the board-count vanishing class, for size).
+   * Refuse at the cap and name it instead; the form stays open. */
+  if (callBytes.length > C.MAX_CALL_SIZE){
+    err.textContent = "Inner call is " + callBytes.length.toLocaleString("en-US") +
+      " bytes — the cap is " + C.MAX_CALL_SIZE.toLocaleString("en-US") +
+      " bytes; a larger call can never be a valid proposal.";
+    return;
+  }
   var expiry = Number($("bp-expiry").value);
   if (!(expiry >= 1)){ err.textContent = "Expiry block required."; return; }
   var items = loadBoard();
