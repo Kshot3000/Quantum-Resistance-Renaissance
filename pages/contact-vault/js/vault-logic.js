@@ -266,6 +266,45 @@ function parseImportPayload(obj) {
   return { ok: true, contacts: contacts, errors: errors };
 }
 
+/* ---------- backup-import paste length gate ---------- */
+/* The Import tab JSON.parse'd the WHOLE pasted backup before any
+ * length was consulted: a 20,000,066-char backup-shaped paste built
+ * its full parse tree in ~76 ms in Node (probe
+ * qa-contactvault-importgate) on every Import click, all to import at
+ * most MAX_CONTACTS contacts. The core now owns the parse behind
+ * MAX_IMPORT_PASTE_CHARS: parseImportPaste refuses over-cap pastes on
+ * length alone via the pure fail-closed importPasteRoom, naming size
+ * + cap, before JSON.parse runs. The cap is derived from the largest
+ * legitimate pastes measured with the core's own producers: a full
+ * 500-contact plain backup pretty-printed is 498,112 chars; with
+ * every free-text character at JSON's worst 6-char \\uXXXX escaping
+ * it is 2,348,112 chars; and that worst-escape payload inside the
+ * PBKDF2/AES-GCM armored form (base64 of the escaped plain) is
+ * 3,057,662 chars — so MAX_IMPORT_PASTE_CHARS = 4,194,304 (4 MiB,
+ * the fleet's paste/file cap) holds every genuine backup intact and
+ * no legitimate input changes outcome. The decrypted inner payload
+ * routes through the same gate: it is bounded by construction (its
+ * ciphertext rode inside an already-gated paste), and the gate keeps
+ * that invariant enforced rather than assumed. Non-string input
+ * fails closed as not-text. */
+var MAX_IMPORT_PASTE_CHARS = 4 * 1024 * 1024;
+function importPasteRoom(chars) {
+  return typeof chars === "number" && isFinite(chars) && chars >= 0 && chars <= MAX_IMPORT_PASTE_CHARS;
+}
+function parseImportPaste(text) {
+  if (typeof text !== "string")
+    return { ok: false, code: "not-text",
+             error: "Backup paste is not text — refused by the import gate (cap " + MAX_IMPORT_PASTE_CHARS.toLocaleString("en-US") + " characters) before parsing." };
+  if (!importPasteRoom(text.length))
+    return { ok: false, code: "too-long",
+             error: "Backup paste too long (" + text.length.toLocaleString("en-US") + " characters) — the cap is " + MAX_IMPORT_PASTE_CHARS.toLocaleString("en-US") + " characters; refused before parsing." };
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch (e) {
+    return { ok: false, code: "not-json", error: "Not valid JSON: " + e.message };
+  }
+}
+
 /* ---------- base64 helpers (browser + Node) ---------- */
 function b64encode(bytes) {
   if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
@@ -340,6 +379,8 @@ var api = {
   cleanAddedAt: cleanAddedAt, cleanCheckphrase: cleanCheckphrase,
   buildExportPayload: buildExportPayload,
   parseImportPayload: parseImportPayload,
+  MAX_IMPORT_PASTE_CHARS: MAX_IMPORT_PASTE_CHARS,
+  importPasteRoom: importPasteRoom, parseImportPaste: parseImportPaste,
   encryptBackup: encryptBackup,
   decryptBackup: decryptBackup,
   b64encode: b64encode, b64decode: b64decode,

@@ -283,7 +283,7 @@
       </div>
       <div class="card">
         <h2><span class="p-ico">📥</span>Import</h2>
-        <p class="sub">Paste a backup below. Every address is re-validated (checksum + prefix 189) and every stored checkphrase is recomputed and compared before anything enters your vault. Duplicates are skipped.</p>
+        <p class="sub">Paste a backup below. Every address is re-validated (checksum + prefix 189) and every stored checkphrase is recomputed and compared before anything enters your vault. Duplicates are skipped. Backup pastes are length-gated at 4,194,304 characters (the largest genuine backup — a full 500-contact vault in its encrypted form — is 3,057,662 characters), refused before parsing.</p>
         <label class="f" for="iIn">Backup JSON (plain or encrypted)</label>
         <textarea class="mono" id="iIn" rows="7" placeholder='Paste {"app":"qtc-contact-vault",…} here' spellcheck="false"></textarea>
         <label class="f" for="iPass">Password (only for encrypted backups)</label>
@@ -339,7 +339,7 @@
 <script src="js/checkphrase-core.js?v=1.25.0"></script>
 <script src="js/ss58.js?v=1.27.0"></script>
 <script src="../../assets/vendor/qrcode.js?v=1.0.0"></script>
-<script src="js/vault-logic.js?v=1.30.0"></script>
-<script src="js/app.js?v=1.31.0"></script>
+<script src="js/vault-logic.js?v=1.31.0"></script>
+<script src="js/app.js?v=1.32.0"></script>
 </body>
 </html>

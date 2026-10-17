@@ -670,9 +670,9 @@ $("iRun").addEventListener("click", function () {
   var msg = $("iMsg"), raw = $("iIn").value.trim();
   msg.className = "msg"; msg.textContent = "";
   if (!raw) { msg.className = "msg err"; msg.textContent = "Paste a backup first."; return; }
-  var obj;
-  try { obj = JSON.parse(raw); }
-  catch (e) { msg.className = "msg err"; msg.textContent = "Not valid JSON: " + e.message; return; }
+  var paste = LOGIC.parseImportPaste(raw);
+  if (!paste.ok) { msg.className = "msg err"; msg.textContent = paste.error; return; }
+  var obj = paste.value;
   function handlePlain(parsed) {
     var res = LOGIC.parseImportPayload(parsed);
     if (!res.ok) { msg.className = "msg err"; msg.textContent = res.errors.join(" "); return; }
@@ -683,9 +683,9 @@ $("iRun").addEventListener("click", function () {
     if (!pw) { msg.className = "msg err"; msg.textContent = "This backup is encrypted — enter the password."; return; }
     msg.innerHTML = '<span class="spinner"></span>Decrypting…';
     LOGIC.decryptBackup(pw, obj).then(function (plain) {
-      var parsed;
-      try { parsed = JSON.parse(plain); }
-      catch (e) { msg.className = "msg err"; msg.textContent = "Decrypted, but the inner JSON is corrupt."; return; }
+      var inner = LOGIC.parseImportPaste(plain);
+      if (!inner.ok) { msg.className = "msg err"; msg.textContent = inner.code === "too-long" ? inner.error : "Decrypted, but the inner JSON is corrupt."; return; }
+      var parsed = inner.value;
       $("iPass").value = "";
       handlePlain(parsed);
     }).catch(function (e) { msg.className = "msg err"; msg.textContent = e.message; });

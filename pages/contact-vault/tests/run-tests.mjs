@@ -332,5 +332,66 @@ ok("parseBatchInput fail-closed on non-strings",
     return r.lines.length === 0 && r.skippedChars === 0 && r.droppedLines === 0;
   }));
 
+/* 11. backup-import paste length gate (parseImportPaste): the Import
+ * handler used to JSON.parse the WHOLE paste before any length was
+ * consulted — a 20,000,062-char backup-shaped paste built its full
+ * parse tree in ~76 ms in Node (probe qa-contactvault-importgate) to
+ * import at most 500 contacts. The core now refuses over-cap pastes
+ * on length alone. Cap derivation (core's own producers): a full
+ * 500-contact plain backup pretty-printed is 498,112 chars; at JSON's
+ * worst 6-char escaping it is 2,348,112 chars; that payload in the
+ * armored form is 3,057,662 chars — all under the 4,194,304 cap. */
+ok("import paste cap exported (MAX_IMPORT_PASTE_CHARS 4194304)",
+  LOGIC.MAX_IMPORT_PASTE_CHARS === 4194304);
+ok("importPasteRoom arithmetic at the cap",
+  LOGIC.importPasteRoom(0) === true && LOGIC.importPasteRoom(4194304) === true &&
+  LOGIC.importPasteRoom(4194305) === false);
+ok("importPasteRoom fail-closed on non-numbers",
+  [NaN, -1, Infinity, "100", undefined, null, {}].every((v) => LOGIC.importPasteRoom(v) === false));
+ok("parseImportPaste small backup parses and validates",
+  (() => { const r = LOGIC.parseImportPaste(JSON.stringify(LOGIC.buildExportPayload(
+      [{ label: "Kyle", address: KYLE, note: "", trusted: true, checkphrase: null, addedAt: null }])));
+    return r.ok === true && LOGIC.parseImportPayload(r.value).ok === true; })());
+ok("parseImportPaste refuses a 20M-char paste unparsed, naming size + cap",
+  (() => { const r = LOGIC.parseImportPaste('{"pad":"' + "a".repeat(20000000) + '"}');
+    return r.ok === false && r.code === "too-long" &&
+      /4,194,304/.test(r.error) && /characters/.test(r.error); })());
+ok("parseImportPaste refuses cap+1 chars",
+  (() => { const r = LOGIC.parseImportPaste('"' + "a".repeat(4194303) + '"');
+    return r.ok === false && r.code === "too-long" && /4,194,305/.test(r.error); })());
+ok("parseImportPaste exactly-cap valid JSON still parses",
+  (() => { const r = LOGIC.parseImportPaste('"' + "a".repeat(4194302) + '"');
+    return r.ok === true && r.value.length === 4194302; })());
+ok("parseImportPaste invalid JSON keeps a Not-valid-JSON error",
+  (() => { const r = LOGIC.parseImportPaste("{not json");
+    return r.ok === false && r.code === "not-json" && /Not valid JSON/.test(r.error); })());
+ok("parseImportPaste fail-closed on non-strings",
+  [null, undefined, 42, NaN, {}, []].every((v) => {
+    const r = LOGIC.parseImportPaste(v);
+    return r.ok === false && r.code === "not-text";
+  }));
+{
+  const maxC = { label: "a".repeat(80), address: KYLE, note: "b".repeat(500), trusted: true,
+                 checkphrase: ["w".repeat(32), "w".repeat(32), "w".repeat(32), "w".repeat(32), "w".repeat(32)],
+                 addedAt: "2026-09-01T00:00:00.000Z".padEnd(40, "0") };
+  const escC = { label: "\u0001".repeat(80), address: KYLE, note: "\u0001".repeat(500), trusted: true,
+                 checkphrase: Array(5).fill("\u0001".repeat(32)),
+                 addedAt: "2026-09-01T00:00:00.000Z".padEnd(40, "0") };
+  const plainPretty = JSON.stringify(LOGIC.buildExportPayload(Array.from({ length: 500 }, () => maxC)), null, 2);
+  const escPayload = LOGIC.buildExportPayload(Array.from({ length: 500 }, () => escC));
+  const escPretty = JSON.stringify(escPayload, null, 2);
+  ok("largest genuine backups fit the cap (plain 498,112; worst-escape 2,348,112)",
+    plainPretty.length === 498112 && escPretty.length === 2348112 &&
+    LOGIC.parseImportPaste(plainPretty).ok === true && LOGIC.parseImportPaste(escPretty).ok === true);
+  const armoredEsc = await LOGIC.encryptBackup("password123", JSON.stringify(escPayload));
+  const encPretty = JSON.stringify(armoredEsc, null, 2);
+  const rEnc = LOGIC.parseImportPaste(encPretty);
+  const innerPlain = rEnc.ok ? await LOGIC.decryptBackup("password123", rEnc.value) : "";
+  const rInner = LOGIC.parseImportPaste(innerPlain);
+  ok("largest encrypted backup (3,057,662 chars) parses; its decrypted inner payload parses through the same gate",
+    encPretty.length === 3057662 && rEnc.ok === true && rInner.ok === true &&
+    LOGIC.parseImportPayload(rInner.value).ok === true);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
