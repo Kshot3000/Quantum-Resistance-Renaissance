@@ -6,6 +6,7 @@ import {
   summarizeHeader, summarizeBlock, summarizePeers, summarizeHealth, summarizeRuntimeVersion, summarizeSyncState,
   RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory, sanitizeHistory, BROADCAST_METHODS, formatPartialFeeQtc,
   parseBlockNumber, isHash32, validPlanckField, validChainHeight, validExtrinsicHex, MAX_CHAIN_HEIGHT,
+  MAX_PARAMS_JSON_CHARS, paramsJsonRoom,
 } from '../js/core.js';
 import { qtcToPlancks } from '../js/lib/scale.js';
 import { ConsoleRpc } from '../js/rpc-client.js';
@@ -42,6 +43,21 @@ t('endpoint: garbage rejected', !validateEndpoint('not a url').ok);
   t('params: empty -> []', parseParamsJson('').ok && parseParamsJson('  ').params.length === 0);
   t('params: non-array rejected', !parseParamsJson('{"a":1}').ok);
   t('params: bad json rejected', !parseParamsJson('[1,').ok);
+}
+/* params-paste length gate (white-hat): parseParamsJson used to
+ * JSON.parse the WHOLE paste before any length was consulted; the cap
+ * (1,048,576 — the fleet cap for the largest chain object) is >10x the
+ * largest legitimate params JSON, a signed 1,000-leg batch_all
+ * extrinsic as one string param (~98,540 chars). */
+{
+  t('params cap: exported at 1,048,576', MAX_PARAMS_JSON_CHARS === 1048576);
+  t('params cap: room fail-closed', paramsJsonRoom(0) === 1048576 && paramsJsonRoom(1048576) === 0 &&
+    paramsJsonRoom(-1) === 0 && paramsJsonRoom(1.5) === 0 && paramsJsonRoom('5') === 0);
+  const over = parseParamsJson('["' + 'a'.repeat(1048576) + '"]');
+  t('params cap: over-cap refused', !over.ok);
+  t('params cap: refusal names size + cap', /1048580/.test(over.error) && /1048576/.test(over.error), over.error);
+  t('params cap: exactly-cap still parses', parseParamsJson('["' + 'a'.repeat(1048572) + '"]').ok);
+  t('params cap: non-string input still safe', parseParamsJson(undefined).ok && parseParamsJson(null).params.length === 0);
 }
 
 /* ---- error explainer ---- */

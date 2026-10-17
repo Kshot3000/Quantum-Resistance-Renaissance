@@ -175,6 +175,21 @@ t("donation address exact", function(){
   assert.strictEqual(m.DONATE_ADDR, "qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau");
 });
 
+// 14b. buildJsonRpc params-paste length gate (white-hat): buildJsonRpc
+// used to JSON.parse the WHOLE paste before any length was consulted.
+// The cap (1048576 — the fleet cap for the largest chain object) is
+// >10x the largest legitimate params JSON, a signed 1,000-leg
+// batch_all extrinsic as one string param (~98,540 chars).
+t("buildJsonRpc refuses over-cap params before parsing", function(){
+  assert.strictEqual(m.MAX_PARAMS_JSON_CHARS, 1048576);
+  var r = m.buildJsonRpc("author_submitExtrinsic", "[\"" + "a".repeat(1048576) + "\"]");
+  assert.strictEqual(r.ok, false);
+  assert.ok(/1048580/.test(r.error), "refusal names the size: " + r.error);
+  assert.ok(/1048576/.test(r.error), "refusal names the cap: " + r.error);
+  assert.strictEqual(m.buildJsonRpc("author_submitExtrinsic", "[\"" + "a".repeat(1048572) + "\"]").ok, true,
+    "exactly-cap params still build");
+});
+
 // 15. RECIPES are honest: browser-CORS caveat present
 t("recipes include honest CORS caveats", function(){
   assert.ok(m.RECIPES["r-gql"].note.indexOf("allowlisted") >= 0);

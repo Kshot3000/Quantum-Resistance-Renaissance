@@ -132,8 +132,23 @@ function shellQuote(s){
   return "'" + String(s).replace(/'/g, "'\\''") + "'";
 }
 
+/* Params-paste length gate: buildJsonRpc used to JSON.parse the
+ * WHOLE params paste before any length was consulted — a
+ * 20,000,004-char paste paid a full 58.1–76.6 ms parse to build a
+ * payload no RPC call can use. The cap derives from the largest
+ * legitimate params JSON: a signed 1,000-leg batch_all extrinsic
+ * carried as one string param measures ~98,540 chars (Extrinsic Lab
+ * Batch 162: 49,266 bytes = 98,532 hex chars), so
+ * MAX_PARAMS_JSON_CHARS = 1048576 — the fleet cap for the largest
+ * chain object (Chain Console / Extrinsic Lab / Notary Desk) — is
+ * >10x that, and no legitimate input changes outcome. */
+var MAX_PARAMS_JSON_CHARS = 1048576;
+
 function buildJsonRpc(method, paramsJson){
   var params;
+  if (typeof paramsJson === "string" && paramsJson.length > MAX_PARAMS_JSON_CHARS) {
+    return { ok: false, error: "Params JSON too long (" + paramsJson.length + " characters) — the cap is " + MAX_PARAMS_JSON_CHARS + " characters; refused before parsing" };
+  }
   try {
     params = JSON.parse(String(paramsJson).trim() === "" ? "[]" : paramsJson);
     if (!Array.isArray(params)) return { ok: false, error: "Params must be a JSON array, e.g. [137536]" };
@@ -474,6 +489,7 @@ var api = {
   qtcToPlancks: qtcToPlancks, plancksToQtc: plancksToQtc,
   groupDigits: groupDigits, belowED: belowED,
   lookupPallet: lookupPallet, buildJsonRpc: buildJsonRpc, shellQuote: shellQuote,
+  MAX_PARAMS_JSON_CHARS: MAX_PARAMS_JSON_CHARS,
   init: init
 };
 

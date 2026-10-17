@@ -34,7 +34,30 @@ export function buildRequest(method, params, id) {
   return JSON.stringify({ jsonrpc: '2.0', id, method, params: params === undefined ? [] : params });
 }
 
+/* Params-paste length gate: parseParamsJson used to JSON.parse the
+ * WHOLE custom-params paste before any length was consulted — the
+ * parsed params then flow into the node request, the history store
+ * and a re-stringify, so a 20,000,004-char paste paid a full parse
+ * (57.9–170.3 ms in Node) plus the downstream copies, all for params
+ * no RPC call can use. The cap derives from the largest legitimate
+ * params JSON: a signed 1,000-leg batch_all extrinsic carried as one
+ * author_submitExtrinsic string param measures ~98,540 chars
+ * (Extrinsic Lab Batch 162: 49,266 bytes = 98,532 hex chars), so
+ * MAX_PARAMS_JSON_CHARS = 1,048,576 — the fleet cap for the largest
+ * chain object (Extrinsic Lab / Notary Desk hex gates) — is >10x
+ * that, and no legitimate input changes outcome. paramsJsonRoom is
+ * the pure fail-closed gate (a non-integer, negative, or non-number
+ * count gets no room), mirroring the fleet hexInputRoom bounds. */
+export const MAX_PARAMS_JSON_CHARS = 1048576;
+export function paramsJsonRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_PARAMS_JSON_CHARS - chars);
+}
+
 export function parseParamsJson(text) {
+  if (typeof text === 'string' && text.length > MAX_PARAMS_JSON_CHARS) {
+    return { ok: false, error: 'Params JSON too long (' + text.length + ' characters) — the cap is ' + MAX_PARAMS_JSON_CHARS + ' characters; refused before parsing' };
+  }
   const t = (text || '').trim();
   if (!t) return { ok: true, params: [] };
   try {

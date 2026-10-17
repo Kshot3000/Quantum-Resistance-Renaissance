@@ -30,17 +30,17 @@ CHAIN.BLOCKS_PER_DAY = 86400 / CHAIN.BLOCK_TIME_S; // 7200
 /* Dated static FALLBACK bundle — replaced at load by deriveNetworkDefaults()
  * from the hourly data/*.json snapshots. Kept honest and dated for the
  * no-fetch path (file://, offline). Every figure comes from ONE capture
- * (2026-10-17 12:20Z): consensus difficulty @241,232 and total issuance
- * @241,232, fetched 2 seconds apart — never mix snapshot dates in one bundle.
+ * (2026-10-17 13:22Z): consensus difficulty @241,509 and total issuance
+ * @241,509, fetched 2 seconds apart — never mix snapshot dates in one bundle.
  * Guarded by tests/calc.test.js (fallback-integrity suite). */
 var FALLBACK = {
-  difficulty: "436454073023600",        // data/consensus.json @241,232
-  netHs: 36371172751966,                // = floor(difficulty / 12 s)
-  totalSupplyPlancks: "5828244222466360331", // data/supply.json @241,232
-  supplyQtc: 5828244.2225,              // total issuance incl. genesis
-  avgBlockMs: 14560,                    // consensus block_times_ms (3,000-block sample)
-  height: 241232,
-  fetchedAt: "2026-10-17T12:20:01.648Z"
+  difficulty: "441574402873034",        // data/consensus.json @241,509
+  netHs: 36797866906086,                // = floor(difficulty / 12 s)
+  totalSupplyPlancks: "5828415018084960587", // data/supply.json @241,509
+  supplyQtc: 5828415.0181,              // total issuance incl. genesis
+  avgBlockMs: 14529,                    // consensus block_times_ms (3,000-block sample)
+  height: 241509,
+  fetchedAt: "2026-10-17T13:22:44.170Z"
 };
 
 /* Pure: block reward from total issuance (the emission formula's S —

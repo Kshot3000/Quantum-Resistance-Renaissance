@@ -310,6 +310,33 @@ export function generateProof(leafIndex, depth, getLeafHash, getNodeHash) {
  * (hash_node sorts internally, so order never matters), compare to root.
  * Mirrors tree.rs::verify_proof.
  */
+/* Proof-paste length gate: the verify handler used to JSON.parse the
+ * WHOLE proof paste before verifyProof's shape gate ever ran, so a
+ * 40,600,031-char paste of 200,000 levels paid a full 273.8–723.3 ms
+ * parse building 200,000 level arrays — all to be rejected by the
+ * depth check 0.3 ms later. The cap derives from the largest
+ * legitimate paste this app can produce or accept: a proof at the
+ * chain max depth (MAX_TREE_DEPTH = 32 levels x 3 siblings x 64-char
+ * hashes) measures 6,536 chars compact and 7,540 chars
+ * pretty-printed, so MAX_PROOF_PASTE_CHARS = 65,536 is >8x that and
+ * no legitimate input changes outcome. proofPasteRoom is the pure
+ * fail-closed gate (a non-integer, negative, or non-number count
+ * gets no room), mirroring the fleet hexInputRoom bounds. */
+export const MAX_PROOF_PASTE_CHARS = 65536;
+export function proofPasteRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_PROOF_PASTE_CHARS - chars);
+}
+export function parseProofPaste(text) {
+  if (typeof text !== "string")
+    throw new Error("malformed proof: the paste is not JSON text");
+  if (text.length > MAX_PROOF_PASTE_CHARS)
+    throw new Error(
+      "proof paste too long (" + text.length + " characters) — the cap is " + MAX_PROOF_PASTE_CHARS + " characters; refused before parsing"
+    );
+  return JSON.parse(text);
+}
+
 export function verifyProof(leafFields, proof, expectedRootHex) {
   // Shape-gate BEFORE any hashing: proofs come from pasted JSON and from
   // RPC responses — both untrusted. The pallet caps tree depth at
@@ -559,6 +586,9 @@ export const ZK = {
   computeRoot,
   generateProof,
   verifyProof,
+  MAX_PROOF_PASTE_CHARS,
+  proofPasteRoom,
+  parseProofPaste,
   decodeLeaf,
   encodeLeafForTest,
   decodeCompact,

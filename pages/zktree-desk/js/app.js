@@ -578,7 +578,7 @@ $("proof-gen").addEventListener("click", () => {
 $("proof-verify").addEventListener("click", () => {
   const box = $("proof-verify-out");
   try {
-    const proof = JSON.parse($("proof-paste").value);
+    const proof = ZK.parseProofPaste($("proof-paste").value);
     if (!proof || !Array.isArray(proof.siblings)) throw new Error("proof JSON needs {leaf_index, siblings: [[h,h,h], …]}");
     const acct = ZK.parseAccount($("pv-to").value);
     const fields = {

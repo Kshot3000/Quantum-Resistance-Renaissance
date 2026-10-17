@@ -384,5 +384,31 @@ function throws(name, fn) {
     ZK.verifyProof(leaf, { siblings: "nope" }, sib));
 }
 
+// --- 12. proof-paste length gate (white-hat): the verify handler used to
+// JSON.parse the WHOLE paste before verifyProof's shape gate ran — a
+// 40,600,031-char paste of 200,000 levels paid a full 273.8–723.3 ms
+// parse building 200,000 level arrays, all to be rejected 0.3 ms later.
+// parseProofPaste refuses over-cap pastes unread. The cap derives from
+// the largest legitimate paste: a depth-32 (chain max) proof measures
+// 6,536 chars compact / 7,540 pretty — 65,536 is >8x that.
+{
+  const sib = "ab".repeat(32);
+  const proof32 = { leaf_index: "4294967295", siblings: Array.from({ length: 32 }, () => [sib, sib, sib]) };
+  const compact = JSON.stringify(proof32);
+  ok("paste cap exported at 65,536", ZK.MAX_PROOF_PASTE_CHARS === 65536);
+  ok("proofPasteRoom fail-closed", ZK.proofPasteRoom(0) === 65536 && ZK.proofPasteRoom(65536) === 0 &&
+    ZK.proofPasteRoom(-1) === 0 && ZK.proofPasteRoom(1.5) === 0 && ZK.proofPasteRoom("5") === 0);
+  const parsed = ZK.parseProofPaste(compact);
+  ok("depth-32 proof paste round-trips", parsed.siblings.length === 32 && parsed.leaf_index === "4294967295");
+  const atCap = compact + " ".repeat(ZK.MAX_PROOF_PASTE_CHARS - compact.length);
+  ok("exactly-cap paste still parses", atCap.length === 65536 && ZK.parseProofPaste(atCap).siblings.length === 32);
+  let overErr = "";
+  try { ZK.parseProofPaste(atCap + " "); } catch (e) { overErr = e.message; }
+  ok("over-cap paste refused before parsing, size + cap named", /65537/.test(overErr) && /65536/.test(overErr), overErr);
+  throws("malformed JSON still throws", () => ZK.parseProofPaste("[1,"));
+  throws("non-string paste refused fail-closed", () => ZK.parseProofPaste(42));
+  ok("pretty depth-32 proof (7,540 chars) parses", ZK.parseProofPaste(JSON.stringify(proof32, null, 2)).siblings.length === 32);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
