@@ -338,6 +338,44 @@ eq(C.feeBpsLabel(100), "1%", "label 100");
   eq(W(big, C.MAX_SIGNER_LINES).skipped, 19500, "signerwindow: 20,000 lines skip the tail");
 }
 
+/* signer text scan window: signerParseWindow bounded the decode work,
+ * but parseSigners still split/mapped/filtered the WHOLE textarea value
+ * to build the line array — a 19,600,000-char paste of 400,000 lines
+ * built all 400,000 strings in ~325 ms in Node on every keystroke, all
+ * to decode 500. signerTextWindow scans only the first
+ * MAX_SIGNER_SCAN_CHARS chars (500 max-length 128-char lines plus
+ * separators are 64,500 chars, so the full line window scans intact),
+ * backs the cut off to the last newline, and reports skippedChars. */
+{
+  const T = C.signerTextWindow;
+  eq(typeof T, "function", "signerscan: signerTextWindow exported from core");
+  eq(C.MAX_SIGNER_SCAN_CHARS, 65536, "signerscan: scan cap constant is 65,536");
+  const small = T("  qzAAA  \n\nqzBBB\n");
+  eq(small.lines.join(","), "qzAAA,qzBBB", "signerscan: small input lines trimmed, blanks dropped");
+  eq(small.skippedChars, 0, "signerscan: small input skips 0 chars");
+  eq(small.scannedChars, small.totalChars, "signerscan: small input scans in full");
+  const maxLines = Array.from({ length: 500 }, () => "x".repeat(128)).join("\n");
+  const ml = T(maxLines);
+  eq(ml.lines.length, 500, "signerscan: 500 max-length lines all scanned");
+  eq(ml.skippedChars, 0, "signerscan: 500 max-length lines skip 0 chars");
+  const rows = Array.from({ length: 1000 }, () => "x".repeat(100)).join("\n");
+  const mid = T(rows);
+  eq(mid.lines.every((l) => l.length === 100), true, "signerscan: cut backs off to a line boundary — no partial line");
+  eq(mid.scannedChars <= C.MAX_SIGNER_SCAN_CHARS, true, "signerscan: scanned window at or under cap");
+  eq(mid.skippedChars, mid.totalChars - mid.scannedChars, "signerscan: skippedChars is the unscanned tail");
+  const giant = ("qz" + "a".repeat(46) + "\n").repeat(400000);
+  const g = T(giant);
+  eq(g.totalChars, 19600000, "signerscan: giant paste total counted");
+  eq(g.skippedChars > 19000000, true, "signerscan: giant paste tail skipped and counted");
+  const oneLine = T("x".repeat(200000));
+  eq(oneLine.lines.length, 0, "signerscan: single over-window line scans as empty");
+  eq(oneLine.scannedChars, 0, "signerscan: single over-window line scans 0 chars");
+  eq(T(null).lines.length, 0, "signerscan: null fails closed as empty");
+  eq(T(undefined).totalChars, 0, "signerscan: undefined fails closed as empty");
+  eq(T(42).lines.length, 0, "signerscan: non-string fails closed as empty");
+  eq(T("").lines.length, 0, "signerscan: empty string -> no lines");
+}
+
 /* hexInputRoom + fromHex bound: fromHex parsed the WHOLE string before
  * any caller checked a length (every encode* bounds only the parsed
  * result; sanitizeBoard and the board form parse first, check after) —

@@ -698,6 +698,45 @@ function signerParseWindow(lines, cap){
   return { parse: parse, total: total, skipped: total - parse.length };
 }
 
+/* Signer-input scan window (white-hat): signerParseWindow bounds the
+ * DECODE work, but the caller still had to split/map/filter the WHOLE
+ * textarea value to build the line array it windows — a 19,600,000-char
+ * paste of 400,000 lines built all 400,000 strings in ~325 ms in Node
+ * on EVERY keystroke, all to decode 500. signerTextWindow owns the raw
+ * text: it scans only the first MAX_SIGNER_SCAN_CHARS characters and
+ * reports skippedChars so the UI can disclose the unscanned tail.
+ * The cap is derived from the largest legitimate input the line window
+ * can ever consume: MAX_SIGNER_LINES lines of the longest decodable
+ * address (ss58Decode refuses inputs over 128 chars) plus a separator
+ * each are 500 x 129 = 64,500 chars — the cap holds that in full, so
+ * no legitimate paste changes outcome. When the cut lands inside a
+ * line, the scan backs off to the last newline so no truncated partial
+ * line is ever decoded as if it were a pasted address; a single line
+ * longer than the window scans as empty (it can never be a valid
+ * address). Fail-closed: a non-string input scans as empty. Returns
+ * { lines, totalChars, scannedChars, skippedChars } with lines
+ * trimmed and non-empty, matching the caller's previous semantics. */
+var MAX_SIGNER_SCAN_CHARS = 65536;
+function signerTextWindow(text){
+  if (typeof text !== "string")
+    return { lines: [], totalChars: 0, scannedChars: 0, skippedChars: 0 };
+  var totalChars = text.length;
+  var scanned = text;
+  if (totalChars > MAX_SIGNER_SCAN_CHARS){
+    scanned = text.slice(0, MAX_SIGNER_SCAN_CHARS);
+    var nextCh = text.charAt(MAX_SIGNER_SCAN_CHARS);
+    var lastCh = scanned.charAt(scanned.length - 1);
+    if (nextCh && nextCh !== "\n" && nextCh !== "\r" && lastCh !== "\n" && lastCh !== "\r"){
+      var cut = Math.max(scanned.lastIndexOf("\n"), scanned.lastIndexOf("\r"));
+      scanned = cut >= 0 ? scanned.slice(0, cut + 1) : "";
+    }
+  }
+  var lines = scanned.split(/\r?\n/).map(function(s){ return s.trim(); })
+    .filter(function(s){ return s.length > 0; });
+  return { lines: lines, totalChars: totalChars, scannedChars: scanned.length,
+           skippedChars: totalChars - scanned.length };
+}
+
 var MsigCore = {
   SS58_PREFIX: SS58_PREFIX, DECIMALS: DECIMALS,
   PALLET_INDEX: PALLET_INDEX, BALANCES_PALLET_INDEX: BALANCES_PALLET_INDEX,
@@ -706,6 +745,7 @@ var MsigCore = {
   MAX_BOARD_ENTRIES: MAX_BOARD_ENTRIES, MAX_BOARD_BLOCK: MAX_BOARD_BLOCK,
   BOARD_STATUSES: BOARD_STATUSES, sanitizeBoard: sanitizeBoard, boardRoom: boardRoom,
   MAX_SIGNER_LINES: MAX_SIGNER_LINES, signerParseWindow: signerParseWindow,
+  MAX_SIGNER_SCAN_CHARS: MAX_SIGNER_SCAN_CHARS, signerTextWindow: signerTextWindow,
   MULTISIG_FEE: MULTISIG_FEE, PROPOSAL_DEPOSIT: PROPOSAL_DEPOSIT,
   PROPOSAL_FEE: PROPOSAL_FEE, SIGNER_STEP_PERMILL: SIGNER_STEP_PERMILL,
   blake2b: blake2b, ss58Encode: ss58Encode, ss58Decode: ss58Decode,

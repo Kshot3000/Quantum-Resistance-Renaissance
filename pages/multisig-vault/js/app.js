@@ -33,8 +33,13 @@ function esc(s){
 /* ---------- 01 factory ---------- */
 var signerState = { valid: [], invalid: [] };  // valid: [{addr, keyHex}]
 function parseSigners(){
-  var allLines = $("signer-input").value.split(/\r?\n/).map(function(s){ return s.trim(); })
-    .filter(function(s){ return s.length > 0; });
+  // Scan window (white-hat): the core scans only the first
+  // MAX_SIGNER_SCAN_CHARS characters of the paste — splitting the whole
+  // value here built every line string on every keystroke before the
+  // line window below ever bounded the decode work. The unscanned tail
+  // is counted and disclosed in the hint, never silently dropped.
+  var textWin = C.signerTextWindow($("signer-input").value);
+  var allLines = textWin.lines;
   // Parse window (white-hat): this handler runs on every keystroke and
   // SS58-decodes every line it touches — the core window bounds that
   // work to the first MAX_SIGNER_LINES lines; the rest are counted and
@@ -63,6 +68,9 @@ function parseSigners(){
   if (win.skipped) msg += ' · <span class="bad">' + win.skipped + " line" + (win.skipped === 1 ? "" : "s") +
     " not parsed — only the first " + C.MAX_SIGNER_LINES + " lines are parsed (a vault takes at most " +
     C.MAX_SIGNERS + " signers); trim the list to reach them</span>";
+  if (textWin.skippedChars) msg += ' · <span class="bad">' + textWin.skippedChars.toLocaleString("en-US") +
+    " characters were not scanned — only the first " + C.MAX_SIGNER_SCAN_CHARS.toLocaleString("en-US") +
+    " characters of the paste are scanned; trim the paste to reach them</span>";
   hint.innerHTML = '<span class="ok">' + msg + "</span>";
   var thr = $("threshold");
   thr.max = Math.max(2, valid.length);
