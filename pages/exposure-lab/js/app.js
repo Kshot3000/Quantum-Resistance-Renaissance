@@ -272,14 +272,15 @@ var running = false;
  * over state the user has already cleared. */
 var auditSeq = 0;
 
+/* The core scan window bounds the split/dedupe work to the first
+ * MAX_AUDIT_SCAN_CHARS characters of the paste (the audit itself
+ * caps at 25 addresses); the skipped tail is disclosed by the Run
+ * handler instead of being silently dropped. */
+var lastParseInfo = { totalChars: 0, scannedChars: 0, skippedChars: 0 };
 function parseInput(text){
-  var seen = {}, out = [];
-  text.split(/[\s,;]+/).forEach(function(line){
-    var a = line.trim();
-    if (!a || seen[a]) return;
-    seen[a] = 1; out.push(a);
-  });
-  return out;
+  var info = C.parseAuditInput(text);
+  lastParseInfo = info;
+  return info.addresses;
 }
 
 function sampleByAddress(addr){
@@ -288,7 +289,7 @@ function sampleByAddress(addr){
   return null;
 }
 
-async function runAudit(addresses, useSamples){
+async function runAudit(addresses, useSamples, inputNote){
   if (running) return;
   running = true;
   var mySeq = ++auditSeq;
@@ -353,7 +354,8 @@ async function runAudit(addresses, useSamples){
              e.analysis.verdict === "unknown" || e.analysis.verdict === "invalid";
     }).length;
     $("statusLine").textContent = "Audit complete: " + entries.length + " address(es), " +
-      problems + " need attention." + (prices.offline ? " (Price feed offline — USD estimates skipped.)" : "");
+      problems + " need attention." + (prices.offline ? " (Price feed offline — USD estimates skipped.)" : "") +
+      (inputNote ? " " + inputNote : "");
   } catch (e) {
     // A current audit that throws (e.g. detectChain rejecting when
     // SubtleCrypto is unavailable) reports honestly instead of wedging;
@@ -377,11 +379,17 @@ function init(){
       $("statusLine").textContent = "Paste at least one address first — or try the sample set.";
       return;
     }
+    var notes = [];
     if (addrs.length > 25){
-      $("statusLine").textContent = "Capped at 25 addresses per audit (API courtesy). Auditing the first 25.";
+      notes.push("Capped at 25 addresses per audit (API courtesy). Auditing the first 25.");
       addrs = addrs.slice(0, 25);
     }
-    runAudit(addrs, false);
+    if (lastParseInfo.skippedChars > 0){
+      notes.push("Only the first " + C.MAX_AUDIT_SCAN_CHARS.toLocaleString("en-US") + " characters of the paste were scanned — " +
+        lastParseInfo.skippedChars + " characters were not scanned; trim the paste to reach them.");
+    }
+    if (notes.length) $("statusLine").textContent = notes.join(" ");
+    runAudit(addrs, false, notes.join(" "));
   });
   $("sampleBtn").addEventListener("click", function(){
     if (running) return; // an audit is already in flight; don't swap its input

@@ -424,6 +424,54 @@ function nonNegInt(v){
   }
   return null;
 }
+
+/* ============================================================
+ * Audit-input scan window (white-hat bound): the Run handler
+ * audits at most 25 addresses, but the shipped parser split and
+ * deduped the WHOLE paste first — a 19,349,999-char paste of
+ * 450,000 unique tokens cost 608 ms of synchronous split/dedupe
+ * in Node and built a 450,000-entry seen-set, all to audit 25.
+ * parseAuditInput scans only the first MAX_AUDIT_SCAN_CHARS
+ * characters and reports the skipped tail so the UI can disclose
+ * it. The cap is derived from the largest legitimate audit: the
+ * longest address this lab accepts is a 62-char bc1p (taproot)
+ * address, so 25 of them plus separators are ~1,600 chars; the
+ * window is >20x that and still holds over 500 max-length
+ * addresses — any paste whose first 25 unique addresses matter
+ * is scanned in full, and no legitimate audit changes outcome.
+ * When the cut lands inside a token, the scan backs off to the
+ * last separator so no truncated partial token is ever audited
+ * as if it were a pasted address. Fail-closed: a non-string
+ * input parses as empty.
+ * ============================================================ */
+var MAX_AUDIT_SCAN_CHARS = 32768;
+function parseAuditInput(text){
+  if (typeof text !== "string")
+    return { addresses: [], totalChars: 0, scannedChars: 0, skippedChars: 0 };
+  var totalChars = text.length;
+  var scanned = text;
+  if (totalChars > MAX_AUDIT_SCAN_CHARS){
+    scanned = text.slice(0, MAX_AUDIT_SCAN_CHARS);
+    var nextCh = text.charAt(MAX_AUDIT_SCAN_CHARS);
+    var lastCh = scanned.charAt(scanned.length - 1);
+    if (nextCh && !/[\s,;]/.test(nextCh) && !/[\s,;]/.test(lastCh)){
+      var cut = -1;
+      for (var i = scanned.length - 1; i >= 0; i--){
+        if (/[\s,;]/.test(scanned.charAt(i))){ cut = i; break; }
+      }
+      scanned = cut >= 0 ? scanned.slice(0, cut + 1) : "";
+    }
+  }
+  var seen = {}, out = [];
+  scanned.split(/[\s,;]+/).forEach(function(tok){
+    var a = tok.trim();
+    if (!a || seen[a]) return;
+    seen[a] = 1; out.push(a);
+  });
+  return { addresses: out, totalChars: totalChars,
+           scannedChars: scanned.length,
+           skippedChars: totalChars - scanned.length };
+}
 function sanitizeBtcApi(api){
   if (!api || typeof api !== "object" || Array.isArray(api)) return null;
   var spent = api.spent_txo_count == null ? 0 : nonNegInt(api.spent_txo_count);
@@ -807,7 +855,8 @@ var ExposureCore = {
   summarize: summarize, fmtBTC: fmtBTC, fmtETH: fmtETH, SAMPLES: SAMPLES,
   validPlancks: validPlancks, nonNegInt: nonNegInt,
   sanitizeBtcApi: sanitizeBtcApi, sanitizeEthApi: sanitizeEthApi,
-  extractTopLevelInts: extractTopLevelInts
+  extractTopLevelInts: extractTopLevelInts,
+  MAX_AUDIT_SCAN_CHARS: MAX_AUDIT_SCAN_CHARS, parseAuditInput: parseAuditInput
 };
 
 if (typeof window !== "undefined") window.ExposureCore = ExposureCore;

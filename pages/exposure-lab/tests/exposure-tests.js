@@ -439,6 +439,61 @@ async function ta(name, fn){
     assert.strictEqual(ext.final_balance, "3000000000000000");
   });
 
+  /* --- audit-input scan window (white-hat bound) --- */
+  t("parseAuditInput: small input dedupes in order, nothing skipped", function(){
+    var r = C.parseAuditInput("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4\nbc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4 , 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+    assert.deepStrictEqual(r.addresses, ["bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]);
+    assert.strictEqual(r.skippedChars, 0);
+    assert.strictEqual(r.scannedChars, r.totalChars);
+  });
+  t("parseAuditInput: cap pinned at 32,768", function(){
+    assert.strictEqual(C.MAX_AUDIT_SCAN_CHARS, 32768);
+  });
+  t("parseAuditInput: exactly-cap input scanned fully", function(){
+    var r = C.parseAuditInput("a ".repeat(16384));
+    assert.strictEqual(r.totalChars, 32768);
+    assert.strictEqual(r.scannedChars, 32768);
+    assert.strictEqual(r.skippedChars, 0);
+    assert.deepStrictEqual(r.addresses, ["a"]);
+  });
+  t("parseAuditInput: over-cap input windows with skipped counted", function(){
+    var r = C.parseAuditInput("a ".repeat(20000));
+    assert.strictEqual(r.totalChars, 40000);
+    assert.strictEqual(r.scannedChars, 32768);
+    assert.strictEqual(r.skippedChars, 7232);
+  });
+  t("parseAuditInput: a token crossing the cut is never partially scanned", function(){
+    var head = "x".repeat(32760) + " ";
+    var addr = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+    var r = C.parseAuditInput(head + addr + "\n" + addr);
+    assert.ok(r.skippedChars > 0);
+    assert.deepStrictEqual(r.addresses, ["x".repeat(32760)]);
+  });
+  t("parseAuditInput: fail-closed on non-string input", function(){
+    [null, undefined, 42, {}, [], NaN].forEach(function(bad){
+      var r = C.parseAuditInput(bad);
+      assert.deepStrictEqual(r.addresses, []);
+      assert.strictEqual(r.skippedChars, 0);
+      assert.strictEqual(r.totalChars, 0);
+    });
+  });
+  t("parseAuditInput: 25 max-length taproot addresses scan fully", function(){
+    var list = [];
+    for (var i = 0; i < 25; i++) list.push("bc1p" + String(i).padStart(58, "0"));
+    var r = C.parseAuditInput(list.join("\n"));
+    assert.strictEqual(r.addresses.length, 25);
+    assert.strictEqual(r.skippedChars, 0);
+  });
+  t("parseAuditInput: giant unique paste is windowed to a bounded set", function(){
+    var parts = [];
+    var base = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+    for (var i = 0; i < 450000; i++) parts.push(base.slice(0, 36) + String(i).padStart(6, "0"));
+    var r = C.parseAuditInput(parts.join("\n"));
+    assert.ok(r.addresses.length < 1000, "addresses bounded, got " + r.addresses.length);
+    assert.ok(r.skippedChars > 19000000, "tail skipped, got " + r.skippedChars);
+    assert.strictEqual(r.scannedChars + r.skippedChars, r.totalChars);
+  });
+
   /* --- samples --- */
   await ta("every sample address validates on its chain", async function(){
     for (var i = 0; i < C.SAMPLES.length; i++){
