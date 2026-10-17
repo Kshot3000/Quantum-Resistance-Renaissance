@@ -2,7 +2,7 @@
 import {
   BOOTNODES, PORTS, CHAIN_SPECS, PUBLIC_RPC,
   validateInnerHash, validateNodeName, validatePortNumber,
-  buildNodeCommand, firewallRules, analyzeLog, syncProgress, fmtEta, parseSnapshot,
+  buildNodeCommand, firewallRules, analyzeLog, MAX_LOG_LINES, syncProgress, fmtEta, parseSnapshot,
 } from "./node-core.js";
 
 const $ = (id) => document.getElementById(id);
@@ -257,7 +257,8 @@ function renderLog() {
   const a = analyzeLog($("logInput").value);
   $("logSummary").textContent = a.total === 0
     ? "No input yet."
-    : `Scanned ${a.total} line${a.total === 1 ? "" : "s"} — ${a.findings.length} known pattern${a.findings.length === 1 ? "" : "s"} matched.`;
+    : `Scanned ${a.scanned.toLocaleString()} line${a.scanned === 1 ? "" : "s"} — ${a.findings.length} known pattern${a.findings.length === 1 ? "" : "s"} matched.` +
+      (a.skipped ? ` ${a.skipped.toLocaleString()} more line${a.skipped === 1 ? "" : "s"} not scanned — the forensics window is the first ${MAX_LOG_LINES.toLocaleString()} lines; trim the paste to reach them.` : "");
   const sevName = { ok: "ok", info: "info", warn: "warn", error: "error" };
   $("logFindings").innerHTML = a.findings.map(f => `
     <div class="finding">

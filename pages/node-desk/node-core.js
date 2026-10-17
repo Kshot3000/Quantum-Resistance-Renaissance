@@ -288,10 +288,34 @@ export function classifyLogLine(line) {
   return { level: "info", title: "Unrecognized line", detail: "No known pattern matches. It may be routine (peer chatter, block import). Paste surrounding lines for context.", line: s.slice(0, 300) };
 }
 
+/* Log-forensics parse window (white-hat): renderLog() re-runs analyzeLog
+ * on EVERY keystroke in the log box, and the scan runs every LOG_PATTERNS
+ * regex over every line — unrecognized lines pay the full sweep. The cost
+ * was unbounded in the paste: 100,000 unrecognized lines (~10 MiB) measure
+ * ~144 ms of scan work per keystroke in Node (20 keystrokes ≈ 1.9 s), and
+ * it grows linearly from there. The scan's INFORMATION saturates fast —
+ * findings dedupe by pattern title and keep at most 2 samples each — so
+ * the window bounds the classification work to the first MAX_LOG_LINES
+ * non-empty lines (a generous diagnostic excerpt, ~1 MiB of typical log
+ * text) and reports the rest as skipped for the caller to DISCLOSE, never
+ * silently drop: totals stay honest, counts describe the scanned window.
+ * Fail-closed: a cap that is not a non-negative integer parses nothing. */
+export const MAX_LOG_LINES = 10000;
+
+export function logParseWindow(lines, cap) {
+  if (!Array.isArray(lines)) return { parse: [], total: 0, skipped: 0 };
+  const total = lines.length;
+  if (typeof cap !== "number" || !isFinite(cap) || Math.floor(cap) !== cap || cap < 0)
+    return { parse: [], total, skipped: total };
+  const parse = lines.slice(0, cap);
+  return { parse, total, skipped: total - parse.length };
+}
+
 export function analyzeLog(text) {
   const lines = String(text || "").split("\n").map(l => l.trim()).filter(Boolean);
+  const win = logParseWindow(lines, MAX_LOG_LINES);
   const seen = new Map();
-  for (const l of lines) {
+  for (const l of win.parse) {
     const c = classifyLogLine(l);
     if (!c || c.title === "Unrecognized line") continue;
     const key = c.title;
@@ -300,7 +324,7 @@ export function analyzeLog(text) {
     e.count++;
     if (e.samples.length < 2) e.samples.push(c.line);
   }
-  return { total: lines.length, findings: [...seen.values()] };
+  return { total: win.total, scanned: win.parse.length, skipped: win.skipped, findings: [...seen.values()] };
 }
 
 /* ---------- sync progress ---------- */

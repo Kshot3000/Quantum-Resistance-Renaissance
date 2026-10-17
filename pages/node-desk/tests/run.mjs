@@ -6,7 +6,7 @@
 import {
   BOOTNODES, PORTS, CHAIN_SPECS,
   validateInnerHash, validateNodeName, validatePortNumber, validateBootnode, shq,
-  buildNodeCommand, firewallRules, classifyLogLine, analyzeLog,
+  buildNodeCommand, firewallRules, classifyLogLine, analyzeLog, logParseWindow, MAX_LOG_LINES,
   syncProgress, fmtEta, parseSnapshot,
 } from "../node-core.js";
 
@@ -134,6 +134,31 @@ eq("analyze total", a.total, 4);
 ok("analyze dedupes", a.findings.find(f => f.title.includes("sync")) === undefined || true);
 eq("analyze findings", a.findings.length, 3); // syncing, idle, verification
 ok("analyze counts", a.findings.find(f => f.level === "info").count === 2);
+
+/* --- log parse window (white-hat: per-keystroke scan bound) --- */
+eq("log cap", MAX_LOG_LINES, 10000);
+const wl = Array.from({ length: 25000 }, (_, i) => "line " + i);
+const w1 = logParseWindow(wl, MAX_LOG_LINES);
+eq("window parse count", w1.parse.length, 10000);
+eq("window total", w1.total, 25000);
+eq("window skipped", w1.skipped, 15000);
+eq("window is prefix", w1.parse[9999], "line 9999");
+const w2 = logParseWindow(["a", "b"], MAX_LOG_LINES);
+eq("window under-cap parses all", w2.parse.length, 2);
+eq("window under-cap skips none", w2.skipped, 0);
+for (const bad of [NaN, -1, 2.5, "10", undefined, null, Infinity]) {
+  const bw = logParseWindow(["a", "b", "c"], bad);
+  ok("window fail-closed cap " + String(bad), bw.parse.length === 0 && bw.skipped === 3 && bw.total === 3);
+}
+const wn = logParseWindow("not-an-array", 10);
+ok("window non-array parses nothing", wn.parse.length === 0 && wn.total === 0 && wn.skipped === 0);
+const bigA = analyzeLog(Array.from({ length: 25000 }, () => "Syncing 1 bps").join("\n"));
+eq("analyze big total honest", bigA.total, 25000);
+eq("analyze big scanned capped", bigA.scanned, 10000);
+eq("analyze big skipped disclosed", bigA.skipped, 15000);
+eq("analyze big counts window only", bigA.findings.find(f => f.level === "info").count, 10000);
+eq("analyze small scanned", a.scanned, 4);
+eq("analyze small skipped", a.skipped, 0);
 
 /* --- sync progress --- */
 let s = syncProgress(142000, 142417);
