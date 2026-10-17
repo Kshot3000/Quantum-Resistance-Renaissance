@@ -25,6 +25,6 @@ Interactive Substrate SCALE codec workbench for the Quantus chain. Every byte Qu
 - SS58 prefix-189 round-trip, checksum re-verified independently with `node:crypto`, tamper rejection
 - `twox_128("System")` chain anchor, storage-key lengths per hasher
 - all 13 canonical compact spec vectors (encode + strict decode), non-canonical rejection, compact fuzz round-trips, primitives, composites, span coverage
-- hex-input bound + byte-map window: `fromHex` refuses inputs over the 65,536-character cap before parsing (pure fail-closed `hexInputRoom`), and `byteMapWindow` caps drawn byte-map cells at 1,024 with the skipped count disclosed — a 100,048-byte paste once built 100,048 DOM cells in 5,599 ms on the Decode click
+- hex-input bound + byte-map window: `fromHex` refuses inputs over the 65,536-character cap before parsing (pure fail-closed `hexInputRoom`), and `byteMapWindow` caps drawn byte-map cells at 1,024 with the skipped count disclosed — a 100,048-byte paste once built 100,048 DOM cells on a single Decode click (641 ms of synchronous DOM construction in the pre-fix measurement log, before layout/paint)
 
 Browser QA: `~/workspace/goals/quantus-ecosystem-builder/hidden_files/qa-scalelab-browser.mjs` (headless Chromium 152, file:// + CDP) — tab switching, encode/decode flows, address forging, storage keys, vector run-all, zero console errors.

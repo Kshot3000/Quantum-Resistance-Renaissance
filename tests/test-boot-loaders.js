@@ -5010,8 +5010,9 @@ console.log(`\n${pass} passed, ${fail} failed`);
 // paste built a 10,000,000-element array, ~0.9 s in Node, only for the
 // Address Coder to reject it as not-32-bytes), and renderByteMap built
 // one live DOM cell with its own click listener per byte (a 48-byte
-// struct + 100,000 trailing bytes measured 5,599 ms and 100,048 cells
-// at 253 MB heap in-browser on the Decode click). fromHex now refuses
+// struct + 100,000 trailing bytes measured 100,048 cells and 641 ms
+// of synchronous DOM construction in-browser on the Decode click).
+// fromHex now refuses
 // inputs over MAX_HEX_INPUT_CHARS = 65,536 (over 4x the largest real
 // wire object, a ~7,300-byte signed ML-DSA-87 extrinsic, as plain hex)
 // via the pure fail-closed hexInputRoom before any parsing, call sites
