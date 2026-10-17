@@ -204,6 +204,21 @@
     voidVerify('A new extrinsic was decoded, so the previous verdict no longer applies. Verify again.');
     var hex = (hexInput != null ? hexInput : $('hex-input').value).trim();
     if (!hex) { state.last = null; state.lastHex = ''; errBox.hidden = false; errBox.innerHTML = '<b>No input.</b> Paste an extrinsic hex first — or pick a lab sample.'; return; }
+    /* Size gate BEFORE the decoder sees a byte: hexToBytes parsed the
+     * whole paste before the length prefix could reject it, so the
+     * paste box asks the decoder's fail-closed room gate first and
+     * refuses over-cap pastes unread with size + cap named. (The
+     * decoder enforces the same cap itself for the Live scanner's
+     * node-supplied entries.) */
+    if (D.hexInputRoom(hex.length) === 0) {
+      state.last = null; state.lastHex = '';
+      errBox.hidden = false;
+      errBox.innerHTML = '<b>Extrinsic too long.</b> The paste is ' + hex.length.toLocaleString('en-US') +
+        ' characters — over the ' + D.MAX_HEX_INPUT_CHARS.toLocaleString('en-US') +
+        '-character cap; refused before parsing. The largest real extrinsic this lab handles ' +
+        '(a signed ML-DSA-87 batch) is far smaller.';
+      return;
+    }
     var d;
     try {
       d = D.decodeExtrinsic(hex);

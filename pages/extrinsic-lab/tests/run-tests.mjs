@@ -402,5 +402,43 @@ test('derivations stop at the cap and skipped accounts stay honest', () => {
     'past-budget account keeps its address, phrase honestly skipped');
 });
 
+/* ---------- 13: hex-input parse bound (white-hat) ----------
+ * hexToBytes stripped, regex-tested and parseInt-looped the WHOLE
+ * paste before the decoder read the length prefix that rejects it:
+ * a 20,000,000-char paste built a 10,000,000-byte array (~0.5 s in
+ * Node) per Autopsy click, and Live-scan entries from a node faced
+ * no bound at all. The cap (1,048,576 chars = 524,288 plain bytes)
+ * is ~71x the largest signed single-call extrinsic the lab's own
+ * encoder produces (ML-DSA-87 transfer: 7,302 bytes, measured) and
+ * admits a 1,000-leg batch_all (49,266 bytes) plain or byte-spaced. */
+test('hexInputRoom arithmetic is exact and fail-closed', () => {
+  assertEq(D.MAX_HEX_INPUT_CHARS, 1048576, 'cap is 1,048,576 chars');
+  assertEq(D.hexInputRoom(0), 1048576, 'full room at 0 chars');
+  assertEq(D.hexInputRoom(1048575), 1, 'one left at cap-1');
+  assertEq(D.hexInputRoom(1048576), 0, 'zero at cap');
+  assertEq(D.hexInputRoom(2000000), 0, 'zero past cap');
+  for (const bad of [-1, NaN, 1.5, '100', null, undefined, Infinity]) {
+    assertEq(D.hexInputRoom(bad), 0, 'fail-closed for ' + JSON.stringify(bad));
+  }
+});
+test('hexToBytes refuses over-cap inputs unparsed, cap still parses', () => {
+  let err = null;
+  try { D.hexToBytes('0x' + 'ab'.repeat(524288)); } catch (e) { err = e; }  // cap + 2 chars
+  assert(err && /too long/i.test(err.message) && err.message.includes('1048576'),
+    'over-cap refusal names the cap, got ' + (err && err.message));
+  err = null;
+  try { D.hexToBytes('ab'.repeat(1000000)); } catch (e) { err = e; }        // 2,000,000 chars
+  assert(err && /too long/i.test(err.message), '2M-char input refused before parsing');
+  const atCap = D.hexToBytes('ab'.repeat(524288));                          // exactly cap
+  assert(atCap.length === 524288, 'exactly-cap input parses to 524,288 bytes');
+  assert(D.hexToBytes('0x' + 'ab'.repeat(32)).length === 32, 'normal hash hex still parses');
+});
+test('decodeExtrinsic refuses a 20M-char paste before parsing', () => {
+  let err = null;
+  try { D.decodeExtrinsic('0x' + 'ab'.repeat(10000000)); } catch (e) { err = e; }
+  assert(err && /too long/i.test(err.message),
+    'the top-level decode surfaces the cap refusal, got ' + (err && err.message));
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

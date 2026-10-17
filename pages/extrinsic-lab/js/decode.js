@@ -16,7 +16,36 @@
 var CT = function () { return global.QEL_CALLS; };
 
 /* ---------------- bytes ---------------- */
+/* Hex-input bound BEFORE parsing (white-hat): hexToBytes trimmed,
+ * whitespace-stripped, regex-tested and parseInt-looped the WHOLE
+ * string before decodeExtrinsicInner ever read the length prefix —
+ * the prefix mismatch that rejects a bogus paste was only checked
+ * AFTER the parse, so a 20,000,000-char paste built a 10,000,000-byte
+ * array (~0.5 s measured in Node, ~0.6 s through decodeExtrinsic)
+ * on every Autopsy click, and the Live scanner fed it node-supplied
+ * block entries whose validExtrinsicHex shape check has no length
+ * bound at all. The cap is derived from the largest legitimate
+ * inputs, measured with this lab's own encoder: a signed ML-DSA-87
+ * transfer extrinsic is 7,302 bytes (14,604 hex chars) and a signed
+ * ML-DSA-87 batch_all of 1,000 transfer legs is 49,266 bytes
+ * (98,532 chars; 147,799 chars byte-spaced). MAX_HEX_INPUT_CHARS =
+ * 1,048,576 admits 524,288 bytes of plain hex (~71x that signed
+ * extrinsic, a ~11,000-leg batch) and the byte-spaced form of a
+ * ~349,000-byte extrinsic, while refusing anything larger unparsed.
+ * hexInputRoom is the pure fail-closed gate (a non-integer,
+ * negative, or non-number count gets no room), mirroring the
+ * quantus-crypto / Scale Lab / Multisig hex bounds. This copy was
+ * missed by the Batch 160/161 closure because it is named
+ * hexToBytes, not fromHex/hexDecode — the class closes per PARSER
+ * (strip + regex + parseInt loop), not per filename. */
+var MAX_HEX_INPUT_CHARS = 1048576;
+function hexInputRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_HEX_INPUT_CHARS - chars);
+}
 function hexToBytes(hex) {
+  if (typeof hex === "string" && hex.length > MAX_HEX_INPUT_CHARS)
+    throw new Error('Hex input too long (' + hex.length + ' characters) — the cap is ' + MAX_HEX_INPUT_CHARS + ' characters; refused before parsing');
   var h = String(hex).trim().replace(/^0x/i, '').replace(/\s+/g, '');
   if (!/^[0-9a-fA-F]*$/.test(h) || h.length % 2 !== 0) throw new Error('not valid hex');
   var out = new Uint8Array(h.length / 2);
@@ -416,6 +445,7 @@ var api = {
   hexToBytes: hexToBytes, bytesToHex: bytesToHex, concatBytes: concatBytes,
   Reader: Reader, plancksToQtc: plancksToQtc, ss58Of: ss58Of, checkphraseOf: checkphraseOf,
   decodeExtrinsic: decodeExtrinsic, decodeCall: decodeCall, decodeCallBytes: decodeCallBytes,
+  MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom,
   MAX_CHECKPHRASE_DERIVATIONS: MAX_CHECKPHRASE_DERIVATIONS, checkphraseRoom: checkphraseRoom,
   decodeEra: decodeEra, eraBirth: eraBirth, decodeMultiAddress: decodeMultiAddress,
   decodeSignature: decodeSignature, buildSigningPayload: buildSigningPayload,
