@@ -9,6 +9,7 @@ import {
   makeTicket, encodeTicket, decodeTicket, encodeChunks, decodeChunks,
   decodeForVerify, reverifySigned, buildColdPayload, buildColdExtrinsic,
   computeServiceFee, feeBpsLabel, SERVICE_FEE_ADDRESS, mergePackageLines,
+  packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
   DEFAULT_ERA_PERIOD,
 } from './airgap.js';
 import { drawQR, decodeQRImage, mountChunkStepper, startCameraScan } from './qr.js';
@@ -217,6 +218,16 @@ async function ingestFiles(fileList, onChunkText) {
     if (/\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)) {
       texts.push(await decodeQRImage(f)); // throws if no QR found
     } else {
+      // Size gate BEFORE reading a byte: File.size is known up front,
+      // and the largest genuine package file (see airgap.js) is
+      // 168,103 bytes even at a degenerate 1-byte chunking — the old
+      // path read and token-split the whole file before decodeChunks
+      // ever saw a line. Refuse over-cap picks unread, cap named.
+      // (Image picks skip the gate: decodeQRImage bounds its canvas.)
+      if (!packageFileRoom(f.size)) {
+        throw new Error(`${f.name} is ${f.size} bytes — over the signed-package file cap of ` +
+          `${MAX_PACKAGE_FILE_BYTES} bytes (256 KiB); the file was not read`);
+      }
       texts.push(await f.text());
     }
   }
@@ -612,7 +623,18 @@ $('cold-ticket-file').addEventListener('change', async (e) => {
     if (!f) return;
     let text;
     if (/\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)) text = await decodeQRImage(f);
-    else text = await f.text();
+    else {
+      // Size gate BEFORE reading a byte: a genuine ticket file holds
+      // exactly the ticket string — at most 696 bytes with every field
+      // maxed (see airgap.js) — and File.size is known up front; the
+      // old path read the whole file just to regex-search it for that
+      // string. Refuse over-cap picks unread, cap named.
+      if (!ticketFileRoom(f.size)) {
+        throw new Error(`${f.name} is ${f.size} bytes — over the chain ticket file cap of ` +
+          `${MAX_TICKET_FILE_BYTES} bytes (16 KiB); the file was not read`);
+      }
+      text = await f.text();
+    }
     // A newer import (another file, the paste button, a camera scan)
     // landed while this file was being read/decoded: this ticket is no
     // longer the one the user last chose — discard it silently rather

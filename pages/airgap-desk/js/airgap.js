@@ -329,6 +329,40 @@ export function mergePackageLines(collected, pasted) {
   return out;
 }
 
+/* ---------------- file-import size gates ----------------
+ * Both file imports read a picked file's WHOLE text before any cap was
+ * consulted: the hot package ingest (f.text() on every non-image file,
+ * then a whitespace split of the full text) and the cold ticket import
+ * (f.text(), then a regex search). File.size is known before a byte is
+ * read, and everything a genuine file can carry is producer-bounded,
+ * measured with this module's own producers:
+ *   ticket — every field is bounded by decodeTicket's own grammar
+ *     (u32 nonce/spec/txv, head at the fleet ceiling, bounded hashes and
+ *     era), so the largest ticket string makeTicket/encodeTicket can
+ *     emit is 696 bytes;
+ *   package — the largest signed extrinsic (ML-DSA-87, the 2-leg fee
+ *     batch, maximum amounts) is 7,357 raw bytes: 14,716 chars as a 0x
+ *     file, 9,973 bytes chunked at this desk's own 800-byte chunking,
+ *     and 168,103 bytes even at the degenerate 1-byte chunking — the
+ *     largest file encodeChunks can emit at ANY chunk size.
+ * The caps sit above those maxima with headroom (256 KiB / 16 KiB), so
+ * no genuine ticket or package file can ever trip them, while an
+ * over-cap pick is refused UNREAD instead of allocating its full text
+ * (and token split) on the air-gapped machine. Image picks are not
+ * gated here: they never take the text path, and decodeQRImage already
+ * bounds its canvas via qrCanvasSize. Fail-closed: a size that is not
+ * a finite, non-negative number refuses. */
+export const MAX_PACKAGE_FILE_BYTES = 256 * 1024;
+export const MAX_TICKET_FILE_BYTES = 16 * 1024;
+
+export function packageFileRoom(size) {
+  return typeof size === 'number' && isFinite(size) && size >= 0 && size <= MAX_PACKAGE_FILE_BYTES;
+}
+
+export function ticketFileRoom(size) {
+  return typeof size === 'number' && isFinite(size) && size >= 0 && size <= MAX_TICKET_FILE_BYTES;
+}
+
 /* ---------------- era decode (mirror of scale.js encodeMortalEra) -------- */
 
 export function decodeMortalEra(twoBytes) {

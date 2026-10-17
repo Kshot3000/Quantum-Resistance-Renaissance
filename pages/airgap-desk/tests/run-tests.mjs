@@ -15,6 +15,7 @@ import {
   buildColdPayload, buildColdExtrinsic, reverifySigned,
   computeServiceFee, feeBpsLabel, serviceFeeAccountId,
   SERVICE_FEE_ADDRESS, SERVICE_FEE_MAX_BPS,
+  packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
 } from '../js/airgap.js';
 import { encodeMortalEra, qtcToPlancks, buildTransferCall, buildBatchAllCall, buildSigningPayload, buildExtrinsic } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
@@ -215,6 +216,44 @@ test('mergePackageLines: linear on large pastes (100k tokens, 99% duplicates)', 
   assert.equal(mergePackageLines([], big).length, 100000);
   const dup = Array.from({ length: 100000 }, (_, i) => 'tok' + (i % 1000));
   assert.deepEqual(mergePackageLines([], dup), Array.from({ length: 1000 }, (_, i) => 'tok' + i));
+});
+
+/* ---------------- file-import size gates ---------------- */
+test('file gates: package cap arithmetic + fail-closed sizes', () => {
+  assert.equal(MAX_PACKAGE_FILE_BYTES, 256 * 1024);
+  assert.equal(packageFileRoom(0), true);
+  assert.equal(packageFileRoom(MAX_PACKAGE_FILE_BYTES), true);
+  assert.equal(packageFileRoom(MAX_PACKAGE_FILE_BYTES + 1), false);
+  for (const bad of [NaN, -1, '100', undefined, null, Infinity])
+    assert.equal(packageFileRoom(bad), false, 'fail-closed on ' + String(bad));
+});
+
+test('file gates: ticket cap arithmetic + fail-closed sizes', () => {
+  assert.equal(MAX_TICKET_FILE_BYTES, 16 * 1024);
+  assert.equal(ticketFileRoom(0), true);
+  assert.equal(ticketFileRoom(MAX_TICKET_FILE_BYTES), true);
+  assert.equal(ticketFileRoom(MAX_TICKET_FILE_BYTES + 1), false);
+  for (const bad of [NaN, -1, '100', undefined, null, Infinity])
+    assert.equal(ticketFileRoom(bad), false, 'fail-closed on ' + String(bad));
+});
+
+test('file gates: producer maxima fit (largest ticket + largest package at any chunking)', () => {
+  // Largest ticket: every field at its grammar maximum (u32 nonce/spec/
+  // txv, head at the fleet ceiling, max era, 26-digit fee string).
+  const big = fixtureTicket({ nonce: 4294967295, spec: 4294967295, txv: 4294967295, head: 10000000, era: { period: 65536, phase: 38464, birth: 9999936, birthHash: BIRTHH }, fee: '21000000000000000000000000' });
+  const ticketBytes = te.encode(encodeTicket(big)).length;
+  assert.equal(ticketBytes, 696);
+  assert.equal(decodeTicket(encodeTicket(big)).nonce, 4294967295); // genuinely issuable: era relations hold
+  assert.equal(ticketFileRoom(ticketBytes), true);
+  // Largest package payload (ML-DSA-87 extrinsic, 7,357 raw bytes) in
+  // every file form the producers emit — all fit the package cap.
+  const maxHex = '0x' + 'ab'.repeat(7357);
+  assert.equal(packageFileRoom(te.encode(maxHex).length), true);
+  for (const cb of [900, 800, 100, 10, 1]) {
+    const fileBytes = te.encode(encodeChunks('ffff', maxHex, cb).join('\n')).length;
+    assert.equal(packageFileRoom(fileBytes), true, 'chunkBytes ' + cb + ' file of ' + fileBytes + ' bytes fits');
+  }
+  assert.equal(te.encode(encodeChunks('ffff', maxHex, 1).join('\n')).length, 168103);
 });
 
 /* ---------------- era ---------------- */
