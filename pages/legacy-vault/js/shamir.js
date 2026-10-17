@@ -29,6 +29,22 @@
   const VERSION = "LV1";
   const MAX_SECRET_BYTES = 512; // keeps shares printable; enough for any seed phrase
   const MAX_SHARES = 255; // x-coordinates must be nonzero bytes
+  /* Combine-input bound: a split makes at most MAX_SHARES shares, with
+   * indices 1..MAX_SHARES, and combine uses at most t of them — so any
+   * input past MAX_SHARE_LINES lines is guaranteed to fail anyway (a
+   * duplicate or impossible index), and refusing it BEFORE the parse
+   * keeps a huge paste from paying a regex + hex decode for every line
+   * only to be rejected at the end. */
+  const MAX_SHARE_LINES = MAX_SHARES;
+
+  /* Room for `count` pasted share lines under the combine bound: true
+   * only for a finite, non-negative number at or under MAX_SHARE_LINES.
+   * Fail-closed — NaN, negative, infinite, string, and missing counts
+   * all refuse, matching the fleet's other *Room gates. */
+  function combineLinesRoom(count) {
+    return typeof count === "number" && isFinite(count) &&
+      count >= 0 && count <= MAX_SHARE_LINES;
+  }
 
   function shamirError(code, message) {
     const e = new Error(message);
@@ -176,6 +192,10 @@
     if (!Array.isArray(shareTexts) || shareTexts.length === 0) {
       throw shamirError("BAD_SHARE", "provide at least one share");
     }
+    if (!combineLinesRoom(shareTexts.length)) {
+      throw shamirError("TOO_MANY_SHARES",
+        `too many share lines — the cap is ${MAX_SHARE_LINES} shares (a split makes at most ${MAX_SHARES}); remove the extra lines and try again`);
+    }
     const parsed = shareTexts.map(parseShare);
     const t = parsed[0].t, n = parsed[0].n;
     for (const p of parsed) {
@@ -229,7 +249,7 @@
   }
 
   return {
-    VERSION, MAX_SECRET_BYTES, MAX_SHARES,
+    VERSION, MAX_SECRET_BYTES, MAX_SHARES, MAX_SHARE_LINES, combineLinesRoom,
     gfMul, gfInv, gfDiv,
     split, combine, splitText, combineText,
     parseShare, formatShare,

@@ -130,6 +130,21 @@ for (const [n, t, len] of combos) {
   const p = SHAMIR.parseShare(shares[2]);
   ok("parseShare fields", p.t === 3 && p.n === 5 && p.index === 3 && p.bytes.length === 8);
   throwsCode("combine([]) rejected", () => SHAMIR.combine([]), "BAD_SHARE");
+  // combine line bound: a split makes at most MAX_SHARES shares (indices
+  // 1..255), so >255 lines can never succeed — refused before any parse.
+  const full = SHAMIR.split(new Uint8Array(512).fill(7), 255, 2, seededRng(99));
+  ok("combineLinesRoom arithmetic",
+    SHAMIR.MAX_SHARE_LINES === 255 && SHAMIR.MAX_SHARE_LINES === SHAMIR.MAX_SHARES &&
+    SHAMIR.combineLinesRoom(0) === true && SHAMIR.combineLinesRoom(255) === true &&
+    SHAMIR.combineLinesRoom(256) === false && SHAMIR.combineLinesRoom(100000) === false);
+  ok("combineLinesRoom fails closed",
+    SHAMIR.combineLinesRoom(NaN) === false && SHAMIR.combineLinesRoom(-1) === false &&
+    SHAMIR.combineLinesRoom("255") === false && SHAMIR.combineLinesRoom(undefined) === false &&
+    SHAMIR.combineLinesRoom(Infinity) === false && SHAMIR.combineLinesRoom(null) === false);
+  ok("a full 255-share set still combines", SHAMIR.combine(full).length === 512);
+  throwsCode("256 share lines refused at the cap", () => SHAMIR.combine(full.concat([full[0]])), "TOO_MANY_SHARES");
+  throwsCode("over-cap refusal precedes parsing (bad tail still yields the cap error)",
+    () => SHAMIR.combine(full.concat(["LV1-bogus"])), "TOO_MANY_SHARES");
 }
 
 // ---------- plan-logic ----------
