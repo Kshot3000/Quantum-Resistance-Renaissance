@@ -346,5 +346,51 @@ t("sanitizeMiners rejects 101 all-time rows (over the producer's top-100)", func
   assert.throws(function(){ m.sanitizeMiners(topPayload(101)); }, /malformed miners snapshot/);
 });
 
+// 17. Round 5: window producer caps — the producer always emits a
+// WINDOW_BLOCKS = 15,000-block window in BUCKET_SIZE = 500 buckets, so
+// an over-cap window fails the snapshot (like the 101st all-time row)
+// and an over-cap bucket is dropped by cleanBucket.
+t("window caps are pinned at the producer constants", function(){
+  assert.strictEqual(m.MAX_WINDOW_BLOCKS, 15000);
+  assert.strictEqual(m.MAX_BUCKET_BLOCKS, 500);
+});
+function winPayload(winBlocks, miners){
+  var p = fillGood(goodPayload());
+  p.chain_height = 100000;
+  p.window = { start_height: 100000 - winBlocks + 1, end_height: 100000, block_count: winBlocks, observed_block_time_s: 10 };
+  p.window_miners = miners;
+  p.buckets = [];
+  p.all_time = [{ address: VA("a"), blocks: 90000 }];
+  return p;
+}
+t("sanitizeMiners accepts a window at exactly the producer cap (15,000)", function(){
+  var miners = {}; miners[VA("a")] = 10000; miners[VA("b")] = 5000;
+  assert.strictEqual(m.sanitizeMiners(winPayload(15000, miners)).window.block_count, 15000);
+});
+expectBad("sanitizeMiners rejects a window one block over the producer cap", function(p){
+  p.chain_height = 100000;
+  p.window = { start_height: 85000, end_height: 100000, block_count: 15001, observed_block_time_s: 10 };
+  p.window_miners = {}; p.window_miners[VA("a")] = 15001;
+  p.buckets = [];
+});
+t("cleanBuckets drops a bucket counting past BUCKET_SIZE", function(){
+  var b = { start: 1, end: 500, blocks: 501, miners: {} };
+  b.miners[VA("a")] = 501;
+  var wm = {}; wm[VA("a")] = 501;
+  assert.deepStrictEqual(m.cleanBuckets([b], { start: 1, end: 500 }, wm), []);
+});
+t("cleanBuckets drops a bucket spanning past BUCKET_SIZE", function(){
+  var b = { start: 1, end: 501, blocks: 500, miners: {} };
+  b.miners[VA("a")] = 500;
+  var wm = {}; wm[VA("a")] = 500;
+  assert.deepStrictEqual(m.cleanBuckets([b], { start: 1, end: 501 }, wm), []);
+});
+t("cleanBuckets keeps a bucket at exactly BUCKET_SIZE", function(){
+  var b = { start: 1, end: 500, blocks: 500, miners: {} };
+  b.miners[VA("a")] = 500;
+  var wm = {}; wm[VA("a")] = 500;
+  assert.strictEqual(m.cleanBuckets([b], { start: 1, end: 500 }, wm).length, 1);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

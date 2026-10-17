@@ -150,7 +150,24 @@ function loadData(){
  * real snapshot before being held: 35 of 40 window miners appear in
  * all_time, 0 violations) painted two contradictory decentralization
  * verdicts from one capture. (Membership is still NOT required —
- * small window miners legitimately sit outside the top 100.) */
+ * small window miners legitimately sit outside the top 100.)
+ * Round 5 — the WINDOW collections' producer caps: all_time was held
+ * to its producer limit (100 rows) but the window was not held to
+ * anything but the generic posInt ceiling of 10,000,000. The producer
+ * (scripts/fetch-miner-data.mjs) always emits WINDOW_BLOCKS = 15,000
+ * blocks in BUCKET_SIZE = 500 buckets, so a window past 15,000 blocks
+ * is not producer data and fails the snapshot like the 101st all-time
+ * row; window_miners is then bounded by construction (every count is
+ * >= 1 and the counts sum to the window), and a bucket spanning or
+ * counting past 500 blocks is dropped by cleanBucket like any other
+ * non-producer bucket. Before this round a crafted snapshot carrying
+ * a 2,000,000-block window of 200,000 distinct miners was accepted
+ * whole — sanitize + sort alone cost 350.8 ms in Node before the
+ * leaderboard could paint a row per miner — the unbounded load-boundary
+ * class whale-watch (top <= 200), block-explorer (limit:10/25) and
+ * network-dashboard (BLOCKS_LIMIT/DAILY_LIMIT) already close. */
+var MAX_WINDOW_BLOCKS = 15000; // producer WINDOW_BLOCKS in scripts/fetch-miner-data.mjs
+var MAX_BUCKET_BLOCKS = 500;   // producer BUCKET_SIZE in scripts/fetch-miner-data.mjs
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
 var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
 
@@ -166,8 +183,9 @@ function cleanBlockTime(v){
 function cleanBucket(b){
   if (!b || typeof b !== "object" || Array.isArray(b)) return null;
   var start = posInt(b.start, 10000000), end = posInt(b.end, 10000000);
-  var blocks = posInt(b.blocks, 100000);
+  var blocks = posInt(b.blocks, MAX_BUCKET_BLOCKS);
   if (start === null || end === null || blocks === null || end < start) return null;
+  if (end - start + 1 > MAX_BUCKET_BLOCKS) return null; // producer buckets span exactly BUCKET_SIZE
   if (blocks > end - start + 1) return null;
   if (!b.miners || typeof b.miners !== "object" || Array.isArray(b.miners)) return null;
   var keys = Object.keys(b.miners);
@@ -219,6 +237,7 @@ function sanitizeMiners(d){
   var wStart = posInt(w.start_height, 10000000), wEnd = posInt(w.end_height, 10000000);
   var wCount = posInt(w.block_count, 10000000);
   if (wStart === null || wEnd === null || wCount === null) bad("window heights");
+  if (wCount > MAX_WINDOW_BLOCKS) bad("window.block_count exceeds the producer window");
   if (wEnd !== height) bad("window.end_height != chain_height");
   if (wStart !== wEnd - wCount + 1) bad("window range != block_count");
   var wm = d.window_miners;
@@ -648,6 +667,8 @@ if (typeof module !== "undefined" && module.exports){
     bucketStats: bucketStats,
     sanitizeMiners: sanitizeMiners,
     cleanBuckets: cleanBuckets,
+    MAX_WINDOW_BLOCKS: MAX_WINDOW_BLOCKS,
+    MAX_BUCKET_BLOCKS: MAX_BUCKET_BLOCKS,
     fmtAddr: fmtAddr,
     timeAgo: timeAgo,
   };
