@@ -149,6 +149,35 @@ t("json arg valid", r.problems.length === 0, JSON.stringify(r.problems));
 r = build("ms-propose-custom", { address: GOOD, pallet: "Balances", call: "x", args: "not json", expiry: "100", from: "alice" });
 t("json arg invalid flagged", r.problems.some(p => p.field === "args"), "");
 
+/* ---- json field length bound: the value becomes ONE command-line
+ * argument, and Linux caps a single argv string at MAX_ARG_STRLEN =
+ * 131,072 bytes — a longer value can never reach the CLI. The validator
+ * used to JSON.parse the whole value per keystroke (result discarded);
+ * over-cap values are now refused on length alone, before parsing. ---- */
+const ARGS_FIELD = { f: "args", kind: "json" };
+eq("json cap is the argv limit", F.MAX_JSON_FIELD_CHARS, 131072);
+eq("json room of empty is the cap", F.jsonFieldRoom(""), 131072);
+eq("json room at exactly cap is 0", F.jsonFieldRoom("x".repeat(131072)), 0);
+eq("json room at cap+1 is -1", F.jsonFieldRoom("x".repeat(131073)), -1);
+t("json room fail-closed on non-strings",
+  F.jsonFieldRoom(null) === -1 && F.jsonFieldRoom(undefined) === -1 &&
+  F.jsonFieldRoom(42) === -1 && F.jsonFieldRoom({}) === -1, "");
+eq("json exactly-cap valid still validates",
+  F.validateField(ARGS_FIELD, "[\"" + "a".repeat(131068) + "\"]"), null);
+let overErr = F.validateField(ARGS_FIELD, "[\"" + "a".repeat(131070) + "\"]");
+t("json cap+2 refused on length naming size + cap",
+  typeof overErr === "string" && /131,074/.test(overErr) && /131,072/.test(overErr) && !/valid JSON/.test(overErr), overErr);
+let giantErr = F.validateField(ARGS_FIELD, "[\"" + "a".repeat(20000000) + "\"]");
+t("json 20M-char value refused on length", typeof giantErr === "string" && /20,000,004/.test(giantErr), giantErr);
+eq("json largest genuine args validate (1,000 pairs)",
+  F.validateField(ARGS_FIELD, JSON.stringify(Array.from({ length: 1000 }, () => [GOOD, "1000000000000"]))), null);
+eq("json ML-DSA-87 sig arg validates",
+  F.validateField(ARGS_FIELD, JSON.stringify(["0x" + "ab".repeat(7357)])), null);
+eq("json invalid under cap keeps the JSON error",
+  F.validateField(ARGS_FIELD, "not json"), "must be valid JSON");
+r = build("call", { pallet: "Balances", call: "transfer_allow_death", args: "[\"" + "a".repeat(200000) + "\"]", from: "main" });
+t("buildCommand flags over-cap args", r.problems.some(p => p.field === "args" && /131,072/.test(p.msg)), JSON.stringify(r.problems));
+
 r = build("scheduler-agenda", { range: "80..100" });
 eq("range exact", r.cmd, "quantus scheduler agenda --range 80..100");
 r = build("scheduler-agenda", { range: "80-100" });

@@ -55,9 +55,17 @@ out of scope here.
   validators, recipes, batch builder, and DOM layer. Dual-mode: `require()`s
   cleanly in node for tests, runs in the browser via `DOMContentLoaded`.
 - `js/ss58.js` — vendored SS58-189 codec (shared with other hub apps)
-- `tests/cli-forge.test.js` — 117 assertions: catalog integrity, exact
+- `tests/cli-forge.test.js` — 143 assertions: catalog integrity, exact
   serializer outputs, quoting, validators, real-checksum address tests,
   batch-file builder, recipe integrity. Run with `node tests/cli-forge.test.js`.
+
+JSON argument fields (`--args` on the generic call and the multisig custom
+call) are length-gated at 131,072 characters: the value becomes one
+command-line argument, and no single argument can exceed that (Linux
+MAX_ARG_STRLEN), so longer values are refused on length alone — naming size
+and cap — before any JSON parsing, instead of being parsed whole on every
+keystroke. The largest genuine arguments (a 1,000-element args array is
+70,001 characters) fit intact, and invalid JSON keeps its usual error.
 
 ## Attribution
 

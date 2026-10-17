@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+443,478% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+442,151% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">68/68 consensus tests green · snapshot boundary round 3: every recent difficulty must recompute as the exact retarget of its predecessor and the block-time window's tail must equal the recent series' own deltas · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -809,7 +809,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC CLI Forge <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The interactive <code>quantus</code> command builder: 110 commands across wallets, payments, multisig, governance, Wormhole privacy, NEAR bridge, and runtime upgrades — with a flag map verified field-by-field against the real CLI source, live validation, exact planck previews, batch-file builder, and 7 verified recipe flows. Never asks for passwords.</p>
-        <div class="meta">131/131 logic tests green · the global camera index is held to the same u32 grammar as the command field — no NaN, negative, overflowing or silently truncated values reach a copied command · full browser QA green · zero console errors</div>
+        <div class="meta">143/143 logic tests green · the global camera index is held to the same u32 grammar as the command field — no NaN, negative, overflowing or silently truncated values reach a copied command · JSON arguments are length-gated at 131,072 characters (one command-line argument cannot exceed that) and refused on length before parsing, instead of being parsed whole on every keystroke · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card luck" href="pages/luck-lab/">
         <div class="icon-row">

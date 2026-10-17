@@ -101,6 +101,27 @@ function isValidHex(raw, bytes) {
   return true;
 }
 
+/* JSON field length bound. A json field's value becomes ONE shell-quoted
+ * argument in the built command, and Linux caps a single argv string at
+ * MAX_ARG_STRLEN = 131,072 bytes (128 KiB) — a longer value can never be
+ * passed to the CLI at all. The validator used to JSON.parse the WHOLE
+ * value on every keystroke (buildCommand runs per input event) with the
+ * result discarded; a 20,000,002-char paste cost a full parse (~66 ms in
+ * Node) per keystroke, all to validate arguments whose largest genuine
+ * forms — a 1,000-element [address, planck] args array (70,001 chars),
+ * an ML-DSA-87 signature as one hex-string arg (14,720 chars), a 4 KiB
+ * Vec<u8> as a number array (14,627 chars) — fit far under the cap.
+ * Over-cap values are now refused on length alone, before parsing. */
+var MAX_JSON_FIELD_CHARS = 131072;
+
+/* Characters of room left for a json field value, or -1 when the value
+ * is not a string or is already over the cap (fail-closed). */
+function jsonFieldRoom(value) {
+  if (typeof value !== "string") return -1;
+  var room = MAX_JSON_FIELD_CHARS - value.length;
+  return room >= 0 ? room : -1;
+}
+
 /* Validate one field value. Returns null when OK, else an error string. */
 function validateField(field, raw) {
   var v = trim(raw);
@@ -125,6 +146,10 @@ function validateField(field, raw) {
     case "enum":
       return field.values.indexOf(v) >= 0 ? null : ("one of: " + field.values.join(", "));
     case "json":
+      if (jsonFieldRoom(v) < 0)
+        return "JSON arguments too long: " + v.length.toLocaleString("en-US") +
+          " characters (max " + MAX_JSON_FIELD_CHARS.toLocaleString("en-US") +
+          " — one command-line argument cannot exceed that)";
       try { JSON.parse(v); return null; } catch (e) { return "must be valid JSON"; }
     case "range":
       return /^\d+\.\.\d+$/.test(v) ? null : 'range like "80..100"';
@@ -537,7 +562,7 @@ var COMMANDS = [
     { f: "address", kind: "address-strict", req: true, help: "The multisig account address (SS58)." },
     { f: "pallet", kind: "string", req: true, help: "Pallet name, e.g. \"Balances\"." },
     { f: "call", kind: "string", req: true, help: "Call name, e.g. \"transfer_allow_death\"." },
-    { f: "args", kind: "json", help: "Arguments as a JSON array, e.g. '[\"5GrwvaEF…\", \"1000000000000\"]'." },
+    { f: "args", kind: "json", help: "Arguments as a JSON array, e.g. '[\"5GrwvaEF…\", \"1000000000000\"]'. Max 131,072 characters — the value becomes one command-line argument, and no single argument can exceed that." },
     { f: "expiry", kind: "uint", u: 32, req: true, help: "Expiry block number for this proposal." },
     { f: "from", kind: "string", req: true, help: "Proposer wallet name (must be a signer)." },
     { f: "password-file", kind: "path", help: "Read the wallet password from an owner-only file." },
@@ -1311,7 +1336,7 @@ var COMMANDS = [
   fields: [
     { f: "pallet", kind: "string", req: true, help: "Pallet name, e.g. \"Balances\"." },
     { f: "call", kind: "string", req: true, help: "Call/function name, e.g. \"transfer_allow_death\"." },
-    { f: "args", kind: "json", help: "Arguments as a JSON array, e.g. '[\"5GrwvaEF…\", \"1000000000000\"]'." },
+    { f: "args", kind: "json", help: "Arguments as a JSON array, e.g. '[\"5GrwvaEF…\", \"1000000000000\"]'. Max 131,072 characters — the value becomes one command-line argument, and no single argument can exceed that." },
     { f: "from", kind: "string", req: true, help: "Wallet name to sign with." },
     { f: "tip", kind: "amount", help: "Optional tip to prioritize the transaction." },
     { f: "offline", kind: "bool", help: "Build the extrinsic offline without submitting." },
@@ -1860,6 +1885,8 @@ if (typeof module !== "undefined" && module.exports) {
     buildCommand: buildCommand,
     buildBatchFile: buildBatchFile,
     validateField: validateField,
+    MAX_JSON_FIELD_CHARS: MAX_JSON_FIELD_CHARS,
+    jsonFieldRoom: jsonFieldRoom,
     classifyAddressOrName: classifyAddressOrName,
     parseQtcToPlancks: parseQtcToPlancks,
     plancksToQtcString: plancksToQtcString,
