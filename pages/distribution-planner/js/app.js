@@ -9,7 +9,7 @@ var $ = function (id) { return document.getElementById(id); };
 var core = window.DistCore, ss58 = window.QSS58, check = window.QTC_CHECK;
 var WORDLIST = window.QTC_WORDLIST;
 
-var state = { validated: [], batches: [], fees: [], scheme: "ml-dsa-65" };
+var state = { validated: [], batches: [], fees: [], scheme: "ml-dsa-65", planRefusal: null };
 var cpCache = {};   // address -> phrase
 var cpQueued = [];  // addresses awaiting checkphrase
 var cpRunning = false;
@@ -110,15 +110,34 @@ function scheduleRevalidate() {
   debounceT = setTimeout(revalidate, 250);
 }
 
+/* Disclosure for a truncated list: exactly what was not scanned, with
+ * both caps named. The scanned rows are still shown for review, but
+ * renderPlan refuses to build batches or exports from them — a plan
+ * built from a partial list would silently underpay everyone past the
+ * cap. */
+function truncationNote(p) {
+  var bits = [];
+  if (p.droppedRows > 0) bits.push(p.droppedRows.toLocaleString("en-US") + " recipient rows");
+  if (p.skippedChars > 0) bits.push(p.skippedChars.toLocaleString("en-US") + " characters");
+  return bits.join(" and ") + " were not scanned — the planner scans at most " +
+    core.MAX_RECIPIENT_ROWS.toLocaleString("en-US") + " rows and " +
+    core.MAX_LIST_SCAN_CHARS.toLocaleString("en-US") + " characters of a list.";
+}
+
 function revalidate() {
   var text = $("recipients").value;
-  var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); }).length;
-  $("rowcount").textContent = lines + (lines === 1 ? " line" : " lines");
-  var rows = core.parseInput(text);
-  var validated = core.validateRows(rows, ss58, { addressToChecksum: function () { return ["…"]; } }, WORDLIST);
+  // Bounded parse (core): the old code split the whole text here just to
+  // count lines, then parseInput split it again into an uncapped row
+  // array that validateRows decoded row by row — a giant paste froze
+  // the tab on every debounce. Counts now come from the bounded parse.
+  var parsed = core.parseInputBounded(text);
+  $("rowcount").textContent = parsed.totalRows + (parsed.totalRows === 1 ? " line" : " lines") +
+    (parsed.skippedChars > 0 ? " scanned of " + parsed.totalChars.toLocaleString("en-US") + " characters" : "");
+  var validated = core.validateRows(parsed.rows, ss58, { addressToChecksum: function () { return ["…"]; } }, WORDLIST);
   // checkphrases are filled in progressively; keep a placeholder object shape
   validated.forEach(function (v) { v.checkphrase = null; });
   state.validated = validated;
+  state.planRefusal = (parsed.droppedRows > 0 || parsed.skippedChars > 0) ? parsed : null;
   cpCache = {};
   // Derivations are bounded to the rows the review table can display:
   // a checkphrase is display-only (exports never carry one) and each
@@ -165,10 +184,19 @@ function renderReview() {
     }).join("");
   }
   var cap = $("table-cap");
+  var notes = [];
   if (state.validated.length > CAP) {
+    notes.push("Showing the first " + CAP + " of " + state.validated.length +
+      " rows — checkphrases are computed for the shown rows only" +
+      (state.planRefusal ? "." : "; the full list is still validated and exported."));
+  }
+  if (state.planRefusal) {
+    notes.push("List truncated: " + truncationNote(state.planRefusal) +
+      " The scanned rows are shown for review only — no batch plan or export was built from a partial list.");
+  }
+  if (notes.length) {
     cap.hidden = false;
-    cap.textContent = "Showing the first " + CAP + " of " + state.validated.length +
-      " rows — checkphrases are computed for the shown rows only; the full list is still validated and exported.";
+    cap.textContent = notes.join(" ");
   } else cap.hidden = true;
 }
 
@@ -191,8 +219,24 @@ function currentServiceFeeBps() {
 }
 
 function renderPlan() {
-  var sum = core.summarize(state.validated);
   var totals = $("totals"), cards = $("batch-cards"), feeBox = $("fee-breakdown");
+  if (state.planRefusal) {
+    // Truncated list: batches/exports from the scanned rows alone would
+    // underpay the unscanned recipients while looking complete. Refuse.
+    state.batches = [];
+    state.fees = [];
+    state.script = null;
+    totals.innerHTML = '<span class="fine bad">No batch plan was built: this list is truncated — ' +
+      esc(truncationNote(state.planRefusal)) +
+      " Split the list into smaller parts and plan each part separately.</span>";
+    cards.innerHTML = "";
+    feeBox.innerHTML = "<p class=\"fine\">—</p>";
+    $("export-btns").innerHTML = '<span class="fine">Exports are disabled for a truncated list.</span>';
+    $("script-preview").firstChild.textContent = "—";
+    updateBalanceCheck(null);
+    return;
+  }
+  var sum = core.summarize(state.validated);
   if (!sum.valid) {
     totals.innerHTML = '<span class="fine">No valid recipients yet — the batch plan appears here.</span>';
     cards.innerHTML = "";

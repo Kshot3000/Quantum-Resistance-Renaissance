@@ -9,19 +9,19 @@
   var $ = function (id) { return document.getElementById(id); };
 
   // Fallback bundle — ONE capture, never mixed dates: every field below comes
-  // from the 2026-10-17 17:24Z snapshot refresh (consensus @ block 242,486 +
-  // supply @ block 242,486, fetched 1 seconds apart). The previous bundle paired
+  // from the 2026-10-17 18:29Z snapshot refresh (consensus @ block 242,765 +
+  // supply @ block 242,765, fetched 2 seconds apart). The previous bundle paired
   // Oct 1 difficulty/head with an Oct 2 supply-derived reward, which silently
   // skewed every fallback-painted figure. Guarded by tests/luck-core.test.js
   // (cross-checked against energy-observatory's fallback bundle).
   var state = {
-    difficulty: 436534015242687,   // fallback: consensus snapshot 2026-10-17
-    netHs: 36377834603557,         // = difficulty / 12 s (indexer est. hashrate)
-    reward: 0.3034192,             // fallback: (21M − 5,829,042.4887 total supply) / 50M, same capture
-    blocksPerDay: 5910,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
-    avgBlockMs: 14619,
-    head: 242486,
-    fetchedAt: "2026-10-17T17:24:47.100Z",
+    difficulty: 441654766789786,   // fallback: consensus snapshot 2026-10-17
+    netHs: 36804563899148,         // = difficulty / 12 s (indexer est. hashrate)
+    reward: 0.3034160,             // fallback: (21M − 5,829,201.5313 total supply) / 50M, same capture
+    blocksPerDay: 5970,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
+    avgBlockMs: 14472,
+    head: 242765,
+    fetchedAt: "2026-10-17T18:29:21.604Z",
     source: "snapshot"
   };
 

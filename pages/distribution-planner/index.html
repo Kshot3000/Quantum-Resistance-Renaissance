@@ -102,7 +102,10 @@
     <h2>Who gets paid</h2>
     <p class="fine">One recipient per line: <code>&lt;address&gt; &lt;amount in QTC&gt;</code> —
     space, comma, or tab separated. A header row (<code>address,amount</code>), blank lines, and
-    <code>#</code> comments are skipped. Amounts are decimal QTC (up to 12 places).</p>
+    <code>#</code> comments are skipped. Amounts are decimal QTC (up to 12 places). Lists are
+    scanned up to 65,536 rows and 4 MiB of text (about 2.4&times; a payout to every account on
+    chain); a larger list is disclosed as truncated and no plan is built from it — split it
+    into parts and plan each part separately.</p>
     <div class="input-row">
       <textarea id="recipients" aria-label="Recipient list: one Quantus address and amount in QTC per line" rows="9" spellcheck="false"
         placeholder="qz…address  12.5&#10;qz…address, 0.75&#10;# lines starting with # are ignored"></textarea>
@@ -249,7 +252,7 @@
 <script src="js/wordlist.js?v=1.21.0"></script>
 <script src="js/checkphrase-core.js?v=1.21.0"></script>
 <script src="js/ss58.js?v=1.23.0"></script>
-<script src="js/core.js?v=1.26.0"></script>
-<script src="js/app.js?v=1.24.0"></script>
+<script src="js/core.js?v=1.27.0"></script>
+<script src="js/app.js?v=1.25.0"></script>
 </body>
 </html>

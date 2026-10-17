@@ -415,6 +415,85 @@ t("listFileRoom: the largest genuine list fits — every chain account, max-leng
   assert.strictEqual(v[0].plancks, BigInt("20999999999999999999"));
 });
 
+/* ---------- recipient-list paste bound (scan window + row cap) ---------- */
+t("paste bound: caps pinned, scan cap equals the file cap", function () {
+  // A paste carries exactly what a list file carries — one cap serves
+  // both, pinned so the two can never drift apart.
+  assert.strictEqual(DistCore.MAX_LIST_SCAN_CHARS, 4 * 1024 * 1024);
+  assert.strictEqual(DistCore.MAX_LIST_SCAN_CHARS, DistCore.MAX_LIST_FILE_BYTES);
+  assert.strictEqual(DistCore.MAX_RECIPIENT_ROWS, 65536);
+});
+t("listTextWindow: window arithmetic at the cap", function () {
+  var exact = DistCore.listTextWindow("x".repeat(4194304));
+  assert.strictEqual(exact.scannedChars, 4194304);
+  assert.strictEqual(exact.skippedChars, 0);
+  assert.strictEqual(exact.text.length, 4194304);
+  var over = DistCore.listTextWindow("x".repeat(4194305));
+  assert.strictEqual(over.text, "", "single line longer than the window scans as empty");
+  assert.strictEqual(over.skippedChars, 4194305);
+  var lined = DistCore.listTextWindow(("a".repeat(99) + "\n").repeat(50000)); // 5,000,000 chars
+  assert.strictEqual(lined.scannedChars % 100, 0, "mid-line cut backs off to the last newline");
+  assert.strictEqual(lined.skippedChars, 5000000 - lined.scannedChars);
+  var small = DistCore.listTextWindow("a 1\nb 2");
+  assert.strictEqual(small.skippedChars, 0);
+  assert.strictEqual(small.text, "a 1\nb 2");
+});
+t("listTextWindow: fail-closed on non-strings", function () {
+  [null, undefined, 42, {}, []].forEach(function (v) {
+    var w = DistCore.listTextWindow(v);
+    assert.strictEqual(w.text, "", String(v));
+    assert.strictEqual(w.skippedChars, 0, String(v));
+  });
+});
+t("parseInputBounded: small lists match parseInput exactly", function () {
+  var text = "# plan\naddress,amount\n" + POOL + " 10\n\n" + MSIG + ",2.5\nlonelyfield\n";
+  var b = DistCore.parseInputBounded(text);
+  var p = DistCore.parseInput(text);
+  assert.strictEqual(b.droppedRows, 0);
+  assert.strictEqual(b.skippedChars, 0);
+  assert.strictEqual(b.rows.length, p.length);
+  b.rows.forEach(function (r, i) {
+    assert.strictEqual(r.line, p[i].line);
+    assert.strictEqual(r.address, p[i].address);
+    assert.strictEqual(r.amountStr, p[i].amountStr);
+    assert.strictEqual(r.error, p[i].error);
+  });
+  assert.strictEqual(b.rows[0].line, 3, "original line numbers preserved");
+});
+t("parseInputBounded: the largest genuine list scans intact", function () {
+  // Every account on chain (27,008 at the 2026-10-16 capture) at a
+  // max-length amount: 2,025,600 chars / 27,008 rows — under both caps.
+  var line = POOL + ", 20,999,999.999999999999\n";
+  var b = DistCore.parseInputBounded(line.repeat(27008));
+  assert.strictEqual(b.rows.length, 27008);
+  assert.strictEqual(b.droppedRows, 0);
+  assert.strictEqual(b.skippedChars, 0);
+});
+t("parseInputBounded: row cap counts dropped rows exactly", function () {
+  var text = (POOL + " 1\n").repeat(70000); // inside the char window, past the row cap
+  var b = DistCore.parseInputBounded(text);
+  assert.strictEqual(b.rows.length, 65536);
+  assert.strictEqual(b.droppedRows, 4464);
+  assert.strictEqual(b.totalRows, 70000);
+  assert.strictEqual(b.skippedChars, 0);
+  assert.strictEqual(b.rows[65535].line, 65536, "kept rows keep original line numbers");
+});
+t("parseInputBounded: tail counting skips blanks, comments and a header", function () {
+  var text = "a 1\n".repeat(65536) + "\n# note\naddress,amount\nb 2\nc 3\n";
+  var b = DistCore.parseInputBounded(text);
+  assert.strictEqual(b.rows.length, 65536);
+  assert.strictEqual(b.droppedRows, 2, "only the two data rows past the cap count as dropped");
+});
+t("parseInputBounded: giant paste is windowed and row-capped", function () {
+  var giant = (POOL + " 1\n").repeat(400000); // 20,800,000 chars
+  var b = DistCore.parseInputBounded(giant);
+  assert.ok(b.scannedChars <= DistCore.MAX_LIST_SCAN_CHARS, "scan windowed");
+  assert.strictEqual(b.skippedChars, giant.length - b.scannedChars);
+  assert.ok(b.skippedChars > 15000000, "tail reported, not parsed");
+  assert.strictEqual(b.rows.length, 65536);
+  assert.ok(b.droppedRows > 0, "in-window rows past the cap counted");
+});
+
 /* ---------- summarize ---------- */
 t("summarize counts and totals", function () {
   var rows = DistCore.parseInput(POOL + " 1\n" + MSIG + " 2\n" + "bad 3\n");

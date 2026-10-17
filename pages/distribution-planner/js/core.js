@@ -101,9 +101,11 @@ function compactLenU128(v) {
  * at the FIRST comma only — the remainder is the amount, commas and
  * all — and extra whitespace-separated fields are an explicit error
  * row, never a silent drop in a money plan. */
-function parseInput(text) {
+function parseLines(lines, cap) {
   var rows = [];
-  var lines = String(text == null ? "" : text).split(/\r?\n/);
+  var droppedRows = 0;
+  var limit = (typeof cap === "number" && isFinite(cap) && cap > 0)
+    ? Math.floor(cap) : Infinity;
   var headerSeen = false;
   for (var i = 0; i < lines.length; i++) {
     var ln = i + 1;
@@ -118,6 +120,7 @@ function parseInput(text) {
       headerSeen = true;
       continue;
     }
+    if (rows.length >= limit) { droppedRows++; continue; }
     if (parts.length !== 2) {
       rows.push({ line: ln, raw: lines[i], address: parts[0] || "", amountStr: parts[1] || "",
                   error: "expected \"<address> <amount>\" (got " + parts.length + " field(s))" });
@@ -125,7 +128,11 @@ function parseInput(text) {
     }
     rows.push({ line: ln, raw: lines[i], address: parts[0], amountStr: parts[1], error: null });
   }
-  return rows;
+  return { rows: rows, droppedRows: droppedRows };
+}
+
+function parseInput(text) {
+  return parseLines(String(text == null ? "" : text).split(/\r?\n/), Infinity).rows;
 }
 
 /* ---------- address validation ---------- */
@@ -391,6 +398,62 @@ function checkphraseQueue(validated, cap) {
   return out;
 }
 
+/* ---------- recipient-list paste bound (scan window + row cap) ----------
+ * The file picker is size-gated (listFileRoom below), but the paste path
+ * never was: parseInput split the WHOLE textarea value into an uncapped
+ * row array, validateRows then SS58-decoded every row (a base58 +
+ * blake2b-512 decode each), and the app's revalidate() split the whole
+ * text a second time just to count lines — all on a 250 ms debounce.
+ * A 20,800,000-char paste of 400,000 rows built all 400,000 row objects
+ * in ~437 ms in Node and the validation pass decoded all 400,000 rows
+ * in ~11,603 ms (probe qa-distribution-rowcap) — a frozen tab on every
+ * keystroke pause, for a list no payout can legitimately be.
+ * The core now owns the raw text, in two bounds:
+ *  - listTextWindow scans only the first MAX_LIST_SCAN_CHARS characters
+ *    and backs the cut off to the last newline, so no truncated partial
+ *    line is ever parsed. The window EQUALS the file cap
+ *    (MAX_LIST_FILE_BYTES): a paste carries exactly what a list file
+ *    carries, so one cap serves both (and it is ~2.07x the largest
+ *    genuine list — every account on chain at max-length amounts,
+ *    2,025,600 chars, measured in the tests — so genuine lists scan
+ *    intact).
+ *  - parseInputBounded then applies MAX_RECIPIENT_ROWS: rows past the
+ *    cap are counted in droppedRows, never materialized or validated.
+ *    65,536 rows is ~2.4x a whole-chain payout (27,008 accounts at the
+ *    2026-10-16 supply capture); within the character window it also
+ *    bounds the decode count for short-line pastes.
+ * Both overflow figures (droppedRows, skippedChars) are reported, and
+ * the app REFUSES to build a plan from a truncated list — a partial
+ * payout plan would silently underpay the unscanned recipients.
+ * Non-string input fails closed as empty. */
+var MAX_RECIPIENT_ROWS = 65536;
+var MAX_LIST_SCAN_CHARS = 4 * 1024 * 1024; // === MAX_LIST_FILE_BYTES (below)
+function listTextWindow(text) {
+  if (typeof text !== "string")
+    return { text: "", totalChars: 0, scannedChars: 0, skippedChars: 0 };
+  var totalChars = text.length;
+  var scanned = text;
+  if (totalChars > MAX_LIST_SCAN_CHARS) {
+    scanned = text.slice(0, MAX_LIST_SCAN_CHARS);
+    var nextCh = text.charAt(MAX_LIST_SCAN_CHARS);
+    var lastCh = scanned.charAt(scanned.length - 1);
+    if (nextCh && nextCh !== "\n" && nextCh !== "\r" && lastCh !== "\n" && lastCh !== "\r") {
+      var cut = Math.max(scanned.lastIndexOf("\n"), scanned.lastIndexOf("\r"));
+      scanned = cut >= 0 ? scanned.slice(0, cut + 1) : "";
+    }
+  }
+  return { text: scanned, totalChars: totalChars, scannedChars: scanned.length,
+           skippedChars: totalChars - scanned.length };
+}
+function parseInputBounded(text) {
+  var w = listTextWindow(text);
+  var p = parseLines(w.text ? w.text.split(/\r?\n/) : [], MAX_RECIPIENT_ROWS);
+  return { rows: p.rows, droppedRows: p.droppedRows,
+           totalRows: p.rows.length + p.droppedRows,
+           totalChars: w.totalChars, scannedChars: w.scannedChars,
+           skippedChars: w.skippedChars };
+}
+
 /* ---------- recipient-list file bound ----------
  * The file picker used to readAsText the WHOLE picked file into the
  * recipients textarea, where revalidate() parses and SS58-validates
@@ -407,9 +470,10 @@ function checkphraseQueue(validated, cap) {
  * 4 MiB, ~2x that maximum: any larger file is beyond a whole-chain
  * payout and is refused UNREAD. File.size is known before a byte is
  * read. Fail-closed: a sizeless or non-numeric size refuses too.
- * (The paste path is deliberately NOT gated — large-list paste
- * support is intentional, and typing/pasting is the user's own pace;
- * only the one-click file read needed the gate.) */
+ * (The paste path is bounded separately, at this same 4 MiB scale:
+ * parseInputBounded above scans at most MAX_LIST_SCAN_CHARS —
+ * deliberately equal to this cap — and MAX_RECIPIENT_ROWS rows, and
+ * the app refuses to plan from a truncated list.) */
 var MAX_LIST_FILE_BYTES = 4 * 1024 * 1024;
 function listFileRoom(size) {
   return typeof size === "number" && isFinite(size) && size >= 0 && size <= MAX_LIST_FILE_BYTES;
@@ -453,6 +517,10 @@ var api = {
   checkphraseQueue: checkphraseQueue,
   MAX_LIST_FILE_BYTES: MAX_LIST_FILE_BYTES,
   listFileRoom: listFileRoom,
+  MAX_RECIPIENT_ROWS: MAX_RECIPIENT_ROWS,
+  MAX_LIST_SCAN_CHARS: MAX_LIST_SCAN_CHARS,
+  listTextWindow: listTextWindow,
+  parseInputBounded: parseInputBounded,
   summarize: summarize
 };
 
