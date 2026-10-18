@@ -434,7 +434,13 @@ $("sCheckBtn").addEventListener("click", function () {
   sShown = { addr: addrRaw, words: wordsRaw };
   var v = LOGIC.validateQuantusAddress(addrRaw);
   if (!v.ok) { out.innerHTML = ""; setVerdict(out, "err", "✗ Invalid address", esc(v.message)); return; }
-  var typed = wordsRaw.toLowerCase().split(/[\s\-_.,;\/]+/).filter(Boolean);
+  var parsedWords = LOGIC.parseCheckphraseWords(wordsRaw);
+  if (!parsedWords.ok) {
+    out.innerHTML = "";
+    setVerdict(out, "err", "✗ Words refused", esc(parsedWords.error));
+    return;
+  }
+  var typed = parsedWords.words;
   if (typed.length !== 5) {
     out.innerHTML = "";
     setVerdict(out, "err", "✗ Need exactly five words", "You entered " + typed.length + ". Ask them to read the checkphrase again, slowly.");

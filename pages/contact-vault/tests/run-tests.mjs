@@ -393,5 +393,48 @@ ok("parseImportPaste fail-closed on non-strings",
     LOGIC.parseImportPayload(rInner.value).ok === true);
 }
 
+/* 12. spoken-checkphrase input length gate (parseCheckphraseWords):
+ * the handler used to lowercase/split the WHOLE words box before
+ * counting — a 20,000,000-char paste materialized 4,000,000 tokens in
+ * ~829 ms in Node (probe qa-checkphrase-bound) only to be rejected as
+ * not-five-words. The core now refuses over-cap input on length alone.
+ * Cap derivation: the shipped checkphrase wordlist's longest word is
+ * 14 chars, so a real five-word phrase is at most 74 chars
+ * single-spaced; 256 admits generous dictation formatting. */
+ok("checkphrase cap exported (MAX_CHECKPHRASE_CHARS 256)",
+  LOGIC.MAX_CHECKPHRASE_CHARS === 256);
+ok("checkphraseInputRoom arithmetic at the cap",
+  LOGIC.checkphraseInputRoom(0) === true && LOGIC.checkphraseInputRoom(256) === true &&
+  LOGIC.checkphraseInputRoom(257) === false);
+ok("checkphraseInputRoom fail-closed on non-integers",
+  [NaN, -1, Infinity, 1.5, "100", undefined, null, {}].every((v) => LOGIC.checkphraseInputRoom(v) === false));
+ok("parseCheckphraseWords parses a plain five-word phrase",
+  (() => { const r = LOGIC.parseCheckphraseWords("exit until obtain enchant toddler");
+    return r.ok === true && JSON.stringify(r.words) === JSON.stringify(["exit", "until", "obtain", "enchant", "toddler"]); })());
+ok("parseCheckphraseWords parses messy dictation (case, commas, period, newline)",
+  (() => { const r = LOGIC.parseCheckphraseWords("  EXIT , Until\nOBTAIN; enchant.  toddler ");
+    return r.ok === true && r.words.length === 5 && r.words[0] === "exit" && r.words[4] === "toddler"; })());
+ok("parseCheckphraseWords returns short inputs whole (count verdict stays the app's)",
+  (() => { const r = LOGIC.parseCheckphraseWords("alpha beta");
+    return r.ok === true && r.words.length === 2; })() &&
+  (() => { const r = LOGIC.parseCheckphraseWords("");
+    return r.ok === true && r.words.length === 0; })());
+ok("parseCheckphraseWords refuses a 20M-char paste unsplit, naming size + cap",
+  (() => { const r = LOGIC.parseCheckphraseWords("word ".repeat(4000000));
+    return r.ok === false && r.code === "too-long" && r.words.length === 0 &&
+      /256/.test(r.error) && /20,000,000/.test(r.error); })());
+ok("parseCheckphraseWords refuses cap+1 chars",
+  (() => { const r = LOGIC.parseCheckphraseWords("exit until obtain enchant toddler" + " ".repeat(300));
+    return r.ok === false && r.code === "too-long"; })());
+ok("parseCheckphraseWords exactly-cap (256-char) padded phrase still parses",
+  (() => { const p = "exit until obtain enchant toddler";
+    const r = LOGIC.parseCheckphraseWords(p + " ".repeat(256 - p.length));
+    return r.ok === true && r.words.length === 5; })());
+ok("parseCheckphraseWords fail-closed on non-strings",
+  [null, undefined, 42, NaN, {}, []].every((v) => {
+    const r = LOGIC.parseCheckphraseWords(v);
+    return r.ok === false && r.code === "not-text" && r.words.length === 0;
+  }));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

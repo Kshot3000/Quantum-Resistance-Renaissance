@@ -406,6 +406,43 @@ export function splitPackagePaste(text) {
   return text.split(/\s+/).map((s) => s.trim()).filter(Boolean);
 }
 
+/* ---------------- checkphrase answer length gate ----------------
+ * The cold review handler lowercased, trimmed and split the WHOLE
+ * cp-answer box before comparing it to the five checkphrase words: a
+ * 20,000,000-char paste materialized 4,000,000 token strings (~535 ms
+ * in Node, probe qa-checkphrase-bound) on the offline signing machine
+ * on every Review click, only to mismatch. splitCheckphraseAnswer owns
+ * the split behind MAX_CHECKPHRASE_CHARS: it refuses over-cap input on
+ * length alone via the pure fail-closed checkphraseAnswerRoom, naming
+ * size + cap, before any copy or split. The cap is derived from the
+ * checkphrase wordlist itself (the shipped qp-human-checkphrase list,
+ * 2,048 words): its longest word is 14 characters ("unquestionable"),
+ * so a real five-word answer is at most 5 x 14 + 4 separators = 74
+ * characters single-spaced. The 256 cap is ~3.5x that, admitting
+ * generous multi-space / newline formatting and mixed case, while no
+ * legitimate answer changes outcome — in-cap answers split exactly as
+ * the old inline expression did (an empty answer still yields [""],
+ * which mismatches and is refused as before). Fail-closed, matching
+ * the paste gate: a length that is not a finite, non-negative integer
+ * refuses, and a non-string answer refuses instead of being coerced.
+ * The same bound guards the Contact Vault's spoken-checkphrase split
+ * (its vault-logic.js copy). */
+export const MAX_CHECKPHRASE_CHARS = 256;
+
+export function checkphraseAnswerRoom(chars) {
+  return typeof chars === 'number' && isFinite(chars) && chars >= 0 && Math.floor(chars) === chars && chars <= MAX_CHECKPHRASE_CHARS;
+}
+
+export function splitCheckphraseAnswer(text) {
+  if (typeof text !== 'string') {
+    throw new Error(`checkphrase answer is not text — refused by the checkphrase answer gate (cap ${MAX_CHECKPHRASE_CHARS} characters) before splitting`);
+  }
+  if (!checkphraseAnswerRoom(text.length)) {
+    throw new Error(`checkphrase answer is ${text.length.toLocaleString('en-US')} characters — over the checkphrase answer cap of ${MAX_CHECKPHRASE_CHARS} characters; refused before splitting`);
+  }
+  return text.toLowerCase().trim().split(/\s+/);
+}
+
 /* ---------------- era decode (mirror of scale.js encodeMortalEra) -------- */
 
 export function decodeMortalEra(twoBytes) {

@@ -305,6 +305,38 @@ function parseImportPaste(text) {
   }
 }
 
+/* ---------- spoken-checkphrase input length gate ---------- */
+/* The spoken-checkphrase handler lowercased and split the WHOLE words
+ * box before counting: a 20,000,000-char paste materialized 4,000,000
+ * token strings (~829 ms in Node, probe qa-checkphrase-bound) on every
+ * Check click, only to be rejected as not-five-words. The core now owns
+ * the split behind MAX_CHECKPHRASE_CHARS: parseCheckphraseWords refuses
+ * over-cap input on length alone via the pure fail-closed
+ * checkphraseInputRoom, naming size + cap, before any copy or split.
+ * The cap is derived from the checkphrase wordlist itself (the shipped
+ * qp-human-checkphrase list, 2,048 words): its longest word is 14
+ * characters ("unquestionable"), so a real five-word phrase is at most
+ * 5 x 14 + 4 separators = 74 characters single-spaced. The 256 cap is
+ * ~3.5x that, admitting generous dictation formatting — multi-space or
+ * newline runs, hyphen/comma/period separators, mixed case, padding —
+ * while no legitimate answer changes outcome. Non-string input fails
+ * closed as not-text. The word-count verdict itself stays the app's:
+ * an in-cap parse returns the words however many there are. */
+var MAX_CHECKPHRASE_CHARS = 256;
+function checkphraseInputRoom(chars) {
+  return typeof chars === "number" && isFinite(chars) && chars >= 0 &&
+    Math.floor(chars) === chars && chars <= MAX_CHECKPHRASE_CHARS;
+}
+function parseCheckphraseWords(text) {
+  if (typeof text !== "string")
+    return { ok: false, code: "not-text", words: [],
+             error: "Spoken words are not text — refused by the checkphrase gate (cap " + MAX_CHECKPHRASE_CHARS.toLocaleString("en-US") + " characters) before splitting." };
+  if (!checkphraseInputRoom(text.length))
+    return { ok: false, code: "too-long", words: [],
+             error: "Spoken words too long (" + text.length.toLocaleString("en-US") + " characters) — the cap is " + MAX_CHECKPHRASE_CHARS.toLocaleString("en-US") + " characters for a five-word checkphrase; refused before splitting." };
+  return { ok: true, words: text.toLowerCase().split(/[\s\-_.,;\/]+/).filter(Boolean) };
+}
+
 /* ---------- base64 helpers (browser + Node) ---------- */
 function b64encode(bytes) {
   if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
@@ -381,6 +413,8 @@ var api = {
   parseImportPayload: parseImportPayload,
   MAX_IMPORT_PASTE_CHARS: MAX_IMPORT_PASTE_CHARS,
   importPasteRoom: importPasteRoom, parseImportPaste: parseImportPaste,
+  MAX_CHECKPHRASE_CHARS: MAX_CHECKPHRASE_CHARS,
+  checkphraseInputRoom: checkphraseInputRoom, parseCheckphraseWords: parseCheckphraseWords,
   encryptBackup: encryptBackup,
   decryptBackup: decryptBackup,
   b64encode: b64encode, b64decode: b64decode,

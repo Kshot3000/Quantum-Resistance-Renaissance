@@ -11,6 +11,7 @@ import {
   computeServiceFee, feeBpsLabel, SERVICE_FEE_ADDRESS, mergePackageLines,
   packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
   splitPackagePaste,
+  splitCheckphraseAnswer,
   DEFAULT_ERA_PERIOD,
 } from './airgap.js';
 import { drawQR, decodeQRImage, mountChunkStepper, startCameraScan } from './qr.js';
@@ -771,7 +772,7 @@ $('btn-cold-review').addEventListener('click', () => {
     const { prefix, accountId: destAccountId } = ss58Decode(dest);
     if (prefix !== 189) throw new Error('destination has wrong network prefix');
     if (!cold.cpWords) throw new Error('wait for the checkphrase to compute');
-    const answer = $('cp-answer').value.toLowerCase().trim().split(/\s+/);
+    const answer = splitCheckphraseAnswer($('cp-answer').value);
     if (answer.join(' ') !== cold.cpWords.join(' '))
       throw new Error('checkphrase mismatch — re-read the five words from the destination address');
     const amount = qtcToPlancks($('cold-amount').value);

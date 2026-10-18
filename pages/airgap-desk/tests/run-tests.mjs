@@ -17,6 +17,7 @@ import {
   SERVICE_FEE_ADDRESS, SERVICE_FEE_MAX_BPS,
   packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
   packagePasteRoom, splitPackagePaste, MAX_PACKAGE_PASTE_CHARS,
+  checkphraseAnswerRoom, splitCheckphraseAnswer, MAX_CHECKPHRASE_CHARS,
 } from '../js/airgap.js';
 import { encodeMortalEra, qtcToPlancks, buildTransferCall, buildBatchAllCall, buildSigningPayload, buildExtrinsic } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
@@ -638,4 +639,31 @@ test('mnemonic: input length cap refuses over-cap pastes before splitting (cold 
   assert.equal(normalizeMnemonic('  ' + m.split(' ').join('  \n ') + ' '), m);
   assert.throws(() => normalizeMnemonic('abandon '.repeat(2500000)), /1024/);
   assert.throws(() => mnemonicToSeed('abandon '.repeat(2500000)), /1024/);
+});
+
+test('checkphrase answer: input length cap refuses over-cap answers before splitting (cold review)', () => {
+  // Cap derivation: the shipped checkphrase wordlist's longest word is
+  // 14 chars, so a real five-word answer is at most 74 chars
+  // single-spaced; 256 admits generous formatting. The old handler
+  // split the whole box first — a 20M-char paste built 4,000,000
+  // tokens in ~535 ms in Node (probe qa-checkphrase-bound).
+  assert.equal(MAX_CHECKPHRASE_CHARS, 256);
+  assert.equal(checkphraseAnswerRoom(0), true);
+  assert.equal(checkphraseAnswerRoom(256), true);
+  assert.equal(checkphraseAnswerRoom(257), false);
+  assert.equal(checkphraseAnswerRoom(-1), false);
+  assert.equal(checkphraseAnswerRoom(1.5), false);
+  assert.equal(checkphraseAnswerRoom('12'), false);
+  assert.equal(checkphraseAnswerRoom(NaN), false);
+  const words = ['exit', 'until', 'obtain', 'enchant', 'toddler'];
+  assert.deepEqual(splitCheckphraseAnswer(words.join(' ')), words);
+  assert.deepEqual(splitCheckphraseAnswer('  ' + words.map((w) => w.toUpperCase()).join(' \n ') + '  '), words);
+  assert.deepEqual(splitCheckphraseAnswer(''), [''], 'empty answer keeps the legacy [""] mismatch shape');
+  const padded = words.join(' ') + ' '.repeat(MAX_CHECKPHRASE_CHARS - words.join(' ').length);
+  assert.equal(padded.length, 256);
+  assert.deepEqual(splitCheckphraseAnswer(padded), words, 'exactly-cap padded answer must split');
+  assert.throws(() => splitCheckphraseAnswer(padded + ' '), /256/);
+  assert.throws(() => splitCheckphraseAnswer('word '.repeat(4000000)), /20,000,000.*256|256/);
+  assert.throws(() => splitCheckphraseAnswer(null), /not text/);
+  assert.throws(() => splitCheckphraseAnswer(42), /not text/);
 });
