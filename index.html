@@ -701,7 +701,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Mempool Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Read the pool before the block does: connect to any node and watch live pending-extrinsic gauges, get txWatch zero-confirmation signals the second a transfer requests your address, and estimate node-quoted fees on what's actually waiting. No node, no data — nothing simulated, 100% client-side.</p>
-        <div class="meta">19/19 logic tests green · live pool gauge + txWatch signals + fee desk · watcher creation gated at the same 50 cap the load sanitizer enforces — the 51st add is refused with a cap-named message instead of opening a subscription that silently vanishes on reload · browser QA green (watch-cap suite 7/7) · endpoint URLs are length-bounded at 2,048 characters before the shape regex, localStorage save or socket — a 20M-char paste the old check scanned whole is refused on length alone</div>
+        <div class="meta">20/20 logic tests green · live pool gauge + txWatch signals + fee desk · watcher creation gated at the same 50 cap the load sanitizer enforces — the 51st add is refused with a cap-named message instead of opening a subscription that silently vanishes on reload · browser QA green (watch-cap suite 7/7) · endpoint URLs are length-bounded at 2,048 characters before the shape regex, localStorage save or socket — a 20M-char paste the old check scanned whole is refused on length alone · extrinsic hex is length-bounded at 1,048,576 characters inside the core validators — an over-cap pool entry is dropped and an over-cap fee paste is refused on length alone, never sent to the node</div>
       </a>
       <a class="app-card wallet" href="pages/web-wallet/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+435,517% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+434,641% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">76/76 consensus tests green · snapshot boundary round 4: the trend series' length is exact-pinned to the producer's sampled size (every 100 blocks plus the head) before its points are walked, and the producer no longer duplicates the head point on a sample step · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">

@@ -183,6 +183,29 @@ test("hexByteLen and summarizePool", () => {
   assert.equal(empty.avgBytes, 0);
 });
 
+test("extrinsic hex length bound refuses over-cap input before parsing", () => {
+  assert.equal(C.MAX_EXTRINSIC_HEX_CHARS, 1048576);
+  // fail-closed room gate
+  assert.equal(C.extrinsicHexRoom(0), 1048576);
+  assert.equal(C.extrinsicHexRoom(1048576), 0);
+  assert.equal(C.extrinsicHexRoom(1048577), 0);
+  assert.equal(C.extrinsicHexRoom(-1), 0);
+  assert.equal(C.extrinsicHexRoom(1.5), 0);
+  assert.equal(C.extrinsicHexRoom("10"), 0);
+  assert.equal(C.extrinsicHexRoom(NaN), 0);
+  // exactly-cap inputs still work on both gated paths
+  assert.equal(C.hexByteLen("0x" + "ff".repeat((1048576 - 2) / 2)), (1048576 - 2) / 2);
+  assert.equal(C.validExtrinsicHex("0x" + "ab".repeat((1048576 - 2) / 2)), true);
+  // cap+2 refused with size + cap named, before the regex
+  assert.throws(() => C.hexByteLen("0x" + "ff".repeat(1048576 / 2)), /too long \(1048578 characters\) — the cap is 1048576 characters/);
+  assert.throws(() => C.hexByteLen("0x" + "ff".repeat(10000000)), /too long \(20000002 characters\)/);
+  assert.equal(C.validExtrinsicHex("0x" + "ab".repeat(1048576 / 2)), false);
+  // an over-cap pool entry is skipped by the summarizer, genuine kept
+  const s = C.summarizePool(["0x" + "ff".repeat(1048576 / 2), "0x" + "ee".repeat(50)]);
+  assert.equal(s.valid, 1);
+  assert.equal(s.totalBytes, 50);
+});
+
 test("sortPoolByFee and decodePartialFee", () => {
   const rows = [
     { hex: "0xaa", bytes: 10, fee: null },

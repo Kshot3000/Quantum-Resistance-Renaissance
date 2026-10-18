@@ -231,9 +231,37 @@ function validSubscriptionId(v) {
   return null;
 }
 
+/* Extrinsic-hex length bound BEFORE the shape regex (white-hat track):
+ * validExtrinsicHex regex-tested the WHOLE string and hexByteLen did
+ * the same, with no length consulted anywhere — a hostile or buggy
+ * node could hand the pool list a 20,000,000-char "extrinsic" that was
+ * regex-tested and fee-quoted whole, and the fee desk's paste path
+ * (estimatePasted) regex-tested a user's paste in full and then sent
+ * it whole to the node as a payment_queryInfo param. Every consumer
+ * here handles ONE extrinsic: the largest legitimate one, measured
+ * fleet-wide with the fleet's own encoders, is a signed ML-DSA-87
+ * batch_all of 1,000 transfer legs at 49,266 bytes (98,532 hex chars;
+ * a plain signed transfer is ~7,357 bytes). MAX_EXTRINSIC_HEX_CHARS =
+ * 1,048,576 — the Extrinsic Lab's cap for this same artifact — admits
+ * 524,288 bytes (~a 10,000-leg batch) while refusing anything larger
+ * before the regex or the socket sees it. extrinsicHexRoom is the
+ * pure fail-closed gate (a non-integer, negative, or non-number count
+ * gets no room), mirroring the fleet's other *Room gates. Gating
+ * inside these two core functions covers every caller at once: the
+ * pool filter, summarizePool, the pool fee sampler and the paste
+ * path (which pre-checks the room for a length-specific message). */
+var MAX_EXTRINSIC_HEX_CHARS = 1048576;
+function extrinsicHexRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_EXTRINSIC_HEX_CHARS - chars);
+}
+
 function validExtrinsicHex(s) {
-  // A pool entry is extrinsic Bytes: even-length 0x hex, at least 1 byte.
-  return typeof s === "string" && HEX_RE.test(s) && s.length % 2 === 0 && s.length >= 4;
+  // A pool entry is extrinsic Bytes: even-length 0x hex, at least 1 byte,
+  // and never longer than one extrinsic can legitimately be (above) —
+  // the length is consulted BEFORE the regex runs.
+  return typeof s === "string" && s.length <= MAX_EXTRINSIC_HEX_CHARS &&
+    HEX_RE.test(s) && s.length % 2 === 0 && s.length >= 4;
 }
 
 function parseTxWatchNotification(raw) {
@@ -285,7 +313,14 @@ function assetLabel(assetId) {
 /* ---------- pool statistics ---------- */
 
 function hexByteLen(hex) {
-  // "0x..." extrinsic -> byte length. Throws on garbage.
+  // "0x..." extrinsic -> byte length. Throws on garbage. The length
+  // bound runs BEFORE the shape regex (see MAX_EXTRINSIC_HEX_CHARS):
+  // an over-cap string is refused with its size and the cap named,
+  // never regex-tested in full.
+  if (typeof hex === "string" && hex.length > MAX_EXTRINSIC_HEX_CHARS) {
+    throw new Error("extrinsic hex too long (" + hex.length + " characters) — the cap is " +
+      MAX_EXTRINSIC_HEX_CHARS + " characters; refused before parsing");
+  }
   if (typeof hex !== "string" || !HEX_RE.test(hex) || hex.length % 2 !== 0) {
     throw new Error("bad extrinsic hex");
   }
@@ -421,6 +456,7 @@ var api = {
   isHash32: isHash32,
   validSubscriptionId: validSubscriptionId,
   validExtrinsicHex: validExtrinsicHex,
+  MAX_EXTRINSIC_HEX_CHARS: MAX_EXTRINSIC_HEX_CHARS, extrinsicHexRoom: extrinsicHexRoom,
   parseTxWatchNotification: parseTxWatchNotification,
   assetLabel: assetLabel,
   hexByteLen: hexByteLen,

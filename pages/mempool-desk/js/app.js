@@ -683,6 +683,18 @@ var pasteQuoteSeq = 0;
 function estimatePasted() {
   var hex = $("fee-hex").value.trim();
   var msg = $("fee-paste-msg");
+  // Length gate BEFORE the shape check and BEFORE anything is sent to
+  // the node: a paste is ONE extrinsic, and the largest legitimate one
+  // is far under the core cap (see rpc-core.js) — an over-cap paste was
+  // regex-tested in full and then shipped whole as an RPC param. The
+  // core hexByteLen gate refuses it too; this pre-check exists so the
+  // refusal names the length instead of reading as a hex error.
+  if (typeof C.MAX_EXTRINSIC_HEX_CHARS === "number" && hex.length > C.MAX_EXTRINSIC_HEX_CHARS) {
+    msg.textContent = "That extrinsic hex is " + hex.length.toLocaleString("en-US") + " characters — over the cap of " +
+      C.MAX_EXTRINSIC_HEX_CHARS.toLocaleString("en-US") + " characters for a single extrinsic; it was not checked and was not sent to the node.";
+    msg.className = "form-msg err";
+    return;
+  }
   if (!state.connected) {
     msg.textContent = "Connect a node first — the fee quote comes from the node, never from this page.";
     msg.className = "form-msg err";
