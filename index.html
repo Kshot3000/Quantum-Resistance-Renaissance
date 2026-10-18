@@ -593,7 +593,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Quantum Key Forge <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Forge real ML-DSA-65/87 post-quantum keypairs in your browser and watch the exact upstream derivation run: Poseidon2-Goldilocks account-ID hash into SS58 (prefix 189) <code>qz…</code> addresses — validated against 45 upstream test vectors. Address inspector, sign &amp; verify lab, printable paper card. Zero network calls; keys never leave the tab.</p>
-        <div class="meta">45/45 vector tests green · 63/63 unit tests green · 32/32 browser checks green · hex pastes are length-bounded before parsing (65,536-char cap, over 4× the largest signed extrinsic) in the shared quantus-crypto module — the same bound guards the Web Wallet, Airgap Desk, Chain Console and ZKTree Desk copies, whose hexDecode previously parsed a 20M-char paste in full (~0.41–0.47 s in Node) before any caller could reject it</div>
+        <div class="meta">45/45 vector tests green · 81/81 unit tests green · 32/32 browser checks green · hex pastes are length-bounded before parsing (65,536-char cap, over 4× the largest signed extrinsic) in the shared quantus-crypto module — the same bound guards the Web Wallet, Airgap Desk, Chain Console and ZKTree Desk copies, whose hexDecode previously parsed a 20M-char paste in full (~0.41–0.47 s in Node) before any caller could reject it · sign/verify messages are length-bounded before encoding in the shared module (65,536-char cap) — the message fields previously fed a whole paste into an ML-DSA sign/verify pass with no cap anywhere</div>
       </a>
       <a class="app-card distplanner" href="pages/distribution-planner/" style="grid-column:1 / -1">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+435,679% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+441,870% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">76/76 consensus tests green · snapshot boundary round 4: the trend series' length is exact-pinned to the producer's sampled size (every 100 blocks plus the head) before its points are walked, and the producer no longer duplicates the head point on a sample step · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -827,7 +827,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Notary Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The on-chain timestamping &amp; proof-of-existence desk: hash any document in your browser, wrap the digest in a versioned envelope, and anchor it with a byte-exact <code>System.remark</code> extrinsic — then verify it, keep it in a local vault, and read the live public remark board. Never signs; every byte cited to upstream source. The vault Save button refuses at its 500-anchor cap instead of silently evicting the oldest anchor. Its hex parser now refuses inputs over 1,048,576 characters before parsing, so a hostile node's oversized <code>System.Events</code> value or a poisoned vault entry can't force a multi-megabyte parse.</p>
-        <div class="meta">129/129 logic tests green · hexbound browser QA 8/8 · zero console errors · the board's RPC endpoint is validated (scheme + a 2,048-character length bound) before any socket opens — it previously went to the WebSocket constructor unchecked</div>
+        <div class="meta">136/136 logic tests green · hexbound browser QA 8/8 · zero console errors · the board's RPC endpoint is validated (scheme + a 2,048-character length bound) before any socket opens — it previously went to the WebSocket constructor unchecked · message-mode text is length-gated before encoding (4,096 chars guarantees the 4,096-byte cap, since every character is at least one byte) — the build path and the byte counter previously encoded the whole paste first</div>
       </a>
       <a class="app-card zktree" href="pages/zktree-desk/">
         <div class="icon-row">

@@ -1,12 +1,11 @@
 /* QTC Quantum Key Forge — app wiring (ES module, 100% client-side). */
 import {
   ss58Decode, ss58Encode, accountIdFromPubkey, pubkeyToAddress,
-  hexEncode, hexDecode, QUANTUS_SS58_PREFIX,
+  hexEncode, hexDecode, QUANTUS_SS58_PREFIX, encodeMessageText,
 } from './quantus-crypto.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 
 const $ = (id) => document.getElementById(id);
-const te = new TextEncoder();
 
 const SCHEMES = {
   65: { mod: ml_dsa65, label: 'ML-DSA-65', pkLen: 1952, skLen: 4032, sigLen: 3309 },
@@ -283,7 +282,12 @@ $('signBtn').addEventListener('click', async () => {
   const box = $('signResult');
   if (!currentKey) return;
   const S = SCHEMES[currentKey.scheme];
-  const msg = te.encode($('signMsg').value);
+  /* Length bound (white-hat track): the message is length-gated
+   * BEFORE encoding inside encodeMessageText — an over-cap paste is
+   * refused with size + cap named, never encoded or signed whole. */
+  let msg;
+  try { msg = encodeMessageText($('signMsg').value); }
+  catch (err) { box.innerHTML = inspHtml([['Error', err.message]], false, 'Cannot sign'); signRendered = true; return; }
   if (!msg.length) { box.innerHTML = '<p class="hint">Type a message first.</p>'; signRendered = false; return; }
   box.innerHTML = '<p class="hint">Signing…</p>';
   await sleep(30);
@@ -327,7 +331,7 @@ $('verifyBtn').addEventListener('click', async () => {
     if (!entry) throw new Error(`Public key must be ${SCHEMES[65].pkLen} (ML-DSA-65) or ${SCHEMES[87].pkLen} (ML-DSA-87) bytes; got ${pk.length}`);
     const sig = hexDecode($('verSig').value);
     if (sig.length !== entry.sigLen) throw new Error(`Signature must be ${entry.sigLen} bytes for ${entry.label}; got ${sig.length}`);
-    const msg = te.encode($('verMsg').value);
+    const msg = encodeMessageText($('verMsg').value);
     if (!msg.length) throw new Error('Enter the message that was signed.');
     box.innerHTML = '<p class="hint">Verifying…</p>';
     await sleep(30);

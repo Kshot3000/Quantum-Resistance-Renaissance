@@ -175,7 +175,15 @@ $("labelInput").addEventListener("input", () => {
 });
 $("msgInput").addEventListener("input", () => {
   voidBuild("the message changed after this build, so it no longer describes the current inputs.");
-  const n = new TextEncoder().encode($("msgInput").value).length;
+  const v = $("msgInput").value;
+  /* Length bound (white-hat track): over-cap text is counted on
+   * length alone — never encoded whole just to count its bytes. */
+  if (v.length > C.MAX_MESSAGE_INPUT_CHARS) {
+    $("msgBytes").textContent = v.length.toLocaleString("en-US") + " chars — over the 4096-byte cap";
+    $("msgBytes").style.color = "var(--red)";
+    return;
+  }
+  const n = new TextEncoder().encode(v).length;
   $("msgBytes").textContent = n.toLocaleString("en-US") + " / 4096 bytes";
   $("msgBytes").style.color = n > C.MAX_MESSAGE_BYTES ? "var(--red)" : "";
 });
@@ -242,7 +250,16 @@ $("buildBtn").addEventListener("click", () => {
     remarkBytes = env.bytes; envelopeHex = env.hex;
     parsed = C.parseRemark(remarkBytes);
   } else {
-    const msgBytes = Array.from(new TextEncoder().encode($("msgInput").value));
+    const rawMsg = $("msgInput").value;
+    /* Length bound (white-hat track): text over MAX_MESSAGE_INPUT_CHARS
+     * characters is guaranteed over the byte cap (every character is
+     * at least one UTF-8 byte) — refused before encoding, with size +
+     * cap named; the byte check below still governs in-cap text. */
+    if (C.messageInputRoom(rawMsg.length) === 0 && rawMsg.length > C.MAX_MESSAGE_INPUT_CHARS) {
+      $("oDigest").textContent = "⚠ Message is " + rawMsg.length.toLocaleString("en-US") + " characters — over the " + C.MAX_MESSAGE_BYTES + "-byte cap; refused before encoding. Shorten it and build again.";
+      return;
+    }
+    const msgBytes = Array.from(new TextEncoder().encode(rawMsg));
     if (msgBytes.length === 0 || msgBytes.length > C.MAX_MESSAGE_BYTES) {
       $("oDigest").textContent = "⚠ Message must be 1–4096 bytes.";
       return;

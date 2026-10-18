@@ -314,3 +314,31 @@ export function hexDecode(hex) {
   for (let i = 0; i < out.length; i++) out[i] = parseInt(h.slice(2 * i, 2 * i + 2), 16);
   return out;
 }
+
+/* Message-text length bound (white-hat track, Batch 192): the sign /
+ * verify message fields were this module's last unbounded user input —
+ * app.js utf8-encoded the WHOLE paste and fed it straight into an
+ * ML-DSA sign/verify pass, with no cap anywhere: a 20,000,000-char
+ * paste encodes whole and signs unbounded. The cap is this module's
+ * own input ceiling: every other user input (hex keys, signatures,
+ * packages) is already refused past MAX_HEX_INPUT_CHARS = 65,536
+ * chars above. A signable message is a short attestation — the
+ * fleet's on-chain text cap is 4,096 bytes — so 65,536 chars is over
+ * 16x any genuine message, while the worst case it admits (262,144
+ * encoded bytes for astral text) still signs in well under a second.
+ * messageInputRoom is the pure fail-closed gate (non-integer,
+ * negative, or non-number counts get no room); encodeMessageText is
+ * the only encode path the apps use for these fields — it refuses
+ * over-cap or non-string input on length BEFORE any encoding. */
+export const MAX_MESSAGE_CHARS = 65536;
+export function messageInputRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_MESSAGE_CHARS - chars);
+}
+export function encodeMessageText(text) {
+  if (typeof text !== 'string')
+    throw new Error('Message must be text — got ' + typeof text + '; refused before encoding');
+  if (text.length > MAX_MESSAGE_CHARS)
+    throw new Error('Message too long (' + text.length + ' characters) — the cap is ' + MAX_MESSAGE_CHARS + ' characters; refused before encoding');
+  return new TextEncoder().encode(text);
+}

@@ -60,6 +60,23 @@
   var ALGOS = { 1: "SHA-256", 2: "BLAKE2b-256" };
   var MAX_LABEL_BYTES = 64;
   var MAX_MESSAGE_BYTES = 4096; // raw message mode cap (keeps fees sane)
+  /* Message-input length bound (white-hat track, Batch 192): the
+   * message-mode build path utf8-encoded the WHOLE paste and only
+   * then consulted MAX_MESSAGE_BYTES, and the byte counter encoded
+   * the whole paste again on every keystroke — the encode ran
+   * unbounded however large the paste was. Derivation: every
+   * character encodes to at least one UTF-8 byte, so text over
+   * MAX_MESSAGE_BYTES characters is GUARANTEED over the byte cap.
+   * MAX_MESSAGE_INPUT_CHARS = MAX_MESSAGE_BYTES lets both app paths
+   * refuse over-cap text on length, before any encoding, via the
+   * fail-closed messageInputRoom gate; in-cap text is still encoded
+   * and byte-checked exactly as before (multibyte text can still be
+   * refused on bytes after the encode). */
+  var MAX_MESSAGE_INPUT_CHARS = MAX_MESSAGE_BYTES;
+  function messageInputRoom(chars) {
+    if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+    return Math.max(0, MAX_MESSAGE_INPUT_CHARS - chars);
+  }
 
   /* ---------------- Byte helpers ----------------
    * hexToBytes refuses over-cap inputs BEFORE any parsing: it used to
@@ -604,6 +621,7 @@
     SS58_PREFIX: SS58_PREFIX, EXISTENTIAL_DEPOSIT_QTC: EXISTENTIAL_DEPOSIT_QTC,
     SIG_SCHEMES: SIG_SCHEMES, ALGOS: ALGOS, MAX_LABEL_BYTES: MAX_LABEL_BYTES,
     MAX_MESSAGE_BYTES: MAX_MESSAGE_BYTES,
+    MAX_MESSAGE_INPUT_CHARS: MAX_MESSAGE_INPUT_CHARS, messageInputRoom: messageInputRoom,
     hexToBytes: hexToBytes, bytesToHex: bytesToHex,
     MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom,
     MAX_ENDPOINT_URL_CHARS: MAX_ENDPOINT_URL_CHARS, endpointUrlRoom: endpointUrlRoom,

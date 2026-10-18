@@ -316,6 +316,21 @@ t("hexInputRoom fail-closed on NaN/negative/fraction/string/undefined/null/Infin
   codec.hexInputRoom(1.5) === 0 && codec.hexInputRoom("10") === 0 &&
   codec.hexInputRoom(undefined) === 0 && codec.hexInputRoom(null) === 0 &&
   codec.hexInputRoom(Infinity) === 0);
+t("message input cap is the byte cap itself (bytes >= chars derivation)",
+  codec.MAX_MESSAGE_INPUT_CHARS === codec.MAX_MESSAGE_BYTES && codec.MAX_MESSAGE_INPUT_CHARS === 4096);
+t("messageInputRoom at 0 is the whole cap", codec.messageInputRoom(0) === 4096);
+t("messageInputRoom arithmetic below the cap", codec.messageInputRoom(96) === 4000);
+t("messageInputRoom is 0 at and past the cap",
+  codec.messageInputRoom(4096) === 0 && codec.messageInputRoom(20000000) === 0);
+t("messageInputRoom fail-closed on NaN/negative/fraction/string/undefined/null/Infinity",
+  codec.messageInputRoom(NaN) === 0 && codec.messageInputRoom(-1) === 0 &&
+  codec.messageInputRoom(1.5) === 0 && codec.messageInputRoom("10") === 0 &&
+  codec.messageInputRoom(undefined) === 0 && codec.messageInputRoom(null) === 0 &&
+  codec.messageInputRoom(Infinity) === 0);
+t("derivation holds: 4,097 two-byte chars encode past the byte cap",
+  codec.utf8ToBytes("é".repeat(4097)).length === 8194);
+t("derivation holds: 4,097 astral chars encode past the byte cap",
+  codec.utf8ToBytes("😀".repeat(4097)).length === 16388);
 t("hexToBytes refuses a 2,000,002-char input unparsed",
   codec.hexToBytes("aa".repeat(1000001)) === null);
 t("hexToBytes refuses cap+2 chars", codec.hexToBytes("a".repeat(1048578)) === null);

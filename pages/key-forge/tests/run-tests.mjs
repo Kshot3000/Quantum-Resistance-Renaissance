@@ -27,6 +27,9 @@ import {
   hexDecode,
   hexInputRoom,
   MAX_HEX_INPUT_CHARS,
+  encodeMessageText,
+  messageInputRoom,
+  MAX_MESSAGE_CHARS,
   QUANTUS_SS58_PREFIX,
 } from '../js/quantus-crypto.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
@@ -179,6 +182,30 @@ const KYLE_QTC = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
   eq('hexDecode exactly-cap parses', hexDecode('ab'.repeat(32768)).length, 32768);
   eq('hexDecode ML-DSA-87 signature hex parses', hexDecode('cd'.repeat(4627)).length, 4627);
   eq('hexDecode largest signed extrinsic hex parses', hexDecode('ef'.repeat(7357)).length, 7357);
+}
+
+// ---- 9. message text bound (white-hat: refuse before encoding/signing) ----
+{
+  eq('message cap is 65,536 chars (the module input ceiling)', MAX_MESSAGE_CHARS, 65536);
+  eq('message cap equals the hex input cap', MAX_MESSAGE_CHARS, MAX_HEX_INPUT_CHARS);
+  eq('messageInputRoom(0)', messageInputRoom(0), 65536);
+  eq('messageInputRoom at cap', messageInputRoom(65536), 0);
+  eq('messageInputRoom over cap', messageInputRoom(65537), 0);
+  for (const bad of [NaN, -1, 1.5, '10', undefined, null, Infinity])
+    eq('messageInputRoom fail-closed ' + String(bad), messageInputRoom(bad), 0);
+  let msg = '';
+  try { encodeMessageText('a'.repeat(65537)); } catch (e) { msg = e.message; }
+  ok('encodeMessageText refuses cap+1 naming size + cap', /65537/.test(msg) && /65536/.test(msg), msg);
+  let nsMsg = '';
+  try { encodeMessageText(42); } catch (e) { nsMsg = e.message; }
+  ok('encodeMessageText refuses a non-string fail-closed', nsMsg.length > 0, nsMsg);
+  eq('encodeMessageText exactly-cap ASCII encodes', encodeMessageText('a'.repeat(65536)).length, 65536);
+  eq('encodeMessageText multibyte encodes', encodeMessageText('é😀').length, 6);
+  eq('encodeMessageText empty encodes empty', encodeMessageText('').length, 0);
+  const m = encodeMessageText('Quantus is quantum-safe from genesis');
+  const kp = ml_dsa65.keygen(new Uint8Array(32).fill(7));
+  const s = ml_dsa65.sign(m, kp.secretKey);
+  ok('genuine message signs + verifies through the gate', ml_dsa65.verify(s, m, kp.publicKey));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
