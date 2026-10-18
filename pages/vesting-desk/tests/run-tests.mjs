@@ -336,4 +336,36 @@ t("boundary: shifting grant value into liquidity fails wholesale (cohort identit
   assert.equal(VApp.validateSchedules(rows, ANCHOR_V).length, 0);
 });
 
+/* --- producer count cap round 6 (app.js, 2026-10-17): rounds 1–5
+ * bounded what a row may claim, but not how MANY rows the load walks —
+ * individually-valid 1-planck grant rows pass even the round-5
+ * aggregate, so a crafted 200,000-row payload was accepted whole
+ * (1,210.7 ms walk in Node) before renderTable painted every row.
+ * Both producers query vesting_schedule(limit: 64), so the RAW row
+ * count is now capped at MAX_SCHEDULES before any row is validated
+ * and an over-cap set fails wholesale; non-arrays fail closed. */
+const tinyGrant = (id) => {
+  const r = { ...REAL_V.schedules.find((s) => s.cohort === "grant") };
+  r.id = id; r.total_plancks = "1"; r.claimed_plancks = "0"; r.last_claim_at_ms = null;
+  return r;
+};
+t("boundary: the schedule cap is pinned to the producer limit (64)", () => {
+  assert.equal(VApp.MAX_SCHEDULES, 64);
+});
+t("boundary: exactly-cap valid rows validate (64/64)", () => {
+  const rows = Array.from({ length: 64 }, (_, i) => tinyGrant(1000 + i));
+  assert.equal(VApp.validateSchedules(rows, ANCHOR_V).length, 64);
+});
+t("boundary: cap+1 valid rows fail wholesale, and the raw-length cap holds for rows that would dedupe away", () => {
+  const rows = Array.from({ length: 65 }, (_, i) => tinyGrant(2000 + i));
+  assert.equal(VApp.validateSchedules(rows, ANCHOR_V).length, 0);
+  const dupes = Array.from({ length: 65 }, () => tinyGrant(3000));
+  assert.equal(VApp.validateSchedules(dupes, ANCHOR_V).length, 0);
+});
+t("boundary: a non-array payload fails closed instead of throwing", () => {
+  assert.equal(VApp.validateSchedules(null, ANCHOR_V).length, 0);
+  assert.equal(VApp.validateSchedules(undefined, ANCHOR_V).length, 0);
+  assert.equal(VApp.validateSchedules("x", ANCHOR_V).length, 0);
+});
+
 console.log(`\nvesting-core: ${pass} tests green`);

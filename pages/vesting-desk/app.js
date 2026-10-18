@@ -54,7 +54,22 @@
    * Round 5 (2026-10-14): the validated SET is held to the genesis
    * aggregate — per-cohort sums <= the mainnet_vesting.rs cohort
    * totals and the grand sum <= the 27% genesis mint — see
-   * validateSchedules. A set breaking containment fails wholesale. */
+   * validateSchedules. A set breaking containment fails wholesale.
+   * Round 6 (2026-10-17): the validated set is held to the PRODUCER
+   * count — both producers query the indexer with
+   * vesting_schedule(limit: 64) (scripts/fetch-vesting-data.mjs, whose
+   * snapshot maps that result 1:1, and this app's own LIVE_QUERY), so
+   * a producer-shaped payload can never carry more than MAX_SCHEDULES
+   * rows. Rounds 1–5 bounded what a row may claim but not how many
+   * rows the load walks: a crafted payload of individually-valid
+   * 1-planck grant rows passed even the round-5 aggregate (200,000
+   * plancks << the grant cap) and was accepted whole — the per-row
+   * BigInt walk took 1,210.7 ms in Node before renderTable painted
+   * every row. validateSchedules now checks the RAW row count before
+   * any row is validated and an over-cap set fails wholesale (the
+   * round-5 convention): truncating to the first 64 would paint a
+   * partial genesis set as complete. The same guard makes a
+   * non-array payload fail closed instead of throwing. */
   const ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
   const MS_MIN = 946684800000, MS_MAX = 4102444800000; // 2000-01-01 .. 2100-01-01
   function decStr(v) {
@@ -159,7 +174,12 @@
     grant: VC.GRANT_TOTAL_QTC * Q, intents: VC.INTENTS_TOTAL_QTC * Q,
     liquidity: VC.LIQUIDITY_TOTAL_QTC * Q,
   };
+  /* Producer cap (round 6): fetch-vesting-data.mjs and LIVE_QUERY both
+   * query vesting_schedule(limit: 64) — a producer-shaped payload can
+   * never carry more rows than this. */
+  const MAX_SCHEDULES = 64;
   function validateSchedules(rows, anchorMs) {
+    if (!Array.isArray(rows) || rows.length > MAX_SCHEDULES) return []; // round 6: raw-count producer cap, before any row is validated
     const seen = new Set();
     const out = [];
     for (const r of rows) { const s = validSchedule(r, seen, anchorMs); if (s) out.push(s); }
@@ -717,6 +737,6 @@
    * testable without a browser — pages/vesting-desk/tests/run-tests.mjs
    * requires this file and drives validSchedule/validBlockHeight. */
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { validSchedule, validateSchedules, validBlockHeight, validFetchedAtMs };
+    module.exports = { validSchedule, validateSchedules, validBlockHeight, validFetchedAtMs, MAX_SCHEDULES };
   }
 })();
