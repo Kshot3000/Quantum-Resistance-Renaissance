@@ -335,3 +335,13 @@ test("parseTxWatchNotification sanitizes a garbage from", () => {
   assert.equal(C.parseTxWatchNotification({ ...raw, from: "<script>alert(1)</script>" }).from, "");
   assert.equal(C.formatCompact(-5n), "—");
 });
+
+/* Batch 194: amount-input length bound — parseQtcToPlancks BigInt-converted
+ * an unbounded digit string whole (superlinear freeze). */
+test("amount bound: parseQtcToPlancks length gate", () => {
+  assert.equal(C.parseQtcToPlancks("1.5"), 1500000000000n);
+  assert.throws(() => C.parseQtcToPlancks("9".repeat(600)), /512/);
+  assert.throws(() => C.parseQtcToPlancks("0".repeat(600) + "1.5"), /512/);
+  assert.throws(() => C.parseQtcToPlancks("9".repeat(2000000)), /512/);
+  assert.equal(typeof C.parseQtcToPlancks("9".repeat(512)), "bigint");
+});

@@ -591,3 +591,13 @@ test("ruleLabel renders human descriptions", () => {
   assert.equal(W.ruleLabel({ type: "chain_stall", threshold: "30" }), "No new block for 30 min");
   assert.equal(W.ruleLabel({ type: "new_referendum" }), "New governance referendum");
 });
+
+/* Batch 194: amount-input length bound — parseQtcToPlancks BigInt-converted
+ * an unbounded digit string whole (superlinear freeze). */
+test("amount bound: parseQtcToPlancks length gate", () => {
+  assert.equal(W.parseQtcToPlancks("1.5"), 1500000000000n);
+  assert.throws(() => W.parseQtcToPlancks("9".repeat(600)), /512/);
+  assert.throws(() => W.parseQtcToPlancks("0".repeat(600) + "1.5"), /512/);
+  assert.throws(() => W.parseQtcToPlancks("9".repeat(2000000)), /512/);
+  assert.equal(typeof W.parseQtcToPlancks("9".repeat(512)), "bigint");
+});

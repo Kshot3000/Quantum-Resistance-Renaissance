@@ -8,7 +8,7 @@
 import { hexEncode, hexDecode } from './quantus-crypto.js';
 import { ss58Decode } from './quantus-crypto.js';
 import { SYSTEM_ACCOUNT_KEY } from './xxhash.js?v=1.39.0';
-import { decodeAccountInfo, eraBirth, encodeMortalEra, buildTransferWithServiceFee, buildSigningPayload, buildExtrinsic, SERVICE_FEE_ADDRESS, DILITHIUM65_VARIANT, DILITHIUM87_VARIANT } from './scale.js?v=1.2.0';
+import { decodeAccountInfo, eraBirth, encodeMortalEra, buildTransferWithServiceFee, buildSigningPayload, buildExtrinsic, SERVICE_FEE_ADDRESS, DILITHIUM65_VARIANT, DILITHIUM87_VARIANT } from './scale.js?v=1.3.0';
 import { parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex } from './rpc-validate.js?v=1.2.0';
 
 export const DEFAULT_RPC = 'wss://rpc.quantus.network';

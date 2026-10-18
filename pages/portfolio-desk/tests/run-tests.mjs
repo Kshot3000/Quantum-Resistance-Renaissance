@@ -470,3 +470,13 @@ test("round 3 relations: schedule identity dedupe and per-beneficiary cap", () =
   const ctx = { balances: new Map(), schedules: new Map([[MA, [S({}), S({})]]]), byAddr: new Map(), minedCounts: new Map() };
   assert.equal(P.rollupPortfolio(vault, ctx, 0).rows[0].schedules.length, 1);
 });
+
+/* Batch 194: amount-input length bound — parseQtcToPlancks BigInt-converted
+ * an unbounded digit string whole (superlinear freeze). */
+test("amount bound: parseQtcToPlancks length gate", () => {
+  assert.equal(P.parseQtcToPlancks("1.5"), 1500000000000n);
+  assert.throws(() => P.parseQtcToPlancks("9".repeat(600)), /512/);
+  assert.throws(() => P.parseQtcToPlancks("0".repeat(600) + "1.5"), /512/);
+  assert.throws(() => P.parseQtcToPlancks("9".repeat(2000000)), /512/);
+  assert.equal(typeof P.parseQtcToPlancks("9".repeat(512)), "bigint");
+});

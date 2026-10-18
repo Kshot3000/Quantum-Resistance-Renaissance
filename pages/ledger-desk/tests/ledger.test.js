@@ -667,4 +667,20 @@ t("csvFileRoom: the largest export the desk can produce fits the gate", () => {
   assert.equal(L.csvFileRoom(Buffer.byteLength(quoted)), true);
 });
 
+// Batch 194: amount-input length bound (parsers + stored-state BigInt gate)
+t("amount bound: parsers refuse over-long digit strings before BigInt", () => {
+  assert.equal(L.MAX_AMOUNT_CHARS, 512);
+  assert.equal(L.parseQtcToPlanck("1.5"), 1500000000000n);
+  assert.equal(L.parseQtcToPlanck("9".repeat(600)), null);
+  assert.equal(L.parseQtcToPlanck("0".repeat(600) + "1.5"), null);
+  assert.equal(L.parseQtcToPlanck("9".repeat(2000000)), null);
+  assert.equal(typeof L.parseQtcToPlanck("9".repeat(512)), "bigint");
+  assert.equal(L.parseUsdPerQtcToMicro("12.50"), 12500000n);
+  assert.equal(L.parseUsdPerQtcToMicro("9".repeat(600)), null);
+  assert.equal(L.toBigIntOrNull("12345"), 12345n);
+  assert.equal(L.toBigIntOrNull("9".repeat(600)), null);
+  assert.equal(L.toBigIntOrNull("0".repeat(600) + "7"), null);
+  assert.equal(typeof L.toBigIntOrNull("9".repeat(512)), "bigint");
+});
+
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nAll " + n + " tests passed.");

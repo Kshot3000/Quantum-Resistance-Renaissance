@@ -324,5 +324,12 @@ F.RECIPES.forEach(rec => {
   });
 });
 
+/* Batch 194: amount-input length bound. */
+eq("amountbound: genuine parses", F.parseQtcToPlancks("1.5"), 1500000000000n);
+eq("amountbound: 600 digits -> null", F.parseQtcToPlancks("9".repeat(600)), null);
+eq("amountbound: long-but-tiny -> null by gate", F.parseQtcToPlancks("0".repeat(600) + "1.5"), null);
+eq("amountbound: 2M digits -> null", F.parseQtcToPlancks("9".repeat(2000000)), null);
+t("amountbound: at-cap parses", typeof F.parseQtcToPlancks("9".repeat(512)) === "bigint");
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

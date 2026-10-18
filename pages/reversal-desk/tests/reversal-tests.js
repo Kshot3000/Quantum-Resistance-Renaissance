@@ -356,5 +356,21 @@ const msFee = RC.encodeScheduleWithServiceFee(DKEY, 2000000000000n, { kind: "ms"
 eq(msFee.kind, "batch_all", "fee on: timestamp-delay schedules batch the same way");
 eq(msFee.feePlancks.toString(), "20000000000", "fee on: 1% of 2 QTC");
 
+/* Batch 194: amount-input length bound in app.js parseQTC (not exported —
+ * the app is a DOM IIFE — so the pure function is extracted and evaluated
+ * against a stub C, the same shape the page closes over). */
+{
+  const fs = require("fs");
+  const src = fs.readFileSync(__dirname + "/../js/app.js", "utf8");
+  const m = src.match(/function parseQTC\(s\) \{[\s\S]*?\n  \}/);
+  ok(!!m, "amountbound: parseQTC located in app.js");
+  const parseQTC = new Function("C", m[0] + "; return parseQTC;")({ UNIT: 1000000000000n });
+  ok(parseQTC("1.5") === 1500000000000n, "amountbound: genuine parses");
+  eq(parseQTC("9".repeat(600)), null, "amountbound: 600 digits -> null");
+  eq(parseQTC("0".repeat(600) + "1.5"), null, "amountbound: long-but-tiny -> null by gate");
+  eq(parseQTC("9".repeat(2000000)), null, "amountbound: 2M digits -> null");
+  ok(typeof parseQTC("9".repeat(512)) === "bigint", "amountbound: at-cap parses");
+}
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

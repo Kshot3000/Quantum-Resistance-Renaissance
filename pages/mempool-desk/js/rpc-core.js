@@ -18,10 +18,24 @@ var SS58_189_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // strict shape: qz + 47 base5
 
 /* ---------- planck <-> QTC ---------- */
 
+/* Amount-input length bound (white-hat): the regex below admits an
+ * unbounded whole part and BigInt(parts[0]) converts it whole —
+ * BigInt decimal conversion is superlinear (20M digits ~7.1 s
+ * measured), so an over-long amount froze the parse. Cap 512 chars
+ * (the fleet amount cap; the largest genuine amount string is 21
+ * chars), refused on length alone before the regex/BigInt, in this
+ * parser's throw convention, input never echoed. */
+var MAX_AMOUNT_CHARS = 512;
+function amountInputRoom(chars) {
+  return typeof chars === "number" && isFinite(chars) && chars >= 0 && Math.floor(chars) === chars && chars <= MAX_AMOUNT_CHARS;
+}
+
 function parseQtcToPlancks(str) {
   // Accepts "1", "1.5", "0.000001", "1,234.5". Returns BigInt plancks. Throws on garbage.
   if (typeof str !== "string") throw new Error("amount must be a string");
   var s = str.trim().replace(/,/g, "");
+  if (!amountInputRoom(s.length))
+    throw new Error("amount is " + s.length + " characters — over the amount-input cap of " + MAX_AMOUNT_CHARS + " characters; refused before parsing");
   if (!/^\d+(\.\d{1,12})?$/.test(s)) throw new Error("invalid QTC amount: " + str);
   var parts = s.split(".");
   var whole = BigInt(parts[0]);

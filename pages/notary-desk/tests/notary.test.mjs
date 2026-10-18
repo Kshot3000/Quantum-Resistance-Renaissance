@@ -363,5 +363,13 @@ const evKey = codec.systemEventsKey((b) => twox.twox128bytes(b));
 t("System.Events key shape",
   evKey.startsWith("0x26aa394eea5630e07c48ae0c9558cef7") && evKey.length === 66, evKey);
 
+/* --- Batch 194: stored-fee length bound in validFeeForCall --- */
+t("validFeeForCall: 2M-digit stored fee refused (no BigInt freeze)",
+  codec.validFeeForCall("9".repeat(2000000), 100) === false);
+t("validFeeForCall: 600-digit stored fee refused",
+  codec.validFeeForCall("9".repeat(600), 100) === false);
+t("validFeeForCall: genuine fee still validated on its merits",
+  typeof codec.validFeeForCall("0.001", 100) === "boolean");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

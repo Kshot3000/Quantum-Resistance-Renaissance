@@ -343,8 +343,16 @@ function boundedBytes(bytes){
 }
 
 /* ================= money ================= */
+/* Amount-input length bound (white-hat): the regex admits an unbounded
+ * whole part and BigInt(parts[0]) converts it whole BEFORE the supply
+ * check below can refuse — BigInt decimal conversion is superlinear
+ * (20M digits ~7.1 s measured). Cap 512 chars (the fleet amount cap;
+ * the largest genuine amount string is 21 chars), refused on length
+ * alone in this parser's null convention. */
+var MAX_AMOUNT_CHARS = 512;
 function qtcToPlancks(qtcStr){
   var s = String(qtcStr).trim();
+  if (s.length > MAX_AMOUNT_CHARS) return null;
   if (!/^\d+(\.\d{1,12})?$/.test(s)) return null;
   var parts = s.split(".");
   var whole = BigInt(parts[0]) * PLANCKS;
@@ -752,7 +760,7 @@ var MsigCore = {
   toHex: toHex, fromHex: fromHex, MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS,
   hexInputRoom: hexInputRoom, u32le: u32le, u64le: u64le,
   compactU128: compactU128, vecAccountId: vecAccountId, boundedBytes: boundedBytes,
-  qtcToPlancks: qtcToPlancks, plancksToQtc: plancksToQtc,
+  qtcToPlancks: qtcToPlancks, plancksToQtc: plancksToQtc, MAX_AMOUNT_CHARS: MAX_AMOUNT_CHARS,
   deriveMultisigAddress: deriveMultisigAddress, sortKeyHex: sortKeyHex,
   proposalFeePlancks: proposalFeePlancks, lifecycleBudget: lifecycleBudget,
   UTILITY_PALLET_INDEX: UTILITY_PALLET_INDEX, BATCH_ALL_CALL_IDX: BATCH_ALL_CALL_IDX,

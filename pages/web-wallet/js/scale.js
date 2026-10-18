@@ -276,8 +276,26 @@ export function plancksToQtc(plancks) {
   return frac ? `${whole}.${frac}` : `${whole}`;
 }
 
+/* Amount-input length bound (white-hat): the regex below admits an
+ * UNBOUNDED whole part, and BigInt(w) converts the whole digit string
+ * before the supply check can refuse it — BigInt decimal conversion is
+ * superlinear (measured: 1M digits ~178 ms, 5M ~1.6 s, 20M ~7.1 s), so
+ * a multi-million-digit paste froze the tab on the send/review path.
+ * The largest genuine amount string is 21 chars ("21000000.000000000000"
+ * — the whole supply at full precision); MAX_AMOUNT_CHARS = 512, the
+ * fleet cap the exact parsers (Tokenomics / Fee Lab / Pay Desk) already
+ * use, is >24x that, and in-cap parses are byte-identical. Refused on
+ * length alone, size + cap named, input never echoed. Fail-closed room
+ * gate, matching this fleet's other input gates. */
+export const MAX_AMOUNT_CHARS = 512;
+export function amountInputRoom(chars) {
+  return typeof chars === 'number' && isFinite(chars) && chars >= 0 && Math.floor(chars) === chars && chars <= MAX_AMOUNT_CHARS;
+}
+
 export function qtcToPlancks(str) {
   const s = String(str).trim();
+  if (!amountInputRoom(s.length))
+    throw new Error(`amount is ${s.length.toLocaleString('en-US')} characters — over the amount-input cap of ${MAX_AMOUNT_CHARS} characters; refused before parsing`);
   if (!/^\d+(\.\d{1,12})?$/.test(s)) throw new Error('amount must look like 1.5 (max 12 decimals)');
   const [w, f = ''] = s.split('.');
   const plancks = BigInt(w) * PLANCKS_PER_QTC + BigInt((f + '000000000000').slice(0, 12));

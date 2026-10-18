@@ -406,5 +406,15 @@ eq(C.feeBpsLabel(100), "1%", "label 100");
   eq(key && key.length, 32, "hexbound: ordinary 32-byte key hex still parses");
 }
 
+/* Batch 194: amount-input length bound — BigInt ran before the supply check. */
+{
+  eq(C.MAX_AMOUNT_CHARS, 512, "amountbound: cap exported");
+  ok(C.qtcToPlancks("1.5") === 1500000000000n, "amountbound: genuine parses");
+  eq(C.qtcToPlancks("9".repeat(600)), null, "amountbound: 600 digits -> null");
+  eq(C.qtcToPlancks("0".repeat(600) + "1.5"), null, "amountbound: long-but-tiny -> null by gate");
+  eq(C.qtcToPlancks("9".repeat(2000000)), null, "amountbound: 2M digits -> null");
+  ok(C.qtcToPlancks("21000000") === 21000000000000000000n, "amountbound: supply cap still parses");
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

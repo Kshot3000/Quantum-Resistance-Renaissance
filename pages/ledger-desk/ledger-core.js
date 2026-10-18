@@ -20,6 +20,14 @@
 "use strict";
 
 var PLANCK = 1000000000000n;      // 10^12 planck per QTC
+/* Amount-input length bound (white-hat): the parsers below (and the
+ * stored-state toBigIntOrNull) regex-admit an unbounded digit string
+ * and BigInt() it whole — BigInt decimal conversion is superlinear
+ * (20M digits ~7.1 s measured), so an over-long form entry, or a
+ * poisoned stored row at load, froze the desk. Cap 512 chars (the
+ * fleet amount cap; genuine amounts are <= 21 chars, plancks <= 20,
+ * timestamps <= 13), refused on length alone in the null convention. */
+var MAX_AMOUNT_CHARS = 512;
 var QUANTUM = 10000000000n;       // 0.01 QTC leaf quantum, in planck
 var EMISSION_DIVISOR = 50000000;
 var MICRO = 1000000n;             // microdollars per USD
@@ -40,6 +48,7 @@ function parseQtcToPlanck(s) {
   // Accepts "123", "123.45", "0.000000000001". Returns BigInt planck or null.
   if (s === null || s === undefined) return null;
   var t = String(s).trim().replace(/,/g, "");
+  if (t.length > MAX_AMOUNT_CHARS) return null;
   var m = /^(\d+)(?:\.(\d{1,12}))?$/.exec(t);
   if (!m) return null;
   var frac = (m[2] || "");
@@ -60,6 +69,7 @@ function parseUsdPerQtcToMicro(s) {
   // "12.50" -> 12_500_000n microdollars per QTC. Up to 6 decimals. null if bad.
   if (s === null || s === undefined || String(s).trim() === "") return null;
   var t = String(s).trim().replace(/,/g, "").replace(/^\$/, "");
+  if (t.length > MAX_AMOUNT_CHARS) return null;
   var m = /^(\d+)(?:\.(\d{1,6}))?$/.exec(t);
   if (!m) return null;
   var frac = (m[2] || "");
@@ -333,6 +343,7 @@ function toBigIntOrNull(v) {
   if (typeof v === "string") {
     var t = v.trim();
     if (t.indexOf("bigint:") === 0) t = t.slice(7); // save() encoding
+    if (t.length > MAX_AMOUNT_CHARS) return null; // length bound before BigInt (see MAX_AMOUNT_CHARS)
     return /^-?\d+$/.test(t) ? BigInt(t) : null;
   }
   return null;
@@ -743,7 +754,7 @@ var api = {
   MAX_PRICE_DAYS: MAX_PRICE_DAYS, eventRoom: eventRoom, addressRoom: addressRoom, priceRoom: priceRoom,
   MAX_CSV_FILE_BYTES: MAX_CSV_FILE_BYTES, csvFileRoom: csvFileRoom,
   rewardModelPlancks: rewardModelPlancks,
-  parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc,
+  parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc, MAX_AMOUNT_CHARS: MAX_AMOUNT_CHARS,
   parseUsdPerQtcToMicro: parseUsdPerQtcToMicro, formatUsd: formatUsd,
   usdValueMicro: usdValueMicro, dayKey: dayKey,
   INFLOW: INFLOW, OUTFLOW: OUTFLOW, INCOME_TYPES: INCOME_TYPES,

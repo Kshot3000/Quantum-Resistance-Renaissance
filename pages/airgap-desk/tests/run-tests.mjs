@@ -21,7 +21,7 @@ import {
   checkphraseAnswerRoom, splitCheckphraseAnswer, MAX_CHECKPHRASE_CHARS,
   validateRpcUrl, rpcUrlRoom, MAX_RPC_URL_CHARS,
 } from '../js/airgap.js';
-import { encodeMortalEra, qtcToPlancks, buildTransferCall, buildBatchAllCall, buildSigningPayload, buildExtrinsic } from '../js/lib/scale.js';
+import { encodeMortalEra, qtcToPlancks, buildTransferCall, buildBatchAllCall, buildSigningPayload, buildExtrinsic, MAX_AMOUNT_CHARS, amountInputRoom } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
 import { keypairFromSeed, validateMnemonic, loadWordlist, entropyToMnemonic, normalizeMnemonic, mnemonicToSeed, MAX_MNEMONIC_CHARS, mnemonicInputRoom } from '../js/lib/mnemonic.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
@@ -724,4 +724,17 @@ test('rpc-url gate: endpoint length bound before connect (white-hat)', () => {
   assert.ok(!over.ok && /2049/.test(over.error) && /2048/.test(over.error), over.error);
   const huge = validateRpcUrl('wss://' + 'a'.repeat(20000000));
   assert.ok(!huge.ok && /20000006/.test(huge.error), huge.error);
+});
+
+/* Batch 194: amount-input length bound — the cold review/sign path calls
+ * qtcToPlancks twice per signing; an over-long paste froze both calls. */
+test('amount bound: qtcToPlancks length gate (vendored scale.js)', () => {
+  assert.equal(MAX_AMOUNT_CHARS, 512);
+  assert.ok(amountInputRoom(512) && !amountInputRoom(513));
+  assert.equal(qtcToPlancks('1.5'), 1500000000000n);
+  assert.throws(() => qtcToPlancks('9'.repeat(600)), /512/);
+  assert.throws(() => qtcToPlancks('0'.repeat(600) + '1.5'), /512/);
+  assert.throws(() => qtcToPlancks('9'.repeat(2000000)), /512/);
+  let e = null; try { qtcToPlancks('9'.repeat(512)); } catch (err) { e = err; }
+  assert.ok(e && /total supply/.test(e.message), 'at-cap reaches the supply check');
 });

@@ -86,7 +86,12 @@
 
   /* ============ delay planner ============ */
   function parseQTC(s) {
-    var m = /^(\d+)(?:\.(\d{1,12}))?$/.exec(String(s).trim());
+    var t = String(s).trim();
+    /* Amount-input length bound (white-hat): BigInt(m[1]) below converts
+     * the whole unbounded digit string (superlinear — 20M digits ~7.1 s
+     * measured); cap 512 chars, the fleet amount cap, before parsing. */
+    if (t.length > 512) return null;
+    var m = /^(\d+)(?:\.(\d{1,12}))?$/.exec(t);
     if (!m) return null;
     var frac = (m[2] || "").padEnd(12, "0");
     return BigInt(m[1]) * C.UNIT + BigInt(frac);

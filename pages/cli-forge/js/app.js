@@ -34,8 +34,15 @@ var PLANCKS_PER_QTC = 1000000000000n; // 12 decimals, chain-verified
 function trim(s) { return String(s == null ? "" : s).replace(/^\s+|\s+$/g, ""); }
 
 /* ---------------- amount math (exact, BigInt) ---------------- */
+/* Amount-input length bound (white-hat): the regex admits an unbounded
+ * whole part and BigInt(m[1]) converts it whole — BigInt decimal
+ * conversion is superlinear (20M digits ~7.1 s measured). Cap 512
+ * chars (the fleet amount cap; the largest genuine amount string is
+ * 21 chars), refused on length alone in this parser's null convention. */
+var MAX_AMOUNT_CHARS = 512;
 function parseQtcToPlancks(s) {
   s = trim(s).replace(/,/g, "");
+  if (s.length > MAX_AMOUNT_CHARS) return null;
   var m = /^(\d+)(?:\.(\d{1,12}))?$/.exec(s);
   if (!m || /^0+$/.test(m[1]) && (!m[2] || /^0+$/.test(m[2]))) {
     if (!m) return null;

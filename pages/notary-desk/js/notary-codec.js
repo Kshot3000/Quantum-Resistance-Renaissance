@@ -418,6 +418,13 @@
    *  - the vault had no entry cap while renderVault paints every row.
    */
   var MAX_VAULT_ENTRIES = 500;
+  /* Stored-fee length bound (white-hat): validFeeForCall BigInt()s the
+   * stored feeQTC whole part whole — a poisoned vault row with a
+   * multi-million-digit fee froze sanitize at load (BigInt decimal
+   * conversion is superlinear, 20M digits ~7.1 s measured). A genuine
+   * feeQTC is a length-fee for a <= ~11,400-byte call: a handful of
+   * chars. Cap 512 (the fleet amount cap), refused before the regex. */
+  var MAX_FEE_QTC_CHARS = 512;
   var VAULT_EPOCH_MS = Date.parse("2026-09-01T00:00:00.000Z");
   var CREATED_SKEW_MS = 5 * 60 * 1000;
   // Achievable signed lengths for a call of callLen bytes, mirroring
@@ -431,6 +438,7 @@
   // section with a 5-byte nonce) is as unproducible as one outside.
   function validFeeForCall(feeQTC, callLen) {
     if (typeof feeQTC !== "string") return false;
+    if (feeQTC.length > MAX_FEE_QTC_CHARS) return false;
     var m = /^(0|[1-9]\d*)(?:\.(\d*[1-9]))?$/.exec(feeQTC);
     if (!m) return false;
     var frac = m[2] || "";

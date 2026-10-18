@@ -47,6 +47,13 @@
 
 var PLANCKS_PER_QTC = BigInt("1000000000000"); // 10^12
 var MAX_SUPPLY_PLANCKS = BigInt("21000000") * PLANCKS_PER_QTC; // 21M QTC hard cap
+/* Amount-input length bound (white-hat): parseAmountToPlancks regex-
+ * admits an unbounded whole part and BigInt()s it whole BEFORE the
+ * supply check can refuse — BigInt decimal conversion is superlinear
+ * (20M digits ~7.1 s measured), per recipient row. Cap 512 chars (the
+ * fleet amount cap; the largest genuine amount string is 21 chars),
+ * refused on length alone in this parser's {ok:false} convention. */
+var MAX_AMOUNT_CHARS = 512;
 var LENGTH_FEE_PER_BYTE = 100000;              // plancks/byte (runtime polynomial)
 var QUANTUS_PREFIX = 189;
 var DEFAULT_BATCH_SIZE = 256;                  // from the CLI team's airdrop example
@@ -56,6 +63,8 @@ var SIG_BYTES = { "ml-dsa-65": 3309, "ml-dsa-87": 4627 };
 function parseAmountToPlancks(str) {
   var s = String(str == null ? "" : str).trim().replace(/,/g, "");
   if (!s) return { ok: false, error: "empty amount" };
+  if (s.length > MAX_AMOUNT_CHARS)
+    return { ok: false, error: "amount is " + s.length + " characters — over the amount-input cap of " + MAX_AMOUNT_CHARS + " characters; refused before parsing" };
   if (!/^\d+(\.\d+)?$/.test(s))
     return { ok: false, error: "not a positive decimal number" };
   var parts = s.split(".");

@@ -429,5 +429,16 @@ function throws(name, fn) {
   ok("endpoint: http/empty/non-string refused", !ZK.validateEndpointUrl("https://x").ok && !ZK.validateEndpointUrl("").ok && !ZK.validateEndpointUrl(null).ok);
 }
 
+/* Batch 194: amount-input length bound. */
+{
+  ok("amount bound: cap exported", ZK.MAX_AMOUNT_CHARS === 512);
+  eq("amount bound: genuine parses", ZK.parseQtcToPlancks("1.5"), 1500000000000n);
+  throws("amount bound: 600 digits refused naming cap", () => ZK.parseQtcToPlancks("9".repeat(600)));
+  let e = null; try { ZK.parseQtcToPlancks("9".repeat(600)); } catch (err) { e = err; }
+  ok("amount bound: refusal names size + cap, no echo", !!e && /600/.test(e.message) && /512/.test(e.message) && !e.message.includes("9999999999"), e && e.message);
+  throws("amount bound: long-but-tiny refused by gate", () => ZK.parseQtcToPlancks("0".repeat(600) + "1.5"));
+  eq("amount bound: at-cap parses (no supply cap in this parser)", typeof ZK.parseQtcToPlancks("9".repeat(512)), "bigint");
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

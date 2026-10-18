@@ -406,5 +406,16 @@ const factory = (u) => { const m = new MockWS(u); mocks.push(m); setTimeout(() =
   rpc.close();
 }
 
+/* Batch 194: amount-input length bound in the vendored scale.js. */
+{
+  t('amount bound: genuine parses', qtcToPlancks('1.5') === 1500000000000n);
+  let e = null; try { qtcToPlancks('9'.repeat(600)); } catch (err) { e = err; }
+  t('amount bound: 600 digits refused naming cap', !!e && /512/.test(e.message) && /600/.test(e.message), e && e.message);
+  let e2 = null; try { qtcToPlancks('0'.repeat(600) + '1.5'); } catch (err) { e2 = err; }
+  t('amount bound: long-but-tiny refused by gate', !!e2 && /512/.test(e2.message), e2 && e2.message);
+  let e3 = null; try { qtcToPlancks('9'.repeat(512)); } catch (err) { e3 = err; }
+  t('amount bound: at-cap reaches supply check', !!e3 && /total supply/.test(e3.message), e3 && e3.message);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

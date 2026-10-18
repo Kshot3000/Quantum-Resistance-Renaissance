@@ -547,8 +547,20 @@ export function encodeMerkleProofRpcForTest(proof, rootHex, depth) {
 
 // ---------------------------------------------------------------- amount / address parsing
 
+/* Amount-input length bound (white-hat): see the scale.js note — the
+ * regex admits an unbounded whole part and BigInt(parts[0]) converts it
+ * whole (superlinear: 20M digits ~7.1 s measured). Cap 512 chars (the
+ * fleet amount cap; the largest genuine amount string is 21 chars),
+ * refused on length alone before the regex/BigInt, input never echoed. */
+export const MAX_AMOUNT_CHARS = 512;
+export function amountInputRoom(chars) {
+  return typeof chars === 'number' && isFinite(chars) && chars >= 0 && Math.floor(chars) === chars && chars <= MAX_AMOUNT_CHARS;
+}
+
 export function parseQtcToPlancks(str) {
   const s = String(str).trim().replace(/,/g, "");
+  if (!amountInputRoom(s.length))
+    throw new Error("amount is " + s.length + " characters — over the amount-input cap of " + MAX_AMOUNT_CHARS + " characters; refused before parsing");
   if (!/^\d+(\.\d{1,12})?$/.test(s)) throw new Error("invalid QTC amount: " + str);
   const parts = s.split(".");
   const frac = (parts[1] || "").padEnd(12, "0");
@@ -632,6 +644,8 @@ export const ZK = {
   ZK_RPC,
   decodeU64LeHex,
   parseQtcToPlancks,
+  MAX_AMOUNT_CHARS,
+  amountInputRoom,
   formatQtc,
   parseAccount,
   exhaustionProjection,

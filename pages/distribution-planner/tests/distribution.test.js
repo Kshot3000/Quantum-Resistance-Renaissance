@@ -521,6 +521,21 @@ t("summarize counts and totals", function () {
   assert.strictEqual(s.totalPlancks, BigInt("3000000000000"));
 });
 
+/* Batch 194: amount-input length bound — refused before BigInt, cap named. */
+t("amount bound: parseAmountToPlancks length gate", function () {
+  var g = DistCore.parseAmountToPlancks("1.5");
+  assert.strictEqual(g.ok, true);
+  assert.strictEqual(g.plancks, BigInt("1500000000000"));
+  var o = DistCore.parseAmountToPlancks("9".repeat(600));
+  assert.strictEqual(o.ok, false);
+  assert.ok(/512/.test(o.error), o.error);
+  var v = DistCore.parseAmountToPlancks("0".repeat(600) + "1.5");
+  assert.strictEqual(v.ok, false);
+  assert.ok(/512/.test(v.error), v.error);
+  var h = DistCore.parseAmountToPlancks("9".repeat(2000000));
+  assert.strictEqual(h.ok, false);
+});
+
 (async function () {
   await Promise.all(pending);
   console.log("---");

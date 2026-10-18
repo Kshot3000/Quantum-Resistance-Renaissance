@@ -411,5 +411,17 @@ eq("registerRoom(499.9) === 1 (floor)", P.registerRoom(499.9), 1);
 /* ---- constants ---- */
 eq("plancks per QTC", P.PLANCKS_PER_QTC, 1000000000000n);
 
+/* ---- Batch 194: amount-input length bound (both parsers; the rational
+ * rate parser already capped at 512, these two BigInt'd whole) ---- */
+eq("amountbound qtc: genuine", P.parseQtcToPlancks("1.5"), 1500000000000n);
+eq("amountbound qtc: 600 digits -> null", P.parseQtcToPlancks("9".repeat(600)), null);
+eq("amountbound qtc: long-but-tiny -> null by gate", P.parseQtcToPlancks("0".repeat(600) + "1.5"), null);
+eq("amountbound qtc: 2M digits -> null", P.parseQtcToPlancks("9".repeat(2000000)), null);
+t("amountbound qtc: at-cap parses", typeof P.parseQtcToPlancks("9".repeat(512)) === "bigint");
+eq("amountbound usd: genuine", P.parseUsdToCents("12.50"), 1250n);
+eq("amountbound usd: 600 digits -> null", P.parseUsdToCents("9".repeat(600)), null);
+eq("amountbound usd: long-but-tiny -> null by gate", P.parseUsdToCents("0".repeat(600) + "1.5"), null);
+eq("amountbound usd: 2M digits -> null", P.parseUsdToCents("9".repeat(2000000)), null);
+
 console.log("pay-desk tests: " + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

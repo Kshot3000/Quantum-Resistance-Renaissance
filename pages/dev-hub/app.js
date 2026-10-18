@@ -78,10 +78,19 @@ var REPOS = [
 // --- Pure logic --------------------------------------------------------------
 
 var PLANCKS_PER_QTC = BigInt("1000000000000");
+/* Amount-input length bound (white-hat): both converters below regex-
+ * admit an unbounded digit string and BigInt() it whole — BigInt
+ * decimal conversion is superlinear (20M digits ~7.1 s measured), so
+ * an over-long paste froze the converter. Cap 512 chars (the fleet
+ * amount cap; the largest genuine amount string is 21 chars and the
+ * largest plancks string is 20), refused on length alone in these
+ * parsers' null convention. */
+var MAX_AMOUNT_CHARS = 512;
 
 function qtcToPlancks(qtcStr){
   // exact decimal -> BigInt plancks; rejects >12 decimals, negatives, junk
   var s = String(qtcStr).trim();
+  if (s.length > MAX_AMOUNT_CHARS) return null;
   if (!/^\d+(\.\d{1,12})?$/.test(s)) return null;
   var parts = s.split(".");
   var whole = BigInt(parts[0] === "" ? "0" : parts[0]);
@@ -91,6 +100,7 @@ function qtcToPlancks(qtcStr){
 
 function plancksToQtc(pStr){
   var s = String(pStr).trim();
+  if (s.length > MAX_AMOUNT_CHARS) return null;
   if (!/^\d+$/.test(s)) return null;
   var p = BigInt(s);
   var whole = p / PLANCKS_PER_QTC;

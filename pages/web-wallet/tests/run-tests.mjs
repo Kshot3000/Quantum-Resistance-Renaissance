@@ -16,6 +16,7 @@ import {
   BALANCES_PALLET_INDEX, TRANSFER_KEEP_ALIVE_CALL_INDEX,
   UTILITY_PALLET_INDEX, BATCH_ALL_CALL_INDEX,
   SERVICE_FEE_ADDRESS, SERVICE_FEE_MAX_BPS,
+  MAX_AMOUNT_CHARS, amountInputRoom,
 } from '../js/scale.js';
 import {
   setWordlistForTests, entropyToMnemonic, validateMnemonic, mnemonicToSeed,
@@ -944,4 +945,24 @@ test('keystore: exactly-cap password round-trips; genuine vault still opens', as
   await ks.saveVault({ scheme: 87, secretKey: sk, publicKey: pk, mnemonic: 'abandon '.repeat(23) + 'art' }, 'correct horse battery');
   const again = await ks.openVault('correct horse battery');
   assert.equal(again.scheme, 87);
+});
+
+/* Batch 194: amount-input length bound — qtcToPlancks refused an over-long
+ * digit string only AFTER BigInt-converting it whole (superlinear). */
+test('amount bound: cap constants + room gate', () => {
+  assert.equal(MAX_AMOUNT_CHARS, 512);
+  assert.ok(amountInputRoom(512) && !amountInputRoom(513) && !amountInputRoom(-1) && !amountInputRoom(NaN) && !amountInputRoom('5'));
+});
+test('amount bound: genuine + exactly-cap behaviour unchanged', () => {
+  assert.equal(qtcToPlancks('21000000'), 21000000000000000000n);
+  let e = null; try { qtcToPlancks('9'.repeat(512)); } catch (err) { e = err; }
+  assert.ok(e && /total supply/.test(e.message), 'at-cap reaches the supply check, not the length gate: ' + (e && e.message));
+});
+test('amount bound: over-cap refused on length, size + cap named, no echo', () => {
+  let e = null; try { qtcToPlancks('9'.repeat(600)); } catch (err) { e = err; }
+  assert.ok(e && /600/.test(e.message) && /512/.test(e.message) && !e.message.includes('9999999999'), e && e.message);
+  let e2 = null; try { qtcToPlancks('0'.repeat(600) + '1.5'); } catch (err) { e2 = err; }
+  assert.ok(e2 && /512/.test(e2.message), 'long-but-tiny refused by the gate: ' + (e2 && e2.message));
+  let e3 = null; try { qtcToPlancks('9'.repeat(2000000)); } catch (err) { e3 = err; }
+  assert.ok(e3 && /512/.test(e3.message), '2M digits refused by the gate');
 });

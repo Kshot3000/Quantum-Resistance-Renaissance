@@ -28,9 +28,23 @@ var SCHED_MS_MAX = 4102444800000;  // 2100-01-01
 
 /* ---------- planck <-> QTC ---------- */
 
+/* Amount-input length bound (white-hat): the regex below admits an
+ * unbounded whole part and BigInt(parts[0]) converts it whole —
+ * BigInt decimal conversion is superlinear (20M digits ~7.1 s
+ * measured), so an over-long amount froze the parse. Cap 512 chars
+ * (the fleet amount cap; the largest genuine amount string is 21
+ * chars), refused on length alone before the regex/BigInt, in this
+ * parser's throw convention, input never echoed. */
+var MAX_AMOUNT_CHARS = 512;
+function amountInputRoom(chars) {
+  return typeof chars === "number" && isFinite(chars) && chars >= 0 && Math.floor(chars) === chars && chars <= MAX_AMOUNT_CHARS;
+}
+
 function parseQtcToPlancks(str) {
   if (typeof str !== "string") throw new Error("amount must be a string");
   var s = str.trim().replace(/,/g, "");
+  if (!amountInputRoom(s.length))
+    throw new Error("amount is " + s.length + " characters — over the amount-input cap of " + MAX_AMOUNT_CHARS + " characters; refused before parsing");
   if (!/^\d+(\.\d{1,12})?$/.test(s)) throw new Error("invalid QTC amount: " + str);
   var parts = s.split(".");
   var whole = BigInt(parts[0] || "0");

@@ -21,6 +21,7 @@ function parseUsdToCents(s) {
   // was silently truncated: "1.005" parsed to 100 cents, not 101.)
   var t = String(s == null ? "" : s).trim().replace(/[$,\s]/g, "");
   if (t === "") return null;
+  if (t.length > 512) return null; // amount-input length bound before BigInt (the 512 cap parseDecimalRational already applies; BigInt conversion is superlinear)
   var m = /^(\d*)(?:\.(\d*))?$/.exec(t);
   if (!m) return null;
   var whole = m[1] === "" ? "0" : m[1];
@@ -73,6 +74,7 @@ function parseQtcToPlancks(s) {
   // Accepts up to 12 decimal places; rounds half-up at the 13th digit.
   var t = String(s == null ? "" : s).trim();
   if (t === "") return null;
+  if (t.length > 512) return null; // amount-input length bound before BigInt (the 512 cap parseDecimalRational already applies; BigInt conversion is superlinear)
   var m = /^(\d*)(?:\.(\d*))?$/.exec(t);
   if (!m) return null;
   var whole = m[1] === "" ? "0" : m[1];

@@ -198,5 +198,16 @@ t("recipes include honest CORS caveats", function(){
   assert.ok(m.RECIPES["r-safesend"].code.indexOf("reversibleTransfers") >= 0);
 });
 
+// 16. Batch 194: amount-input length bound, both converter directions
+t("amount bound: over-long amounts refused before BigInt, both directions", function(){
+  assert.strictEqual(m.qtcToPlancks("9".repeat(600)), null);
+  assert.strictEqual(m.qtcToPlancks("0".repeat(600) + "1.5"), null);
+  assert.strictEqual(m.qtcToPlancks("9".repeat(2000000)), null);
+  assert.strictEqual(m.plancksToQtc("9".repeat(600)), null);
+  assert.strictEqual(m.plancksToQtc("0".repeat(600) + "1500000000000"), null);
+  assert.strictEqual(String(m.qtcToPlancks("1.5")), "1500000000000");
+  assert.strictEqual(m.plancksToQtc("1500000000000"), "1.5");
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
