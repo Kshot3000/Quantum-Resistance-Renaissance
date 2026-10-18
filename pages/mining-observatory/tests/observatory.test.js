@@ -392,5 +392,35 @@ t("cleanBuckets keeps a bucket at exactly BUCKET_SIZE", function(){
   assert.strictEqual(m.cleanBuckets([b], { start: 1, end: 500 }, wm).length, 1);
 });
 
+// 18. Round 6: the bucket LIST's producer count — the producer emits
+// exactly ceil(15000 / 500) = 30 buckets, so cleanBuckets checks the RAW
+// length against MAX_BUCKETS before cleaning any row and an over-cap
+// list degrades wholesale to [] (auxiliary timeline; core survives).
+t("bucket-count cap is pinned at the producer ceil (30)", function(){
+  assert.strictEqual(m.MAX_BUCKETS, 30);
+});
+function tilingBuckets(n){
+  var out = [];
+  for (var i = 0; i < n; i++){
+    var b = { start: 85001 + i * 500, end: 85001 + i * 500 + 499, blocks: 500, miners: {} };
+    b.miners[VA("a")] = 500;
+    out.push(b);
+  }
+  return out;
+}
+t("cleanBuckets keeps exactly MAX_BUCKETS valid buckets", function(){
+  assert.strictEqual(m.cleanBuckets(tilingBuckets(30)).length, 30);
+});
+t("cleanBuckets refuses 31 valid buckets wholesale (no truncation to 30)", function(){
+  assert.deepStrictEqual(m.cleanBuckets(tilingBuckets(31)), []);
+});
+t("sanitizeMiners drops an over-cap bucket list but keeps the core verdicts", function(){
+  var p = winPayload(15000, (function(){ var mm = {}; mm[VA("a")] = 15000; return mm; })());
+  p.buckets = tilingBuckets(31);
+  var out = m.sanitizeMiners(p);
+  assert.strictEqual(out.buckets.length, 0);
+  assert.strictEqual(out.window.block_count, 15000);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

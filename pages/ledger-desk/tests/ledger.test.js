@@ -416,6 +416,34 @@ t("validateMiners: all_time must cover the window, no duplicates", () => {
   assert.equal(L.validateMiners(minersFx((m) => { m.all_time[0].blocks = 39; }), 1000), null);
   assert.equal(L.validateMiners(minersFx((m) => { m.all_time.push({ address: A1, blocks: 600 }); }), 1000), null);
 });
+// Producer caps (fetch-miner-data.mjs): WINDOW_BLOCKS = 15,000 in
+// BUCKET_SIZE = 500 buckets = at most 30 buckets. The tiling relations
+// alone let a crafted 200,000-bucket file through the walk whole.
+function tilingMiners(nBuckets, span, head) {
+  const start = head - nBuckets * span + 1;
+  const buckets = [], wm = { [A1]: 0 };
+  for (let i = 0; i < nBuckets; i++) {
+    const s = start + i * span;
+    buckets.push({ start: s, end: s + span - 1, blocks: span, miners: { [A1]: span } });
+    wm[A1] += span;
+  }
+  return { ok: true, chain_height: head,
+    window: { start_height: start, end_height: head, block_count: nBuckets * span, observed_block_time_s: 12 },
+    buckets, window_miners: wm, all_time: [{ address: A1, blocks: head }] };
+}
+t("validateMiners: producer caps are pinned (15,000 window, 30 buckets)", () => {
+  assert.equal(L.MAX_MINERS_WINDOW_BLOCKS, 15000);
+  assert.equal(L.MAX_MINERS_BUCKETS, 30);
+});
+t("validateMiners: exactly 30 producer buckets over the 15,000 window passes", () => {
+  assert.ok(L.validateMiners(tilingMiners(30, 500, 100000), 100000) !== null);
+});
+t("validateMiners: 31 tiling buckets fail before the walk", () => {
+  assert.equal(L.validateMiners(tilingMiners(31, 500, 100000), 100000), null);
+});
+t("validateMiners: a 16,000-block window fails on the window cap alone", () => {
+  assert.equal(L.validateMiners(tilingMiners(16, 1000, 100000), 100000), null);
+});
 t("validateFlowsMeta: v2 meta restates the payload; v1 passes on shape", () => {
   assert.equal(L.validateFlowsMeta({ ok: true, meta: { transfers: 2, chain_height: 1000 }, transfers: [1, 2] }, 1000), true);
   assert.equal(L.validateFlowsMeta({ ok: true, meta: { transfers: 3, chain_height: 1000 }, transfers: [1, 2] }, 1000), false);

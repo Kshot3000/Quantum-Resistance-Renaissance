@@ -165,9 +165,22 @@ function loadData(){
  * whole — sanitize + sort alone cost 350.8 ms in Node before the
  * leaderboard could paint a row per miner — the unbounded load-boundary
  * class whale-watch (top <= 200), block-explorer (limit:10/25) and
- * network-dashboard (BLOCKS_LIMIT/DAILY_LIMIT) already close. */
+ * network-dashboard (BLOCKS_LIMIT/DAILY_LIMIT) already close.
+ * Round 6 — the BUCKET LIST's producer count: rounds 4–5 capped each
+ * bucket's span/count and the window, but no round bounded how MANY
+ * buckets cleanBuckets walks — it cleaned every raw row (an Object.keys
+ * walk per bucket) before the round-2 contiguity filter dropped the
+ * excess. The producer emits exactly ceil(WINDOW_BLOCKS / BUCKET_SIZE)
+ * = ceil(15000 / 500) = 30 buckets (the real snapshot carries 30), so
+ * cleanBuckets now checks the RAW list length against MAX_BUCKETS
+ * before any row is cleaned and an over-cap list degrades wholesale to
+ * [] — buckets are auxiliary timeline data (the core verdicts still
+ * render; the timeline card hides), and truncating to 30 would paint a
+ * partial tiling as the complete window. A crafted 200,000-bucket file
+ * is now refused in O(1) instead of walked whole. */
 var MAX_WINDOW_BLOCKS = 15000; // producer WINDOW_BLOCKS in scripts/fetch-miner-data.mjs
 var MAX_BUCKET_BLOCKS = 500;   // producer BUCKET_SIZE in scripts/fetch-miner-data.mjs
+var MAX_BUCKETS = 30;          // producer ceil(WINDOW_BLOCKS / BUCKET_SIZE) = ceil(15000 / 500)
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
 var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z");
 
@@ -203,6 +216,7 @@ function cleanBucket(b){
 
 function cleanBuckets(buckets, win, windowMiners){
   if (!Array.isArray(buckets)) return [];
+  if (buckets.length > MAX_BUCKETS) return []; // round 6: raw-count producer cap, checked before any row is cleaned
   var cleaned = [];
   buckets.forEach(function(b){ var c = cleanBucket(b); if (c) cleaned.push(c); });
   if (!win || !windowMiners) return cleaned; // no window context: per-bucket shapes only
@@ -669,6 +683,7 @@ if (typeof module !== "undefined" && module.exports){
     cleanBuckets: cleanBuckets,
     MAX_WINDOW_BLOCKS: MAX_WINDOW_BLOCKS,
     MAX_BUCKET_BLOCKS: MAX_BUCKET_BLOCKS,
+    MAX_BUCKETS: MAX_BUCKETS,
     fmtAddr: fmtAddr,
     timeAgo: timeAgo,
   };

@@ -534,6 +534,18 @@ var MAX_CHAIN_HEIGHT = 10000000;
 var MAX_SUPPLY_PLANCKS = 21000000n * PLANCK;
 var GENESIS_FLOOR_MS = Date.UTC(2026, 8, 1); // chain lifetime floor (fleet)
 var HEAD_SKEW_BLOCKS = 1000;
+// The miners snapshot's producer caps (scripts/fetch-miner-data.mjs): the
+// window is always WINDOW_BLOCKS = 15,000 blocks sliced into BUCKET_SIZE
+// = 500 buckets, so a producer file carries at most ceil(15000 / 500) =
+// 30 buckets. validateMiners held the buckets to every tiling relation
+// but to no count — a crafted file tiling a 200,000-block "window" with
+// 200,000 one-block buckets satisfied every relation and was walked
+// whole (span check + Object.keys per bucket) before the scan inferred
+// a single row. Both RAW values are now checked before the bucket loop;
+// an over-cap payload is not producer data and fails the scan honestly,
+// like any other core corruption.
+var MAX_MINERS_WINDOW_BLOCKS = 15000; // producer WINDOW_BLOCKS in scripts/fetch-miner-data.mjs
+var MAX_MINERS_BUCKETS = 30;          // producer ceil(WINDOW_BLOCKS / BUCKET_SIZE)
 
 function validChainHeight(v) {
   var n;
@@ -608,10 +620,12 @@ function validateMiners(miners, liveHead) {
   if (endH !== chainHeight) return null;
   var blockCount = validCount(win.block_count);
   if (blockCount === null || blockCount !== endH - startH + 1) return null;
+  if (blockCount > MAX_MINERS_WINDOW_BLOCKS) return null; // producer window cap, before the bucket walk
   var blockS = Number(win.observed_block_time_s);
   if (!isFinite(blockS) || blockS <= 0 || blockS > 3600) return null;
   var buckets = miners.buckets;
   if (!Array.isArray(buckets) || !buckets.length) return null;
+  if (buckets.length > MAX_MINERS_BUCKETS) return null; // producer bucket-count cap, before the bucket walk
   var sums = {};
   for (var i = 0; i < buckets.length; i++) {
     var b = buckets[i];
@@ -685,6 +699,7 @@ var api = {
   MICRO: MICRO, LONG_TERM_DAYS: LONG_TERM_DAYS,
   MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT, MAX_SUPPLY_PLANCKS: MAX_SUPPLY_PLANCKS,
   GENESIS_FLOOR_MS: GENESIS_FLOOR_MS, HEAD_SKEW_BLOCKS: HEAD_SKEW_BLOCKS,
+  MAX_MINERS_WINDOW_BLOCKS: MAX_MINERS_WINDOW_BLOCKS, MAX_MINERS_BUCKETS: MAX_MINERS_BUCKETS,
   validChainHeight: validChainHeight, validCount: validCount,
   validChainTimeMs: validChainTimeMs, isSs58_189: isSs58_189,
   validateLiveHead: validateLiveHead, validateMiners: validateMiners,
