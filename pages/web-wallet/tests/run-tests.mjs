@@ -20,6 +20,7 @@ import {
 import {
   setWordlistForTests, entropyToMnemonic, validateMnemonic, mnemonicToSeed,
   keypairFromSeed, keypairFromMnemonic, loadWordlist, embeddedWordlist,
+  MAX_MNEMONIC_CHARS, mnemonicInputRoom, normalizeMnemonic,
 } from '../js/mnemonic.js';
 import { readFileSync } from 'node:fs';
 
@@ -143,6 +144,43 @@ test('mnemonic: unknown word rejected', () => {
   setWordlistForTests(MINI_WORDS);
   const v = validateMnemonic(('abandon '.repeat(23) + 'nope').trim());
   assert.ok(!v.ok);
+});
+
+test('mnemonic: input length cap refuses over-cap pastes before splitting', () => {
+  setWordlistForTests(MINI_WORDS);
+  assert.equal(MAX_MNEMONIC_CHARS, 1024);
+  assert.equal(mnemonicInputRoom(0), 1024);
+  assert.equal(mnemonicInputRoom(1024), 0);
+  assert.equal(mnemonicInputRoom(1025), 0);
+  assert.equal(mnemonicInputRoom(-1), 0);
+  assert.equal(mnemonicInputRoom(1.5), 0);
+  assert.equal(mnemonicInputRoom('12'), 0);
+  assert.equal(mnemonicInputRoom(NaN), 0);
+  const m = entropyToMnemonic(new Uint8Array(32)); // 187 chars with the fixture list
+  // exactly at the cap (phrase + trailing padding) still validates
+  const atCap = m + ' '.repeat(MAX_MNEMONIC_CHARS - m.length);
+  assert.equal(atCap.length, MAX_MNEMONIC_CHARS);
+  assert.ok(validateMnemonic(atCap).ok, 'exactly-cap padded phrase must validate');
+  // one char over is refused on length, naming the cap — not as a word count
+  const over = validateMnemonic(atCap + ' ');
+  assert.ok(!over.ok && /too long/.test(over.reason) && /1024/.test(over.reason), over.reason);
+  // a giant word-salad paste is refused on length, never split
+  const giant = validateMnemonic('abandon '.repeat(2500000));
+  assert.ok(!giant.ok && /too long/.test(giant.reason), giant.reason);
+  // non-string input fails closed instead of throwing
+  assert.equal(validateMnemonic(null).ok, false);
+  assert.equal(validateMnemonic(undefined).ok, false);
+});
+
+test('mnemonic: seed + normalize paths ask the same length gate', () => {
+  setWordlistForTests(MINI_WORDS);
+  const m = entropyToMnemonic(new Uint8Array(32));
+  assert.equal(normalizeMnemonic('  ' + m.split(' ').join('   \n ') + ' '), m);
+  assert.throws(() => normalizeMnemonic('abandon '.repeat(2500000)), /1024/);
+  assert.throws(() => mnemonicToSeed('abandon '.repeat(2500000)), /1024/);
+  assert.throws(() => keypairFromMnemonic('abandon '.repeat(2500000)), /1024/);
+  // a legit phrase still seeds deterministically through the gate
+  assert.deepEqual(mnemonicToSeed(m), mnemonicToSeed(normalizeMnemonic(m)));
 });
 
 test('mnemonicToSeed: deterministic, 64 bytes', () => {

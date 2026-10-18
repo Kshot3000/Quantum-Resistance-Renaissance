@@ -20,7 +20,7 @@ import {
 } from '../js/airgap.js';
 import { encodeMortalEra, qtcToPlancks, buildTransferCall, buildBatchAllCall, buildSigningPayload, buildExtrinsic } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
-import { keypairFromSeed } from '../js/lib/mnemonic.js';
+import { keypairFromSeed, validateMnemonic, loadWordlist, entropyToMnemonic, normalizeMnemonic, mnemonicToSeed, MAX_MNEMONIC_CHARS, mnemonicInputRoom } from '../js/lib/mnemonic.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { xxhash128, SYSTEM_ACCOUNT_KEY } from '../js/lib/xxhash.js';
 import { qrCanvasSize, MAX_QR_DIM } from '../js/qr.js';
@@ -617,4 +617,25 @@ test('qrCanvasSize: fail-closed on bad dimensions and bad caps', () => {
   assert.equal(qrCanvasSize(Infinity, 600), null);
   assert.equal(qrCanvasSize(800, 600, 0), null);
   assert.equal(qrCanvasSize(800, 600, NaN), null);
+});
+
+test('mnemonic: input length cap refuses over-cap pastes before splitting (cold key entry)', async () => {
+  await loadWordlist();
+  assert.equal(MAX_MNEMONIC_CHARS, 1024);
+  assert.equal(mnemonicInputRoom(0), 1024);
+  assert.equal(mnemonicInputRoom(1025), 0);
+  assert.equal(mnemonicInputRoom(-1), 0);
+  assert.equal(mnemonicInputRoom('12'), 0);
+  const m = entropyToMnemonic(new Uint8Array(32)); // valid 24 words, 187 chars
+  assert.ok(validateMnemonic(m).ok);
+  const atCap = m + ' '.repeat(MAX_MNEMONIC_CHARS - m.length);
+  assert.ok(validateMnemonic(atCap).ok, 'exactly-cap padded phrase must validate');
+  const over = validateMnemonic(atCap + ' ');
+  assert.ok(!over.ok && /too long/.test(over.reason) && /1024/.test(over.reason), over.reason);
+  const giant = validateMnemonic('abandon '.repeat(2500000));
+  assert.ok(!giant.ok && /too long/.test(giant.reason), giant.reason);
+  assert.equal(validateMnemonic(null).ok, false);
+  assert.equal(normalizeMnemonic('  ' + m.split(' ').join('  \n ') + ' '), m);
+  assert.throws(() => normalizeMnemonic('abandon '.repeat(2500000)), /1024/);
+  assert.throws(() => mnemonicToSeed('abandon '.repeat(2500000)), /1024/);
 });

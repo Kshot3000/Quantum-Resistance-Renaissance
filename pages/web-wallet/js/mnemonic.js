@@ -49,9 +49,45 @@ export function entropyToMnemonic(entropy) {
   return out.join(' ');
 }
 
+/* Mnemonic-input bound BEFORE parsing (white-hat): validateMnemonic
+ * lowercased, trimmed and split the WHOLE paste before counting words —
+ * a 20,000,000-char paste materialized 2,500,000 token strings (~0.49 s
+ * in Node, far worse in a tab) only to be rejected as not-24-words, and
+ * mnemonicToSeed fed the same unbounded string straight into the
+ * 2,048-round PBKDF2-HMAC-SHA512 (a 20M-char paste hung the probe for
+ * >150 s). A real 24-word phrase is at most 215 characters single-spaced
+ * (24 words x the 8-char longest BIP-39 word + 23 separators; the
+ * zero-entropy phrase measures 187). MAX_MNEMONIC_CHARS = 1,024 admits
+ * ~4.8x that — a phrase pasted with generous multi-space / newline
+ * formatting (a 307-char padded phrase is exercised in tests) — while
+ * refusing anything larger before a single copy or token is made.
+ * mnemonicInputRoom is the pure fail-closed gate (a non-integer,
+ * negative, or non-number count gets no room), mirroring the fleet's
+ * hexInputRoom bounds. normalizeMnemonic is the ONLY re-split the apps
+ * perform after validation, and it asks the same gate first. */
+export const MAX_MNEMONIC_CHARS = 1024;
+export function mnemonicInputRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_MNEMONIC_CHARS - chars);
+}
+function mnemonicTooLong(mnemonic) {
+  return typeof mnemonic !== 'string' || mnemonic.length > MAX_MNEMONIC_CHARS;
+}
+function tooLongReason(mnemonic) {
+  return typeof mnemonic !== 'string'
+    ? 'recovery phrase is not text — refused before parsing'
+    : `too long (${mnemonic.length} characters) — a 24-word phrase is at most 215 characters single-spaced; the cap is ${MAX_MNEMONIC_CHARS} characters; refused before parsing`;
+}
+export function normalizeMnemonic(mnemonic) {
+  if (mnemonicTooLong(mnemonic))
+    throw new Error('Recovery phrase ' + tooLongReason(mnemonic));
+  return mnemonic.toLowerCase().trim().split(/\s+/).join(' ');
+}
+
 export function validateMnemonic(mnemonic) {
   const words = WORDLIST;
   if (!words) throw new Error('wordlist not loaded');
+  if (mnemonicTooLong(mnemonic)) return { ok: false, reason: tooLongReason(mnemonic) };
   const list = mnemonic.toLowerCase().trim().split(/\s+/);
   if (list.length !== 24) return { ok: false, reason: 'expected 24 words' };
   const idx = [];
@@ -91,6 +127,8 @@ function pbkdf2Sha512(password, salt, iterations, dkLen) {
 }
 
 export function mnemonicToSeed(mnemonic, passphrase = '') {
+  if (mnemonicTooLong(mnemonic))
+    throw new Error('Recovery phrase ' + tooLongReason(mnemonic));
   const pw = new TextEncoder().encode(mnemonic.normalize('NFKD'));
   const salt = new TextEncoder().encode(('mnemonic' + passphrase).normalize('NFKD'));
   return pbkdf2Sha512(pw, salt, 2048, 64);

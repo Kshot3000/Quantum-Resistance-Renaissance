@@ -20,7 +20,7 @@ import {
 } from './lib/rpc.js';
 import { parseFeeField } from './lib/rpc-validate.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
-import { keypairFromMnemonic, keypairFromSeed, validateMnemonic, loadWordlist } from './lib/mnemonic.js';
+import { keypairFromMnemonic, keypairFromSeed, validateMnemonic, normalizeMnemonic, loadWordlist } from './lib/mnemonic.js';
 import { ss58Decode, hexEncode } from './lib/quantus-crypto.js';
 import {
   encodeMortalEra, qtcToPlancks, plancksToQtc, EXISTENTIAL_DEPOSIT,
@@ -753,7 +753,7 @@ function readColdKey(scheme) {
   if (m === 'mnemonic') {
     const v = validateMnemonic($('cold-mnemonic').value);
     if (!v.ok) throw new Error('recovery phrase invalid: ' + v.reason);
-    return { kp: keypairFromMnemonic($('cold-mnemonic').value.toLowerCase().trim().split(/\s+/).join(' '), '', scheme), mnemonic: true };
+    return { kp: keypairFromMnemonic(normalizeMnemonic($('cold-mnemonic').value), '', scheme), mnemonic: true };
   }
   const hex = $('cold-seed').value.trim().replace(/^0x/, '');
   if (!/^[0-9a-fA-F]{64}$/.test(hex)) throw new Error('seed must be 64 hex characters (32 bytes)');

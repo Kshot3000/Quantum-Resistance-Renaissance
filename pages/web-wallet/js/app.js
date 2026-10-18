@@ -5,7 +5,7 @@
  */
 import { hexEncode, hexDecode } from './quantus-crypto.js';
 import {
-  loadWordlist, generateMnemonic, validateMnemonic, mnemonicToSeed,
+  loadWordlist, generateMnemonic, validateMnemonic, normalizeMnemonic, mnemonicToSeed,
   keypairFromSeed, keypairFromMnemonic, keypairFromSecret, schemeInfo, setWordlistForTests,
 } from './mnemonic.js';
 import { vaultExists, saveVault, openVault, wipeVault, exportVaultFile, importVaultFile } from './keystore.js?v=1.2.0';
@@ -212,7 +212,7 @@ $('btn-import').addEventListener('click', async () => {
     if (m === 'mnemonic') {
       const v = validateMnemonic($('imp-mnemonic').value);
       if (!v.ok) throw new Error('Recovery phrase invalid: ' + v.reason);
-      mnemonic = $('imp-mnemonic').value.toLowerCase().trim().split(/\s+/).join(' ');
+      mnemonic = normalizeMnemonic($('imp-mnemonic').value);
       kp = keypairFromMnemonic(mnemonic, $('imp-passphrase').value, scheme);
     } else if (m === 'seed') {
       const hex = $('imp-seed').value.trim().replace(/^0x/, '');
