@@ -45,8 +45,10 @@ const BASELINES = {
   "assets/vendor/qrcode.js": "1.0.0",
   // assets/flows-decode.js: 1.0.0 introduces the flows.json format-v2 codec
   // (columnar + dictionary-encoded, lossless) shared by the 4 flows
-  // consumers (2026-10-02 flow-tracer heap pass).
-  "assets/flows-decode.js": "1.0.0",
+  // consumers (2026-10-02 flow-tracer heap pass); 1.1.0 adds the
+  // producer-count caps in decode() (transfers/addresses/fees held to
+  // the fetch-flow-data.mjs ceilings before any row is walked).
+  "assets/flows-decode.js": "1.1.0",
 };
 
 let fails = 0;

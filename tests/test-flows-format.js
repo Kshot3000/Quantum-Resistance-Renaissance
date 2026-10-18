@@ -48,6 +48,31 @@ const v1 = { meta: { transfers: 1 }, transfers: [synth[0]] };
 check("decode passes v1 object rows through", QFlows.decode(v1) === v1);
 check("decode tolerates junk", QFlows.decode(null) === null && QFlows.decode({}) !== undefined);
 
+/* ---- producer-count caps (2026-10-17 load boundary) ----
+ * decode() runs ahead of every consumer sanitizer, so the raw lengths
+ * are held to the producer's ceilings (scripts/fetch-flow-data.mjs:
+ * recent <= 40,999 by the page guard, whales limit:600, genesis 22)
+ * before any row is walked — in the v1 pass-through shape too. */
+check("codec exports the derived producer caps",
+  QFlows.MAX_TRANSFERS === 41621 && QFlows.MAX_ADDRESSES === 83242 && QFlows.MAX_FEES === 41621,
+  "transfers " + QFlows.MAX_TRANSFERS + ", addresses " + QFlows.MAX_ADDRESSES + ", fees " + QFlows.MAX_FEES);
+function v2Bomb(nRows, nAddrs, nFees) {
+  return {
+    ok: true, meta: { format: 2, transfers: nRows, chain_height: 244743 },
+    addresses: Array.from({ length: nAddrs }, (_, i) => "qz" + i),
+    fees: Array.from({ length: nFees }, (_, i) => String(i)),
+    transfers: Array.from({ length: nRows }, (_, i) => ["id-" + i, "1000000000000", 0, 0, 100, null, 0, null]),
+  };
+}
+function isRefusal(o) { return !!o && o.ok === false && Array.isArray(o.transfers) && o.transfers.length === 0 && !!o.meta; }
+const atCapDec = QFlows.decode(v2Bomb(41621, 83242, 41621));
+check("exactly-cap payload decodes whole", atCapDec.ok === true && atCapDec.transfers.length === 41621);
+check("cap+1 rows refused wholesale", isRefusal(QFlows.decode(v2Bomb(41622, 2, 1))));
+check("addresses dictionary over cap refused", isRefusal(QFlows.decode(v2Bomb(10, 83243, 1))));
+check("fees dictionary over cap refused", isRefusal(QFlows.decode(v2Bomb(10, 2, 41622))));
+const v1Bomb = { meta: { transfers: 41622 }, transfers: Array.from({ length: 41622 }, () => synth[0]) };
+check("over-cap v1 payload refused (no pass-through bypass)", isRefusal(QFlows.decode(v1Bomb)));
+
 /* ---- the real snapshot ---- */
 const file = path.join(ROOT, "data", "flows.json");
 const raw = fs.readFileSync(file, "utf8");
