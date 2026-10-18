@@ -433,6 +433,21 @@ var MAX_CSV_FILE_BYTES = 32 * 1024 * 1024;
 function csvFileRoom(size) {
   return typeof size === "number" && isFinite(size) && size >= 0 && size <= MAX_CSV_FILE_BYTES;
 }
+/* Date-range bound for stored event dates (white-hat, 2026-10-18):
+ * sanitizeState kept any FINITE dateMs, including values outside the
+ * ECMAScript Date range (|ms| > 8.64e15). Such a row renders as
+ * "NaN-NaN-NaN" through dayKey and makes eventsToCsv THROW
+ * (new Date(ms).toISOString() is a RangeError for an invalid Date) —
+ * one poisoned stored row bricked CSV export for the whole ledger and
+ * re-saved itself on every save(). No producer can emit an
+ * out-of-range value — the manual form and the CSV importer take
+ * Date.parse results (NaN outside the range) and the scan derives
+ * from validated anchors — so an out-of-range row is dropped like
+ * any other dateless row. The bound is the Date range itself, not a
+ * chain-era window: the ledger is a personal tax record and a
+ * pre-chain date (the round-1 tests keep a 1970 event) is the user's
+ * own history, not a chain fact. */
+var MAX_DATE_MS = 8640000000000000; // ECMAScript Date range: ±8.64e15 ms
 function sanitizeState(raw, opts) {
   var clean = { addresses: [], events: [], prices: [], method: "FIFO" };
   if (!raw || typeof raw !== "object") return clean;
@@ -470,7 +485,7 @@ function sanitizeState(raw, opts) {
       if (!e || typeof e !== "object") return;
       if (!INFLOW[e.type] && !OUTFLOW[e.type]) return; // unknown type: engine would only flag it
       var dateMs = Number(e.dateMs);
-      if (!isFinite(dateMs)) return;
+      if (!isFinite(dateMs) || dateMs > MAX_DATE_MS || dateMs < -MAX_DATE_MS) return;
       var qty = toBigIntOrNull(e.qtyPlanck);
       // An event without a real quantity is not an event — and no event
       // can move more QTC than exists: the supply is capped at 21M.
@@ -753,6 +768,7 @@ var api = {
   MAX_VAULT_ADDRESSES: MAX_VAULT_ADDRESSES, MAX_LEDGER_EVENTS: MAX_LEDGER_EVENTS,
   MAX_PRICE_DAYS: MAX_PRICE_DAYS, eventRoom: eventRoom, addressRoom: addressRoom, priceRoom: priceRoom,
   MAX_CSV_FILE_BYTES: MAX_CSV_FILE_BYTES, csvFileRoom: csvFileRoom,
+  MAX_DATE_MS: MAX_DATE_MS,
   rewardModelPlancks: rewardModelPlancks,
   parseQtcToPlanck: parseQtcToPlanck, formatQtc: formatQtc, MAX_AMOUNT_CHARS: MAX_AMOUNT_CHARS,
   parseUsdPerQtcToMicro: parseUsdPerQtcToMicro, formatUsd: formatUsd,

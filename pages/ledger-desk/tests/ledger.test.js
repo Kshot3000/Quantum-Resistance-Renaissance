@@ -667,6 +667,33 @@ t("csvFileRoom: the largest export the desk can produce fits the gate", () => {
   assert.equal(L.csvFileRoom(Buffer.byteLength(quoted)), true);
 });
 
+// Batch 196: stored dateMs held to the ECMAScript Date range.
+// sanitizeState kept any FINITE dateMs — a value outside ±8.64e15 is an
+// invalid Date: dayKey renders "NaN-NaN-NaN" and eventsToCsv's
+// toISOString THROWS, so one poisoned stored row bricked CSV export
+// and re-saved itself forever. No producer can emit one (form/CSV take
+// Date.parse results, the scan derives from validated anchors).
+t("sanitizeState: event dates outside the Date range are dropped", () => {
+  assert.equal(L.MAX_DATE_MS, 8640000000000000);
+  const mk = (dm, id) => ({ id: id, dateMs: dm, type: "buy", address: "",
+    qtyPlanck: "bigint:2000000000000", priceMicro: "bigint:3000000", feePlanck: "bigint:0" });
+  const s = L.sanitizeState({ events: [
+    mk(Date.UTC(2026, 0, 15), "good"),
+    mk(1000, "epoch"),                       // pre-chain personal history stays (round-1 behaviour)
+    mk(8640000000000000, "maxdate"),         // the exact Date maximum is a real date
+    mk(-8640000000000000, "mindate"),
+    mk(8640000000000001, "over"),
+    mk(9e15, "huge"),
+    mk(-9e15, "hugeneg"),
+    mk(1e20, "absurd"),
+    mk("9e15", "strhuge"),
+  ] });
+  assert.deepEqual(s.events.map((e) => e.id), ["good", "epoch", "maxdate", "mindate"]);
+  // The bricking scenario, end to end: export and day keys survive.
+  assert.doesNotThrow(() => L.eventsToCsv(s.events));
+  assert.ok(s.events.every((e) => !/NaN/.test(L.dayKey(e.dateMs))));
+});
+
 // Batch 194: amount-input length bound (parsers + stored-state BigInt gate)
 t("amount bound: parsers refuse over-long digit strings before BigInt", () => {
   assert.equal(L.MAX_AMOUNT_CHARS, 512);

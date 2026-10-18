@@ -1,10 +1,10 @@
 {
   "ok": true,
   "source": "https://sqm.quantus.com/v1/graphql",
-  "fetched_at": "2026-10-18T19:39:50.335Z",
+  "fetched_at": "2026-10-18T20:33:59.736Z",
   "data": {
     "status": {
-      "block_height": 248990,
+      "block_height": 249206,
       "total_scheduled_transfers": 156
     },
     "scheduled": [
