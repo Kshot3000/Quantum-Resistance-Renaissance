@@ -12,6 +12,7 @@ import {
   packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
   splitPackagePaste,
   splitCheckphraseAnswer,
+  validateRpcUrl,
   DEFAULT_ERA_PERIOD,
 } from './airgap.js';
 import { drawQR, decodeQRImage, mountChunkStepper, startCameraScan } from './qr.js';
@@ -127,7 +128,9 @@ $('btn-issue').addEventListener('click', async () => {
     if (prefix !== 189) throw new Error(`wrong network prefix ${prefix} — Quantus addresses use prefix 189`);
   } catch (e) { err('issue-err', 'Invalid sender address: ' + e.message); return; }
 
-  const url = $('rpc-url').value.trim() || 'wss://rpc.quantus.network';
+  const urlV = validateRpcUrl($('rpc-url').value.trim() || 'wss://rpc.quantus.network');
+  if (!urlV.ok) { err('issue-err', urlV.error); return; }
+  const url = urlV.url;
   const seq = ++issueSeq;
   // The connection standing when this issue began (closed below, replaced
   // only at this handler's successful end). Another handler — the fee quote —
@@ -430,7 +433,9 @@ $('btn-quote-fee').addEventListener('click', async () => {
   };
   const btn = $('btn-quote-fee'); btn.disabled = true; btn.textContent = 'Quoting…';
   try {
-    const url = $('rpc-url').value.trim() || 'wss://rpc.quantus.network';
+    const urlV = validateRpcUrl($('rpc-url').value.trim() || 'wss://rpc.quantus.network');
+    if (!urlV.ok) throw new Error(urlV.error);
+    const url = urlV.url;
     if (!hot.rpc || !hot.rpc.connected || hot.rpcUrl !== url) {
       if (hot.rpc) hot.rpc.close();
       hot.rpc = new RpcClient(url); hot.rpcUrl = url;

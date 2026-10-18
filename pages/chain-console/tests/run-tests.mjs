@@ -7,6 +7,7 @@ import {
   RECIPE_BUILDERS, historyEntry, loadHistory, saveHistory, sanitizeHistory, BROADCAST_METHODS, formatPartialFeeQtc,
   parseBlockNumber, isHash32, validPlanckField, validChainHeight, validExtrinsicHex, MAX_CHAIN_HEIGHT,
   MAX_PARAMS_JSON_CHARS, paramsJsonRoom,
+  MAX_ENDPOINT_URL_CHARS, endpointUrlRoom,
 } from '../js/core.js';
 import { qtcToPlancks } from '../js/lib/scale.js';
 import { ConsoleRpc } from '../js/rpc-client.js';
@@ -31,6 +32,23 @@ t('endpoint: ws ok', validateEndpoint('ws://127.0.0.1:9944').ok);
 t('endpoint: http rejected', !validateEndpoint('https://example.com').ok);
 t('endpoint: empty rejected', !validateEndpoint('').ok);
 t('endpoint: garbage rejected', !validateEndpoint('not a url').ok);
+/* endpoint length gate (white-hat): validateEndpoint used to trim and
+ * WHATWG-parse the WHOLE paste — a 20,000,006-char endpoint parsed in
+ * ~94–126 ms and was ACCEPTED, its normalized copy handed to the
+ * WebSocket constructor. The cap (2,048) is >4x the largest genuine
+ * endpoint (hostname ≤253 chars per RFC 1035 + scheme/port/path/key
+ * material well under 500 total). */
+{
+  t('endpoint cap: exported at 2,048', MAX_ENDPOINT_URL_CHARS === 2048);
+  t('endpoint cap: room fail-closed', endpointUrlRoom(0) === 2048 && endpointUrlRoom(2048) === 0 &&
+    endpointUrlRoom(2049) === 0 && endpointUrlRoom(-1) === 0 && endpointUrlRoom(1.5) === 0 && endpointUrlRoom('5') === 0);
+  const atCap = 'ws://127.0.0.1:9944/' + 'p'.repeat(2048 - 'ws://127.0.0.1:9944/'.length);
+  t('endpoint cap: exactly-cap accepted', atCap.length === 2048 && validateEndpoint(atCap).ok);
+  const over = validateEndpoint(atCap + 'p');
+  t('endpoint cap: over-cap refused naming size + cap', !over.ok && /2049/.test(over.error) && /2048/.test(over.error), over.error);
+  const huge = validateEndpoint('wss://' + 'a'.repeat(20000000));
+  t('endpoint cap: 20M-char paste refused before parsing', !huge.ok && /20000006/.test(huge.error), huge.error);
+}
 
 /* ---- request building ---- */
 {

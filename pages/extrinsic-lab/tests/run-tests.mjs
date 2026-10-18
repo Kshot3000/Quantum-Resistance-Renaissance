@@ -421,6 +421,30 @@ test('hexInputRoom arithmetic is exact and fail-closed', () => {
     assertEq(D.hexInputRoom(bad), 0, 'fail-closed for ' + JSON.stringify(bad));
   }
 });
+test('endpoint URL length bound before connect (white-hat)', () => {
+  // The rpc-url field reached new WebSocket with at most a scheme
+  // regex (the context fetch had no check at all) and no length
+  // bound. Cap 2,048 is >4x the largest genuine endpoint (hostname
+  // ≤253 per RFC 1035 + the rest well under 500 total).
+  assertEq(D.MAX_ENDPOINT_URL_CHARS, 2048, 'cap is 2,048 chars');
+  assertEq(D.endpointUrlRoom(0), 2048, 'full room at 0 chars');
+  assertEq(D.endpointUrlRoom(2048), 0, 'zero at cap');
+  assertEq(D.endpointUrlRoom(2049), 0, 'zero past cap');
+  for (const bad of [-1, NaN, 1.5, '100', null, undefined, Infinity]) {
+    assertEq(D.endpointUrlRoom(bad), 0, 'fail-closed for ' + JSON.stringify(bad));
+  }
+  assert(D.validateEndpointUrl('wss://rpc.quantus.network').ok, 'genuine endpoint ok');
+  const atCap = 'ws://127.0.0.1:9944/' + 'p'.repeat(2048 - 'ws://127.0.0.1:9944/'.length);
+  assertEq(atCap.length, 2048, 'at-cap fixture is exactly 2,048');
+  assert(D.validateEndpointUrl(atCap).ok, 'exactly-cap endpoint still validates');
+  const over = D.validateEndpointUrl(atCap + 'p');
+  assert(!over.ok && /2049/.test(over.error) && /2048/.test(over.error), 'over-cap refusal names size + cap: ' + over.error);
+  const huge = D.validateEndpointUrl('wss://' + 'a'.repeat(20000000));
+  assert(!huge.ok && /20000006/.test(huge.error), '20M-char paste refused before connecting: ' + huge.error);
+  assert(!D.validateEndpointUrl('https://example.com').ok, 'http refused');
+  assert(!D.validateEndpointUrl('').ok, 'empty refused');
+  assert(!D.validateEndpointUrl(null).ok, 'non-string refused');
+});
 test('hexToBytes refuses over-cap inputs unparsed, cap still parses', () => {
   let err = null;
   try { D.hexToBytes('0x' + 'ab'.repeat(524288)); } catch (e) { err = e; }  // cap + 2 chars

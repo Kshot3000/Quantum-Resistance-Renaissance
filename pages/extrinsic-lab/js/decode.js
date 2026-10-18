@@ -38,6 +38,31 @@ var CT = function () { return global.QEL_CALLS; };
  * missed by the Batch 160/161 closure because it is named
  * hexToBytes, not fromHex/hexDecode — the class closes per PARSER
  * (strip + regex + parseInt loop), not per filename. */
+/* Endpoint length bound (white-hat): the lab's rpc-url field reached
+ * `new WebSocket` through rpcConnect with at most a scheme-prefix
+ * regex (the context fetch had no check at all) and no length bound —
+ * a 20,000,000-char paste went straight to the socket constructor.
+ * The cap derives from the largest genuine endpoint: a fully-qualified
+ * hostname is at most 253 chars (RFC 1035), and scheme + port + a
+ * path/query carrying hosted-RPC key material stays well under 500
+ * chars total — MAX_ENDPOINT_URL_CHARS = 2,048 is >4x that (and the
+ * interoperable URL length every browser/server stack accepts).
+ * validateEndpointUrl refuses over-cap input on length BEFORE any
+ * parse, naming size + cap, via the fail-closed endpointUrlRoom. */
+var MAX_ENDPOINT_URL_CHARS = 2048;
+function endpointUrlRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_ENDPOINT_URL_CHARS - chars);
+}
+function validateEndpointUrl(raw) {
+  if (typeof raw === 'string' && raw.length > MAX_ENDPOINT_URL_CHARS)
+    return { ok: false, error: 'Endpoint URL too long (' + raw.length + ' characters) — the cap is ' + MAX_ENDPOINT_URL_CHARS + ' characters; refused before connecting' };
+  if (typeof raw !== 'string') return { ok: false, error: 'Enter an endpoint URL.' };
+  var url = raw.trim();
+  if (!url) return { ok: false, error: 'Enter an endpoint URL.' };
+  if (!/^wss?:\/\//.test(url)) return { ok: false, error: 'Endpoint must use ws:// or wss:// — the chain speaks WebSocket JSON-RPC.' };
+  return { ok: true, url: url };
+}
 var MAX_HEX_INPUT_CHARS = 1048576;
 function hexInputRoom(chars) {
   if (!Number.isSafeInteger(chars) || chars < 0) return 0;
@@ -446,6 +471,8 @@ var api = {
   Reader: Reader, plancksToQtc: plancksToQtc, ss58Of: ss58Of, checkphraseOf: checkphraseOf,
   decodeExtrinsic: decodeExtrinsic, decodeCall: decodeCall, decodeCallBytes: decodeCallBytes,
   MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom,
+  MAX_ENDPOINT_URL_CHARS: MAX_ENDPOINT_URL_CHARS, endpointUrlRoom: endpointUrlRoom,
+  validateEndpointUrl: validateEndpointUrl,
   MAX_CHECKPHRASE_DERIVATIONS: MAX_CHECKPHRASE_DERIVATIONS, checkphraseRoom: checkphraseRoom,
   decodeEra: decodeEra, eraBirth: eraBirth, decodeMultiAddress: decodeMultiAddress,
   decodeSignature: decodeSignature, buildSigningPayload: buildSigningPayload,

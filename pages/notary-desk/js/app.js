@@ -683,7 +683,9 @@ $("connBtn").addEventListener("click", () => {
   if (board.ws && board.ws.readyState === 1) {
     board.ws.close(); return;
   }
-  const url = $("rpcUrl").value.trim();
+  const urlV = C.validateEndpointUrl($("rpcUrl").value);
+  if (!urlV.ok) { setStatus("", urlV.error); return; }
+  const url = urlV.url;
   setStatus("scan", "Connecting to " + url + " …");
   let ws;
   try { ws = new WebSocket(url); } catch (e) {

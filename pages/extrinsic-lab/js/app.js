@@ -463,8 +463,10 @@
 
   /* ---------- minimal JSON-RPC over WebSocket ---------- */
   function rpcConnect(url, onOpen, onFail) {
+    var v = D.validateEndpointUrl(url);
+    if (!v.ok) { if (typeof onFail === 'function') onFail(new Error(v.error)); return null; }
     var ws;
-    try { ws = new WebSocket(url); } catch (e) { onFail(e); return null; }
+    try { ws = new WebSocket(v.url); } catch (e) { onFail(e); return null; }
     var opened = false;
     var timer = setTimeout(function () { if (!opened) { try { ws.close(); } catch (e) {} onFail(new Error('connection timed out (10s)')); } }, 10000);
     ws.onopen = function () { opened = true; clearTimeout(timer); onOpen(ws); };
@@ -513,6 +515,12 @@
     var errBox = $('verify-error');
     errBox.hidden = true;
     var url = $('rpc-url').value.trim();
+    var urlV = D.validateEndpointUrl(url);
+    if (!urlV.ok) {
+      errBox.hidden = false;
+      errBox.innerHTML = '<b>Bad endpoint.</b> ' + esc(urlV.error);
+      return;
+    }
     setPill('busy', 'fetching context…');
     rpcConnect(url, function (ws) {
       if (myCtx !== ctxSeq) { try { ws.close(); } catch (e) {} return; }
@@ -678,9 +686,10 @@
     var errBox = $('live-error');
     errBox.hidden = true;
     var url = $('rpc-url').value.trim();
-    if (!/^wss?:\/\//.test(url)) {
+    var urlV2 = D.validateEndpointUrl(url);
+    if (!urlV2.ok) {
       errBox.hidden = false;
-      errBox.innerHTML = '<b>Bad endpoint.</b> Use a ws:// or wss:// URL.';
+      errBox.innerHTML = '<b>Bad endpoint.</b> ' + esc(urlV2.error);
       return;
     }
     setPill('busy', 'connecting…');

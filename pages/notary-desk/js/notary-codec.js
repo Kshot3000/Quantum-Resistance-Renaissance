@@ -82,6 +82,30 @@
    * refusing anything larger unparsed. hexInputRoom is the pure
    * fail-closed gate (a non-integer, negative, or non-number count
    * gets no room), mirroring the fleet's Extrinsic Lab hex bound. */
+  /* Endpoint length bound (white-hat): the board's rpcUrl field went
+   * straight to `new WebSocket` with no validation at all — any paste,
+   * of any length, reached the socket constructor. The cap derives
+   * from the largest genuine endpoint: a fully-qualified hostname is
+   * at most 253 chars (RFC 1035), and scheme + port + a path/query
+   * carrying hosted-RPC key material stays well under 500 chars
+   * total — MAX_ENDPOINT_URL_CHARS = 2,048 is >4x that (and the
+   * interoperable URL length every browser/server stack accepts).
+   * validateEndpointUrl refuses over-cap input on length BEFORE any
+   * parse, naming size + cap, via the fail-closed endpointUrlRoom. */
+  var MAX_ENDPOINT_URL_CHARS = 2048;
+  function endpointUrlRoom(chars) {
+    if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+    return Math.max(0, MAX_ENDPOINT_URL_CHARS - chars);
+  }
+  function validateEndpointUrl(raw) {
+    if (typeof raw === "string" && raw.length > MAX_ENDPOINT_URL_CHARS)
+      return { ok: false, error: "Endpoint URL too long (" + raw.length + " characters) — the cap is " + MAX_ENDPOINT_URL_CHARS + " characters; refused before connecting" };
+    if (typeof raw !== "string") return { ok: false, error: "Enter an endpoint URL." };
+    var url = raw.trim();
+    if (!url) return { ok: false, error: "Enter an endpoint URL." };
+    if (!/^wss?:\/\//.test(url)) return { ok: false, error: "Endpoint must use ws:// or wss:// — the chain speaks WebSocket JSON-RPC." };
+    return { ok: true, url: url };
+  }
   var MAX_HEX_INPUT_CHARS = 1048576;
   function hexInputRoom(chars) {
     if (!Number.isSafeInteger(chars) || chars < 0) return 0;
@@ -582,6 +606,8 @@
     MAX_MESSAGE_BYTES: MAX_MESSAGE_BYTES,
     hexToBytes: hexToBytes, bytesToHex: bytesToHex,
     MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom,
+    MAX_ENDPOINT_URL_CHARS: MAX_ENDPOINT_URL_CHARS, endpointUrlRoom: endpointUrlRoom,
+    validateEndpointUrl: validateEndpointUrl,
     utf8ToBytes: utf8ToBytes, bytesToUtf8: bytesToUtf8,
     compactU32: compactU32, readCompact: readCompact,
     buildEnvelope: buildEnvelope, parseRemark: parseRemark,

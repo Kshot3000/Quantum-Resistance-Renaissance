@@ -337,6 +337,33 @@ export function parseProofPaste(text) {
   return JSON.parse(text);
 }
 
+/* Endpoint length bound (white-hat): the observer's endpoint field
+ * reached `new WebSocket` through rpc.connect with no validation at
+ * all — any paste, of any length, reached the socket constructor, and
+ * a constructor failure schedules a reconnect, so a hostile paste
+ * would be retried forever. The cap derives from the largest genuine
+ * endpoint: a fully-qualified hostname is at most 253 chars (RFC
+ * 1035), and scheme + port + a path/query carrying hosted-RPC key
+ * material stays well under 500 chars total —
+ * MAX_ENDPOINT_URL_CHARS = 2,048 is >4x that (and the interoperable
+ * URL length every browser/server stack accepts).
+ * validateEndpointUrl refuses over-cap input on length BEFORE any
+ * parse, naming size + cap, via the fail-closed endpointUrlRoom. */
+export const MAX_ENDPOINT_URL_CHARS = 2048;
+export function endpointUrlRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_ENDPOINT_URL_CHARS - chars);
+}
+export function validateEndpointUrl(raw) {
+  if (typeof raw === "string" && raw.length > MAX_ENDPOINT_URL_CHARS)
+    return { ok: false, error: "Endpoint URL too long (" + raw.length + " characters) — the cap is " + MAX_ENDPOINT_URL_CHARS + " characters; refused before connecting" };
+  if (typeof raw !== "string") return { ok: false, error: "Enter an endpoint URL." };
+  const url = raw.trim();
+  if (!url) return { ok: false, error: "Enter an endpoint URL." };
+  if (!/^wss?:\/\//.test(url)) return { ok: false, error: "Endpoint must use ws:// or wss:// — the chain speaks WebSocket JSON-RPC." };
+  return { ok: true, url };
+}
+
 export function verifyProof(leafFields, proof, expectedRootHex) {
   // Shape-gate BEFORE any hashing: proofs come from pasted JSON and from
   // RPC responses — both untrusted. The pallet caps tree depth at
@@ -589,6 +616,9 @@ export const ZK = {
   MAX_PROOF_PASTE_CHARS,
   proofPasteRoom,
   parseProofPaste,
+  MAX_ENDPOINT_URL_CHARS,
+  endpointUrlRoom,
+  validateEndpointUrl,
   decodeLeaf,
   encodeLeafForTest,
   decodeCompact,

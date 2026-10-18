@@ -410,5 +410,24 @@ function throws(name, fn) {
   ok("pretty depth-32 proof (7,540 chars) parses", ZK.parseProofPaste(JSON.stringify(proof32, null, 2)).siblings.length === 32);
 }
 
+/* Endpoint length bound (white-hat): the observer endpoint reached
+ * new WebSocket with no validation at all, and a constructor failure
+ * schedules a reconnect — a hostile paste would be retried forever.
+ * Cap 2,048 is >4x the largest genuine endpoint (hostname ≤253 per
+ * RFC 1035 + scheme/port/path/key material well under 500 total). */
+{
+  ok("endpoint cap exported at 2,048", ZK.MAX_ENDPOINT_URL_CHARS === 2048);
+  ok("endpointUrlRoom fail-closed", ZK.endpointUrlRoom(0) === 2048 && ZK.endpointUrlRoom(2048) === 0 &&
+    ZK.endpointUrlRoom(2049) === 0 && ZK.endpointUrlRoom(-1) === 0 && ZK.endpointUrlRoom(1.5) === 0 && ZK.endpointUrlRoom("5") === 0);
+  ok("endpoint: genuine validates", ZK.validateEndpointUrl("wss://rpc.quantus.network").ok === true);
+  const atCap = "ws://127.0.0.1:9944/" + "p".repeat(2048 - "ws://127.0.0.1:9944/".length);
+  ok("endpoint: exactly-cap validates", atCap.length === 2048 && ZK.validateEndpointUrl(atCap).ok === true);
+  const over = ZK.validateEndpointUrl(atCap + "p");
+  ok("endpoint: over-cap refused naming size + cap", !over.ok && /2049/.test(over.error) && /2048/.test(over.error), over.error);
+  const huge = ZK.validateEndpointUrl("wss://" + "a".repeat(20000000));
+  ok("endpoint: 20M-char paste refused before connecting", !huge.ok && /20000006/.test(huge.error), huge.error);
+  ok("endpoint: http/empty/non-string refused", !ZK.validateEndpointUrl("https://x").ok && !ZK.validateEndpointUrl("").ok && !ZK.validateEndpointUrl(null).ok);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

@@ -14,6 +14,38 @@ import { parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeFie
 export const DEFAULT_RPC = 'wss://rpc.quantus.network';
 export const QUANTUS_PREFIX = 189;
 
+/* RPC endpoint validation — the wallet used to hand the rpc-url field's
+ * raw value straight to `new WebSocket` with NO validation at all (not
+ * even a scheme check): any paste, of any length, reached the socket
+ * constructor. The length cap derives from the largest genuine
+ * endpoint: a fully-qualified hostname is at most 253 chars (RFC 1035),
+ * and scheme + port + a path/query carrying hosted-RPC key material
+ * stays well under 500 chars total — MAX_RPC_URL_CHARS = 2,048 is >4x
+ * that (and the interoperable URL length every browser/server stack
+ * accepts). rpcUrlRoom is the pure fail-closed gate. Refusal happens
+ * on length BEFORE any trim/parse, so a 20,000,000-char paste is
+ * refused in O(1) instead of being copied and parsed. */
+export const MAX_RPC_URL_CHARS = 2048;
+export function rpcUrlRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_RPC_URL_CHARS - chars);
+}
+
+export function validateRpcUrl(raw) {
+  if (typeof raw === 'string' && raw.length > MAX_RPC_URL_CHARS) {
+    return { ok: false, error: 'RPC URL too long (' + raw.length + ' characters) — the cap is ' + MAX_RPC_URL_CHARS + ' characters; refused before connecting' };
+  }
+  if (typeof raw !== 'string') return { ok: false, error: 'Enter an RPC URL.' };
+  const url = raw.trim();
+  if (!url) return { ok: false, error: 'Enter an RPC URL.' };
+  let u;
+  try { u = new URL(url); } catch { return { ok: false, error: 'Not a valid URL.' }; }
+  if (u.protocol !== 'ws:' && u.protocol !== 'wss:') {
+    return { ok: false, error: 'RPC URL must use ws:// or wss:// — the chain speaks WebSocket JSON-RPC.' };
+  }
+  return { ok: true, url };
+}
+
 /* Strict recipient parse: valid SS58 checksum AND Quantus prefix 189. */
 export function parseRecipient(address) {
   const { prefix, accountId } = ss58Decode(address);

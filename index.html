@@ -701,7 +701,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Mempool Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Read the pool before the block does: connect to any node and watch live pending-extrinsic gauges, get txWatch zero-confirmation signals the second a transfer requests your address, and estimate node-quoted fees on what's actually waiting. No node, no data — nothing simulated, 100% client-side.</p>
-        <div class="meta">18/18 logic tests green · live pool gauge + txWatch signals + fee desk · watcher creation gated at the same 50 cap the load sanitizer enforces — the 51st add is refused with a cap-named message instead of opening a subscription that silently vanishes on reload · browser QA green (watch-cap suite 7/7)</div>
+        <div class="meta">19/19 logic tests green · live pool gauge + txWatch signals + fee desk · watcher creation gated at the same 50 cap the load sanitizer enforces — the 51st add is refused with a cap-named message instead of opening a subscription that silently vanishes on reload · browser QA green (watch-cap suite 7/7) · endpoint URLs are length-bounded at 2,048 characters before the shape regex, localStorage save or socket — a 20M-char paste the old check scanned whole is refused on length alone</div>
       </a>
       <a class="app-card wallet" href="pages/web-wallet/">
         <div class="icon-row">
@@ -710,7 +710,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Web Wallet <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The vault for the quantum chain: forge ML-DSA-65/87 keys from a 24-word phrase in your browser, get your Poseidon2-derived qz… address, encrypt the vault with AES-GCM, read live balances from chain storage, and broadcast real transfer_keep_alive extrinsics signed under the chain's QUANTUS_EXTRINSIC context. Sends may add an optional, plainly disclosed builder service fee (None / 0.25% / 0.5% / 1%, on top — recipient paid in full) as a second leg in the same atomic batch_all. Keys never leave your device.</p>
-        <div class="meta">64/64 wallet tests green · extrinsic format verified against chain source · browser QA green — vault backup imports are size-gated before a byte is read: every real backup is under ~132 KiB (the ciphertext cap), so a pick over the 256 KiB file cap is refused unread with size + cap named and the stored vault untouched · recovery-phrase pastes are length-bounded at 1,024 characters (a real 24-word phrase is at most 215) before any split or PBKDF2 seed derivation — the same bound guards the Airgap Desk copy</div>
+        <div class="meta">65/65 wallet tests green · the RPC endpoint field is validated (scheme + a 2,048-character length bound) before any socket opens — it used to reach the WebSocket constructor unchecked · extrinsic format verified against chain source · browser QA green — vault backup imports are size-gated before a byte is read: every real backup is under ~132 KiB (the ciphertext cap), so a pick over the 256 KiB file cap is refused unread with size + cap named and the stored vault untouched · recovery-phrase pastes are length-bounded at 1,024 characters (a real 24-word phrase is at most 215) before any split or PBKDF2 seed derivation — the same bound guards the Airgap Desk copy</div>
       </a>
       <a class="app-card airgap" href="pages/airgap-desk/">
         <div class="icon-row">
@@ -719,7 +719,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Airgap Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Sign QTC transfers on a machine that never touches the network: the hot desk issues a chain ticket (genesis, runtime, nonce, era window) as one QR, the cold desk builds and signs the transfer_keep_alive offline with real ML-DSA keys, and the hot desk re-verifies the signature locally before quoting the exact node fee and broadcasting. Chunked QR transport, checkphrase read-back, key wipe after signing.</p>
-        <div class="meta">54/54 protocol tests green · full sign→verify round-trip in browser QA green · QR image decode canvas bounded at 2048px (oversize scans drawn scaled — a huge image can no longer force a multi-GB canvas on the cold machine) · package paste merge is Set-linear (the old per-token rescan froze the cold machine ~17s on a 20k-token paste) · package + ticket file imports are size-gated before any read (256 KiB / 16 KiB — the largest genuine package is 168,103 bytes at any chunking, the largest ticket 696 bytes) · package paste is length-gated at the same 256 KiB cap before any token is split (the split alone cost ~1 s on a 20M-char paste) · cold recovery-phrase pastes are length-bounded at 1,024 characters (a real 24-word phrase is at most 215) before any split or PBKDF2 seed derivation — the same bound guards the Web Wallet copy · checkphrase read-back answers are length-gated at 256 characters (a real five-word answer is at most 74) before any split — the same bound guards the Contact Vault's spoken-checkphrase box</div>
+        <div class="meta">55/55 protocol tests green · hot-side RPC endpoint URLs are validated (scheme + a 2,048-character length bound) before any socket opens · full sign→verify round-trip in browser QA green · QR image decode canvas bounded at 2048px (oversize scans drawn scaled — a huge image can no longer force a multi-GB canvas on the cold machine) · package paste merge is Set-linear (the old per-token rescan froze the cold machine ~17s on a 20k-token paste) · package + ticket file imports are size-gated before any read (256 KiB / 16 KiB — the largest genuine package is 168,103 bytes at any chunking, the largest ticket 696 bytes) · package paste is length-gated at the same 256 KiB cap before any token is split (the split alone cost ~1 s on a 20M-char paste) · cold recovery-phrase pastes are length-bounded at 1,024 characters (a real 24-word phrase is at most 215) before any split or PBKDF2 seed derivation — the same bound guards the Web Wallet copy · checkphrase read-back answers are length-gated at 256 characters (a real five-word answer is at most 74) before any split — the same bound guards the Contact Vault's spoken-checkphrase box</div>
       </a>
       <a class="app-card ledger" href="pages/ledger-desk/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+448,359% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+439,650% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">76/76 consensus tests green · snapshot boundary round 4: the trend series' length is exact-pinned to the producer's sampled size (every 100 blocks plus the head) before its points are walked, and the producer no longer duplicates the head point on a sample step · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -755,7 +755,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Chain Console <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The live JSON-RPC developer workbench: connect to the mainnet public RPC or your own node, run 16 one-click recipes (head, balance, nonce, storage, fees, node identity), fire custom methods, watch live new-head and balance subscriptions, browse 40+ documented methods, and broadcast signed extrinsics through an explicit review gate — every answer read from the node.</p>
-        <div class="meta">145/145 console tests green · full browser QA green · zero console errors</div>
+        <div class="meta">150/150 console tests green · full browser QA green · zero console errors · endpoint URLs are length-bounded at 2,048 characters before parsing — a 20M-char paste the old validator accepted as a valid endpoint is refused on length alone</div>
       </a>
       <a class="app-card consensus" href="pages/extrinsic-lab/">
         <div class="icon-row">
@@ -764,7 +764,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Extrinsic Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The transaction autopsy desk: paste any extrinsic hex for a full byte-level anatomy — signer, ML-DSA signature, era, nonce, tip, every call argument decoded from a source-verified call table — then re-derive the exact signing payload and verify the signature locally. Plus a live finalized-block scanner and searchable call reference.</p>
-        <div class="meta">30/30 decoder tests green · hex pastes are length-bounded before parsing (1,048,576-char cap — a 20M-char paste that built a 10M-byte array in ~0.5 s now refuses instantly; the largest real input, a signed ML-DSA-87 batch, is ~98,532 chars) · checkphrase derivations capped at 10 per decode — each is a 40,000-iteration PBKDF2, so a 60-account extrinsic can no longer burn 60 sequential KDFs on the Autopsy click; repeats memoized, skips disclosed · full browser QA green · zero console errors</div>
+        <div class="meta">31/31 decoder tests green · endpoint URLs are length-bounded at 2,048 characters before any socket opens (the context fetch previously had no endpoint check at all) · hex pastes are length-bounded before parsing (1,048,576-char cap — a 20M-char paste that built a 10M-byte array in ~0.5 s now refuses instantly; the largest real input, a signed ML-DSA-87 batch, is ~98,532 chars) · checkphrase derivations capped at 10 per decode — each is a 40,000-iteration PBKDF2, so a 60-account extrinsic can no longer burn 60 sequential KDFs on the Autopsy click; repeats memoized, skips disclosed · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/scale-lab/">
         <div class="icon-row">
@@ -827,7 +827,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Notary Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The on-chain timestamping &amp; proof-of-existence desk: hash any document in your browser, wrap the digest in a versioned envelope, and anchor it with a byte-exact <code>System.remark</code> extrinsic — then verify it, keep it in a local vault, and read the live public remark board. Never signs; every byte cited to upstream source. The vault Save button refuses at its 500-anchor cap instead of silently evicting the oldest anchor. Its hex parser now refuses inputs over 1,048,576 characters before parsing, so a hostile node's oversized <code>System.Events</code> value or a poisoned vault entry can't force a multi-megabyte parse.</p>
-        <div class="meta">122/122 logic tests green · hexbound browser QA 8/8 · zero console errors</div>
+        <div class="meta">129/129 logic tests green · hexbound browser QA 8/8 · zero console errors · the board's RPC endpoint is validated (scheme + a 2,048-character length bound) before any socket opens — it previously went to the WebSocket constructor unchecked</div>
       </a>
       <a class="app-card zktree" href="pages/zktree-desk/">
         <div class="icon-row">
@@ -836,7 +836,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC ZkTree Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The ZK Merkle-tree observatory &amp; proof laboratory: watch the chain's 4-ary Poseidon tree live, recompute exact leaf and node hashes in your browser, grow your own tree with batched folding, and verify real Merkle proofs against the live chain root. Never signs; every constant cited to upstream source. Proof inputs are shape-gated to the chain's own grammar (max depth 32, exact byte budget, 32-byte siblings) before any hashing, so a hostile node response or pasted proof can't freeze the tab.</p>
-        <div class="meta">101/101 logic tests green · full browser QA green · zero console errors</div>
+        <div class="meta">108/108 logic tests green · full browser QA green · zero console errors · the observer endpoint is validated (scheme + a 2,048-character length bound) before any socket opens, and a refused endpoint is never retried by the reconnect loop</div>
       </a>
       <a class="app-card energy" href="pages/energy-observatory/">
         <div class="icon-row">

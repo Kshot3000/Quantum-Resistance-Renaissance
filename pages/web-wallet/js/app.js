@@ -10,10 +10,10 @@ import {
 } from './mnemonic.js';
 import { vaultExists, saveVault, openVault, wipeVault, exportVaultFile, importVaultFile } from './keystore.js?v=1.2.0';
 import {
-  RpcClient, DEFAULT_RPC, getRuntimeVersion, getLatestHeader,
+  RpcClient, DEFAULT_RPC, validateRpcUrl, getRuntimeVersion, getLatestHeader,
   getAccountInfo, getNonce, buildUnsignedTransfer, finalizeTransfer, submitExtrinsic,
   parseRecipient,
-} from './rpc.js?v=1.2.0';
+} from './rpc.js?v=1.3.0';
 import { sanitizeActivityRows } from './rpc-validate.js?v=1.2.0';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { plancksToQtc, qtcToPlancks, EXISTENTIAL_DEPOSIT, SIGNING_CONTEXT, describeExtrinsicParts, SERVICE_FEE_ADDRESS, feeBpsLabel, computeServiceFee } from './scale.js?v=1.2.0';
@@ -323,7 +323,16 @@ $('rpc-url').value = DEFAULT_RPC;
 
 async function connectRpc() {
   invalidateUnsigned(); // a pinned estimate was quoted by the previous node/era
-  const url = $('rpc-url').value.trim() || DEFAULT_RPC;
+  const v = validateRpcUrl($('rpc-url').value.trim() || DEFAULT_RPC);
+  if (!v.ok) {
+    // Refused before any socket exists: a stale connection must not be
+    // presented as this attempt's node, and no estimate survives it.
+    if (state.rpc) { state.rpc.close(); state.rpc = null; }
+    setConn('bad', 'offline');
+    err('conn-err', v.error + ' Balances and sending need a live RPC — everything else works offline.');
+    return;
+  }
+  const url = v.url;
   state.rpcUrl = url;
   if (state.rpc) state.rpc.close();
   state.rpc = new RpcClient(url);

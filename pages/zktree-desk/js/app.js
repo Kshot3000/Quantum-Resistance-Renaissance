@@ -69,6 +69,16 @@ const rpc = {
 
   connect(endpoint) {
     if (endpoint) this.endpoint = endpoint;
+    // Length/scheme gate BEFORE the socket (and before wantConnection,
+    // so a refused endpoint is never retried by the reconnect loop).
+    const v = ZK.validateEndpointUrl(this.endpoint);
+    if (!v.ok) {
+      this.wantConnection = false;
+      this.setDot("off");
+      this.log("connection refused: " + v.error, "bad");
+      return;
+    }
+    this.endpoint = v.url;
     this.wantConnection = true;
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
     this.setDot("");

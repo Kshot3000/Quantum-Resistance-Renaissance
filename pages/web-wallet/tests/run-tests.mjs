@@ -353,6 +353,7 @@ import {
 import {
   getRuntimeVersion, getGenesisHash, getLatestHeader, getAccountInfo, getNonce, submitExtrinsic,
   buildUnsignedTransfer, parseRecipient as parseRecipientDirect,
+  validateRpcUrl, rpcUrlRoom, MAX_RPC_URL_CHARS,
 } from '../js/rpc.js';
 import { ss58Encode, hexEncode } from '../js/quantus-crypto.js';
 
@@ -395,6 +396,33 @@ test('rpc-validate: fee fields whitelist integer shapes (BigInt("-5") is a coerc
   assert.equal(parseFeeField('1.5'), null);
   assert.equal(parseFeeField({}), null);
   assert.equal(parseFeeField(null), null);
+});
+
+test('rpc-url: endpoint validation bounds length before parse (white-hat)', () => {
+  // The wallet used to hand the field's raw value straight to
+  // new WebSocket with NO validation at all. The cap (2,048) is >4x
+  // the largest genuine endpoint (hostname ≤253 chars per RFC 1035 +
+  // scheme/port/path/key material well under 500 total).
+  assert.equal(MAX_RPC_URL_CHARS, 2048);
+  assert.equal(rpcUrlRoom(0), 2048);
+  assert.equal(rpcUrlRoom(2048), 0);
+  assert.equal(rpcUrlRoom(2049), 0);
+  assert.equal(rpcUrlRoom(-1), 0);
+  assert.equal(rpcUrlRoom(1.5), 0);
+  assert.equal(rpcUrlRoom('5'), 0);
+  assert.ok(validateRpcUrl('wss://rpc.quantus.network').ok);
+  assert.ok(validateRpcUrl('ws://127.0.0.1:9944').ok);
+  assert.ok(!validateRpcUrl('https://example.com').ok);
+  assert.ok(!validateRpcUrl('').ok);
+  assert.ok(!validateRpcUrl(null).ok);
+  assert.ok(!validateRpcUrl(42).ok);
+  const atCap = 'ws://127.0.0.1:9944/' + 'p'.repeat(2048 - 'ws://127.0.0.1:9944/'.length);
+  assert.equal(atCap.length, 2048);
+  assert.ok(validateRpcUrl(atCap).ok, 'exactly-cap endpoint still validates');
+  const over = validateRpcUrl(atCap + 'p');
+  assert.ok(!over.ok && /2049/.test(over.error) && /2048/.test(over.error), over.error);
+  const huge = validateRpcUrl('wss://' + 'a'.repeat(20000000));
+  assert.ok(!huge.ok && /20000006/.test(huge.error), huge.error);
 });
 
 test('rpc-validate: storage hex is 0x + even hex bytes', () => {

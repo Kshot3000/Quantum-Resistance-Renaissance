@@ -99,12 +99,30 @@ function buildHandshake() {
 
 /* ---------- endpoint ---------- */
 
+/* Endpoint length bound BEFORE the shape regex (white-hat): isWsUrl
+ * regex-tested the WHOLE endpoint paste with no length consulted, and
+ * the accepted value is persisted to localStorage and handed to
+ * `new WebSocket` — a 20,000,000-char paste was regex-scanned, stored
+ * (quota throw at best) and socket-attempted. The cap derives from the
+ * largest genuine endpoint: a fully-qualified hostname is at most 253
+ * chars (RFC 1035), and scheme + port + a path/query carrying
+ * hosted-RPC key material stays well under 500 chars total —
+ * MAX_ENDPOINT_URL_CHARS = 2,048 is >4x that (and the interoperable
+ * URL length every browser/server stack accepts). The length check
+ * runs on the raw string before trim/regex, and normalizeEndpoint
+ * names the cap when length is the failure. */
+var MAX_ENDPOINT_URL_CHARS = 2048;
+
 function isWsUrl(s) {
   if (typeof s !== "string") return false;
+  if (s.length > MAX_ENDPOINT_URL_CHARS) return false;
   return /^wss?:\/\/[^/\s]+(\/\S*)?$/.test(s.trim());
 }
 
 function normalizeEndpoint(s) {
+  if (typeof s === "string" && s.length > MAX_ENDPOINT_URL_CHARS) {
+    throw new Error("endpoint URL too long (" + s.length + " characters) — the cap is " + MAX_ENDPOINT_URL_CHARS + " characters; refused before connecting");
+  }
   if (!isWsUrl(s)) throw new Error("endpoint must look like ws://host:port or wss://host");
   return s.trim();
 }
@@ -395,6 +413,7 @@ var api = {
   buildHandshake: buildHandshake,
   isWsUrl: isWsUrl,
   normalizeEndpoint: normalizeEndpoint,
+  MAX_ENDPOINT_URL_CHARS: MAX_ENDPOINT_URL_CHARS,
   checkAddress: checkAddress,
   sanitizeWatchers: sanitizeWatchers,
   MAX_WATCHERS: MAX_WATCHERS, watcherRoom: watcherRoom,

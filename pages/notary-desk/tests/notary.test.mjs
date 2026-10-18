@@ -292,6 +292,25 @@ t("hexInputRoom at 0 is the whole cap",
 t("hexInputRoom arithmetic below the cap", codec.hexInputRoom(48576) === 1000000);
 t("hexInputRoom is 0 at and past the cap",
   codec.hexInputRoom(1048576) === 0 && codec.hexInputRoom(2000000) === 0);
+/* --- endpoint URL length gate (white-hat): the board's rpcUrl field
+ * went straight to new WebSocket with no validation at all. Cap
+ * 2,048 is >4x the largest genuine endpoint (hostname ≤253 per RFC
+ * 1035 + scheme/port/path/key material well under 500 total). --- */
+t("endpoint cap exported at 2,048", codec.MAX_ENDPOINT_URL_CHARS === 2048);
+t("endpointUrlRoom fail-closed",
+  codec.endpointUrlRoom(0) === 2048 && codec.endpointUrlRoom(2048) === 0 &&
+  codec.endpointUrlRoom(2049) === 0 && codec.endpointUrlRoom(-1) === 0 &&
+  codec.endpointUrlRoom(1.5) === 0 && codec.endpointUrlRoom("5") === 0 &&
+  codec.endpointUrlRoom(NaN) === 0 && codec.endpointUrlRoom(undefined) === 0);
+t("endpoint: genuine validates", codec.validateEndpointUrl("wss://rpc.quantus.network").ok === true);
+t("endpoint: exactly-cap validates",
+  (() => { const u = "ws://127.0.0.1:9944/" + "p".repeat(2048 - "ws://127.0.0.1:9944/".length); return u.length === 2048 && codec.validateEndpointUrl(u).ok; })());
+t("endpoint: over-cap refused naming size + cap",
+  (() => { const u = "ws://127.0.0.1:9944/" + "p".repeat(2049 - "ws://127.0.0.1:9944/".length); const r = codec.validateEndpointUrl(u); return !r.ok && /2049/.test(r.error) && /2048/.test(r.error); })());
+t("endpoint: 20M-char paste refused before connecting",
+  (() => { const r = codec.validateEndpointUrl("wss://" + "a".repeat(20000000)); return !r.ok && /20000006/.test(r.error); })());
+t("endpoint: http/empty/non-string refused",
+  !codec.validateEndpointUrl("https://example.com").ok && !codec.validateEndpointUrl("").ok && !codec.validateEndpointUrl(null).ok);
 t("hexInputRoom fail-closed on NaN/negative/fraction/string/undefined/null/Infinity",
   codec.hexInputRoom(NaN) === 0 && codec.hexInputRoom(-1) === 0 &&
   codec.hexInputRoom(1.5) === 0 && codec.hexInputRoom("10") === 0 &&

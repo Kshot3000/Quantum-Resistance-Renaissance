@@ -18,6 +18,7 @@ import {
   packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
   packagePasteRoom, splitPackagePaste, MAX_PACKAGE_PASTE_CHARS,
   checkphraseAnswerRoom, splitCheckphraseAnswer, MAX_CHECKPHRASE_CHARS,
+  validateRpcUrl, rpcUrlRoom, MAX_RPC_URL_CHARS,
 } from '../js/airgap.js';
 import { encodeMortalEra, qtcToPlancks, buildTransferCall, buildBatchAllCall, buildSigningPayload, buildExtrinsic } from '../js/lib/scale.js';
 import { ss58Encode, ss58Decode, hexEncode, hexDecode, QUANTUS_SS58_PREFIX } from '../js/lib/quantus-crypto.js';
@@ -666,4 +667,30 @@ test('checkphrase answer: input length cap refuses over-cap answers before split
   assert.throws(() => splitCheckphraseAnswer('word '.repeat(4000000)), /20,000,000.*256|256/);
   assert.throws(() => splitCheckphraseAnswer(null), /not text/);
   assert.throws(() => splitCheckphraseAnswer(42), /not text/);
+});
+
+test('rpc-url gate: endpoint length bound before connect (white-hat)', () => {
+  // The hot handlers handed the rpc-url field raw to the WebSocket
+  // constructor with no validation at all. Cap 2,048 is >4x the
+  // largest genuine endpoint (hostname ≤253 per RFC 1035 + the rest
+  // well under 500 total).
+  assert.equal(MAX_RPC_URL_CHARS, 2048);
+  assert.equal(rpcUrlRoom(0), true);
+  assert.equal(rpcUrlRoom(2048), true);
+  assert.equal(rpcUrlRoom(2049), false);
+  assert.equal(rpcUrlRoom(-1), false);
+  assert.equal(rpcUrlRoom(1.5), false);
+  assert.equal(rpcUrlRoom('12'), false);
+  assert.ok(validateRpcUrl('wss://rpc.quantus.network').ok);
+  assert.ok(validateRpcUrl('ws://127.0.0.1:9944').ok);
+  assert.ok(!validateRpcUrl('https://example.com').ok);
+  assert.ok(!validateRpcUrl('').ok);
+  assert.ok(!validateRpcUrl(null).ok);
+  const atCap = 'ws://127.0.0.1:9944/' + 'p'.repeat(2048 - 'ws://127.0.0.1:9944/'.length);
+  assert.equal(atCap.length, 2048);
+  assert.ok(validateRpcUrl(atCap).ok, 'exactly-cap endpoint still validates');
+  const over = validateRpcUrl(atCap + 'p');
+  assert.ok(!over.ok && /2049/.test(over.error) && /2048/.test(over.error), over.error);
+  const huge = validateRpcUrl('wss://' + 'a'.repeat(20000000));
+  assert.ok(!huge.ok && /20000006/.test(huge.error), huge.error);
 });

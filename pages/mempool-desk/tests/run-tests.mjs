@@ -69,6 +69,22 @@ test("endpoint validation", () => {
   assert.throws(() => C.normalizeEndpoint("http://x"));
 });
 
+test("endpoint length bound before regex/storage/socket (white-hat)", () => {
+  // isWsUrl regex-tested the WHOLE paste unbounded, and the accepted
+  // value is persisted to localStorage and handed to new WebSocket.
+  // Cap 2,048 is >4x the largest genuine endpoint (hostname ≤253 per
+  // RFC 1035 + scheme/port/path/key material well under 500 total).
+  assert.equal(C.MAX_ENDPOINT_URL_CHARS, 2048);
+  const atCap = "ws://127.0.0.1:9944/" + "p".repeat(2048 - "ws://127.0.0.1:9944/".length);
+  assert.equal(atCap.length, 2048);
+  assert.ok(C.isWsUrl(atCap), "exactly-cap endpoint still validates");
+  assert.ok(!C.isWsUrl(atCap + "p"));
+  assert.ok(!C.isWsUrl("wss://" + "a".repeat(20000000)));
+  let err = null;
+  try { C.normalizeEndpoint("wss://" + "a".repeat(20000000)); } catch (e) { err = e; }
+  assert.ok(err && /too long/.test(err.message) && /20000006/.test(err.message) && /2048/.test(err.message), err && err.message);
+});
+
 test("checkAddress uses prefix 189", () => {
   const good = "qzof7g8enozx1zxZupPoKdssf88hjDPDZGGNfxn4eDrFGxGYa";
   assert.deepEqual(C.checkAddress(good, (a) => S.ss58Decode(a)), { ok: true });

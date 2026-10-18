@@ -243,7 +243,9 @@ function connect() {
   try {
     url = C.normalizeEndpoint($("endpoint-input").value);
   } catch (e) {
-    $("conn-msg").textContent = "That doesn't look like a WebSocket URL — try wss://host or ws://host:9944";
+    $("conn-msg").textContent = /too long/.test(e.message)
+      ? e.message
+      : "That doesn't look like a WebSocket URL — try wss://host or ws://host:9944";
     $("conn-msg").className = "form-msg err";
     return;
   }

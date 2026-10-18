@@ -443,6 +443,40 @@ export function splitCheckphraseAnswer(text) {
   return text.toLowerCase().trim().split(/\s+/);
 }
 
+/* ---------------- RPC endpoint URL length gate ----------------
+ * The hot side's issue and fee-quote handlers handed the rpc-url
+ * field's raw value straight to the vendored RpcClient / WebSocket
+ * with no validation at all — any paste, of any length, reached the
+ * socket constructor. The cap derives from the largest genuine
+ * endpoint: a fully-qualified hostname is at most 253 chars (RFC
+ * 1035), and scheme + port + a path/query carrying hosted-RPC key
+ * material stays well under 500 chars total — MAX_RPC_URL_CHARS =
+ * 2,048 is >4x that (and the interoperable URL length every
+ * browser/server stack accepts). validateRpcUrl refuses over-cap
+ * input on length BEFORE any trim/parse, naming size + cap, via the
+ * fail-closed rpcUrlRoom gate (the same validator ships in the Web
+ * Wallet's rpc.js — this desk vendors that client family). */
+export const MAX_RPC_URL_CHARS = 2048;
+
+export function rpcUrlRoom(chars) {
+  return typeof chars === 'number' && isFinite(chars) && chars >= 0 && Math.floor(chars) === chars && chars <= MAX_RPC_URL_CHARS;
+}
+
+export function validateRpcUrl(raw) {
+  if (typeof raw === 'string' && !rpcUrlRoom(raw.length)) {
+    return { ok: false, error: 'RPC URL too long (' + raw.length + ' characters) — the cap is ' + MAX_RPC_URL_CHARS + ' characters; refused before connecting' };
+  }
+  if (typeof raw !== 'string') return { ok: false, error: 'Enter an RPC URL.' };
+  const url = raw.trim();
+  if (!url) return { ok: false, error: 'Enter an RPC URL.' };
+  let u;
+  try { u = new URL(url); } catch { return { ok: false, error: 'Not a valid URL.' }; }
+  if (u.protocol !== 'ws:' && u.protocol !== 'wss:') {
+    return { ok: false, error: 'RPC URL must use ws:// or wss:// — the chain speaks WebSocket JSON-RPC.' };
+  }
+  return { ok: true, url };
+}
+
 /* ---------------- era decode (mirror of scale.js encodeMortalEra) -------- */
 
 export function decodeMortalEra(twoBytes) {

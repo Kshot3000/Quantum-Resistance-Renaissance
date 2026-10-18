@@ -17,7 +17,27 @@ export const ENDPOINT_PRESETS = [
 
 /* ---------- endpoint validation ---------- */
 
+/* Endpoint length bound BEFORE trim/parse (white-hat): validateEndpoint
+ * used to trim and WHATWG-parse the WHOLE endpoint paste with no length
+ * consulted — a 20,000,006-char paste parsed in ~94–126 ms in Node and
+ * was ACCEPTED as valid, so the normalized 20M-char URL was handed to
+ * the WebSocket constructor and stored as the connected URL. The cap
+ * derives from the largest genuine endpoint: a fully-qualified hostname
+ * is at most 253 chars (RFC 1035), and scheme + port + a path/query
+ * carrying hosted-RPC key material stays well under 500 chars total —
+ * MAX_ENDPOINT_URL_CHARS = 2,048 is >4x that (and the interoperable URL
+ * length every browser/server stack accepts). endpointUrlRoom is the
+ * pure fail-closed gate, mirroring paramsJsonRoom below. */
+export const MAX_ENDPOINT_URL_CHARS = 2048;
+export function endpointUrlRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_ENDPOINT_URL_CHARS - chars);
+}
+
 export function validateEndpoint(raw) {
+  if (typeof raw === 'string' && raw.length > MAX_ENDPOINT_URL_CHARS) {
+    return { ok: false, error: 'Endpoint URL too long (' + raw.length + ' characters) — the cap is ' + MAX_ENDPOINT_URL_CHARS + ' characters; refused before parsing' };
+  }
   const url = (raw || '').trim();
   if (!url) return { ok: false, error: 'Enter an endpoint URL.' };
   let u;
