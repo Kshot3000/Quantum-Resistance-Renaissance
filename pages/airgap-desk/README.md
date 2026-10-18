@@ -53,13 +53,22 @@ Sign QTC transfers on a machine that never touches the network.
   before its own split. The largest genuine paste (168,103 chars at the
   degenerate 1-byte chunking) fits with headroom; the ungated split alone
   cost ~1 s on a 20M-char paste.
+- Ticket paste is length-gated before any decode (Oct 18, 2026):
+  `decodeTicket` in `js/airgap.js` refuses a string over
+  `MAX_TICKET_PASTE_CHARS` (16 KiB — the ticket file cap, since a paste
+  carries exactly what a file carries) on its RAW length alone via the
+  fail-closed `ticketPasteRoom` gate, before the trim, the base64url
+  decode or the JSON.parse; both paste fields (cold import, hot verify)
+  and every other caller pass through the one gate. The largest genuine
+  ticket string is 696 chars; the ungated path decoded and parse-attempted
+  a 20M-char paste in full.
 - Optional builder service fee (2026-10-12): the cold desk can add a disclosed fee
   (None / 0.25% / 0.5% default / 1%, capped at 100 bps) ON TOP of the amount as a
   second `transfer_keep_alive` leg to the builder's QTC address inside one atomic
   `Utility.batch_all` — one signature, recipient leg first and untouched. The hot
   decoder accepts exactly that 2-leg batch shape and renders both legs, warning
   when the second leg does not pay the disclosed builder address.
-- `tests/run-tests.mjs`: 52/52 protocol tests (ticket/chunk/era codecs, full cold-sign →
+- `tests/run-tests.mjs`: 57/57 protocol tests (ticket/chunk/era codecs, full cold-sign →
   hot-verify round trip incl. tamper and wrong-ticket failures, ML-DSA-87 path,
   service-fee math/batch/decode-whitelist tests; the ticket nonce is held to the
   issuer's u32 grammar — a nonce ≥ 2³² or a non-safe integer the JSON text could

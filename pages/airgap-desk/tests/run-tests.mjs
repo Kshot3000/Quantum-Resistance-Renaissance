@@ -17,6 +17,7 @@ import {
   SERVICE_FEE_ADDRESS, SERVICE_FEE_MAX_BPS,
   packageFileRoom, ticketFileRoom, MAX_PACKAGE_FILE_BYTES, MAX_TICKET_FILE_BYTES,
   packagePasteRoom, splitPackagePaste, MAX_PACKAGE_PASTE_CHARS,
+  ticketPasteRoom, MAX_TICKET_PASTE_CHARS,
   checkphraseAnswerRoom, splitCheckphraseAnswer, MAX_CHECKPHRASE_CHARS,
   validateRpcUrl, rpcUrlRoom, MAX_RPC_URL_CHARS,
 } from '../js/airgap.js';
@@ -292,6 +293,36 @@ test('paste gate: split refuses over-cap before splitting, genuine maxima still 
     assert.equal(decodeChunks(paste).hex, maxHex, 'string form, chunkBytes ' + cb);
   }
   assert.throws(() => decodeChunks('x '.repeat(10000000)), /20000000.*262144/);
+});
+
+/* ---------------- ticket-paste length gate ---------------- */
+test('ticket paste gate: cap arithmetic + fail-closed sizes', () => {
+  assert.equal(MAX_TICKET_PASTE_CHARS, 16 * 1024);
+  assert.equal(MAX_TICKET_PASTE_CHARS, MAX_TICKET_FILE_BYTES); // a paste carries what a file carries
+  assert.equal(ticketPasteRoom(0), true);
+  assert.equal(ticketPasteRoom(MAX_TICKET_PASTE_CHARS), true);
+  assert.equal(ticketPasteRoom(MAX_TICKET_PASTE_CHARS + 1), false);
+  assert.equal(ticketPasteRoom(20000000), false);
+  for (const bad of [NaN, -1, '100', undefined, null, Infinity])
+    assert.equal(ticketPasteRoom(bad), false, 'fail-closed on ' + String(bad));
+});
+
+test('ticket paste gate: decodeTicket refuses over-cap on raw length before decoding', () => {
+  // An over-cap payload whose JSON WOULD parse is refused on length —
+  // before the fix it decoded in full and failed only on its type tag.
+  const bigValid = 'QAGT1:' + b64urlEncode(te.encode(JSON.stringify({ t: 'not-a-ticket', pad: 'A'.repeat(200000) })));
+  assert.throws(() => decodeTicket(bigValid), /characters — over the chain ticket paste cap of 16,384 characters/);
+  assert.throws(() => decodeTicket('QAGT1:' + 'A'.repeat(20000000)), /20,000,006 characters — over the chain ticket paste cap/);
+  // RAW length governs: whitespace padding a genuine ticket past the cap
+  // refuses before the trim can shrink it under the cap.
+  const genuine = encodeTicket(fixtureTicket());
+  assert.throws(() => decodeTicket(' '.repeat(20000) + genuine), /over the chain ticket paste cap/);
+  // At exactly the cap the string still reaches validation (and fails on
+  // its payload, not its length); the genuine 696-char maximum decodes.
+  assert.throws(() => decodeTicket('QAGT1:' + 'A'.repeat(MAX_TICKET_PASTE_CHARS - 6)), /not valid JSON/);
+  const big = fixtureTicket({ nonce: 4294967295, spec: 4294967295, txv: 4294967295, head: 10000000, era: { period: 65536, phase: 38464, birth: 9999936, birthHash: BIRTHH }, fee: '21000000000000000000000000' });
+  assert.equal(encodeTicket(big).length, 696);
+  assert.equal(decodeTicket(encodeTicket(big)).nonce, 4294967295);
 });
 
 /* ---------------- era ---------------- */

@@ -155,6 +155,12 @@ export function encodeTicket(ticket) {
 /* Parse + strictly validate a ticket transport string. Throws on anything
  * malformed — the cold side refuses to sign against a bad ticket. */
 export function decodeTicket(str) {
+  /* Ticket-paste length gate (see the gate block below): the RAW string
+   * is refused on length alone, before the trim, the regex, the
+   * base64url decode or the JSON.parse below can allocate anything. */
+  if (typeof str === 'string' && !ticketPasteRoom(str.length)) {
+    throw new Error(`ticket string is ${str.length.toLocaleString('en-US')} characters — over the chain ticket paste cap of ${MAX_TICKET_PASTE_CHARS.toLocaleString('en-US')} characters (16 KiB); refused before decoding`);
+  }
   const s = String(str || '').trim();
   const m = s.match(/^QAGT1:([A-Za-z0-9\-_]+)$/);
   if (!m) throw new Error('not a QTC chain ticket (expected QAGT1:…)');
@@ -369,6 +375,30 @@ export function packageFileRoom(size) {
 
 export function ticketFileRoom(size) {
   return typeof size === 'number' && isFinite(size) && size >= 0 && size <= MAX_TICKET_FILE_BYTES;
+}
+
+/* ---------------- ticket-paste length gate ----------------
+ * The file gate above never covered the paste boxes: both ticket text
+ * fields (the cold desk's paste box and the hot desk's verify-ticket
+ * field) feed their raw value straight into decodeTicket, which trimmed,
+ * regex-matched, base64url-decoded and JSON.parsed the WHOLE string
+ * however large it was — a 20,000,000-char paste was decoded and parse-
+ * attempted in full before validation could refuse it (the parseable
+ * over-cap payload failed only on its type tag, proving the parse ran).
+ * A paste carries exactly what a ticket file carries — the one ticket
+ * string — so the cap is the file cap: MAX_TICKET_PASTE_CHARS = 16 KiB
+ * admits every genuine paste with the same headroom the file gate has
+ * (the largest ticket string the producers can emit is 696 chars),
+ * while an over-cap paste is refused on its RAW length alone — before
+ * trim, so whitespace padding cannot smuggle size past it — inside
+ * decodeTicket itself, so every caller (paste button, file import,
+ * QR scan, verify path) is covered by the one gate. Fail-closed,
+ * matching the file gates: a length that is not a finite, non-negative
+ * number refuses. */
+export const MAX_TICKET_PASTE_CHARS = 16 * 1024;
+
+export function ticketPasteRoom(chars) {
+  return typeof chars === 'number' && isFinite(chars) && chars >= 0 && chars <= MAX_TICKET_PASTE_CHARS;
 }
 
 /* ---------------- package-paste length gate ----------------
