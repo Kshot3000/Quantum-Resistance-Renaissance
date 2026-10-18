@@ -8,6 +8,7 @@ import {
   validateInnerHash, validateNodeName, validatePortNumber, validateBootnode, shq,
   buildNodeCommand, firewallRules, classifyLogLine, analyzeLog, logParseWindow, MAX_LOG_LINES,
   logTextWindow, MAX_LOG_SCAN_CHARS,
+  MAX_SINGLE_ARG_CHARS, singleArgRoom, validatePathArg,
   syncProgress, fmtEta, parseSnapshot,
 } from "../node-core.js";
 
@@ -111,6 +112,38 @@ ok("ufw denies quic", ufw.includes("deny 9833/udp"));
 const ipt = firewallRules("iptables", 30334);
 ok("iptables custom p2p", ipt.includes("--dport 30334"));
 ok("nft ok", firewallRules("nftables").includes("nft add rule"));
+
+/* --- single-argument length bound + firewall port grammar (Batch 187) ---
+ * Every free-text field the Launch Lab emits is ONE shell-quoted argv
+ * (MAX_ARG_STRLEN = 131,072); the firewall port is interpolated into
+ * sudo rules. Both used to pass unbounded / Number()-coerced. */
+eq("single-arg cap is the argv limit", MAX_SINGLE_ARG_CHARS, 131072);
+eq("single-arg room of empty is the cap", singleArgRoom(""), 131072);
+eq("single-arg room at cap is 0", singleArgRoom("x".repeat(131072)), 0);
+eq("single-arg room over cap is -1", singleArgRoom("x".repeat(131073)), -1);
+eq("single-arg room non-string is -1", singleArgRoom(42), -1);
+ok("path arg trims", validatePathArg("  /data/qtc  ", "Base path").value === "/data/qtc");
+ok("path arg refusal names size + cap", /20,000,000/.test(validatePathArg("a".repeat(20000000), "Base path").error) && validatePathArg("a".repeat(20000000), "Base path").error.includes("131,072"));
+for (const [label, opts] of [
+  ["node key file", { nodeKeyFile: "a".repeat(20000000) }],
+  ["base path", { basePath: "a".repeat(20000000) }],
+  ["chain", { chain: "a".repeat(20000000) + ".json" }],
+  ["auth token file", { miner: { authTokenFile: "a".repeat(20000000) } }],
+  ["tls cert file", { miner: { tlsCertFile: "a".repeat(20000000) } }],
+]) {
+  const rr = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, ...opts });
+  eq(`over-cap ${label} blocks node cmd`, rr.cmd, null);
+  eq(`over-cap ${label} blocks miner cmd`, rr.minerCmd, null);
+  ok(`over-cap ${label} errors name the cap`, rr.errors.some(e => e.includes("131,072")));
+}
+r = buildNodeCommand({ name: "ops-01", mode: "external", innerHash: IH, basePath: "a".repeat(131072) });
+ok("exactly-cap base path still builds", !!r.cmd && r.errors.length === 0);
+for (const bad of ["abc", "30333.5", "70000", "0"]) {
+  let threw = false;
+  try { firewallRules("ufw", bad); } catch (e) { threw = /P2P port/.test(e.message); }
+  ok(`firewall refuses port ${JSON.stringify(bad)}`, threw);
+}
+ok("firewall digit-string port ok", firewallRules("ufw", "30334").includes("allow 30334/tcp"));
 
 /* --- log forensics --- */
 let c = classifyLogLine("Mining rewards will be sent to wormhole address qzABC…");

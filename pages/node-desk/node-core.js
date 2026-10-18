@@ -74,6 +74,42 @@ export function validateBootnode(s) {
   return { ok: false, error: "Not a valid libp2p multiaddr — expected /dns|ip4|ip6/host/tcp/PORT/p2p/PEERID" };
 }
 
+/* Single-argument length bound (white-hat): every free-text value the
+ * Launch Lab emits — --node-key-file, --base-path, --chain, and the
+ * miner's --auth-token-file / --tls-cert-sha256-file — becomes ONE
+ * shell-quoted argument in a command the builder re-renders on EVERY
+ * keystroke, and Linux caps a single argv string at MAX_ARG_STRLEN =
+ * 131,072 bytes: a longer value can never be passed to the binary at
+ * all. These fields used to be shell-quoted with NO length check — a
+ * 20,000,000-char paste in the base path built a 20,000,222-char
+ * command in ~69 ms in Node with zero errors reported, re-quoted on
+ * every keystroke (probe qa-nodedesk-singleargbound), the same defect
+ * class CLI Forge closed in Batches 183–185. Over-cap values are now
+ * refused on length alone, before quoting, naming size + cap, and the
+ * refusal blocks BOTH commands (an invalid miner file blocks the node
+ * command too, exactly like a bad miner port). Genuine values sit far
+ * under the cap: filesystem paths are bounded by PATH_MAX = 4,096 and
+ * a chain-spec path is a filesystem path, so 131,072 is >30x the
+ * largest legitimate value and no genuine input changes outcome.
+ * Fail-closed: a non-string has no room. */
+export const MAX_SINGLE_ARG_CHARS = 131072;
+
+export function singleArgRoom(value) {
+  if (typeof value !== "string") return -1;
+  const room = MAX_SINGLE_ARG_CHARS - value.length;
+  return room >= 0 ? room : -1;
+}
+
+/** Validate one single-argument field value. The length gate consults
+ * the RAW value before trimming, so an over-cap paste is refused on
+ * length alone without a scan of the whole string. */
+export function validatePathArg(s, label) {
+  const raw = String(s ?? "");
+  if (singleArgRoom(raw) < 0)
+    return { ok: false, error: `${label}: value too long: ${raw.length.toLocaleString("en-US")} characters (max ${MAX_SINGLE_ARG_CHARS.toLocaleString("en-US")} — one command-line argument cannot exceed that)` };
+  return { ok: true, value: raw.trim() };
+}
+
 /** Shell-quote one argument. */
 export function shq(s) {
   const v = String(s);
@@ -94,7 +130,9 @@ export function shq(s) {
  */
 export function buildNodeCommand(o = {}) {
   const errors = [], warnings = [];
-  const chain = (o.chain || "mainnet").trim() || "mainnet";
+  const chainV = validatePathArg(o.chain || "mainnet", "--chain");
+  if (!chainV.ok) errors.push(chainV.error);
+  const chain = chainV.value || "mainnet";
   if (!["mainnet", "planck", "heisenberg"].includes(chain) && !chain.endsWith(".json"))
     warnings.push(`--chain "${chain}" is not one of the embedded specs (mainnet|planck|heisenberg); it will be treated as a path to a JSON spec file.`);
 
@@ -123,10 +161,16 @@ export function buildNodeCommand(o = {}) {
     warnings.push("Full-node-only mode: syncs and serves RPC, does not mine. Omit --rewards-inner-hash.");
   }
 
-  if (o.nodeKeyFile) parts.push("--node-key-file", shq(o.nodeKeyFile.trim()));
+  if (o.nodeKeyFile) {
+    const kf = validatePathArg(o.nodeKeyFile, "Node key file");
+    if (!kf.ok) errors.push(kf.error); else parts.push("--node-key-file", shq(kf.value));
+  }
   else warnings.push("No --node-key-file: the node generates an ephemeral peer identity each restart — fine for testing, pin one for production.");
 
-  if (o.basePath) parts.push("--base-path", shq(o.basePath.trim()));
+  if (o.basePath) {
+    const bp = validatePathArg(o.basePath, "Base path");
+    if (!bp.ok) errors.push(bp.error); else parts.push("--base-path", shq(bp.value));
+  }
 
   parts.push("--chain", shq(chain));
 
@@ -154,10 +198,19 @@ export function buildNodeCommand(o = {}) {
   if (mode === "external" && errors.length === 0) {
     const m = o.miner || {};
     const mp = validatePortNumber(o.minerListenPort ?? 9833, "Miner listen port").value || 9833;
+    /* The two miner file paths are single shell arguments too — held
+     * to the same validatePathArg bound as the node paths above; a
+     * refusal lands in the shared errors, so it blocks BOTH commands. */
+    const minerPath = (raw, fallback, label) => {
+      if (typeof raw !== "string" || !raw.trim()) return fallback;
+      const v = validatePathArg(raw, label);
+      if (!v.ok) { errors.push(v.error); return fallback; }
+      return v.value;
+    };
     const mc = ["./quantus-miner", "serve",
       "--node-addr", `127.0.0.1:${mp}`,
-      "--auth-token-file", shq((m.authTokenFile || "<base-path>/chains/mainnet/miner-auth-token").trim()),
-      "--tls-cert-sha256-file", shq((m.tlsCertFile || "<base-path>/chains/mainnet/miner-tls-cert-sha256").trim())];
+      "--auth-token-file", shq(minerPath(m.authTokenFile, "<base-path>/chains/mainnet/miner-auth-token", "Miner auth token file")),
+      "--tls-cert-sha256-file", shq(minerPath(m.tlsCertFile, "<base-path>/chains/mainnet/miner-tls-cert-sha256", "Miner TLS cert file"))];
     /* Round 2 — every value interpolated into a command the operator is
      * told to copy and RUN must be validated or shell-quoted, no
      * exceptions. The counts and the metrics port were the exceptions:
@@ -194,7 +247,14 @@ export function buildNodeCommand(o = {}) {
 
 /* ---------- firewall rule generator ---------- */
 export function firewallRules(tool, p2pPort = 30333) {
-  const p = Number(p2pPort) || 30333;
+  /* The port is interpolated into sudo rules the operator is told to
+   * RUN — it gets the same validatePortNumber grammar as every other
+   * port in this builder, never Number() coercion: "30333.5", "70000"
+   * and "1e5" used to paint invalid or nonsense rules verbatim.
+   * Throws on an invalid port; the UI renders the message as a comment. */
+  const pv = validatePortNumber(p2pPort, "P2P port");
+  if (!pv.ok) throw new Error(pv.error);
+  const p = pv.value;
   if (tool === "ufw") return [
     `sudo ufw allow ${p}/tcp comment 'Quantus P2P'`,
     `sudo ufw deny 9944/tcp comment 'Quantus RPC stays local'`,
