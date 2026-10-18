@@ -260,12 +260,25 @@ function parseProposalCalls(json) {
  * no event stamped before a prerequisite stage, no event after a
  * terminal, TIMED_OUT never coexists with DECISION_STARTED — and all
  * events of a referendum restate one proposal identity (preimage hash,
- * size, is_runtime_upgrade from the earliest event). See validateSnapshot. */
+ * size, is_runtime_upgrade from the earliest event). See validateSnapshot.
+ *
+ * Round 4 (extrinsics producer cap): shapes and relations bound what a
+ * row may claim, but no round bounded how MANY extrinsic rows the load
+ * walks — cleanExtrinsic, the JSON.stringify dedupe key and the sort ran
+ * over the whole array, so a crafted snapshot carrying 200,000 distinct
+ * valid rows was accepted whole (1,037.7 ms in Node) before the votes
+ * and treasury views could paint. The producer queries the indexer with
+ * extrinsic(limit: 500), so a producer-shaped snapshot can never carry
+ * more than MAX_EXTRINSICS rows: the raw length is checked before any
+ * row is cleaned and an over-cap snapshot fails honestly — truncating
+ * to the first 500 would paint the EARLIEST activity as complete and
+ * silently drop the newest governance actions. */
 var ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // prefix-189 shape (qz + 47 base58), as in Vesting Desk
 var GENESIS_FLOOR_MS = Date.parse("2026-09-01T00:00:00Z"); // chain exists from Sept 2026
 var MAX_CHAIN_HEIGHT = 10000000; // fleet plausible-height ceiling
 var MAX_REFERENDUM_INDEX = 1000000; // fleet governance-count ceiling (Watchtower MAX_GOV_COUNT)
 var MAX_ARGS_CHARS = 16384;
+var MAX_EXTRINSICS = 500; // producer cap: fetch-governance-data.mjs queries extrinsic(limit: 500)
 
 function nonNegInt(v) {
   if (typeof v === "number") return Number.isInteger(v) && v >= 0 ? v : null;
@@ -377,6 +390,7 @@ function validateSnapshot(raw, nowMs) {
   if (!Array.isArray(d.referenda)) return null;
   if (d.extrinsics !== undefined && !Array.isArray(d.extrinsics)) return null;
   if (d.upgrades !== undefined && !Array.isArray(d.upgrades)) return null;
+  if (d.extrinsics !== undefined && d.extrinsics.length > MAX_EXTRINSICS) return null; // round 4: producer cap, on raw length before any row is cleaned
   var refs = [];
   d.referenda.forEach(function (r) { var c = cleanRefEvent(r, fetchedMs); if (c) refs.push(c); });
   if (d.referenda.length && !refs.length) return null; // claimed referenda, none valid — fail honestly, never an empty-board lie
@@ -492,6 +506,7 @@ if (typeof module !== "undefined" && module.exports) {
     isPreimageHash: isPreimageHash, parseVoteArgs: parseVoteArgs, parseProposalCalls: parseProposalCalls,
     validateSnapshot: validateSnapshot, cleanRefEvent: cleanRefEvent,
     cleanExtrinsic: cleanExtrinsic, cleanUpgrade: cleanUpgrade,
-    GENESIS_FLOOR_MS: GENESIS_FLOOR_MS, ADDR_RE: ADDR_RE
+    GENESIS_FLOOR_MS: GENESIS_FLOOR_MS, ADDR_RE: ADDR_RE,
+    MAX_EXTRINSICS: MAX_EXTRINSICS
   };
 }

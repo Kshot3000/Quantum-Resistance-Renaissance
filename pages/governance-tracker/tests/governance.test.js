@@ -307,4 +307,36 @@ t("validateSnapshot: equal-timestamp lifecycle steps (same block) are kept", () 
   assert.equal(V(s).referenda.filter((r) => r.referendum_index === 3).length, 2);
 });
 
+// --- snapshot boundary producer cap (round 4) --------------------------------------
+// The producer queries extrinsic(limit: 500) — a producer-shaped snapshot can
+// never carry more extrinsic rows than that. The cap is held on the RAW array
+// length before any row is cleaned: over-cap fails the snapshot honestly
+// (truncating would paint the earliest 500 as the complete activity).
+const padExtrinsics = (snap, total) => {
+  const s = clone(snap); const base = s.data.extrinsics.length;
+  for (let i = base; i < total; i++) {
+    const x = clone(s.data.extrinsics[0]);
+    x.index_in_block = i;
+    x.block_id = String(100000 + i).padStart(10, "0") + "-b6b3e";
+    s.data.extrinsics.push(x);
+  }
+  return s;
+};
+t("round 4: MAX_EXTRINSICS pins the producer's extrinsic(limit: 500)", () => {
+  assert.equal(C.MAX_EXTRINSICS, 500);
+});
+t("round 4: an exactly-cap extrinsics payload (500) validates whole", () => {
+  const v = V(padExtrinsics(REAL, 500));
+  assert.ok(v);
+  assert.equal(v.extrinsics.length, 500);
+});
+t("round 4: cap+1 extrinsics (501) fail the snapshot", () => {
+  assert.equal(V(padExtrinsics(REAL, 501)), null);
+});
+t("round 4: the cap is on raw length — 501 rows fail even if they would dedupe away", () => {
+  const s = clone(REAL);
+  while (s.data.extrinsics.length < 501) s.data.extrinsics.push(clone(s.data.extrinsics[3]));
+  assert.equal(V(s), null);
+});
+
 console.log("\n" + passed + " tests passed");
