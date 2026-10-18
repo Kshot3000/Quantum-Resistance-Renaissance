@@ -23,7 +23,36 @@ import { sha256 } from '../../../assets/vendor/noble/hashes/sha2.js';
 const STORE_KEY = 'qtc-web-wallet-vault-v1';
 const ITERATIONS = 250000;
 
+/* Password-input bound BEFORE the KDF (white-hat): deriveKey encoded the
+ * password WHOLE and fed it into the 250,000-round PBKDF2 with no upper
+ * length bound anywhere — no HTML maxlength on pw1/pw2/unlock-pw, no check
+ * in saveVault/openVault — so a 20,000,000-char paste was encoded in full
+ * and run through the KDF (probe qa-passwordbound: accepted in ~247 ms in
+ * Node; the mnemonicToSeed hang shape from the mnemonic bound, one field
+ * over). A genuine vault password is short: NIST SP 800-63B requires
+ * verifiers to accept at least 64 characters, password managers generate
+ * at most ~128, and a long Diceware passphrase runs ~80. MAX_PASSWORD_CHARS
+ * = 1,024 (the fleet's mnemonic-input cap) is 8x the longest manager
+ * password and ~13x a ten-word passphrase, so no legitimate password
+ * changes outcome; over-cap input is refused on length alone, naming size
+ * + cap, before a single byte is encoded. passwordRoom is the pure
+ * fail-closed gate (non-integer, negative, or non-number counts get no
+ * room), mirroring mnemonicInputRoom. Derivation for in-cap passwords is
+ * byte-identical, so existing vaults unlock exactly as before. */
+export const MAX_PASSWORD_CHARS = 1024;
+export function passwordRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_PASSWORD_CHARS - chars);
+}
+function assertPasswordBound(password) {
+  if (typeof password !== 'string')
+    throw new Error('Password is not text — refused before key derivation.');
+  if (!passwordRoom(password.length) && password.length > MAX_PASSWORD_CHARS)
+    throw new Error(`Password too long (${password.length.toLocaleString('en-US')} characters) — the cap is ${MAX_PASSWORD_CHARS.toLocaleString('en-US')} characters; refused before key derivation.`);
+}
+
 async function deriveKey(password, salt) {
+  assertPasswordBound(password);
   const enc = new TextEncoder();
   const base = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
@@ -38,6 +67,7 @@ async function deriveKey(password, salt) {
 /* SHA-256 fingerprint of the password — lets the UI detect a wrong password
  * fast without attempting decryption (still verifies by decrypting). */
 export async function passwordFingerprint(password) {
+  assertPasswordBound(password);
   const h = sha256(new TextEncoder().encode('qtc-wallet|' + password));
   return [...h.slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

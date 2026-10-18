@@ -185,6 +185,35 @@ ok("deterministic", JSON.stringify(CHECK.addressToChecksum(KYLE, WORDS)) === JSO
   ok("randomized encryption", armored2.data !== armored.data && armored2.salt !== armored.salt);
 }
 
+/* 6b. backup-password length bound (white-hat, Batch 193): the password
+ * was encoded WHOLE into the 200,000-iteration PBKDF2 — encryptBackup
+ * checked only the 8-char minimum, decryptBackup nothing. The gate now
+ * lives in deriveBackupKey (cap 1,024, the fleet mnemonic cap), refusing
+ * over-cap/non-string input on length alone, naming size + cap, before
+ * any encoding; in-cap derivation is byte-identical. */
+{
+  ok("password cap pinned at 1,024", LOGIC.MAX_PASSWORD_CHARS === 1024);
+  ok("passwordRoom fail-closed",
+    LOGIC.passwordRoom(0) === 1024 && LOGIC.passwordRoom(1024) === 0 &&
+    LOGIC.passwordRoom(1025) === 0 && LOGIC.passwordRoom(-1) === 0 &&
+    LOGIC.passwordRoom(1.5) === 0 && LOGIC.passwordRoom("8") === 0 &&
+    LOGIC.passwordRoom(NaN) === 0);
+  const plain2 = JSON.stringify(LOGIC.buildExportPayload([]));
+  let encOver = "";
+  try { await LOGIC.encryptBackup("p".repeat(1025), plain2); } catch (e) { encOver = e.message; }
+  ok("encryptBackup refuses 1,025-char password naming size + cap",
+    /1,025/.test(encOver) && /1,024/.test(encOver), encOver);
+  const arm3 = await LOGIC.encryptBackup("correct horse battery staple", plain2);
+  let decOver = "";
+  try { await LOGIC.decryptBackup("p".repeat(1025), arm3); } catch (e) { decOver = e.message; }
+  ok("decryptBackup refuses 1,025-char password naming size + cap",
+    /1,025/.test(decOver) && /1,024/.test(decOver), decOver);
+  const capPw = "p".repeat(1024);
+  const armCap = await LOGIC.encryptBackup(capPw, plain2);
+  ok("exactly-1,024-char password encrypts + decrypts",
+    (await LOGIC.decryptBackup(capPw, armCap)) === plain2);
+}
+
 /* 7. lookalike mutation */
 {
   const m1 = LOGIC.mutateMiddleChar(KYLE);

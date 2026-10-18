@@ -21,6 +21,7 @@ import {
   setWordlistForTests, entropyToMnemonic, validateMnemonic, mnemonicToSeed,
   keypairFromSeed, keypairFromMnemonic, loadWordlist, embeddedWordlist,
   MAX_MNEMONIC_CHARS, mnemonicInputRoom, normalizeMnemonic,
+  MAX_PASSPHRASE_CHARS, passphraseRoom,
 } from '../js/mnemonic.js';
 import { readFileSync } from 'node:fs';
 
@@ -181,6 +182,29 @@ test('mnemonic: seed + normalize paths ask the same length gate', () => {
   assert.throws(() => keypairFromMnemonic('abandon '.repeat(2500000)), /1024/);
   // a legit phrase still seeds deterministically through the gate
   assert.deepEqual(mnemonicToSeed(m), mnemonicToSeed(normalizeMnemonic(m)));
+});
+
+test('mnemonic: passphrase length cap refuses over-cap passphrases before the seed KDF', () => {
+  setWordlistForTests(MINI_WORDS);
+  const m = entropyToMnemonic(new Uint8Array(32));
+  assert.equal(MAX_PASSPHRASE_CHARS, 1024);
+  assert.equal(passphraseRoom(0), 1024);
+  assert.equal(passphraseRoom(1024), 0);
+  assert.equal(passphraseRoom(1025), 0);
+  assert.equal(passphraseRoom(-1), 0);
+  assert.equal(passphraseRoom(1.5), 0);
+  assert.equal(passphraseRoom('12'), 0);
+  assert.equal(passphraseRoom(NaN), 0);
+  // exactly-cap passphrase still derives, and matches the uncapped derivation shape
+  assert.equal(mnemonicToSeed(m, 'p'.repeat(1024)).length, 64);
+  // one char over is refused on length, naming size + cap, before derivation
+  assert.throws(() => mnemonicToSeed(m, 'p'.repeat(1025)), /1,025/);
+  assert.throws(() => mnemonicToSeed(m, 'p'.repeat(1025)), /1,024/);
+  assert.throws(() => keypairFromMnemonic(m, 'p'.repeat(200000)), /too long/);
+  // non-string passphrase fails closed instead of being coerced into the salt
+  assert.throws(() => mnemonicToSeed(m, 42), /not text/);
+  // a genuine passphrase still changes the seed (passphrase path intact)
+  assert.notDeepEqual(mnemonicToSeed(m, 'genuine pass'), mnemonicToSeed(m, ''));
 });
 
 test('mnemonicToSeed: deterministic, 64 bytes', () => {
@@ -876,4 +900,48 @@ test('keystore: at-cap import (genuine blob padded to exactly the cap) succeeds'
   await ks.importVaultFile({ size: padded.length, text: async () => padded });
   const persisted = JSON.parse(vaultStore.get(VAULT_KEY));
   assert.equal(persisted.ciphertext, genuineBlob().ciphertext);
+});
+
+/* ---------- keystore password length bound (white-hat, Batch 193) -----
+ * deriveKey encoded the password WHOLE into the 250,000-round PBKDF2
+ * with no upper bound (no HTML maxlength, no core check): a 20M-char
+ * paste paid the full encode + KDF. The core now owns the bound —
+ * MAX_PASSWORD_CHARS = 1,024 (8x the longest password-manager password;
+ * derivation for in-cap passwords is byte-identical, so existing vaults
+ * unlock as before) — enforced inside deriveKey, the one path saveVault,
+ * openVault and passwordFingerprint all route through, refusing over-cap
+ * or non-string input on length alone, naming size + cap. */
+test('keystore: passwordRoom arithmetic is fail-closed at the 1,024 cap', () => {
+  assert.equal(ks.MAX_PASSWORD_CHARS, 1024);
+  assert.equal(ks.passwordRoom(0), 1024);
+  assert.equal(ks.passwordRoom(1024), 0);
+  assert.equal(ks.passwordRoom(1025), 0);
+  assert.equal(ks.passwordRoom(-1), 0);
+  assert.equal(ks.passwordRoom(1.5), 0);
+  assert.equal(ks.passwordRoom('8'), 0);
+  assert.equal(ks.passwordRoom(NaN), 0);
+});
+
+test('keystore: over-cap passwords are refused before derivation on save and open', async () => {
+  const over = 'p'.repeat(1025);
+  const sk = new Uint8Array(64).fill(3), pk = new Uint8Array(32).fill(4);
+  await assert.rejects(
+    () => ks.saveVault({ scheme: 65, secretKey: sk, publicKey: pk, mnemonic: null }, over),
+    (e) => /1,025/.test(e.message) && /1,024/.test(e.message) && /before key derivation/.test(e.message),
+  );
+  await assert.rejects(() => ks.openVault(over), /too long/);
+  await assert.rejects(() => ks.openVault(42), /not text/);
+  await assert.rejects(() => ks.passwordFingerprint('p'.repeat(200000)), /too long/);
+});
+
+test('keystore: exactly-cap password round-trips; genuine vault still opens', async () => {
+  const capPw = 'p'.repeat(1024);
+  const sk = new Uint8Array(64).fill(3), pk = new Uint8Array(32).fill(4);
+  await ks.saveVault({ scheme: 65, secretKey: sk, publicKey: pk, mnemonic: null }, capPw);
+  const data = await ks.openVault(capPw);
+  assert.equal(data.scheme, 65);
+  // restore the shared fixture vault for any later tests
+  await ks.saveVault({ scheme: 87, secretKey: sk, publicKey: pk, mnemonic: 'abandon '.repeat(23) + 'art' }, 'correct horse battery');
+  const again = await ks.openVault('correct horse battery');
+  assert.equal(again.scheme, 87);
 });

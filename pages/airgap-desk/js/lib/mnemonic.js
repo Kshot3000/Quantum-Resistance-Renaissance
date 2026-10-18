@@ -126,9 +126,37 @@ function pbkdf2Sha512(password, salt, iterations, dkLen) {
   return out.slice(0, dkLen);
 }
 
+/* Passphrase-input bound BEFORE the seed KDF (white-hat): the mnemonic
+ * itself was bounded above (MAX_MNEMONIC_CHARS), but the optional BIP-39
+ * passphrase — a free-text password field in the Web Wallet import form —
+ * was concatenated, NFKD-normalized and utf8-encoded WHOLE into the salt
+ * of the same 2,048-round PBKDF2-HMAC-SHA512 with no bound at all (probe
+ * qa-passwordbound). A genuine passphrase is a word or short phrase
+ * (BIP-39 passphrases in the wild run to a few dozen characters);
+ * MAX_PASSPHRASE_CHARS = 1,024 matches the mnemonic cap and is far above
+ * any legitimate passphrase, so in-cap derivation is byte-identical and
+ * existing passphrased wallets derive exactly as before. passphraseRoom
+ * is the pure fail-closed gate, mirroring mnemonicInputRoom; a non-string
+ * passphrase is refused rather than coerced into the salt. */
+export const MAX_PASSPHRASE_CHARS = 1024;
+export function passphraseRoom(chars) {
+  if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+  return Math.max(0, MAX_PASSPHRASE_CHARS - chars);
+}
+function passphraseTooLong(passphrase) {
+  return typeof passphrase !== 'string' || passphrase.length > MAX_PASSPHRASE_CHARS;
+}
+function passphraseTooLongReason(passphrase) {
+  return typeof passphrase !== 'string'
+    ? 'passphrase is not text — refused before seed derivation'
+    : `too long (${passphrase.length.toLocaleString('en-US')} characters) — the cap is ${MAX_PASSPHRASE_CHARS.toLocaleString('en-US')} characters; refused before seed derivation`;
+}
+
 export function mnemonicToSeed(mnemonic, passphrase = '') {
   if (mnemonicTooLong(mnemonic))
     throw new Error('Recovery phrase ' + tooLongReason(mnemonic));
+  if (passphraseTooLong(passphrase))
+    throw new Error('Passphrase ' + passphraseTooLongReason(passphrase));
   const pw = new TextEncoder().encode(mnemonic.normalize('NFKD'));
   const salt = new TextEncoder().encode(('mnemonic' + passphrase).normalize('NFKD'));
   return pbkdf2Sha512(pw, salt, 2048, 64);

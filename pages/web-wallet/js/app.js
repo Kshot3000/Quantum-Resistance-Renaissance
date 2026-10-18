@@ -8,7 +8,7 @@ import {
   loadWordlist, generateMnemonic, validateMnemonic, normalizeMnemonic, mnemonicToSeed,
   keypairFromSeed, keypairFromMnemonic, keypairFromSecret, schemeInfo, setWordlistForTests,
 } from './mnemonic.js';
-import { vaultExists, saveVault, openVault, wipeVault, exportVaultFile, importVaultFile } from './keystore.js?v=1.2.0';
+import { vaultExists, saveVault, openVault, wipeVault, exportVaultFile, importVaultFile } from './keystore.js?v=1.3.0';
 import {
   RpcClient, DEFAULT_RPC, validateRpcUrl, getRuntimeVersion, getLatestHeader,
   getAccountInfo, getNonce, buildUnsignedTransfer, finalizeTransfer, submitExtrinsic,

@@ -363,9 +363,41 @@ function getRandomValues(u8) {
 function te() { return new TextEncoder(); }
 function td() { return new TextDecoder(); }
 
+/* ---------- backup-password length gate ---------- */
+/* The backup password was utf8-encoded WHOLE and fed into the
+ * 200,000-iteration PBKDF2 with no upper bound: encryptBackup checked
+ * only the 8-character MINIMUM, decryptBackup checked nothing, and no
+ * HTML maxlength guards the fields — a 20,000,000-char paste was encoded
+ * in full and run through the KDF on every encrypt/decrypt (probe
+ * qa-passwordbound; the mnemonicToSeed hang shape, one field over). A
+ * genuine backup password is short (NIST SP 800-63B requires verifiers
+ * to accept at least 64 characters; password managers generate at most
+ * ~128; a long passphrase runs ~80). The cap is 1,024 — the fleet's
+ * mnemonic-input cap, 8x the longest manager password — and derivation for in-cap
+ * passwords is byte-identical, so existing encrypted backups decrypt
+ * exactly as before. The gate lives in deriveBackupKey, the ONE
+ * derivation path both encrypt and decrypt route through, refusing
+ * over-cap or non-string input on length alone via the pure fail-closed
+ * passwordRoom, naming size + cap, before any encoding. passwordRoom
+ * returns the characters of room left (0 when full or when the count is
+ * not a finite non-negative integer), mirroring the fleet's room gates. */
+var MAX_PASSWORD_CHARS = 1024;
+function passwordRoom(chars) {
+  if (typeof chars !== "number" || !isFinite(chars) || chars < 0 ||
+      Math.floor(chars) !== chars) return 0;
+  return Math.max(0, MAX_PASSWORD_CHARS - chars);
+}
+function assertPasswordBound(password) {
+  if (typeof password !== "string")
+    throw new Error("Password is not text — refused before key derivation (cap " + MAX_PASSWORD_CHARS.toLocaleString("en-US") + " characters).");
+  if (password.length > MAX_PASSWORD_CHARS)
+    throw new Error("Password too long (" + password.length.toLocaleString("en-US") + " characters) — the cap is " + MAX_PASSWORD_CHARS.toLocaleString("en-US") + " characters; refused before key derivation.");
+}
+
 async function deriveBackupKey(password, salt) {
+  assertPasswordBound(password);
   var subtle = getSubtle();
-  var keyMat = await subtle.importKey("raw", te().encode(String(password)), "PBKDF2", false, ["deriveKey"]);
+  var keyMat = await subtle.importKey("raw", te().encode(password), "PBKDF2", false, ["deriveKey"]);
   return subtle.deriveKey(
     { name: "PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     keyMat, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
@@ -417,6 +449,7 @@ var api = {
   checkphraseInputRoom: checkphraseInputRoom, parseCheckphraseWords: parseCheckphraseWords,
   encryptBackup: encryptBackup,
   decryptBackup: decryptBackup,
+  MAX_PASSWORD_CHARS: MAX_PASSWORD_CHARS, passwordRoom: passwordRoom,
   b64encode: b64encode, b64decode: b64decode,
   EXPORT_APP: EXPORT_APP, ENC_APP: ENC_APP, EXPORT_VERSION: EXPORT_VERSION,
   PBKDF2_ITERATIONS: PBKDF2_ITERATIONS
