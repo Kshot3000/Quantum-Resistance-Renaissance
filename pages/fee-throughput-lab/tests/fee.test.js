@@ -245,5 +245,28 @@ t("sources", function(){
   });
 });
 
+// 17. Non-finite floats refused (Batch 198): a pasted "1e999" in the free
+// number fields parseFloats to Infinity and used to throw RangeError in
+// lengthFeePlancks (BigInt(Infinity)) and paint "Infinity"/"∞" elsewhere.
+t("non-finite fee inputs refused", function(){
+  assert.strictEqual(m.lengthFeePlancks(Infinity), 0);
+  assert.strictEqual(m.lengthFeePlancks(-Infinity), 0);
+  assert.strictEqual(m.weightFeeEstimatePlancks(Infinity), 0);
+  var r = m.standardFee(Infinity, "0.0002", Infinity);
+  assert.ok(Number.isFinite(r.totalPlancks), "standardFee total stays finite");
+  assert.strictEqual(r.lengthPlancks, 0);
+  assert.strictEqual(r.weightPlancks, 0);
+  assert.strictEqual(m.fmtQTC(Infinity), "—");
+  assert.strictEqual(m.fmtQTC(NaN), "—");
+  assert.strictEqual(m.fmtPlancks(Infinity), "—");
+  assert.strictEqual(m.naiveBytes(Infinity), 0);
+  assert.strictEqual(m.aggregatedBytes(Infinity), 0);
+  assert.strictEqual(m.naiveBlocks(Infinity), 0);
+  assert.strictEqual(m.fmtBytes(Infinity), "0 B");
+  // genuine inputs unchanged
+  assert.strictEqual(m.lengthFeePlancks(7500), 750000000);
+  assert.strictEqual(m.fmtQTC(750000000), "0.00075");
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

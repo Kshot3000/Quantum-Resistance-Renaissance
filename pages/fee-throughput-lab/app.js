@@ -154,6 +154,11 @@ function qtcToPlancksExact(value){
 /* Exact length fee: bytes × 100,000 plancks */
 function lengthFeePlancks(bytes){
   if (!(bytes > 0)) return 0;
+  /* Non-finite guard (white-hat, Batch 198): the size field is a free
+   * number input — "1e999" parseFloats to Infinity, the UI coercions pass
+   * it through, and BigInt(Infinity) THREW RangeError, killing the fee
+   * pane's input handler mid-render. A non-finite size is no size: 0. */
+  if (typeof bytes === "number" && !Number.isFinite(bytes)) return 0;
   return Number(BigInt(Math.round(bytes)) * 100000n);
 }
 
@@ -167,6 +172,9 @@ function plancksToQTC(plancks){
  * falls back to the legacy 8-decimal float rendering and is labeled an
  * estimate wherever it appears. */
 function fmtQTC(plancks){
+  /* Non-finite Numbers render as the fleet's unrenderable marker, never
+   * as the literal strings "Infinity"/"NaN" (Batch 198). */
+  if (typeof plancks === "number" && !Number.isFinite(plancks)) return "—";
   if (typeof plancks === "bigint" || (typeof plancks === "number" && Number.isInteger(plancks))){
     var p = BigInt(plancks);
     var neg = p < 0n; if (neg) p = -p;
@@ -180,12 +188,14 @@ function fmtQTC(plancks){
 function fmtPlancks(plancks){
   if (typeof plancks === "bigint")
     return plancks.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " plancks";
+  if (typeof plancks === "number" && !Number.isFinite(plancks)) return "—";
   return Math.round(plancks).toLocaleString("en-US") + " plancks";
 }
 
 /* Weight fee — benchmark-dependent estimate: 0.1 planck per ps of ref_time */
 function weightFeeEstimatePlancks(refTimePs){
   if (!(refTimePs > 0)) return 0;
+  if (typeof refTimePs === "number" && !Number.isFinite(refTimePs)) return 0;
   return refTimePs * WEIGHT_FEE_PER_PS;
 }
 
@@ -233,12 +243,12 @@ function highSecFee(amountQTC){
 function qtps(perBlock){ return perBlock / BLOCK_TIME; }
 
 /* Aggregation: naive vs amortized on-chain footprint */
-function naiveBytes(n){ return Math.max(0, Math.round(n)) * PQ_OVERHEAD; }
-function aggregatedBytes(n){ return Math.max(0, Math.round(n)) * AMORT_BYTES_PER_TX; }
+function naiveBytes(n){ if (typeof n === "number" && !Number.isFinite(n)) return 0; return Math.max(0, Math.round(n)) * PQ_OVERHEAD; }
+function aggregatedBytes(n){ if (typeof n === "number" && !Number.isFinite(n)) return 0; return Math.max(0, Math.round(n)) * AMORT_BYTES_PER_TX; }
 function naiveBlocks(n){ return naiveBytes(n) / BLOCK_BYTES; }
 
 function fmtBytes(bytes){
-  if (!(bytes > 0)) return "0 B";
+  if (!(bytes > 0) || (typeof bytes === "number" && !Number.isFinite(bytes))) return "0 B";
   var units = ["B","KB","MB","GB","TB"], i = 0, v = bytes;
   while (v >= 1000 && i < units.length - 1){ v /= 1000; i++; }
   return (i === 0 ? Math.round(v) : v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2)) + " " + units[i];
@@ -326,9 +336,14 @@ function renderEstimator(){
   var tipOut = document.getElementById("std-tip-out");
   var refIn = document.getElementById("std-ref");
   var calcStd = function(){
-    estState.bytes = Math.max(0, Math.round(parseFloat(bytesIn.value) || 0));
+    /* Non-finite inputs (a pasted "1e999" parseFloats to Infinity and the
+     * || 0 / Math.max coercions pass it straight through) fall back to 0,
+     * exactly like the empty field they mimic (Batch 198). */
+    var bIn = parseFloat(bytesIn.value);
+    estState.bytes = Number.isFinite(bIn) ? Math.max(0, Math.round(bIn)) : 0;
     estState.tip = tipIn.value;
-    estState.refTime = Math.max(0, parseFloat(refIn.value) || 0);
+    var rIn = parseFloat(refIn.value);
+    estState.refTime = Number.isFinite(rIn) ? Math.max(0, rIn) : 0;
     bytesOut.textContent = estState.bytes.toLocaleString("en-US") + " B";
     tipOut.textContent = estState.tip + " QTC";
     var r = standardFee(estState.bytes, estState.tip, estState.refTime);
@@ -485,7 +500,8 @@ function renderSig(){
     { name:"call data (extrinsic payload)", bytes: null, color:"#8b7bff" }
   ];
   var build = function(){
-    var call = Math.max(0, Math.round(parseFloat(callIn.value) || 0));
+    var cIn = parseFloat(callIn.value);
+    var call = Number.isFinite(cIn) ? Math.max(0, Math.round(cIn)) : 0;
     callOut.textContent = call.toLocaleString("en-US") + " B";
     var wrap = document.getElementById("sig-stack");
     wrap.innerHTML = "";
