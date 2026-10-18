@@ -358,6 +358,22 @@ t("buildRunScript discloses the service fee; fee-free scripts stay clean", funct
   assert.ok(plain.indexOf(DistCore.SERVICE_FEE_ADDRESS) < 0, "no fee address without a fee");
 });
 
+t("buildRunScript single-argument length bound (Batch 188)", function () {
+  // The wallet name and tip each become ONE shell-quoted argument in
+  // the script; Linux caps one argv string at 131,072. Over-cap values
+  // throw naming size + cap; exactly-cap still builds.
+  var batches = [{ index: 1, rows: new Array(1), totalPlancks: BigInt("1000000000000") }];
+  assert.strictEqual(DistCore.MAX_SINGLE_ARG_CHARS, 131072);
+  assert.strictEqual(DistCore.singleArgRoom("x".repeat(131072)), 0);
+  assert.strictEqual(DistCore.singleArgRoom("x".repeat(131073)), -1);
+  assert.strictEqual(DistCore.singleArgRoom(42), -1, "fail-closed on non-strings");
+  assert.throws(function () { DistCore.buildRunScript(batches, "w".repeat(20000000), ""); }, /too long/);
+  assert.throws(function () { DistCore.buildRunScript(batches, "treasury", "9".repeat(20000000)); }, /too long/);
+  assert.throws(function () { DistCore.buildRunScript(batches, "w".repeat(131073), ""); }, /131,072/);
+  var atCap = DistCore.buildRunScript(batches, "w".repeat(131072), "");
+  assert.ok(atCap.indexOf("quantus batch send --from '") >= 0, "exactly-cap wallet still builds");
+});
+
 /* ---------- checkphrase queue bound ---------- */
 t("checkphraseQueue: bounded to the displayed rows, deduped, fail-closed", function () {
   var stub = { addressToChecksum: function () { return ["stub"]; } };

@@ -20,14 +20,14 @@ const NETWORK_DEFAULTS = {
   // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
   // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
   // and dated for the no-fetch path (file://, offline). All four figures come from
-  // ONE capture (2026-10-18 11:25Z): consensus difficulty @246,974 and total
-  // issuance @246,974, 2 seconds apart — never mix snapshot dates in one bundle
+  // ONE capture (2026-10-18 12:21Z): consensus difficulty @247,188 and total
+  // issuance @247,188, 1 seconds apart — never mix snapshot dates in one bundle
   // (the Sept-30 bundle survived to Oct 2 at half the real hashrate and skewed
   // every fallback-path earnings figure ~2x; guarded in tests).
-  blockRewardQTC: 0.3033656, // emission formula: (21M − 5,831,719.4110 total issuance) / 50M, data/supply.json @246974, 2026-10-18
-  blockRewardLabel: "0.3034 QTC · emission formula @ height 246974, 2026-10-18",
-  netHashHS: 37075778857854, // difficulty 444909346294248 / 12s, data/consensus.json @246974, 2026-10-18
-  netHashLabel: "≈37.08 TH/s · from difficulty 444909346294248 @ height 246974, 2026-10-18",
+  blockRewardQTC: 0.3033629, // emission formula: (21M − 5,831,855.3847 total issuance) / 50M, data/supply.json @247188, 2026-10-18
+  blockRewardLabel: "0.3034 QTC · emission formula @ height 247188, 2026-10-18",
+  netHashHS: 36785110401499, // difficulty 441421324817999 / 12s, data/consensus.json @247188, 2026-10-18
+  netHashLabel: "≈36.79 TH/s · from difficulty 441421324817999 @ height 247188, 2026-10-18",
 };
 
 const SOURCES = [
@@ -418,9 +418,23 @@ function deriveNetworkDefaults(snap) {
 
 /* ---------------- validation ---------------- */
 
+/* Address length bound (white-hat): a genuine Quantus address is
+ * exactly 49 characters (36-byte SS58-189 payload) and the largest
+ * SS58 the fleet's encoder can emit is 51, so the fleet SS58 input
+ * gate is 128 chars (>2.5x). The length check below this one is SOFT
+ * (a warning for the 40..52 band) — and buildCommand interpolates the
+ * address RAW into a copy-paste command, so an unbounded soft band
+ * meant a 20,000,000-char Base58 paste built a ~20M-char command the
+ * OS could never run (one argv string caps at MAX_ARG_STRLEN =
+ * 131,072). Over 128 chars is now a HARD refusal, checked before the
+ * Base58 scan; everything at or under the cap behaves exactly as
+ * before, soft band included. */
+const MAX_ADDRESS_CHARS = 128;
+
 function validateAddress(addr) {
   const a = String(addr || "").trim();
   if (!a) return { ok: false, msg: "Enter your Quantus payout address." };
+  if (a.length > MAX_ADDRESS_CHARS) return { ok: false, msg: "Address too long: " + a.length.toLocaleString("en-US") + " characters (max " + MAX_ADDRESS_CHARS + " — a Quantus address is 49 characters); refused before any command is built." };
   if (!a.startsWith("qz")) return { ok: false, msg: "Quantus mainnet addresses start with “qz” (SS58 prefix 189)." };
   if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(a)) return { ok: false, msg: "Address contains characters outside Base58 — check for typos." };
   if (a.length < 40 || a.length > 52) return { ok: false, msg: "Unusual length for a qz… address (" + a.length + " chars) — double-check it.", soft: true };
@@ -454,7 +468,8 @@ function buildCommand(poolId, minerId, address, worker) {
    * ';', '$()', backtick, pipe and space forms that break out of a shell
    * line or smuggle a flag) or an invalid worker builds NO command at
    * all. The soft length warning stays a warning: a short qz… address is
-   * shell-safe (pure Base58) and still builds, exactly as before. */
+   * shell-safe (pure Base58) and still builds, exactly as before. Over
+   * MAX_ADDRESS_CHARS (128) the warning turns hard — see validateAddress. */
   const va = validateAddress(addr);
   if (!va.ok && !va.soft) return { ok: false, msg: va.msg };
   const vw = validateWorker(worker);
@@ -743,7 +758,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     BLOCK_TIME_S, BLOCKS_PER_DAY, NETWORK_DEFAULTS, POOLS, SOURCES,
     effectiveFee, grossPerDay, netPerDay, soloStats, pplnsWindowBlocks,
-    toHS, fmtQTC, fmtDays, validateAddress, validateWorker, authToken, buildCommand,
+    toHS, fmtQTC, fmtDays, validateAddress, validateWorker, authToken, buildCommand, MAX_ADDRESS_CHARS,
     poolById, minerOptions,
     blockRewardQtc, totalSupplyOf, paceBlocksPerDay, paceAvgMs, deriveNetworkDefaults, formatUtc,
     intField, validPlancks, validHeight, validFetchedAt,

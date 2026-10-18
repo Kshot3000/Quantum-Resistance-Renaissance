@@ -129,6 +129,20 @@ t("builder still builds soft-length address", P.buildCommand("ariapool", "offici
 t("worker may start with a digit", P.validateWorker("1rig").ok);
 t("worker may not start with a dash", !P.validateWorker("-rig").ok);
 
+// --- address length bound (Batch 188): the soft 40..52 band is a
+// warning, but over the fleet SS58 gate (128 chars — a genuine address
+// is 49) the refusal is HARD, because the address is interpolated raw
+// into the command; a 20M-char Base58 paste used to build a ~20M-char
+// command. At/under the cap the soft behavior is unchanged.
+t("address cap pinned at the fleet SS58 gate", P.MAX_ADDRESS_CHARS === 128);
+const overAddr = P.validateAddress("qz" + "1".repeat(127));
+t("129-char address is a hard refusal", !overAddr.ok && !overAddr.soft);
+t("hard refusal names size and cap", /too long/i.test(overAddr.msg) && /128/.test(overAddr.msg));
+t("129-char address builds no command", !P.buildCommand("ariapool", "official", "qz" + "1".repeat(127), "rig1").ok);
+t("20M-char address builds no command", P.buildCommand("quanpool", "quanpoolminer", "qz" + "1".repeat(19999998), "w1").cmd === undefined);
+t("exactly-128-char address stays on the soft path", P.buildCommand("ariapool", "official", "qz" + "1".repeat(126), "rig1").ok);
+t("100-char garbage still builds (soft, by design)", P.buildCommand("ariapool", "official", "qz" + "1".repeat(98), "rig1").ok);
+
 // --- data integrity: every published fact well-formed
 t("two pools listed", P.POOLS.length === 2);
 P.POOLS.forEach((p) => {

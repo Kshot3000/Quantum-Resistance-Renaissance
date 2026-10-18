@@ -300,7 +300,34 @@ function shellQuote(s) {
   return "'" + String(s).replace(/'/g, "'\\''") + "'";
 }
 
+/* Single-argument length bound (white-hat). The sender wallet name and
+ * the tip are each emitted as ONE shell-quoted argument in the run
+ * script (`--from '…'` / `--tip '…'`), and Linux caps a single argv
+ * string at MAX_ARG_STRLEN = 131,072 — a longer value can never be
+ * passed to the CLI at all. Both used to be quoted with NO length
+ * check: a 20,000,000-char wallet name built a ~20M-char script in
+ * silence (probe qa-cmdargbound). Over-cap values are now refused on
+ * RAW length before trim or quoting, naming size + cap; exactly-cap
+ * values still build, and genuine values (wallet names are capped at
+ * 64 chars by the CLI's name grammar; a tip is a formatted amount)
+ * sit far under the cap. Fail-closed: a non-string has no room. */
+var MAX_SINGLE_ARG_CHARS = 131072;
+function singleArgRoom(value) {
+  if (typeof value !== "string") return -1;
+  var room = MAX_SINGLE_ARG_CHARS - value.length;
+  return room >= 0 ? room : -1;
+}
+function singleArgTooLong(label, value) {
+  return new Error(label + " too long: " + value.length.toLocaleString("en-US") +
+    " characters (max " + MAX_SINGLE_ARG_CHARS.toLocaleString("en-US") +
+    " — one command-line argument cannot exceed that); the run script was not built.");
+}
+
 function buildRunScript(batches, fromWallet, tipQTC, feeInfo) {
+  if (typeof fromWallet === "string" && singleArgRoom(fromWallet) < 0)
+    throw singleArgTooLong("Sender wallet name", fromWallet);
+  if (typeof tipQTC === "string" && singleArgRoom(tipQTC) < 0)
+    throw singleArgTooLong("Tip", tipQTC);
   var from = (fromWallet || "my_wallet").trim() || "my_wallet";
   var tip = (tipQTC || "").trim();
   var tipFlag = tip ? " --tip " + shellQuote(tip) : "";
@@ -510,6 +537,8 @@ var api = {
   estimateBatchFee: estimateBatchFee,
   buildBatchJson: buildBatchJson,
   buildRunScript: buildRunScript,
+  MAX_SINGLE_ARG_CHARS: MAX_SINGLE_ARG_CHARS,
+  singleArgRoom: singleArgRoom,
   formatQTC: formatQTC,
   formatQTC6: formatQTC6,
   wordsFromKey: wordsFromKey,

@@ -358,14 +358,32 @@ function renderExports(tipPlancks) {
     ? core.formatQTC(tipPlancks) : "";
   var feeInfo = state.serviceFeePlancks > BigInt(0)
     ? { feePlancks: state.serviceFeePlancks, feeBps: state.serviceFeeBps } : null;
-  var script = core.buildRunScript(state.batches, wallet, tipStr, feeInfo);
-  $("script-preview").firstChild.textContent = script;
+  var script = null;
+  try {
+    script = core.buildRunScript(state.batches, wallet, tipStr, feeInfo);
+  } catch (e) {
+    // Over-cap wallet name / tip (core singleArgRoom gate): no script
+    // is built or downloadable — the preview carries the refusal.
+    script = null;
+    $("script-preview").firstChild.textContent =
+      "# " + (e && e.message ? e.message : "The run script was not built.");
+  }
+  if (script) $("script-preview").firstChild.textContent = script;
   state.script = script;
   state.wallet = wallet;
 }
 
 function commandsOnly() {
-  var wallet = $("wallet").value.trim() || "my_wallet";
+  var rawWallet = $("wallet").value;
+  // Same single-argument gate as core.buildRunScript, consulted on the
+  // RAW value before trimming: an over-cap wallet name is refused here
+  // too, never quoted into a command.
+  if (core.singleArgRoom(rawWallet) < 0) {
+    return "# Sender wallet name too long: " + rawWallet.length.toLocaleString("en-US") +
+      " characters (max " + core.MAX_SINGLE_ARG_CHARS.toLocaleString("en-US") +
+      " — one command-line argument cannot exceed that); no commands were built.";
+  }
+  var wallet = rawWallet.trim() || "my_wallet";
   var tip = currentTipPlancks();
   var tipFlag = (tip.ok && tip.plancks > BigInt(0))
     ? " --tip " + core.formatQTC(tip.plancks) : "";
