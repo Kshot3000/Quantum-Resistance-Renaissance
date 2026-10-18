@@ -422,5 +422,29 @@ t("sanitizeMiners drops an over-cap bucket list but keeps the core verdicts", fu
   assert.strictEqual(out.window.block_count, 15000);
 });
 
+// 19. Round 7: the window_miners map's RAW key count — round 5 bounded
+// the map only by construction for accepted payloads, but the walk ran
+// before the sum relation could reject (a 500,000-key map walked whole,
+// 879.8 ms). The producer aggregates over 15,000 blocks, one author per
+// block, so sanitizeMiners now checks the raw key count against
+// MAX_WINDOW_BLOCKS before the walk.
+function wideAddr(i){ // addr4 tops out at ~1,600 distinct shapes; base58-encode the index instead
+  var s = "", n = i;
+  do { s = ALPHA4[n % 58] + s; n = Math.floor(n / 58); } while (n > 0);
+  return "qz" + s.padStart(47, "1");
+}
+function wideWindowPayload(nKeys){
+  var miners = {};
+  for (var i = 0; i < nKeys; i++) miners[wideAddr(i)] = 1;
+  return winPayload(15000, miners);
+}
+t("sanitizeMiners accepts exactly 15,000 distinct window miners", function(){
+  var out = m.sanitizeMiners(wideWindowPayload(15000));
+  assert.strictEqual(Object.keys(out.window_miners).length, 15000);
+});
+t("sanitizeMiners rejects a 15,001-key window_miners map on the raw count", function(){
+  assert.throws(function(){ m.sanitizeMiners(wideWindowPayload(15001)); }, /window_miners exceeds the producer window/);
+});
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

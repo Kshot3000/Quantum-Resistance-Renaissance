@@ -444,6 +444,49 @@ t("validateMiners: 31 tiling buckets fail before the walk", () => {
 t("validateMiners: a 16,000-block window fails on the window cap alone", () => {
   assert.equal(L.validateMiners(tilingMiners(16, 1000, 100000), 100000), null);
 });
+// Producer key-count caps (round 2, 2026-10-18): validCount accepts 0,
+// so a bucket's counts could sum honestly to its span while its map
+// carried unlimited zero-count keys — a 501-key zero-padded bucket over
+// a 500 span was ACCEPTED whole pre-fix, its window_miners restating
+// the padded sums exactly. The producer emits only counts >= 1 (one
+// author per block): at most BUCKET_SIZE = 500 keys per bucket and
+// WINDOW_BLOCKS = 15,000 keys in window_miners.
+const B58L = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function genAddrL(i) {
+  let s = "", n = i;
+  do { s = B58L[n % 58] + s; n = Math.floor(n / 58); } while (n > 0);
+  return "qz" + s.padStart(47, "1");
+}
+function bucketMiners(nReal, nZero, base) {
+  const miners = {};
+  for (let i = 0; i < nReal; i++) miners[genAddrL(base + i)] = 1;
+  for (let i = 0; i < nZero; i++) miners[genAddrL(base + 10000 + i)] = 0;
+  return miners;
+}
+t("validateMiners: producer key caps are pinned (500 bucket keys)", () => {
+  assert.equal(L.MAX_MINERS_BUCKET_KEYS, 500);
+});
+t("validateMiners: exactly 500 producer bucket keys (500 miners x 1) passes", () => {
+  const miners = bucketMiners(500, 0, 3000);
+  const fx = { ok: true, chain_height: 1000,
+    window: { start_height: 501, end_height: 1000, block_count: 500, observed_block_time_s: 10 },
+    buckets: [{ start: 501, end: 1000, blocks: 500, miners }],
+    window_miners: miners, all_time: [] };
+  assert.ok(L.validateMiners(fx, 1000) !== null);
+});
+t("validateMiners: a 501st zero-count bucket key fails on the count alone", () => {
+  const miners = bucketMiners(500, 1, 3000);
+  const fx = { ok: true, chain_height: 1000,
+    window: { start_height: 501, end_height: 1000, block_count: 500, observed_block_time_s: 10 },
+    buckets: [{ start: 501, end: 1000, blocks: 500, miners }],
+    window_miners: miners, all_time: [] };
+  assert.equal(L.validateMiners(fx, 1000), null);
+});
+t("validateMiners: window_miners padded past 15,000 keys fails", () => {
+  assert.equal(L.validateMiners(minersFx((m) => {
+    for (let i = 0; i < 15001; i++) m.window_miners[genAddrL(200000 + i)] = 0;
+  }), 1000), null);
+});
 t("validateFlowsMeta: v2 meta restates the payload; v1 passes on shape", () => {
   assert.equal(L.validateFlowsMeta({ ok: true, meta: { transfers: 2, chain_height: 1000 }, transfers: [1, 2] }, 1000), true);
   assert.equal(L.validateFlowsMeta({ ok: true, meta: { transfers: 3, chain_height: 1000 }, transfers: [1, 2] }, 1000), false);

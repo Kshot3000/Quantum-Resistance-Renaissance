@@ -177,7 +177,20 @@ function loadData(){
  * [] — buckets are auxiliary timeline data (the core verdicts still
  * render; the timeline card hides), and truncating to 30 would paint a
  * partial tiling as the complete window. A crafted 200,000-bucket file
- * is now refused in O(1) instead of walked whole. */
+ * is now refused in O(1) instead of walked whole.
+ * Round 7 — the WINDOW_MINERS map's RAW key count: round 5 bounded the
+ * map only by construction for ACCEPTED payloads (every count >= 1 and
+ * the counts sum to block_count <= MAX_WINDOW_BLOCKS), but the
+ * sanitizeMiners walk runs BEFORE the sum relation can reject, so a
+ * crafted 500,000-key window_miners was walked regex-by-regex on the
+ * rejection path too (879.8 ms in Node). The producer aggregates over
+ * WINDOW_BLOCKS = 15,000 blocks, one author per block, so a producer
+ * file carries at most 15,000 distinct window keys; sanitizeMiners now
+ * checks the RAW key count against MAX_WINDOW_BLOCKS before the walk
+ * and an over-cap map fails the snapshot like any other core
+ * violation. (Ledger Desk's validateMiners and Portfolio Desk's
+ * sanitizeMinedCounts close the same miners.json walks in their own
+ * shapes — Batch 181.) */
 var MAX_WINDOW_BLOCKS = 15000; // producer WINDOW_BLOCKS in scripts/fetch-miner-data.mjs
 var MAX_BUCKET_BLOCKS = 500;   // producer BUCKET_SIZE in scripts/fetch-miner-data.mjs
 var MAX_BUCKETS = 30;          // producer ceil(WINDOW_BLOCKS / BUCKET_SIZE) = ceil(15000 / 500)
@@ -256,8 +269,21 @@ function sanitizeMiners(d){
   if (wStart !== wEnd - wCount + 1) bad("window range != block_count");
   var wm = d.window_miners;
   if (!wm || typeof wm !== "object" || Array.isArray(wm)) bad("window_miners");
+  // Round 7: count the RAW keys with an early exit at the cap + 1 —
+  // an over-cap map is refused with no per-key regex/posInt walk (the
+  // 500,000-key payload took 879.8 ms pre-fix; the residual ~174 ms is
+  // the runtime's key-enumeration snapshot, identical for Object.keys
+  // and for-in on a dictionary-mode object in this Node build).
+  var wkeyCount = 0;
+  for (var wk in wm) {
+    if (Object.prototype.hasOwnProperty.call(wm, wk)) {
+      wkeyCount++;
+      if (wkeyCount > MAX_WINDOW_BLOCKS) break;
+    }
+  }
+  if (!wkeyCount) bad("window_miners empty");
+  if (wkeyCount > MAX_WINDOW_BLOCKS) bad("window_miners exceeds the producer window");
   var wkeys = Object.keys(wm);
-  if (!wkeys.length) bad("window_miners empty");
   var wsum = 0;
   wkeys.forEach(function(a){
     if (!ADDR_RE.test(a)) bad("window_miners address");

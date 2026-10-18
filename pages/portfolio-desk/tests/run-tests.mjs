@@ -429,6 +429,30 @@ test("round 3 relations: mined counts are contained by the chain they claim", ()
   assert.equal(P.sanitizeMinedCounts({}, [{ address: MA, blocks: 9999999 }]).get(MA), 9999999);
 });
 
+test("round 4 caps: mined collections are held to the producer's raw counts", () => {
+  const MA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7";
+  const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const gen = (i) => { let s = "", n = i; do { s = B58[n % 58] + s; n = Math.floor(n / 58); } while (n > 0); return "qz" + s.padStart(47, "1"); };
+  const B = { chainHeight: 10000000, windowBlocks: 15000 };
+  assert.equal(P.MAX_WINDOW_MINERS, 15000);   // producer WINDOW_BLOCKS
+  assert.equal(P.MAX_ALL_TIME_MINERS, 100);   // producer ALL_TIME_LIMIT
+  const wm = (n) => { const o = {}; for (let i = 0; i < n; i++) o[gen(i + 1000)] = 1; return o; };
+  const at = (n) => { const a = []; for (let i = 0; i < n; i++) a.push({ address: gen(i + 500000), blocks: 5 }); return a; };
+  // Exactly-cap collections are producer-shaped and kept whole.
+  assert.equal(P.sanitizeMinedCounts(wm(15000), [], B).size, 15000);
+  assert.equal(P.sanitizeMinedCounts({}, at(100), B).size, 100);
+  // The window view has no sum relation (0 passes per key), so pre-fix a
+  // 500,000-key map materialized whole into the counts Map; an over-cap
+  // map now voids the window view wholesale while all_time stands.
+  const over = P.sanitizeMinedCounts(wm(15001), [{ address: MA, blocks: 95851 }], B);
+  assert.equal(over.size, 1);
+  assert.equal(over.get(MA), 95851);
+  // An over-cap all_time list voids wholesale; the window floor stands.
+  const overAt = P.sanitizeMinedCounts({ [MA]: 500 }, at(101), B);
+  assert.equal(overAt.size, 1);
+  assert.equal(overAt.get(MA), 500);
+});
+
 test("round 3 relations: schedule identity dedupe and per-beneficiary cap", () => {
   const MA = "qzmviwoPJR19XovVwUYUoUKb2MoBygYgwYAevj5Br8JeunxW7";
   const W = { cliff_ms: "1820479917807", start_ms: "1820479917807", end_ms: "1915087917807" };

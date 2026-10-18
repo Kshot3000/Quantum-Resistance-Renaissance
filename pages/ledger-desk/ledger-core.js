@@ -544,8 +544,21 @@ var HEAD_SKEW_BLOCKS = 1000;
 // a single row. Both RAW values are now checked before the bucket loop;
 // an over-cap payload is not producer data and fails the scan honestly,
 // like any other core corruption.
+// Round 2 of the miners caps (2026-10-18): the per-bucket MINER MAPS and
+// window_miners itself. validCount accepts 0, so a bucket's counts can
+// sum honestly to its span while the map carries 500,000 zero-count
+// keys — walked key-by-key before the span relation could reject
+// (566.9 ms in Node) — and a 501-key zero-padded bucket over a 500 span
+// was ACCEPTED whole, its window_miners restating the padded sums
+// exactly. The producer emits only counts >= 1 (one author per block),
+// so a bucket holds at most BUCKET_SIZE = 500 keys and window_miners at
+// most WINDOW_BLOCKS = 15,000; both RAW counts are now checked before
+// their walks. (Portfolio Desk's sanitizeMinedCounts and the Mining
+// Observatory's sanitizeMiners close the same walks in their shapes —
+// Batch 181.)
 var MAX_MINERS_WINDOW_BLOCKS = 15000; // producer WINDOW_BLOCKS in scripts/fetch-miner-data.mjs
 var MAX_MINERS_BUCKETS = 30;          // producer ceil(WINDOW_BLOCKS / BUCKET_SIZE)
+var MAX_MINERS_BUCKET_KEYS = 500;     // producer BUCKET_SIZE: one author per block, counts >= 1
 
 function validChainHeight(v) {
   var n;
@@ -639,6 +652,18 @@ function validateMiners(miners, liveHead) {
     if (span === null || span !== be - bs + 1) return null;
     if (!isPlainObject(b.miners)) return null;
     var sum = 0;
+    // Producer key-count cap, counted with an early exit at the
+    // cap + 1: an over-cap map is refused with no per-key validation
+    // walk (566.9 ms pre-fix; the residual ~160-180 ms is the
+    // runtime's key-enumeration snapshot, identical for Object.keys
+    // and for-in on a dictionary-mode object in this Node build).
+    var bkeyCount = 0;
+    for (var bk in b.miners) {
+      if (Object.prototype.hasOwnProperty.call(b.miners, bk)) {
+        bkeyCount++;
+        if (bkeyCount > MAX_MINERS_BUCKET_KEYS) return null;
+      }
+    }
     var addrs = Object.keys(b.miners);
     for (var j = 0; j < addrs.length; j++) {
       var c = validCount(b.miners[addrs[j]]);
@@ -649,6 +674,14 @@ function validateMiners(miners, liveHead) {
     if (sum !== span) return null;
   }
   if (!isPlainObject(miners.window_miners)) return null;
+  // Producer key-count cap, early-exit counted like the bucket maps.
+  var wmCount = 0;
+  for (var wmk in miners.window_miners) {
+    if (Object.prototype.hasOwnProperty.call(miners.window_miners, wmk)) {
+      wmCount++;
+      if (wmCount > MAX_MINERS_WINDOW_BLOCKS) return null;
+    }
+  }
   var wmKeys = Object.keys(miners.window_miners);
   var total = 0;
   for (var k = 0; k < wmKeys.length; k++) {
@@ -700,6 +733,7 @@ var api = {
   MAX_CHAIN_HEIGHT: MAX_CHAIN_HEIGHT, MAX_SUPPLY_PLANCKS: MAX_SUPPLY_PLANCKS,
   GENESIS_FLOOR_MS: GENESIS_FLOOR_MS, HEAD_SKEW_BLOCKS: HEAD_SKEW_BLOCKS,
   MAX_MINERS_WINDOW_BLOCKS: MAX_MINERS_WINDOW_BLOCKS, MAX_MINERS_BUCKETS: MAX_MINERS_BUCKETS,
+  MAX_MINERS_BUCKET_KEYS: MAX_MINERS_BUCKET_KEYS,
   validChainHeight: validChainHeight, validCount: validCount,
   validChainTimeMs: validChainTimeMs, isSs58_189: isSs58_189,
   validateLiveHead: validateLiveHead, validateMiners: validateMiners,

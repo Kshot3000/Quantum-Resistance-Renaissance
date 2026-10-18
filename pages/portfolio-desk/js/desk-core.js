@@ -244,7 +244,46 @@ function sanitizeTopBalances(rows) {
   return byAddr;
 }
 
+/* Producer count caps for the miners snapshot (round 4, 2026-10-18):
+ * the producer (scripts/fetch-miner-data.mjs) aggregates window_miners
+ * over WINDOW_BLOCKS = 15,000 blocks — one author per block, every
+ * emitted count >= 1 — so it can emit at most 15,000 distinct keys, and
+ * all_time is its top-100 aggregate (ALL_TIME_LIMIT = 100). */
+var MAX_WINDOW_MINERS = 15000; // producer WINDOW_BLOCKS in scripts/fetch-miner-data.mjs
+var MAX_ALL_TIME_MINERS = 100; // producer ALL_TIME_LIMIT in scripts/fetch-miner-data.mjs
+
+/* True when obj carries more than cap own keys, counted with an early
+ * exit at cap + 1: an over-cap map is refused with no per-key
+ * validation walk and no result materialization. (The residual cost is
+ * the runtime's own key-enumeration snapshot — identical for
+ * Object.keys and for-in on a dictionary-mode object, measured
+ * ~173 ms at 500,000 keys in this Node build, against 490.6 ms for
+ * the pre-fix regex walk + Map materialization it replaces.) */
+function keyCountOver(obj, cap) {
+  var n = 0;
+  for (var k in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, k)) {
+      n++;
+      if (n > cap) return true;
+    }
+  }
+  return false;
+}
+
 function sanitizeMinedCounts(windowMiners, allTime, bounds) {
+  // Round 4 (2026-10-18): producer RAW-count caps, checked before either
+  // walk. Rounds 2-3 held the VALUES to chain relations (per-count
+  // ceilings, the all_time sum void) but never counted the collections
+  // themselves: the window view has no sum relation (a 0 count passes
+  // per key), so a crafted 500,000-key window_miners was walked
+  // regex-by-regex and materialized whole into the counts Map
+  // (500,000 entries, 490.6 ms in Node), and a 200,000-row all_time was
+  // walked and deduped whole — accepted outright with no bounds. An
+  // over-cap collection is not producer data: it degrades wholesale
+  // (window view voided / all_time voided) while the other view stands,
+  // mirroring round 3's wholesale void of an all_time list whose kept
+  // entries sum past chain_height. Truncating instead would paint a
+  // partial map as the complete window.
   // Round 3 (2026-10-14): chain-containment relations, verified on the
   // real miners.json at capture 225,165 before being held: every block
   // has exactly one author, so no address's all_time count can exceed
@@ -270,6 +309,9 @@ function sanitizeMinedCounts(windowMiners, allTime, bounds) {
   // that many). A duplicated all_time row restates the same cumulative
   // fact, so it is counted once, never summed.
   var counts = new Map();
+  if (windowMiners && typeof windowMiners === "object" && !Array.isArray(windowMiners) &&
+      keyCountOver(windowMiners, MAX_WINDOW_MINERS))
+    windowMiners = null; // round 4: over-cap window map is not producer data — voided wholesale, pre-walk
   if (windowMiners && typeof windowMiners === "object" && !Array.isArray(windowMiners))
     Object.keys(windowMiners).forEach(function (addr) {
       if (!SS58_189_RE.test(addr)) return;
@@ -279,6 +321,8 @@ function sanitizeMinedCounts(windowMiners, allTime, bounds) {
       if (chainHeight !== null && v > chainHeight) return;
       counts.set(addr, v);
     });
+  if (Array.isArray(allTime) && allTime.length > MAX_ALL_TIME_MINERS)
+    allTime = null; // round 4: over-cap all_time list is not producer data — voided wholesale, pre-walk
   if (Array.isArray(allTime)) {
     var seenAllTime = {};
     var kept = [];
@@ -579,6 +623,7 @@ var api = {
   sanitizeSchedule: sanitizeSchedule, sanitizeSchedules: sanitizeSchedules,
   sanitizeTransfers: sanitizeTransfers, sanitizeTopBalances: sanitizeTopBalances,
   sanitizeMinedCounts: sanitizeMinedCounts, sanitizeVaultEntries: sanitizeVaultEntries,
+  MAX_WINDOW_MINERS: MAX_WINDOW_MINERS, MAX_ALL_TIME_MINERS: MAX_ALL_TIME_MINERS,
   blankVault: blankVault, normalizeAddress: normalizeAddress,
   addToVault: addToVault, removeFromVault: removeFromVault,
   parseVaultJson: parseVaultJson, csvExport: csvExport,
