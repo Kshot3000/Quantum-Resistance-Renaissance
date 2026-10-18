@@ -121,7 +121,12 @@ async function main() {
   const N = stamps.length;
   const trend = [];
   for (let i = 0; i < N; i += 100) trend.push([stamps[i][0], stamps[i][1], D[i].toString()]);
-  trend.push([stamps[N - 1][0], stamps[N - 1][1], D[N - 1].toString()]);
+  // Append the head point only when it is not already the last sampled
+  // point: when (N-1) % 100 === 0 the loop above already emitted it, and
+  // an unconditional push duplicated its height — a trend the Consensus
+  // Lab validator's ascending-height rule (and its exact producer-size
+  // pin, expectedTrendLength) rejects.
+  if (trend[trend.length - 1][0] !== stamps[N - 1][0]) trend.push([stamps[N - 1][0], stamps[N - 1][1], D[N - 1].toString()]);
   const recent = [];
   for (let i = Math.max(0, N - 1500); i < N; i++) recent.push([stamps[i][0], stamps[i][1], D[i].toString()]);
   const times = [];

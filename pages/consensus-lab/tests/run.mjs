@@ -6,7 +6,7 @@
  */
 import {
   calculateDifficulty, recomputeChain, hashrateFromDifficulty,
-  fmtDiff, fmtHashrate, retargetZone, validSnapshot, validBlockHeight,
+  fmtDiff, fmtHashrate, retargetZone, validSnapshot, validBlockHeight, expectedTrendLength,
   TARGET_MS, MIN_DIFF, MAX_DIFF, INITIAL_DIFF,
 } from "../consensus-core.js";
 import { readFileSync } from "node:fs";
@@ -131,6 +131,19 @@ eq("zone floored", retargetZone(10).cls, "up");
   poison("min above current", (s) => { s.difficulty.min = (BigInt(s.current.difficulty) + 1n).toString(); });
   poison("max below current", (s) => { s.difficulty.max = (BigInt(s.current.difficulty) - 1n).toString(); });
   poison("genesis_ts disagrees with trend[0]", (s) => { s.genesis_ts += 60000; });
+  // round 4: the trend's length is exact-pinned to the producer's sampled
+  // size — the producer samples every 100 blocks and appends the head
+  // point only when it is not already a sample step.
+  eq("trend size N=2 (genesis + head)", expectedTrendLength(2), 2);
+  eq("trend size N=101 (head on a sample step)", expectedTrendLength(101), 2);
+  eq("trend size N=150 (2 samples + head)", expectedTrendLength(150), 3);
+  eq("trend size N=201 (head on a sample step)", expectedTrendLength(201), 3);
+  eq("trend size invalid N", expectedTrendLength(1), null);
+  eq("real trend is the producer size", real.trend.length, expectedTrendLength(real.blocks_indexed));
+  poison("trend one inserted point (producer+1)", (s) => {
+    s.trend.splice(500, 0, [s.trend[499][0] + 1, s.trend[499][1], s.trend[0][2]]);
+  });
+  poison("trend one dropped point (producer-1)", (s) => { s.trend.splice(500, 1); });
   // round 3: producer-recompute relations — interior recent points and the
   // block-time window's chronological tail are pinned, not just the tails.
   poison("recent interior difficulty inflated", (s) => {

@@ -93,7 +93,9 @@ export function pctChange(oldD, newD) {
  * trend[0] == the genesis point. Round 3 adds the producer's own
  * recompute: every recent difficulty == the exact retarget of its
  * predecessor over the pair's timestamp delta, and the block-time
- * window's tail == the recent series' own deltas. The 2026-10-09 validator checked shapes
+ * window's tail == the recent series' own deltas. Round 4 exact-pins the
+ * trend series' length to the producer's sampled size (see
+ * expectedTrendLength) before its points are walked. The 2026-10-09 validator checked shapes
  * only (finite / BigInt-parseable): a head of 9,007,199,254,740,991, a
  * tampered avg_ms, or a difficulty.min above the current difficulty all
  * painted as real. Shape is not a boundary — relations are. */
@@ -108,6 +110,23 @@ export function validBlockHeight(v) {
   else if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) n = Number(v);
   else return null;
   return (Number.isSafeInteger(n) && n >= 1 && n <= 10000000) ? n : null;
+}
+
+/* The producer's trend size, exactly (round 4): fetch-consensus-data.mjs
+ * samples the indexed stamps every 100 blocks (indices 0, 100, 200, …)
+ * and appends the head point — unless the head stamp already IS a sample
+ * step, in which case it is the last sampled point and nothing is
+ * appended. For N = blocks_indexed the trend therefore carries
+ * floor((N-1)/100)+1 sampled points plus one head point exactly when
+ * (N-1) % 100 !== 0. Every other collection in this snapshot was already
+ * exact-pinned to its producer size (recent: min(1500, N); block-time
+ * window: min(3000, N-1)); the trend — the largest collection and the
+ * one the history chart maps point-by-point — was held only to >= 2,
+ * so a one-point-per-block trend (100x the producer's, at the current
+ * head) passed every shape and relation check and was walked whole. */
+export function expectedTrendLength(n) {
+  if (!Number.isSafeInteger(n) || n < 2) return null;
+  return Math.floor((n - 1) / 100) + 1 + ((n - 1) % 100 === 0 ? 0 : 1);
 }
 
 /* Difficulty values travel as canonical digit strings; anything else
@@ -165,6 +184,10 @@ export function validSnapshot(j, nowMs = Date.now()) {
     else if (!Number.isSafeInteger(bt.longest_gap_height) || bt.longest_gap_height < 3 || bt.longest_gap_height > head) return false;
     if (head > bt.sample + 1 && bt.longest_gap_ms < bt.max_ms) return false;
     // trend + recent: [height, tsMs, difficulty] triples, ascending, tails == current
+    // Round 4: the trend's length is exact-pinned to the producer's size
+    // BEFORE the per-point walk below — an over-size trend fails in O(1),
+    // never after the validator (and then the chart) has walked it whole.
+    if (!Array.isArray(j.trend) || j.trend.length !== expectedTrendLength(j.blocks_indexed)) return false;
     const triples = (arr) => {
       if (!Array.isArray(arr) || !arr.length) return null;
       let prevH = 0, prevTs = -1;
@@ -181,7 +204,7 @@ export function validSnapshot(j, nowMs = Date.now()) {
     };
     const trendTail = triples(j.trend), recentTail = triples(j.recent);
     if (!trendTail || !recentTail) return false;
-    if (j.trend.length < 2 || j.recent.length !== Math.min(1500, j.blocks_indexed)) return false;
+    if (j.recent.length !== Math.min(1500, j.blocks_indexed)) return false;
     // trend starts at the genesis point: block 1, genesis_ts, initial difficulty
     if (j.trend[0][0] !== 1 || j.trend[0][1] !== j.genesis_ts || j.trend[0][2] !== INITIAL_DIFF.toString()) return false;
     // both series end at the same head point, and it is the current point
