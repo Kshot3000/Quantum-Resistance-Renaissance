@@ -288,5 +288,33 @@ function maxSpacedHex() {
   return "0x" + mc.map((b) => ("0" + b.toString(16)).slice(-2)).join(" ");
 }
 
+// --- textInputRoom plain-text bound: the pd-text handler and the
+// composer's remark template used to utf8-encode the WHOLE string on
+// every keystroke before any length check (pdRender's cap is on the
+// encoded bytes; the remark path consulted no cap at all — a
+// 20,000,000-char paste encoded in ~1.3 s and tplRemark built a
+// 20,000,006-byte call from it). Every character encodes to at least
+// one UTF-8 byte, so text over MAX_PROPOSAL characters is guaranteed
+// over the 4 KiB byte cap and is now refused on raw length before
+// encoding; the handlers consult this gate.
+eq("textbound: cap is MAX_PROPOSAL (4096 chars)", C.MAX_TEXT_INPUT_CHARS, C.MAX_PROPOSAL);
+eq("textbound: room(0) = cap", C.textInputRoom(0), 4096);
+eq("textbound: room(cap) = 0", C.textInputRoom(4096), 0);
+eq("textbound: room(cap+1) = 0", C.textInputRoom(4097), 0);
+eq("textbound: room(NaN) fail-closed", C.textInputRoom(NaN), 0);
+eq("textbound: room(-1) fail-closed", C.textInputRoom(-1), 0);
+eq("textbound: room(2.5) fail-closed", C.textInputRoom(2.5), 0);
+eq("textbound: room('100') fail-closed", C.textInputRoom("100"), 0);
+eq("textbound: room(undefined) fail-closed", C.textInputRoom(undefined), 0);
+eq("textbound: room(null) fail-closed", C.textInputRoom(null), 0);
+eq("textbound: room(Infinity) fail-closed", C.textInputRoom(Infinity), 0);
+// the derivation the gate stands on: bytes >= characters, always
+eq("textbound: 4,096 ASCII chars = 4,096 bytes (fits)", C.utf8("a".repeat(4096)).length, 4096);
+eq("textbound: 4,097 ASCII chars = 4,097 bytes (guaranteed over)", C.utf8("a".repeat(4097)).length, 4097);
+eq("textbound: 4,096 two-byte chars = 8,192 bytes", C.utf8("é".repeat(4096)).length, 8192);
+eq("textbound: astral chars still >= 1 byte per code unit", C.utf8("😀".repeat(2048)).length, 8192);
+t("textbound: a max remark call is 2 + compact + text bytes",
+  C.tplRemark("a".repeat(4090)).bytes.length <= C.MAX_PROPOSAL);
+
 console.log(pass + "/" + (pass + fail) + " proposal-studio tests green");
 process.exit(fail ? 1 : 0);

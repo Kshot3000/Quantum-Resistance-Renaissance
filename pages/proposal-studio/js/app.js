@@ -165,7 +165,24 @@
     } else if (tpl === "remark") {
       var txt = ($("cmp-text") || { value: "" }).value || "";
       if (!txt) err = "Enter remark text.";
-      else built = C.tplRemark(txt);
+      // Length bounds (white-hat track): tplRemark utf8-encodes the
+      // whole text, and no cap was consulted on this path at all — an
+      // over-cap remark was previewed and packed as if it could
+      // execute. Over-cap CHARACTERS are refused before encoding
+      // (every character takes at least one byte, so they are
+      // guaranteed over the 4 KiB cap); a built call over the cap in
+      // BYTES (multibyte text) is refused after the build.
+      else if (txt.length > C.MAX_TEXT_INPUT_CHARS) err = "Remark text too long (" + txt.length.toLocaleString("en-US") +
+        " characters) — text over the " + C.MAX_TEXT_INPUT_CHARS.toLocaleString("en-US") +
+        "-character cap is refused before encoding: every character takes at least one byte, so the call would exceed the 4 KiB proposal cap.";
+      else {
+        built = C.tplRemark(txt);
+        if (built.bytes.length > C.MAX_PROPOSAL) {
+          err = "Remark encodes to a " + built.bytes.length.toLocaleString("en-US") +
+            "-byte call — over the 4 KiB (4,096 byte) proposal cap. The chain would reject this proposal.";
+          built = null;
+        }
+      }
     } else if (tpl === "treasury" || tpl === "member") {
       var id = tpl === "treasury" ? "cmp-addr1" : "cmp-addr2";
       var pk = ss58ToPubkey(($(id) || { value: "" }).value || "");
@@ -392,6 +409,20 @@
   });
   $("pd-text").addEventListener("input", function (e) {
     var t = e.target.value;
+    // Length bound BEFORE encoding (white-hat track): this handler
+    // runs on every keystroke and C.utf8 used to encode the whole
+    // paste before pdRender's 4 KiB byte check could reject it.
+    // Every character encodes to at least one UTF-8 byte, so a text
+    // over MAX_TEXT_INPUT_CHARS characters is guaranteed over the
+    // 4 KiB cap — refuse it unencoded with size + cap named.
+    if (t.length > C.MAX_TEXT_INPUT_CHARS) {
+      pdBytes = null;
+      $("pd-out").innerHTML = "<p class='err'>Text too long (" + t.length.toLocaleString("en-US") +
+        " characters) — text over the " + C.MAX_TEXT_INPUT_CHARS.toLocaleString("en-US") +
+        "-character cap is refused before encoding: every character takes at least one byte, " +
+        "so it would exceed the 4 KiB proposal cap.</p>";
+      return;
+    }
     pdBytes = t ? C.utf8(t) : null; pdRender();
   });
   $("pd-file").addEventListener("change", function (e) {

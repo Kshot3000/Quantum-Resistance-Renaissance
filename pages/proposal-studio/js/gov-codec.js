@@ -102,6 +102,28 @@
     for (var i = 0; i < out.length; i++) out[i] = parseInt(h.substr(i * 2, 2), 16);
     return out;
   }
+  /* Plain-text input bound (white-hat track): the two live text paths
+   * — the Preimage Desk's pd-text handler and the composer's remark
+   * template — encoded the WHOLE string with utf8() on every keystroke
+   * before any length check: pdRender's 4 KiB cap is consulted only on
+   * the ENCODED bytes, and the remark path consulted no cap at all (a
+   * 20,000,000-char paste encoded in ~1.3 s in Node and tplRemark
+   * built a 20,000,006-byte "call" from it in ~15 s). Every character
+   * encodes to AT LEAST one UTF-8 byte (TextEncoder: 1–4 bytes per
+   * code point, ≥1 per UTF-16 code unit; the fallback encoder below
+   * likewise), so a text longer than MAX_PROPOSAL characters is
+   * GUARANTEED to encode to more than MAX_PROPOSAL bytes — refusing
+   * it on raw length before encoding can never refuse a text that
+   * could have fit. Texts at or under the cap still encode (a
+   * multibyte text can still exceed 4 KiB of bytes; pdRender's byte
+   * check and the remark branch's built-call check cover that).
+   * textInputRoom is the pure fail-closed gate, mirroring
+   * hexInputRoom. */
+  var MAX_TEXT_INPUT_CHARS = MAX_PROPOSAL;
+  function textInputRoom(chars) {
+    if (!Number.isSafeInteger(chars) || chars < 0) return 0;
+    return Math.max(0, MAX_TEXT_INPUT_CHARS - chars);
+  }
   function bytesToHex(b) {
     var s = "";
     for (var i = 0; i < b.length; i++) s += ("0" + b[i].toString(16)).slice(-2);
@@ -462,6 +484,7 @@
     LENGTH_FEE_PER_BYTE: LENGTH_FEE_PER_BYTE, REF0: REF0,
     hexToBytes: hexToBytes, bytesToHex: bytesToHex, u32le: u32le,
     MAX_HEX_INPUT_CHARS: MAX_HEX_INPUT_CHARS, hexInputRoom: hexInputRoom,
+    MAX_TEXT_INPUT_CHARS: MAX_TEXT_INPUT_CHARS, textInputRoom: textInputRoom,
     compactU32: compactU32, utf8: utf8, qtc: qtc, blocksToClock: blocksToClock,
     inspectCall: inspectCall, preimageDeposit: preimageDeposit,
     buildNotePreimage: buildNotePreimage, buildUnnotePreimage: buildUnnotePreimage,
