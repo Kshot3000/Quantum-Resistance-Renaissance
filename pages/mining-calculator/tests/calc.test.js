@@ -125,8 +125,8 @@ t("fallback bundle is one consistent capture", function(){
   var F = m.FALLBACK;
   assert.strictEqual(F.netHs, Math.floor(Number(F.difficulty) / 12), "netHs = difficulty / 12s");
   approx(Number(F.totalSupplyPlancks) / 1e12, F.supplyQtc, 0.001); // supplyQtc stored rounded to 4dp
-  approx(m.blockReward(F.supplyQtc), 0.3033368, 1e-7);
-  assert.strictEqual(F.height, 249206);
+  approx(m.blockReward(F.supplyQtc), 0.3033342, 1e-7);
+  assert.strictEqual(F.height, 249424);
   assert.ok(F.fetchedAt.indexOf("2026-10-18") === 0, "fallback is dated 2026-10-18");
   // The old bug, pinned: the pre-v1.9.0 static default was 10 GH/s.
   assert.ok(F.netHs > 1e12, "fallback network rate is TH/s-scale, not the old 10 GH/s example");
@@ -145,7 +145,7 @@ t("estimate uses observed pace when given", function(){
 
 // 14. Default-rig honesty: 500 MH/s vs the fallback network ≈ 0.0244 QTC/day
 // (band re-derived each fallback sync: share × observed pace × reward at the
-// @249,206 capture = 0.0244; it drifts down as the network grows)
+// @249,424 capture = 0.0244; it drifts down as the network grows)
 t("default rig estimate is honest at fallback defaults", function(){
   var e = estimate({ userHs: 500e6, netHs: m.FALLBACK.netHs, watts: 450, kwhPrice: 0.12,
                      qtcPrice: 0, reward: m.blockReward(m.FALLBACK.supplyQtc),
@@ -154,13 +154,13 @@ t("default rig estimate is honest at fallback defaults", function(){
 });
 
 // 15. HTML guards: fallback-accurate defaults + provenance hooks + cache key
-t("index.html carries the fallback defaults and v1.11.155 key", function(){
+t("index.html carries the fallback defaults and v1.12.156 key", function(){
   var fs = require("fs"), path = require("path");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="36.501"') >= 0, "in-net defaults to the fallback TH/s figure");
+  assert.ok(html.indexOf('id="in-net" type="number" min="0" step="any" value="36.304"') >= 0, "in-net defaults to the fallback TH/s figure");
   assert.ok(html.indexOf('<option selected>TH/s</option>') >= 0, "network unit defaults to TH/s");
   assert.ok(html.indexOf('id="net-hint"') >= 0 && html.indexOf('id="supply-hint"') >= 0 && html.indexOf('id="stats-src"') >= 0, "provenance hooks present");
-  assert.ok(html.indexOf("app.js?v=1.11.155") >= 0, "app.js cache key bumped to 1.11.155");
+  assert.ok(html.indexOf("app.js?v=1.12.156") >= 0, "app.js cache key bumped to 1.12.156");
   assert.ok(html.indexOf("falls back to the dated Oct 2, 2026 capture") < 0, "honesty bullet no longer pins the fallback to the stale Oct 2 capture");
   assert.ok(html.indexOf("Example figure") < 0, "the old 'example figure' network default is gone");
 });
@@ -272,6 +272,20 @@ t("pace anchors only when avg recomputes from its own window", function(){
   assert.strictEqual(m.deriveNetworkDefaults(negDelta, sup).blocksPerDay, null);
   var fracDelta = JSON.parse(JSON.stringify(cons)); fracDelta.block_times_ms.last[0] = 14000.5;
   assert.strictEqual(m.deriveNetworkDefaults(fracDelta, sup).blocksPerDay, null);
+});
+
+// Non-finite inputs (white-hat track, 2026-10-18): a 1e999 paste parseFloats
+// to Infinity — infinite hashrate yielded a NaN share against an infinite
+// network and infinite watts an infinite power cost.
+t("non-finite inputs fall back to zero", function(){
+  var e = estimate({ userHs: Infinity, netHs: Infinity, watts: Infinity, kwhPrice: 0.12, qtcPrice: 1, reward: 0.3066 });
+  assert.strictEqual(e.share, 0);
+  assert.strictEqual(e.qtcPerDay, 0);
+  assert.strictEqual(e.powerCost, 0);
+  assert.ok(isFinite(e.profit));
+  var e2 = estimate({ userHs: 1e9, netHs: 1e11, watts: Infinity, kwhPrice: 0.12, qtcPrice: 0, reward: 0.3066 });
+  assert.strictEqual(e2.powerCost, 0);
+  approx(e2.share, 0.01, 1e-12);
 });
 
 console.log(passed + " tests passed");

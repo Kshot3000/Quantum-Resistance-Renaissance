@@ -239,7 +239,7 @@ ok("fallback curSupply within emission bounds", Number(csVal) >= 5670000 && Numb
 var hintM = html.match(/id="supplyHint"[^>]*>([\s\S]*?)<\/p>/);
 ok("fallback hint cites a dated capture height", !!hintM && /block [0-9]{1,3},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
 ok("fallback hint difficulty matches painted netHash (one capture)",
-   !!hintM && /438,009,240,920,699/.test(hintM[1]) && Math.abs(Number(nhVal) - 438009240920699 / 12 / 1e9) < 1,
+   !!hintM && /435,642,221,376,279/.test(hintM[1]) && Math.abs(Number(nhVal) - 435642221376279 / 12 / 1e9) < 1,
    nhVal);
 ok("stale 45,125 example gone", !/45,125/.test(html));
 
@@ -257,6 +257,15 @@ ok("sec sanitize: honest booleans kept, false dropped", JSON.stringify(Studio.sa
 ok("sec sanitize: truthy non-booleans dropped", JSON.stringify(Studio.sanitizeSecDone({ 0: "yes", 1: 1, 2: true })) === '{"2":true}');
 ok("sec sanitize: out-of-range indices + unknown keys dropped", JSON.stringify(Studio.sanitizeSecDone({ 0: true, 8: true, 999: true, poison: true })) === '{"0":true}');
 ok("sec sanitize: fresh object, input unmutated", (function () { var inp = { 0: "yes", 9: true }; var out = Studio.sanitizeSecDone(inp); return out !== inp && inp[0] === "yes" && !("0" in out); })());
+
+/* non-finite calculator inputs (white-hat track, 2026-10-18): a 1e999 paste
+ * parseFloats to Infinity and a 400-digit rig count parseInts to Infinity;
+ * both used to paint "Infinity GH/s" / "Infinity QTC" figures. */
+ok("formatHash Infinity -> dash", Studio.formatHash(Infinity) === "—");
+ok("formatHash NaN -> dash", Studio.formatHash(NaN) === "—");
+ok("estimate null on infinite user hashrate", Studio.estimate(Infinity, 50, 5720000) === null);
+ok("estimate null on infinite network hashrate", Studio.estimate(1200, Infinity, 5720000) === null);
+ok("grade null on infinite rate", Studio.gradeBenchmark(Infinity, 1130) === null);
 
 console.log("\n" + (n - fails) + "/" + n + " passed" + (fails ? " — FAILURES" : ""));
 process.exit(fails ? 1 : 0);

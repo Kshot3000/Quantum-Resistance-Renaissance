@@ -182,6 +182,10 @@ Studio.deriveNetworkDefaults = function (consensus, supply) {
 };
 Studio.estimate = function (userMH, netGH, supply, blocksPerDay) {
   if (!isFinite(supply) || supply < 0) return null;
+  /* Non-finite hashrates (a 1e999 paste parseFloats to Infinity; a 400-digit
+   * rig count parseInts to Infinity) used to sail past the > 0 checks and
+   * paint "Infinity QTC" earnings. No estimate exists for them. */
+  if (!isFinite(userMH) || !isFinite(netGH)) return null;
   var reward = Studio.blockReward(supply);
   var bpd = (isFinite(blocksPerDay) && blocksPerDay > 0) ? blocksPerDay : Studio.blocksPerDay();
   if (!(userMH > 0) || !(netGH > 0)) return null;
@@ -195,6 +199,7 @@ Studio.estimate = function (userMH, netGH, supply, blocksPerDay) {
   };
 };
 Studio.gradeBenchmark = function (rateMH, deviceMid) {
+  if (!isFinite(rateMH) || !isFinite(deviceMid)) return null;
   if (!(rateMH > 0) || !(deviceMid > 0)) return null;
   var r = rateMH / deviceMid;
   if (r < 0.5)  return { cls: "low",   label: "Well below expected", r: r };
@@ -203,6 +208,7 @@ Studio.gradeBenchmark = function (rateMH, deviceMid) {
   return { cls: "great", label: "Above reference — excellent silicon or tuned build", r: r };
 };
 Studio.formatHash = function (mh) {
+  if (!isFinite(mh)) return "—";
   if (mh >= 1000) return (mh / 1000).toFixed(2) + " GH/s";
   if (mh >= 1) return mh.toFixed(mh >= 100 ? 0 : 1) + " MH/s";
   return (mh * 1000).toFixed(0) + " kH/s";

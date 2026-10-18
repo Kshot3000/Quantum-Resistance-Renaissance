@@ -1,7 +1,7 @@
 /* QTC Consensus Lab — app.js */
 import {
   calculateDifficulty, hashrateFromDifficulty, fmtHashrate, fmtDiff, fmtMs, pctChange,
-  retargetZone, validSnapshot, TARGET_MS, MIN_DIFF, MAX_DIFF, INITIAL_DIFF, MAX_REORG_DEPTH,
+  retargetZone, validSnapshot, attackEstimate, TARGET_MS, MIN_DIFF, MAX_DIFF, INITIAL_DIFF, MAX_REORG_DEPTH,
 } from "./consensus-core.js";
 
 const $ = (id) => document.getElementById(id);
@@ -279,26 +279,32 @@ function attackLab() {
     const watts = Math.max(0, parseFloat($("atkW").value) || 0);
     const kwh = Math.max(0, parseFloat($("atkKwh").value) || 0);
     const hrs = Math.max(1, parseFloat($("atkHrs").value) || 0);
-    const mine = BigInt(Math.round(per * unit)) * BigInt(n); // H/s as BigInt
     const out = $("attackOut");
-    if (!S || mine <= 0n) {
+    /* attackEstimate (consensus-core) sanitizes the raw floats first: a
+     * 1e999 paste parseFloats to Infinity, which used to throw inside
+     * BigInt(Math.round(...)) and freeze this pane, or paint "$∞". */
+    const est = S ? attackEstimate(
+      { per, unit, rigs: n, capex, watts, kwh, hrs },
+      (() => { try { return BigInt(S.current.est_hashrate_hs); } catch { return 0n; } })()) : null;
+    if (!est) {
       out.innerHTML = `<div class="big">—</div><p class="fine">Enter your hashrate to price the attack. Network hashrate needs the snapshot.</p>`;
       return;
     }
+    const mine = est.mine;
     const net = BigInt(S.current.est_hashrate_hs);
-    const sharePct = Number((mine * 1000000n) / (net + mine)) / 10000;
-    const majority = mine > net;
-    const totalCapex = capex * n;
-    const energyKwh = watts * n * hrs / 1000;
-    const energyCost = energyKwh * kwh;
-    const fmtUSD = (x) => "$" + x.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    const sharePct = est.sharePct;
+    const majority = est.majority;
+    const totalCapex = est.totalCapex;
+    const energyKwh = est.energyKwh;
+    const energyCost = est.energyCost;
+    const fmtUSD = (x) => x === null ? "—" : "$" + x.toLocaleString("en-US", { maximumFractionDigits: 0 });
     out.innerHTML = `
       <div class="row"><span class="k">Your hashrate</span><span class="v">${fmtHashrate(mine)}</span></div>
       <div class="row"><span class="k">Network hashrate (est.)</span><span class="v">${fmtHashrate(net)}</span></div>
       <div class="row"><span class="k">Your share of total</span><span class="v" style="color:${majority ? "#6df2b8" : "#ff7d8a"}">${sharePct.toFixed(2)}% ${majority ? "— MAJORITY" : "— not enough"}</span></div>
       <div class="row"><span class="k">Hardware capex</span><span class="v">${fmtUSD(totalCapex)}</span></div>
-      <div class="row"><span class="k">Energy for ${hrs} h</span><span class="v">${energyKwh.toLocaleString("en-US", { maximumFractionDigits: 0 })} kWh → ${fmtUSD(energyCost)}</span></div>
-      <div class="row"><span class="k">All-in attack cost</span><span class="v" style="color:#6df2b8;font-weight:800">${fmtUSD(totalCapex + energyCost)}</span></div>
+      <div class="row"><span class="k">Energy for ${est.hrs} h</span><span class="v">${energyKwh === null ? "—" : energyKwh.toLocaleString("en-US", { maximumFractionDigits: 0 }) + " kWh → " + fmtUSD(energyCost)}</span></div>
+      <div class="row"><span class="k">All-in attack cost</span><span class="v" style="color:#6df2b8;font-weight:800">${fmtUSD(est.total)}</span></div>
       <p class="fine">A sustained majority lets you censor, double-spend your own sends, and dictate the canonical chain —
       until the honest network's difficulty outruns your private fork. This prices <em>your</em> hardware only:
       sourcing it at scale is the hard part (see honest limits below).</p>`;

@@ -6,7 +6,7 @@
  */
 import {
   calculateDifficulty, recomputeChain, hashrateFromDifficulty,
-  fmtDiff, fmtHashrate, retargetZone, validSnapshot, validBlockHeight, expectedTrendLength,
+  fmtDiff, fmtHashrate, retargetZone, validSnapshot, validBlockHeight, expectedTrendLength, attackEstimate,
   TARGET_MS, MIN_DIFF, MAX_DIFF, INITIAL_DIFF,
 } from "../consensus-core.js";
 import { readFileSync } from "node:fs";
@@ -172,6 +172,26 @@ eq("zone floored", retargetZone(10).cls, "up");
   eq("height scientific rejects", validBlockHeight("2.02e5"), null);
   eq("height absurd rejects", validBlockHeight(9007199254740991), null);
   eq("height zero rejects", validBlockHeight(0), null);
+}
+
+// --- attackEstimate: non-finite form floats (white-hat track, 2026-10-18).
+// parseFloat("1e999") is Infinity; the old inline math threw inside
+// BigInt(Math.round(per * unit)) and froze the pane, or painted "$∞".
+{
+  const raw = { per: 50, unit: 1e6, rigs: 100, capex: 2500, watts: 800, kwh: 0.10, hrs: 6 };
+  const g = attackEstimate(raw, 1000000000000n);
+  eq("attack genuine mine", g.mine, 5000000000n);
+  eq("attack genuine share", g.sharePct, 0.4975);
+  eq("attack genuine capex", g.totalCapex, 250000);
+  eq("attack genuine energy cost", g.energyCost, 48);
+  eq("attack per Infinity -> null", attackEstimate({ ...raw, per: Infinity }, 1000000000000n), null);
+  eq("attack per*unit overflow -> null", attackEstimate({ ...raw, per: 1e308, unit: 1e9 }, 1000000000000n), null);
+  eq("attack rigs Infinity -> 1 rig", attackEstimate({ ...raw, rigs: Infinity }, 1000000000000n).totalCapex, 2500);
+  const big = attackEstimate({ ...raw, capex: 1e308 }, 1000000000000n);
+  ok("attack capex overflow -> null money", big.totalCapex === null && big.total === null);
+  const inf = attackEstimate({ ...raw, capex: Infinity, watts: Infinity, kwh: Infinity, hrs: Infinity }, 1000000000000n);
+  ok("attack money Infinity -> finite/null", [inf.totalCapex, inf.energyCost, inf.total].every((v) => v === null || Number.isFinite(v)));
+  eq("attack no network -> null", attackEstimate(raw, 0n), null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

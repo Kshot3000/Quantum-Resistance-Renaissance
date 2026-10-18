@@ -44,6 +44,45 @@ export function recomputeChain(stamps) {
   return { D, gaps };
 }
 
+/* 51% attack-cost estimate from raw form numbers. The form fields are free
+ * inputs: parseFloat("1e999") is Infinity, and the old inline math fed that
+ * straight into BigInt(Math.round(per * unit)) — which THROWS RangeError and
+ * froze the lab on stale output — while an infinite capex painted "$∞".
+ * Non-finite inputs fall back exactly like the empty/zero inputs they mimic
+ * (per -> 0, unit -> 1, rigs -> 1, money/power -> 0, hrs -> 1); a finite
+ * per * unit whose product overflows is treated as no hashrate entered.
+ * Derived money that overflows finite inputs (capex 1e308 x 100 rigs) comes
+ * back null, and the render shows "—" for it instead of "$∞". Returns null
+ * when there is no attacker hashrate or no network hashrate to price against. */
+export function attackEstimate(raw, netHs) {
+  if (!raw || typeof netHs !== "bigint" || netHs <= 0n) return null;
+  const fin = (v, dflt) => (typeof v === "number" && Number.isFinite(v) ? v : dflt);
+  const per = Math.max(0, fin(raw.per, 0));
+  const unit = fin(raw.unit, 1) || 1;
+  const rigs = Math.max(1, fin(raw.rigs, 1));
+  const capex = Math.max(0, fin(raw.capex, 0));
+  const watts = Math.max(0, fin(raw.watts, 0));
+  const kwh = Math.max(0, fin(raw.kwh, 0));
+  const hrs = Math.max(1, fin(raw.hrs, 1));
+  const perRig = per * unit;
+  if (!Number.isFinite(perRig)) return null;
+  let mine;
+  try { mine = BigInt(Math.round(perRig)) * BigInt(Math.round(rigs)); }
+  catch { return null; }
+  if (mine <= 0n) return null;
+  const money = (x) => (Number.isFinite(x) ? x : null);
+  const totalCapex = money(capex * rigs);
+  const energyKwh = money(watts * rigs * hrs / 1000);
+  const energyCost = energyKwh === null ? null : money(energyKwh * kwh);
+  const total = totalCapex === null || energyCost === null ? null : money(totalCapex + energyCost);
+  return {
+    mine, hrs,
+    sharePct: Number((mine * 1000000n) / (netHs + mine)) / 10000,
+    majority: mine > netHs,
+    totalCapex, energyKwh, energyCost, total,
+  };
+}
+
 /* Expected network hashrate implied by a difficulty: E[hashes to win] = D, one block per 12s. */
 export function hashrateFromDifficulty(d) { return d / 12n; }
 

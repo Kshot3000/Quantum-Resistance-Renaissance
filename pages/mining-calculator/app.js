@@ -30,17 +30,17 @@ CHAIN.BLOCKS_PER_DAY = 86400 / CHAIN.BLOCK_TIME_S; // 7200
 /* Dated static FALLBACK bundle — replaced at load by deriveNetworkDefaults()
  * from the hourly data/*.json snapshots. Kept honest and dated for the
  * no-fetch path (file://, offline). Every figure comes from ONE capture
- * (2026-10-18 20:34Z): consensus difficulty @249,206 and total issuance
- * @249,206, fetched 2 seconds apart — never mix snapshot dates in one bundle.
+ * (2026-10-18 21:28Z): consensus difficulty @249,424 and total issuance
+ * @249,424, fetched 9 seconds apart — never mix snapshot dates in one bundle.
  * Guarded by tests/calc.test.js (fallback-integrity suite). */
 var FALLBACK = {
-  difficulty: "438009240920699",        // data/consensus.json @249,206
-  netHs: 36500770076724,                // = floor(difficulty / 12 s)
-  totalSupplyPlancks: "5833159459813551559", // data/supply.json @249,206
-  supplyQtc: 5833159.4598,              // total issuance incl. genesis
-  avgBlockMs: 14721,                    // consensus block_times_ms (3,000-block sample)
-  height: 249206,
-  fetchedAt: "2026-10-18T20:34:29.985Z"
+  difficulty: "435642221376279",        // data/consensus.json @249,424
+  netHs: 36303518448023,                // = floor(difficulty / 12 s)
+  totalSupplyPlancks: "5833289485121033661", // data/supply.json @249,424
+  supplyQtc: 5833289.4851,              // total issuance incl. genesis
+  avgBlockMs: 14806,                    // consensus block_times_ms (3,000-block sample)
+  height: 249424,
+  fetchedAt: "2026-10-18T21:28:09.365Z"
 };
 
 /* Pure: block reward from total issuance (the emission formula's S —
@@ -207,8 +207,12 @@ function chainState(atMs){
  * NETWORK's blocks/day (observed pace when known); it defaults to the
  * 7,200/day protocol target. */
 function estimate(o){
-  var userHs = o.userHs > 0 ? o.userHs : 0;
-  var netHs  = o.netHs  > 0 ? o.netHs  : 0;
+  /* Non-finite inputs (a 1e999 paste parseFloats to Infinity) fall back to 0
+   * like the empty inputs they mimic: Infinity hashrate used to yield a NaN
+   * share against an infinite network, and infinite watts an infinite
+   * power cost that the formatters then had to hide. */
+  var userHs = isFinite(o.userHs) && o.userHs > 0 ? o.userHs : 0;
+  var netHs  = isFinite(o.netHs) && o.netHs  > 0 ? o.netHs  : 0;
   var share = netHs > 0 ? userHs / netHs : 0;
   var clamped = false;
   if (share > 1){ share = 1; clamped = true; }
@@ -216,16 +220,19 @@ function estimate(o){
   var blocksPerDay = share * netBpd;
   var qtcPerDay = blocksPerDay * o.reward;
   var daysPerBlock = share > 0 ? (1 / share) / netBpd : Infinity;
-  var kwhPerDay = Math.max(0, o.watts) * 24 / 1000;
-  var powerCost = kwhPerDay * Math.max(0, o.kwhPrice);
-  var revenue = o.qtcPrice > 0 ? qtcPerDay * o.qtcPrice : 0;
-  var profit = o.qtcPrice > 0 ? revenue - powerCost : -powerCost;
+  var watts = isFinite(o.watts) ? Math.max(0, o.watts) : 0;
+  var kwhPrice = isFinite(o.kwhPrice) ? Math.max(0, o.kwhPrice) : 0;
+  var qtcPrice = isFinite(o.qtcPrice) ? o.qtcPrice : 0;
+  var kwhPerDay = watts * 24 / 1000;
+  var powerCost = kwhPerDay * kwhPrice;
+  var revenue = qtcPrice > 0 ? qtcPerDay * qtcPrice : 0;
+  var profit = qtcPrice > 0 ? revenue - powerCost : -powerCost;
   var breakeven = qtcPerDay > 0 ? powerCost / qtcPerDay : Infinity;
   return {
     share: share, shareClamped: clamped, blocksPerDay: blocksPerDay,
     qtcPerDay: qtcPerDay, daysPerBlock: daysPerBlock,
     powerCost: powerCost, revenue: revenue, profit: profit,
-    breakeven: breakeven, hasPrice: o.qtcPrice > 0
+    breakeven: breakeven, hasPrice: qtcPrice > 0
   };
 }
 
