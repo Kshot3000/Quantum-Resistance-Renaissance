@@ -567,6 +567,23 @@ export function parseQtcToPlancks(str) {
   return BigInt(parts[0]) * PLANCKS_PER_QTC + BigInt(frac);
 }
 
+/* Non-amount count-field parser (white-hat, Batch 195): the leaf/proof
+ * forms handed transfer_count and asset_id strings straight to BigInt()
+ * in app.js — an unbounded digit paste froze the click (superlinear
+ * conversion) BEFORE the u64 range check could refuse it. Same fleet
+ * cap (512 chars; a genuine count is at most 20 digits, a u64),
+ * refused on length alone before the regex/BigInt, throw convention,
+ * input never echoed. Range checks stay with the callers. */
+export const MAX_INT_CHARS = 512;
+export function parseCountField(str, label) {
+  const s = String(str).trim();
+  if (s === "") return 0n;
+  if (s.length > MAX_INT_CHARS)
+    throw new Error((label || "count") + " is " + s.length + " characters — over the integer-input cap of " + MAX_INT_CHARS + " characters; refused before parsing");
+  if (!/^\d+$/.test(s)) throw new Error((label || "count") + " must be a non-negative integer");
+  return BigInt(s);
+}
+
 export function formatQtc(plancks) {
   let p = BigInt(plancks);
   if (p === 0n) return "0";
@@ -645,6 +662,8 @@ export const ZK = {
   decodeU64LeHex,
   parseQtcToPlancks,
   MAX_AMOUNT_CHARS,
+  parseCountField,
+  MAX_INT_CHARS,
   amountInputRoom,
   formatQtc,
   parseAccount,

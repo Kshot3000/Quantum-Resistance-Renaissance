@@ -176,9 +176,15 @@ function validHeight(v){
   var n = validCount(v);
   return (n !== null && n >= 1 && n <= MAX_HEIGHT) ? n : null;
 }
+/* Integer-string length bound before BigInt (white-hat, Batch 195): an
+ * unbounded digit string passed here is BigInt()-converted whole by
+ * planckWithinSupply and the account relation checks (superlinear —
+ * 2M digits ~7 s) before the supply cap can refuse it; cap 512 chars
+ * on length alone before the regex/BigInt. */
+var MAX_INT_CHARS = 512;
 function validPlanck(v){
   if (typeof v === "number") return (isFinite(v) && Math.floor(v) === v && v >= 0) ? String(v) : null;
-  if (typeof v === "string" && /^\d+$/.test(v)) return v;
+  if (typeof v === "string" && v.length <= MAX_INT_CHARS && /^\d+$/.test(v)) return v;
   return null;
 }
 /* Planck figure within the chain's hard cap, compared as BigInt so a

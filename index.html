@@ -584,7 +584,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Whale Watch <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Where the QTC actually sits: the genesis vesting pool (95.5% of indexed supply, locked), the circulating rich list with liquid-vs-locked balances, balance-bracket distribution, an estimated Gini, the largest transfers ever made, and a checksum-validated address lookup — all computed from the public Subsquid indexer with the snapshot time printed on everything.</p>
-        <div class="meta">40/40 logic tests green · move lists held to producer relations (supply bound, dedupe, rebuilt order, 40-cap) · genesis set held to its producer cap and the whole supply (round 4) · browser QA green</div>
+        <div class="meta">41/41 logic tests green · move lists held to producer relations (supply bound, dedupe, rebuilt order, 40-cap) · genesis set held to its producer cap and the whole supply (round 4) · browser QA green</div>
       </a>
       <a class="app-card keyforge" href="pages/key-forge/" style="grid-column:1 / -1">
         <div class="icon-row">
@@ -611,7 +611,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC MultiSig Vault <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Shared custody on the real custom multisig pallet (index 19): derive exact on-chain vault addresses from <code>blake2b-256(py/mltsg ‖ signers ‖ threshold ‖ nonce)</code> — cross-checked against an independent implementation — price every fee from runtime constants (0.03 QTC creation burn, exact per-signer proposal-fee formula), build byte-exact unsigned payloads for all seven dispatchables (propose / approve / execute / cancel / remove_expired / claim_deposits), and track proposals on a local board — which now refuses new entries at its 500-proposal cap with the cap named, instead of logging a proposal that the board's own load-time trim immediately dropped. Payouts can carry an optional, plainly disclosed vault service fee (0.25–1%, or None) added on top of the recipient amount as a second transfer in one atomic <code>Utility.batch_all</code> inner call — the recipient is never short-changed. Never touches keys.</p>
-        <div class="meta">245/245 logic tests green · browser QA green (board-cap probe 14/14) · the signer box parses at most the first 500 lines per keystroke (each line is a checksum decode; the count past the window is disclosed in the hint, never silently dropped) · the signer paste is scanned only in its first 65,536 characters (500 max-length lines are 64,500) with the unscanned tail disclosed — the old handler split the whole paste into lines on every keystroke before the line window ran · inner-call hex is refused unread past a 32,768-character cap (a max-size 10 KB call, byte-spaced, is 30,721) — the old parser looped the whole paste before any length check</div>
+        <div class="meta">248/248 logic tests green · browser QA green (board-cap probe 14/14) · the signer box parses at most the first 500 lines per keystroke (each line is a checksum decode; the count past the window is disclosed in the hint, never silently dropped) · the signer paste is scanned only in its first 65,536 characters (500 max-length lines are 64,500) with the unscanned tail disclosed — the old handler split the whole paste into lines on every keystroke before the line window ran · inner-call hex is refused unread past a 32,768-character cap (a max-size 10 KB call, byte-spaced, is 30,721) — the old parser looped the whole paste before any length check</div>
       </a>
       <a class="app-card governance" href="pages/governance-tracker/" style="grid-column:1 / -1">
         <div class="icon-row">
@@ -656,7 +656,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Supply Audit <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The independent money-supply verifier: the exact on-chain emission recurrence recomputed to the planck (verified against <code>pallet_mining_rewards</code>), every recorded mint tallied from the indexer, and the full 22-transfer genesis allocation itemized — reconciled against reported balances. The protocol passes; the indexer's balance sheet is flagged +0.75% with the evidence itemized. Exact BigInt math, no floats.</p>
-        <div class="meta">105/105 logic tests green · first-block known answer exact · pool + sentinel balances held as summands of the reported free aggregate · fmtQtc decimals contract (dec=0 paints no bare dot) and signed gap/fee-wedge deltas · browser QA green</div>
+        <div class="meta">108/108 logic tests green · first-block known answer exact · pool + sentinel balances held as summands of the reported free aggregate · fmtQtc decimals contract (dec=0 paints no bare dot) and signed gap/fee-wedge deltas · browser QA green</div>
       </a>
       <a class="app-card vesting" href="pages/vesting-desk/">
         <div class="icon-row">
@@ -665,7 +665,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Vesting Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The unlock calendar for Quantus's locked genesis supply: all 48 real vesting schedules from the chain indexer (5,669,940 QTC, ~96% still locked behind the one-year cliff), the pallet's exact linear formula recomputed to the planck, a monthly unlock curve to 2030, per-schedule claimable estimates with the 25-QTC payout alignment, and the permissionless <code>Vesting.claim</code> path — 100% client-side.</p>
-        <div class="meta">43/43 logic tests green · every schedule's vested amount recomputed from snapshot · last-claim stamps held to producer relations (claimed, post-cliff, in-capture) · round 5: the schedule set is held to the genesis aggregate — cohort sums within their genesis allocations, grand sum within the 27% mint, or the set fails wholesale · round 6: the set is held to the producer count — both producers query vesting_schedule(limit: 64), so a longer set fails wholesale before any row is validated · browser QA green</div>
+        <div class="meta">44/44 logic tests green · every schedule's vested amount recomputed from snapshot · last-claim stamps held to producer relations (claimed, post-cliff, in-capture) · round 5: the schedule set is held to the genesis aggregate — cohort sums within their genesis allocations, grand sum within the 27% mint, or the set fails wholesale · round 6: the set is held to the producer count — both producers query vesting_schedule(limit: 64), so a longer set fails wholesale before any row is validated · browser QA green</div>
       </a>
       <a class="app-card flow" href="pages/flow-tracer/">
         <div class="icon-row">
@@ -674,7 +674,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Flow Tracer <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Follow the money on the quantum chain: trace any address hop by hop through a live-first indexer query with snapshot fallback, and let the pattern radar flag peel chains, distribution fan-outs, consolidation fan-ins, round-amount moves and miner forwarding — 5,361 real transfers across 1,204 addresses, click-anywhere dossiers, zero simulated data.</p>
-        <div class="meta">35/35 logic tests green · peel/fan detectors on real indexer rows · ids, extrinsic hashes and block time held to producer relations · browser QA green</div>
+        <div class="meta">36/36 logic tests green · peel/fan detectors on real indexer rows · ids, extrinsic hashes and block time held to producer relations · browser QA green</div>
       </a>
       <a class="app-card watch" href="pages/watchtower/">
         <div class="icon-row">
@@ -683,7 +683,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Watchtower <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The eyes that never blink on the quantum chain: watch any Quantus address and arm rules — balance thresholds, big transfers, whale moves, new referenda, runtime upgrades, chain stalls — scanned against live-first chain data with browser notifications, self-test previews, and honest snapshot-staleness badges. 100% client-side; moves no funds.</p>
-        <div class="meta">42/42 logic tests green · 10 rule types on real indexer rows · governance counts held to distinct referenda, not lifecycle events (round 5) · watchlist cap of 500 held at import + add form, not only at load, with checkphrase fills serialized · rule cap of 500 now held at form + import + load too (rules were previously uncapped) · backup imports refuse picks over 32 MiB unread — the largest genuine backup (baselines included) measures ~15.3 MB · browser QA 12/12 green</div>
+        <div class="meta">43/43 logic tests green · 10 rule types on real indexer rows · governance counts held to distinct referenda, not lifecycle events (round 5) · watchlist cap of 500 held at import + add form, not only at load, with checkphrase fills serialized · rule cap of 500 now held at form + import + load too (rules were previously uncapped) · backup imports refuse picks over 32 MiB unread — the largest genuine backup (baselines included) measures ~15.3 MB · browser QA 12/12 green</div>
       </a>
       <a class="app-card portfolio" href="pages/portfolio-desk/">
         <div class="icon-row">
@@ -692,7 +692,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Portfolio Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Command your whole QTC estate: add every address you control to one vault, read live-first balances, split liquid holdings from vesting-locked allocations with claimable-now math, see the allocation donut, transfer activity and mining attribution — each address carrying its human checkphrase. 100% client-side; never signs, never moves funds.</p>
-        <div class="meta">27/27 logic tests green · CSV export guards formula-leading nicknames · live-first balance rollup on real indexer rows · mined counts held to the chain height and vesting schedules deduped by producer id · mined collections held to the producer's raw counts (15,000 window keys / 100 all-time rows) before either walk — a crafted 500,000-key window map previously materialized whole into the counts · vault-file import refuses picks over 128 KiB unread — the sanitizer's largest acceptable vault is 74,469 bytes even at worst JSON escaping · browser QA 13/13 green</div>
+        <div class="meta">28/28 logic tests green · CSV export guards formula-leading nicknames · live-first balance rollup on real indexer rows · mined counts held to the chain height and vesting schedules deduped by producer id · mined collections held to the producer's raw counts (15,000 window keys / 100 all-time rows) before either walk — a crafted 500,000-key window map previously materialized whole into the counts · vault-file import refuses picks over 128 KiB unread — the sanitizer's largest acceptable vault is 74,469 bytes even at worst JSON escaping · browser QA 13/13 green</div>
       </a>
       <a class="app-card mempool" href="pages/mempool-desk/">
         <div class="icon-row">
@@ -701,7 +701,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Mempool Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Read the pool before the block does: connect to any node and watch live pending-extrinsic gauges, get txWatch zero-confirmation signals the second a transfer requests your address, and estimate node-quoted fees on what's actually waiting. No node, no data — nothing simulated, 100% client-side.</p>
-        <div class="meta">21/21 logic tests green · live pool gauge + txWatch signals + fee desk · watcher creation gated at the same 50 cap the load sanitizer enforces — the 51st add is refused with a cap-named message instead of opening a subscription that silently vanishes on reload · browser QA green (watch-cap suite 7/7) · endpoint URLs are length-bounded at 2,048 characters before the shape regex, localStorage save or socket — a 20M-char paste the old check scanned whole is refused on length alone · extrinsic hex is length-bounded at 1,048,576 characters inside the core validators — an over-cap pool entry is dropped and an over-cap fee paste is refused on length alone, never sent to the node</div>
+        <div class="meta">22/22 logic tests green · live pool gauge + txWatch signals + fee desk · watcher creation gated at the same 50 cap the load sanitizer enforces — the 51st add is refused with a cap-named message instead of opening a subscription that silently vanishes on reload · browser QA green (watch-cap suite 7/7) · endpoint URLs are length-bounded at 2,048 characters before the shape regex, localStorage save or socket — a 20M-char paste the old check scanned whole is refused on length alone · extrinsic hex is length-bounded at 1,048,576 characters inside the core validators — an over-cap pool entry is dropped and an over-cap fee paste is refused on length alone, never sent to the node</div>
       </a>
       <a class="app-card wallet" href="pages/web-wallet/">
         <div class="icon-row">
@@ -710,7 +710,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Web Wallet <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The vault for the quantum chain: forge ML-DSA-65/87 keys from a 24-word phrase in your browser, get your Poseidon2-derived qz… address, encrypt the vault with AES-GCM, read live balances from chain storage, and broadcast real transfer_keep_alive extrinsics signed under the chain's QUANTUS_EXTRINSIC context. Sends may add an optional, plainly disclosed builder service fee (None / 0.25% / 0.5% / 1%, on top — recipient paid in full) as a second leg in the same atomic batch_all. Keys never leave your device.</p>
-        <div class="meta">72/72 wallet tests green · vault passwords and the import passphrase are length-bounded at 1,024 characters before any PBKDF2 derivation (a genuine password is at most ~128 characters from a manager; the KDF previously encoded a 20M-char paste whole) · the RPC endpoint field is validated (scheme + a 2,048-character length bound) before any socket opens — it used to reach the WebSocket constructor unchecked · extrinsic format verified against chain source · browser QA green — vault backup imports are size-gated before a byte is read: every real backup is under ~132 KiB (the ciphertext cap), so a pick over the 256 KiB file cap is refused unread with size + cap named and the stored vault untouched · recovery-phrase pastes are length-bounded at 1,024 characters (a real 24-word phrase is at most 215) before any split or PBKDF2 seed derivation — the same bound guards the Airgap Desk copy</div>
+        <div class="meta">73/73 wallet tests green · vault passwords and the import passphrase are length-bounded at 1,024 characters before any PBKDF2 derivation (a genuine password is at most ~128 characters from a manager; the KDF previously encoded a 20M-char paste whole) · the RPC endpoint field is validated (scheme + a 2,048-character length bound) before any socket opens — it used to reach the WebSocket constructor unchecked · extrinsic format verified against chain source · browser QA green — vault backup imports are size-gated before a byte is read: every real backup is under ~132 KiB (the ciphertext cap), so a pick over the 256 KiB file cap is refused unread with size + cap named and the stored vault untouched · recovery-phrase pastes are length-bounded at 1,024 characters (a real 24-word phrase is at most 215) before any split or PBKDF2 seed derivation — the same bound guards the Airgap Desk copy</div>
       </a>
       <a class="app-card airgap" href="pages/airgap-desk/">
         <div class="icon-row">
@@ -719,7 +719,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Airgap Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>Sign QTC transfers on a machine that never touches the network: the hot desk issues a chain ticket (genesis, runtime, nonce, era window) as one QR, the cold desk builds and signs the transfer_keep_alive offline with real ML-DSA keys, and the hot desk re-verifies the signature locally before quoting the exact node fee and broadcasting. Chunked QR transport, checkphrase read-back, key wipe after signing.</p>
-        <div class="meta">58/58 protocol tests green · hot-side RPC endpoint URLs are validated (scheme + a 2,048-character length bound) before any socket opens · full sign→verify round-trip in browser QA green · QR image decode canvas bounded at 2048px (oversize scans drawn scaled — a huge image can no longer force a multi-GB canvas on the cold machine) · package paste merge is Set-linear (the old per-token rescan froze the cold machine ~17s on a 20k-token paste) · package + ticket file imports are size-gated before any read (256 KiB / 16 KiB — the largest genuine package is 168,103 bytes at any chunking, the largest ticket 696 bytes) · package paste is length-gated at the same 256 KiB cap before any token is split (the split alone cost ~1 s on a 20M-char paste) · cold recovery-phrase pastes are length-bounded at 1,024 characters (a real 24-word phrase is at most 215) before any split or PBKDF2 seed derivation — the same bound guards the Web Wallet copy · checkphrase read-back answers are length-gated at 256 characters (a real five-word answer is at most 74) before any split — the same bound guards the Contact Vault's spoken-checkphrase box · ticket paste is length-gated at the same 16 KiB cap before any decode — decodeTicket refuses an over-cap string on its raw length via the fail-closed ticketPasteRoom gate, before the trim, base64url decode or JSON.parse (a genuine ticket string is at most 696 chars; the ungated path decoded and parse-attempted a 20M-char paste in full) · the vendored mnemonic copy carries the same 1,024-character passphrase bound before seed derivation as the Web Wallet</div>
+        <div class="meta">59/59 protocol tests green · hot-side RPC endpoint URLs are validated (scheme + a 2,048-character length bound) before any socket opens · full sign→verify round-trip in browser QA green · QR image decode canvas bounded at 2048px (oversize scans drawn scaled — a huge image can no longer force a multi-GB canvas on the cold machine) · package paste merge is Set-linear (the old per-token rescan froze the cold machine ~17s on a 20k-token paste) · package + ticket file imports are size-gated before any read (256 KiB / 16 KiB — the largest genuine package is 168,103 bytes at any chunking, the largest ticket 696 bytes) · package paste is length-gated at the same 256 KiB cap before any token is split (the split alone cost ~1 s on a 20M-char paste) · cold recovery-phrase pastes are length-bounded at 1,024 characters (a real 24-word phrase is at most 215) before any split or PBKDF2 seed derivation — the same bound guards the Web Wallet copy · checkphrase read-back answers are length-gated at 256 characters (a real five-word answer is at most 74) before any split — the same bound guards the Contact Vault's spoken-checkphrase box · ticket paste is length-gated at the same 16 KiB cap before any decode — decodeTicket refuses an over-cap string on its raw length via the fail-closed ticketPasteRoom gate, before the trim, base64url decode or JSON.parse (a genuine ticket string is at most 696 chars; the ungated path decoded and parse-attempted a 20M-char paste in full) · the vendored mnemonic copy carries the same 1,024-character passphrase bound before seed derivation as the Web Wallet</div>
       </a>
       <a class="app-card ledger" href="pages/ledger-desk/">
         <div class="icon-row">
@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+432,005% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+440,504% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">76/76 consensus tests green · snapshot boundary round 4: the trend series' length is exact-pinned to the producer's sampled size (every 100 blocks plus the head) before its points are walked, and the producer no longer duplicates the head point on a sample step · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -755,7 +755,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Chain Console <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The live JSON-RPC developer workbench: connect to the mainnet public RPC or your own node, run 16 one-click recipes (head, balance, nonce, storage, fees, node identity), fire custom methods, watch live new-head and balance subscriptions, browse 40+ documented methods, and broadcast signed extrinsics through an explicit review gate — every answer read from the node.</p>
-        <div class="meta">154/154 console tests green · full browser QA green · zero console errors · endpoint URLs are length-bounded at 2,048 characters before parsing — a 20M-char paste the old validator accepted as a valid endpoint is refused on length alone</div>
+        <div class="meta">157/157 console tests green · full browser QA green · zero console errors · endpoint URLs are length-bounded at 2,048 characters before parsing — a 20M-char paste the old validator accepted as a valid endpoint is refused on length alone</div>
       </a>
       <a class="app-card consensus" href="pages/extrinsic-lab/">
         <div class="icon-row">
@@ -791,7 +791,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Pool Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The mining-pool directory &amp; comparator: every known QTC pool with verified fees, payout terms, and PPLNS windows — an effective-fee comparator that stacks pool + miner dev fees honestly, a connection command builder that never invents endpoints, and the pool-vs-solo-vs-node tradeoff matrix. Every fact stamped with its source.</p>
-        <div class="meta">169/169 logic tests green · full browser QA green · zero console errors · the command builder now hard-refuses a payout address over 128 characters (a genuine address is 49) — the soft length warning no longer lets an unbounded paste build an unbounded command</div>
+        <div class="meta">172/172 logic tests green · full browser QA green · zero console errors · the command builder now hard-refuses a payout address over 128 characters (a genuine address is 49) — the soft length warning no longer lets an unbounded paste build an unbounded command</div>
       </a>
       <a class="app-card pay" href="pages/pay-desk/">
         <div class="icon-row">
@@ -836,7 +836,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC ZkTree Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The ZK Merkle-tree observatory &amp; proof laboratory: watch the chain's 4-ary Poseidon tree live, recompute exact leaf and node hashes in your browser, grow your own tree with batched folding, and verify real Merkle proofs against the live chain root. Never signs; every constant cited to upstream source. Proof inputs are shape-gated to the chain's own grammar (max depth 32, exact byte budget, 32-byte siblings) before any hashing, so a hostile node response or pasted proof can't freeze the tab.</p>
-        <div class="meta">114/114 logic tests green · full browser QA green · zero console errors · the observer endpoint is validated (scheme + a 2,048-character length bound) before any socket opens, and a refused endpoint is never retried by the reconnect loop</div>
+        <div class="meta">121/121 logic tests green · full browser QA green · zero console errors · the observer endpoint is validated (scheme + a 2,048-character length bound) before any socket opens, and a refused endpoint is never retried by the reconnect loop</div>
       </a>
       <a class="app-card energy" href="pages/energy-observatory/">
         <div class="icon-row">
@@ -854,7 +854,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Reversal Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The reversible-transfers command center: an interactive lifecycle visualizer for the chain's signature safety feature, a delay planner that builds the exact unsigned SCALE call data (pallet 11, verified field-for-field) with an optional, plainly disclosed builder service fee on one-time schedules — on top of the amount, atomic in one batch_all, and honestly unavailable in high-security mode where the whitelist forbids it — the permanent high-security enrollment desk with a 16-tx/day quota simulator and 1% burn calculator, the guardian console, and the live scheduled/cancelled/executed queue from the indexer — never signs, Oct 1, 2026.</p>
-        <div class="meta">138/138 logic tests green · full browser QA green · zero console errors</div>
+        <div class="meta">142/142 logic tests green · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card exposure" href="pages/exposure-lab/">
         <div class="icon-row">
@@ -863,7 +863,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Exposure Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The quantum-exposure auditor: paste Bitcoin/Ethereum/Quantus addresses and learn whether their public keys are already on-chain — harvestable today, breakable at Q-Day. Local SS58-189 / bech32(m) / Base58Check validation, live chain-history lookup, a Q-Day readiness score, and a migration playbook to post-quantum Quantus — read-only, never signs, Oct 1, 2026. The audit-input parser scans a bounded 32,768-character window and discloses any unscanned tail, so a giant paste cannot freeze the audit.</p>
-        <div class="meta">74/74 logic tests green · full browser QA green · zero console errors</div>
+        <div class="meta">75/75 logic tests green · full browser QA green · zero console errors</div>
       </a>
 
     </div>

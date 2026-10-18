@@ -336,7 +336,10 @@ t('fee: sub-millli exact', formatPartialFeeQtc('1000000000') === '0.001');
 t('fee: 1 planck exact', formatPartialFeeQtc('1') === '0.000000000001');
 t('fee: numeric input', formatPartialFeeQtc(1500000000000) === '1.5');
 t('fee: missing -> dash', formatPartialFeeQtc(null) === '—' && formatPartialFeeQtc(undefined) === '—' && formatPartialFeeQtc('') === '—');
-t('fee: garbage -> dash', formatPartialFeeQtc('not-a-number') === '—');
+t('fee: garbage -> dash', formatPartialFeeQtc('not-a-number') === '—');t('fee: garbage -> dash', formatPartialFeeQtc('not-a-number') === '—');
+/* Batch 195: integer-string length bound before BigInt. */
+t('int bound: formatPartialFeeQtc length gate', formatPartialFeeQtc("0".repeat(596) + "7") === '—' && formatPartialFeeQtc('9'.repeat(512)) !== '—' && formatPartialFeeQtc('9'.repeat(2000000)) === '—');
+t('int bound: validPlanckField length gate', validPlanckField("0".repeat(596) + "7") === null && validPlanckField('9'.repeat(512)) === '9'.repeat(512));
 
 /* ---- rpc-client with mock WebSocket ---- */
 class MockWS {

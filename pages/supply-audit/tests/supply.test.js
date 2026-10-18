@@ -262,5 +262,11 @@ ok("validBlockHeight shape (fleet)", A.validBlockHeight(203246) === 203246 && A.
 ok("validFetchedAt window", A.validFetchedAt("2026-10-10T00:00:00.000Z") !== null &&
   A.validFetchedAt("2025-12-31T00:00:00.000Z") === null && A.validFetchedAt("not-a-date") === null);
 
+/* Batch 195: integer-string length bound before BigInt. */
+ok("int bound: validPlancks genuine", A.validPlancks("7000000000000") === "7000000000000");
+ok("int bound: long-but-tiny refused by gate", A.validPlancks("0".repeat(596) + "7") === null);
+ok("int bound: at-cap not refused by gate", A.validPlancks("9".repeat(512)) === "9".repeat(512));
+ok("int bound: 2M-digit refused", A.validPlancks("9".repeat(2000000)) === null);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log("FAILURES:\n - " + failures.join("\n - ")); process.exit(1); }

@@ -227,6 +227,13 @@ async function ta(name, fn){
     assert.strictEqual(C.fmtETH("263000000000000000000"), "263 ETH");
     assert.strictEqual(C.fmtETH("1500000000000000000"), "1.5 ETH");
   });
+  t("int bound (Batch 195): validPlancks length gate before BigInt", function(){
+    assert.strictEqual(C.validPlancks("7000000000000"), "7000000000000");
+    assert.strictEqual(C.validPlancks("0".repeat(596) + "7"), null);
+    assert.strictEqual(C.validPlancks("9".repeat(512)), "9".repeat(512));
+    assert.strictEqual(C.validPlancks("9".repeat(2000000)), null);
+    assert.strictEqual(C.fmtETH("9".repeat(600)), "—");
+  });
 
   /* --- summarize --- */
   t("summarize counts + at-risk math", function(){

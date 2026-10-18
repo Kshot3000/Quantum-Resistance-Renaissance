@@ -48,10 +48,17 @@ export function parseNonce(v) {
  * BigInt. BigInt(String(x)) alone is a coercion, not a validation — it
  * happily converts "-5" into a negative fee quote — so the shape is
  * whitelisted here first. Returns a BigInt or null. */
+/* Integer-string length bound before BigInt (white-hat, Batch 195): the
+ * node is an untrusted boundary — an unbounded digit/hex fee string was
+ * BigInt()-converted whole (decimal conversion is superlinear; 2M digits
+ * ~7 s measured) before any check could refuse it. Cap MAX_INT_CHARS =
+ * 512 (the fleet cap; a genuine fee is at most a u128, 39 digits),
+ * refused on length alone before the regex/BigInt. */
+export const MAX_INT_CHARS = 512;
 export function parseFeeField(v) {
   if (typeof v === "bigint") return v >= 0n ? v : null;
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : null;
-  if (typeof v === "string") {
+  if (typeof v === "string" && v.length <= MAX_INT_CHARS) {
     if (/^\d+$/.test(v)) return BigInt(v);
     if (/^0x[0-9a-fA-F]+$/.test(v)) return BigInt(v);
   }

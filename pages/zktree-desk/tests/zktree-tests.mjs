@@ -439,6 +439,17 @@ function throws(name, fn) {
   throws("amount bound: long-but-tiny refused by gate", () => ZK.parseQtcToPlancks("0".repeat(600) + "1.5"));
   eq("amount bound: at-cap parses (no supply cap in this parser)", typeof ZK.parseQtcToPlancks("9".repeat(512)), "bigint");
 }
+/* Batch 195: count-field length bound before BigInt. */
+{
+  ok("int bound: cap exported", ZK.MAX_INT_CHARS === 512);
+  eq("int bound: genuine count parses", ZK.parseCountField("7", "transfer_count"), 7n);
+  eq("int bound: empty count is zero", ZK.parseCountField("", "transfer_count"), 0n);
+  throws("int bound: long-but-tiny refused naming cap", () => ZK.parseCountField("0".repeat(596) + "7", "transfer_count"));
+  let e = null; try { ZK.parseCountField("9".repeat(600), "asset_id"); } catch (err) { e = err; }
+  ok("int bound: refusal names field + cap, no echo", !!e && /asset_id/.test(e.message) && /512/.test(e.message) && !e.message.includes("9999999999"), e && e.message);
+  eq("int bound: at-cap parses", typeof ZK.parseCountField("9".repeat(512), "transfer_count"), "bigint");
+  throws("int bound: garbage rejected", () => ZK.parseCountField("1.5", "asset_id"));
+}
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

@@ -132,7 +132,10 @@ export function expectedTrendLength(n) {
 /* Difficulty values travel as canonical digit strings; anything else
  * (hex, floats, "1e15", padded) is not a difficulty this chain produced. */
 function digitBig(v) {
-  if (typeof v !== "string" || !/^(0|[1-9]\d*)$/.test(v)) return null;
+  /* Length first (Batch 195): the BigInt below converted an unbounded
+   * digit string whole (superlinear) — cap 512 chars (the fleet cap;
+   * the chain's max difficulty is 155 digits) before the regex/BigInt. */
+  if (typeof v !== "string" || v.length > 512 || !/^(0|[1-9]\d*)$/.test(v)) return null;
   try { return BigInt(v); } catch { return null; }
 }
 

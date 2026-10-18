@@ -350,6 +350,7 @@ function boundedBytes(bytes){
  * the largest genuine amount string is 21 chars), refused on length
  * alone in this parser's null convention. */
 var MAX_AMOUNT_CHARS = 512;
+var MAX_INT_CHARS = 512; // Batch 195: non-amount integer strings (nonce), same cap
 function qtcToPlancks(qtcStr){
   var s = String(qtcStr).trim();
   if (s.length > MAX_AMOUNT_CHARS) return null;
@@ -407,6 +408,8 @@ function deriveMultisigAddress(signerKeys /* array of 64-hex-char strings */,
       return { ok: false, error: "Nonce must be a whole number (0 or greater)." };
     n = BigInt(nonce);
   }
+  else if (typeof nonce === "string" && nonce.trim().length > MAX_INT_CHARS)
+    return { ok: false, error: "Nonce is " + nonce.trim().length + " characters — over the integer-input cap of " + MAX_INT_CHARS + " characters; refused before parsing." };
   else if (typeof nonce === "string" && /^\d+$/.test(nonce.trim())) n = BigInt(nonce.trim());
   else return { ok: false, error: "Nonce must be a whole number (0 or greater)." };
   if (n < 0n || n > 18446744073709551615n)

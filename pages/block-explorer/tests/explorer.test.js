@@ -127,7 +127,11 @@ t("validators: shapes", function(){
   assert.strictEqual(A.validHeight("oops"), null);
   assert.strictEqual(A.validCount(0), 0);
   assert.strictEqual(A.validPlanck("310000000000"), "310000000000");
-  assert.strictEqual(A.validPlanck("1.5"), null);
+  assert.strictEqual(A.validPlanck("1.5"), null);  assert.strictEqual(A.validPlanck("1.5"), null);
+  // Batch 195: integer-string length bound before BigInt.
+  assert.strictEqual(A.validPlanck("0".repeat(596) + "7"), null);
+  assert.strictEqual(A.validPlanck("9".repeat(512)), "9".repeat(512));
+  assert.strictEqual(A.validPlanck("9".repeat(2000000)), null);
   assert.strictEqual(A.validPlanck(-1), null);
   assert.ok(A.validTimestamp("2026-09-29T19:00:00.792+00:00"));
   assert.strictEqual(A.validTimestamp("garbage!!"), null);

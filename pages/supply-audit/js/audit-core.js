@@ -122,9 +122,14 @@ function validFetchedAt(v, nowMs){
   var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : Date.now();
   return (ms >= GENESIS_FLOOR_MS && ms <= now + 3600000) ? ms : null;
 }
+/* Integer-string length bound before BigInt (white-hat, Batch 195): see
+ * the fleet note — an unbounded digit string is BigInt()-converted whole
+ * by planckField/downstream checks before any supply check can refuse
+ * it; cap 512 chars on length alone before the regex/BigInt. */
+var MAX_INT_CHARS = 512;
 function validPlancks(v){
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
-  if (typeof v === "string" && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
+  if (typeof v === "string" && v.length <= MAX_INT_CHARS && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
   return null;
 }
 function validAddress(v){

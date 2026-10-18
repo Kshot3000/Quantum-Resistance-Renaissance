@@ -97,8 +97,15 @@ function simulator() {
     const t = BigInt(tIn.value);
     $("simTimeOut").textContent = (Number(t) / 1000).toFixed(1) + " s";
     let parent;
-    try { parent = BigInt(dIn.value.replace(/[^0-9]/g, "") || "0"); }
+    /* Integer-string length bound before BigInt (white-hat, Batch 195):
+     * the difficulty field is free text fired on every input event — an
+     * unbounded digit paste was BigInt()-converted whole (superlinear)
+     * before any check. The chain's max difficulty is 2^512-1 (155
+     * digits); cap 512 chars (the fleet cap) on length alone. */
+    const diffDigits = dIn.value.replace(/[^0-9]/g, "");
+    try { parent = diffDigits.length > 512 ? 0n : BigInt(diffDigits || "0"); }
     catch { parent = 0n; }
+    if (diffDigits.length > 512) { $("simSteps").innerHTML = `<div class="step"><span class="k">Parent difficulty is ${diffDigits.length.toLocaleString("en-US")} digits — over the 512-character integer-input cap; refused before parsing</span><span class="v">—</span></div>`; return; }
     if (parent <= 0n) { $("simSteps").innerHTML = `<div class="step"><span class="k">Enter a parent difficulty</span><span class="v">—</span></div>`; return; }
     const r = calculateDifficulty(parent, t);
     const chg = pctChange(parent, r.difficulty);

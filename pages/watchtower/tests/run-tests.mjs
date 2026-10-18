@@ -601,3 +601,11 @@ test("amount bound: parseQtcToPlancks length gate", () => {
   assert.throws(() => W.parseQtcToPlancks("9".repeat(2000000)), /512/);
   assert.equal(typeof W.parseQtcToPlancks("9".repeat(512)), "bigint");
 });
+/* Batch 195: non-amount integer-string length bound — validPlancks
+ * BigInt-converted an unbounded digit string whole. */
+test("int bound: validPlancks length gate", () => {
+  assert.equal(W.validPlancks("7000000000000"), 7000000000000n);
+  assert.equal(W.validPlancks("0".repeat(596) + "7"), null);
+  assert.equal(W.validPlancks("9".repeat(512)), BigInt("9".repeat(512)));
+  assert.equal(W.validPlancks("9".repeat(2000000)), null);
+});

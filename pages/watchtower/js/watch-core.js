@@ -150,12 +150,21 @@ function nonNegInt(v) {
   return null;
 }
 
+/* Integer-string length bound before BigInt (white-hat, Batch 195): the
+ * digit grammar below admits an UNBOUNDED string and BigInt() converts it
+ * whole BEFORE any range/supply check can refuse it — BigInt decimal
+ * conversion is superlinear (2M digits ~7 s measured), so an over-long
+ * value from an untrusted answer froze the tab at this validator. Cap
+ * MAX_INT_CHARS = 512 (the fleet cap; the largest genuine chain integer
+ * string is 39 digits, a u128), refused on length alone before the
+ * regex/BigInt. */
+var MAX_INT_CHARS = 512;
 function validPlancks(v) {
   // Non-negative integer plancks as BigInt, or null. Strings must be pure
   // digits (BigInt alone accepts "-5" and throws on "12.5"/"1e3").
   if (typeof v === "bigint") return v >= 0n ? v : null;
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : null;
-  if (typeof v === "string" && /^\d+$/.test(v)) return BigInt(v);
+  if (typeof v === "string" && v.length <= MAX_INT_CHARS && /^\d+$/.test(v)) return BigInt(v);
   return null;
 }
 

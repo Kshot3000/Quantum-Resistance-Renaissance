@@ -381,8 +381,13 @@ function timeoutSignal(ms) {
  * amount desc — the pool identity reads genesis row 0); and a cleaned
  * list longer than the producer's 40-row cap fails the snapshot, like
  * the top list's 200-cap. */
+/* Integer-string length bound before BigInt (white-hat, Batch 195):
+ * decStr canonicalizes via BigInt(v) itself — an unbounded digit string
+ * from the fetched snapshot was converted whole (superlinear) before
+ * any supply relation could refuse it; cap 512 chars on length alone. */
+var MAX_INT_CHARS = 512;
 function decStr(v){
-  if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) return BigInt(v).toString();
+  if (typeof v === "string" && v.length <= MAX_INT_CHARS && /^(0|[1-9]\d*)$/.test(v)) return BigInt(v).toString();
   if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return String(v);
   return null;
 }
@@ -990,7 +995,7 @@ if (typeof module !== "undefined" && module.exports){
     lockedPlancks: lockedPlancks, circPlancks: circPlancks, giniEstimate: giniEstimate,
     bracketLoQTC: bracketLoQTC, bracketHiQTC: bracketHiQTC, tagList: tagList,
     validateAddress: validateAddress, ss58Decode: ss58Decode, ss58Encode: ss58Encode,
-    validateSnapshot: validateSnapshot, validBlockHeight: validBlockHeight,
+    validateSnapshot: validateSnapshot, validBlockHeight: validBlockHeight, decStr: decStr,
     QUANTUS_PREFIX: QUANTUS_PREFIX, PLANCKS_PER_QTC: PLANCKS_PER_QTC
   };
 }

@@ -220,6 +220,12 @@ test("sortPoolByFee and decodePartialFee", () => {
   assert.throws(() => C.decodePartialFee({}));
   assert.throws(() => C.decodePartialFee(null));
 });
+test("int bound (Batch 195): decodePartialFee length gate before BigInt", () => {
+  assert.throws(() => C.decodePartialFee({ partialFee: "0".repeat(596) + "7" }));
+  assert.throws(() => C.decodePartialFee({ partialFee: "0x" + "0".repeat(596) + "7" }));
+  assert.equal(C.decodePartialFee({ partialFee: "9".repeat(512) }), BigInt("9".repeat(512)));
+  assert.throws(() => C.decodePartialFee({ partialFee: "9".repeat(2000000) }));
+});
 
 test("timing helpers", () => {
   assert.equal(C.formatAge(45000), "45s");

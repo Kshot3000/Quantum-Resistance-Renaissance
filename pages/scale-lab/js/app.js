@@ -92,9 +92,18 @@
     }
   }
 
+  /* Integer-string length bound before BigInt (white-hat, Batch 195):
+   * this parser fed an unbounded paste straight into BigInt() — decimal
+   * conversion is superlinear (2M digits ~7 s measured), so the freeze
+   * landed BEFORE compactEncode's own 2^536 cap or any range check could
+   * refuse it. The largest genuine value this lab handles is that cap
+   * (162 decimal digits / 136 hex chars); MAX_INT_CHARS = 512 (the fleet
+   * cap) leaves >3x headroom and refuses on length alone, naming the cap. */
+  var MAX_INT_CHARS = 512;
   function parseIntBig(s) {
     s = String(s).trim();
     if (!s) throw new Error('empty integer');
+    if (s.length > MAX_INT_CHARS) throw new Error('integer is ' + s.length.toLocaleString('en-US') + ' characters — over the integer-input cap of ' + MAX_INT_CHARS + ' characters; refused before parsing');
     if (/^0x[0-9a-fA-F]+$/.test(s)) return BigInt(s);
     if (/^-?[0-9]+$/.test(s)) return BigInt(s);
     throw new Error('not an integer: ' + s);

@@ -480,8 +480,13 @@
     var n = nonNegInt(v);
     return (n !== null && n >= 1 && n <= 10000000) ? n : null;
   }
+  /* Integer-string length bound before BigInt (white-hat, Batch 195):
+   * the try-BigInt below converted an unbounded digit string whole —
+   * superlinear conversion froze the load on a poisoned row; cap 512
+   * chars on length alone before the regex/BigInt. */
+  var MAX_INT_CHARS = 512;
   function validPlancks(v) {
-    if (typeof v !== "string" || !/^(0|[1-9]\d*)$/.test(v)) return null;
+    if (typeof v !== "string" || v.length > MAX_INT_CHARS || !/^(0|[1-9]\d*)$/.test(v)) return null;
     try { BigInt(v); } catch (e) { return null; }
     return v;
   }

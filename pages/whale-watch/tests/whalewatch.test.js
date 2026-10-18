@@ -167,6 +167,12 @@ t("validateSnapshot passes the real snapshot unchanged", function(){
   assert.strictEqual(v.whale_moves_alltime.length, REAL.whale_moves_alltime.length);
   assert.strictEqual(v.whale_moves_recent.length, REAL.whale_moves_recent.length);
 });
+t("int bound (Batch 195): decStr length gate before its BigInt canonicalization", function(){
+  assert.strictEqual(m.decStr("7000000000000"), "7000000000000");
+  assert.strictEqual(m.decStr("9".repeat(600)), null);
+  assert.strictEqual(m.decStr("9".repeat(512)), "9".repeat(512));
+  assert.strictEqual(m.decStr("9".repeat(2000000)), null);
+});
 t("bracket counts must sum to accounts_total", function(){
   assert.strictEqual(m.validateSnapshot(snap(function(s){ s.brackets[5].count += 1; })), null);
 });

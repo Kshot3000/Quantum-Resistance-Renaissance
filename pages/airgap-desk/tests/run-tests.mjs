@@ -608,6 +608,12 @@ test('rpc-validate: fee fields whitelist non-negative integer shapes', () => {
   assert.equal(parseFeeField(null), null);
   assert.equal(parseFeeField({}), null);
 });
+test('int bound (Batch 195): parseFeeField length gate before BigInt', () => {
+  assert.equal(parseFeeField("0".repeat(596) + "7"), null);
+  assert.equal(parseFeeField('0x' + '0'.repeat(596) + '7'), null);
+  assert.equal(parseFeeField('9'.repeat(512)), BigInt('9'.repeat(512)));
+  assert.equal(parseFeeField('9'.repeat(2000000)), null);
+});
 
 test('rpc-validate: storage hex must be 0x-prefixed even-length hex', () => {
   assert.equal(validStorageHex('0x' + 'ab'.repeat(68)), true);

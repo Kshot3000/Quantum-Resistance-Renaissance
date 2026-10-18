@@ -20,14 +20,14 @@ const NETWORK_DEFAULTS = {
   // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
   // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
   // and dated for the no-fetch path (file://, offline). All four figures come from
-  // ONE capture (2026-10-18 18:37Z): consensus difficulty @248,712 and total
-  // issuance @248,712, 1 seconds apart — never mix snapshot dates in one bundle
+  // ONE capture (2026-10-18 19:40Z): consensus difficulty @248,991 and total
+  // issuance @248,991, 2 seconds apart — never mix snapshot dates in one bundle
   // (the Sept-30 bundle survived to Oct 2 at half the real hashrate and skewed
   // every fallback-path earnings figure ~2x; guarded in tests).
-  blockRewardQTC: 0.3033426, // emission formula: (21M − 5,832,872.2440 total issuance) / 50M, data/supply.json @248712, 2026-10-18
-  blockRewardLabel: "0.3033 QTC · emission formula @ height 248712, 2026-10-18",
-  netHashHS: 36008782988670, // difficulty 432105395864046 / 12s, data/consensus.json @248712, 2026-10-18
-  netHashLabel: "≈36.01 TH/s · from difficulty 432105395864046 @ height 248712, 2026-10-18",
+  blockRewardQTC: 0.3033396, // emission formula: (21M − 5,833,019.1357 total issuance) / 50M, data/supply.json @248991, 2026-10-18
+  blockRewardLabel: "0.3033 QTC · emission formula @ height 248991, 2026-10-18",
+  netHashHS: 36716977735904, // difficulty 440603732830848 / 12s, data/consensus.json @248991, 2026-10-18
+  netHashLabel: "≈36.72 TH/s · from difficulty 440603732830848 @ height 248991, 2026-10-18",
 };
 
 const SOURCES = [
@@ -216,8 +216,9 @@ function intField(v) {
   if (typeof v === "number") return Number.isInteger(v) ? v : null;
   return null;
 }
+/* Batch 195: integer-string length bound before BigInt — this validator admits an unbounded digit string that downstream code BigInt()-converts whole (superlinear); cap 512 chars on length alone. */
 function validPlancks(v) {
-  if (typeof v === "string") return /^\d+$/.test(v.trim()) ? v.trim() : null;
+  if (typeof v === "string") return (v.trim().length <= 512 && /^\d+$/.test(v.trim())) ? v.trim() : null;
   if (typeof v === "number" && Number.isInteger(v) && v >= 0) return String(v);
   return null;
 }

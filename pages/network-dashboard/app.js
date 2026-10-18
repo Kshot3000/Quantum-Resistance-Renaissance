@@ -59,9 +59,10 @@ function nonNegInt(v){
   return null;
 }
 
+/* Batch 195: integer-string length bound before BigInt — this validator admits an unbounded digit string that downstream code BigInt()-converts whole (superlinear); cap 512 chars on length alone. */
 function validPlancks(v){
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
-  if (typeof v === "string" && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
+  if (typeof v === "string" && v.length <= 512 && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
   return null;
 }
 

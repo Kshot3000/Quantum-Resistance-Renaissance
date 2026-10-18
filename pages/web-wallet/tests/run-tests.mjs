@@ -373,7 +373,7 @@ test('u32le', () => {
 /* ---- RPC boundary: node answers are validated before they anchor a
  * balance, a signing payload, a fee quote, or a broadcast result ---- */
 import {
-  parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex,
+  parseBlockNumber, isHash32, parseVersionNumber, parseNonce, parseFeeField, validStorageHex, MAX_INT_CHARS,
 } from '../js/rpc-validate.js';
 import {
   getRuntimeVersion, getGenesisHash, getLatestHeader, getAccountInfo, getNonce, submitExtrinsic,
@@ -421,6 +421,13 @@ test('rpc-validate: fee fields whitelist integer shapes (BigInt("-5") is a coerc
   assert.equal(parseFeeField('1.5'), null);
   assert.equal(parseFeeField({}), null);
   assert.equal(parseFeeField(null), null);
+});
+test('int bound (Batch 195): parseFeeField length gate before BigInt', () => {
+  assert.equal(MAX_INT_CHARS, 512);
+  assert.equal(parseFeeField("0".repeat(596) + "7"), null);
+  assert.equal(parseFeeField('0x' + '0'.repeat(596) + '7'), null);
+  assert.equal(parseFeeField('9'.repeat(512)), BigInt('9'.repeat(512)));
+  assert.equal(parseFeeField('9'.repeat(2000000)), null);
 });
 
 test('rpc-url: endpoint validation bounds length before parse (white-hat)', () => {

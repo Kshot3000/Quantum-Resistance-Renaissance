@@ -256,6 +256,11 @@ t("validPlancks accepts only non-negative integer plancks", () => {
   assert.equal(F.validPlancks(null), null);
   assert.equal(F.validPlancks(1.5), null);
 });
+t("int bound (Batch 195): validPlancks length gate before downstream BigInt", () => {
+  assert.equal(F.validPlancks("0".repeat(596) + "7"), null);
+  assert.equal(F.validPlancks("9".repeat(512)), "9".repeat(512));
+  assert.equal(F.validPlancks("9".repeat(2000000)), null);
+});
 t("sanitizeTransfers drops core poison, coerces recoverable fields", () => {
   const clean = F.sanitizeTransfers([
     { id: "ok", amount: "2000000000000", from_id: "A", to_id: "B", block_height: 10, timestamp: "2026-10-01T00:00:00Z", fee: "5", extrinsic_id: "0x1" },

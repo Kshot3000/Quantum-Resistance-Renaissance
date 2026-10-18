@@ -410,10 +410,15 @@ function fmtETH(weiStr){
  * negative computed BTC balance (mempool double-count artifact)
  * floors at 0 — the verdict rides on the counts, not the balance.
  * ============================================================ */
+/* Integer-string length bound before BigInt (white-hat, Batch 195): see
+ * the fleet note — an unbounded digit string is BigInt()-converted whole
+ * by fmtETH/the verdict paths before any check can refuse it; cap 512
+ * chars on length alone before the regex/BigInt. */
+var MAX_INT_CHARS = 512;
 function validPlancks(v){
   if (typeof v === "bigint") return v >= 0n ? v.toString() : null;
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
-  if (typeof v === "string" && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
+  if (typeof v === "string" && v.length <= MAX_INT_CHARS && /^\d+$/.test(v)) return v.replace(/^0+(?=\d)/, "");
   return null;
 }
 function nonNegInt(v){

@@ -260,9 +260,9 @@ $("leaf-hash").addEventListener("click", () => {
   leafLabError(null);
   try {
     const acct = ZK.parseAccount($("leaf-to").value);
-    const tc = BigInt($("leaf-tc").value.trim() || "0");
+    const tc = ZK.parseCountField($("leaf-tc").value, "transfer_count");
     if (tc < 0n || tc > 0xffffffffffffffffn) throw new Error("transfer_count must fit in u64");
-    const asset = BigInt($("leaf-asset").value.trim() || "0");
+    const asset = ZK.parseCountField($("leaf-asset").value, "asset_id");
     const amount = ZK.parseQtcToPlancks($("leaf-amount").value);
     const fields = { to: acct.bytes, transferCount: tc, assetId: asset, amountPlancks: amount };
     const r = ZK.hashLeaf(fields);
@@ -593,8 +593,8 @@ $("proof-verify").addEventListener("click", () => {
     const acct = ZK.parseAccount($("pv-to").value);
     const fields = {
       to: acct.bytes,
-      transferCount: BigInt($("pv-tc").value.trim() || "0"),
-      assetId: BigInt($("pv-asset").value.trim() || "0"),
+      transferCount: ZK.parseCountField($("pv-tc").value, "transfer_count"),
+      assetId: ZK.parseCountField($("pv-asset").value, "asset_id"),
       amountPlancks: ZK.parseQtcToPlancks($("pv-amount").value.trim() || "0"),
     };
     const rootHex = $("proof-root").value.trim();

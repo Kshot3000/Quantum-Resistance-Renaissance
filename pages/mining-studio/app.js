@@ -72,8 +72,9 @@ function intField(v) {
   if (typeof v === "number") return Number.isInteger(v) ? v : null;
   return null;
 }
+/* Batch 195: integer-string length bound before BigInt — this validator admits an unbounded digit string that downstream code BigInt()-converts whole (superlinear); cap 512 chars on length alone. */
 function validPlancks(v) {
-  if (typeof v === "string") return /^\d+$/.test(v.trim()) ? v.trim() : null;
+  if (typeof v === "string") return (v.trim().length <= 512 && /^\d+$/.test(v.trim())) ? v.trim() : null;
   if (typeof v === "number" && Number.isInteger(v) && v >= 0) return String(v);
   return null;
 }

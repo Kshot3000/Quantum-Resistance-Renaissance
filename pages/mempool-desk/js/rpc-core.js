@@ -26,6 +26,7 @@ var SS58_189_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/; // strict shape: qz + 47 base5
  * chars), refused on length alone before the regex/BigInt, in this
  * parser's throw convention, input never echoed. */
 var MAX_AMOUNT_CHARS = 512;
+var MAX_INT_CHARS = 512; // Batch 195: non-amount integer strings (fee fields from the node), same cap
 function amountInputRoom(chars) {
   return typeof chars === "number" && isFinite(chars) && chars >= 0 && Math.floor(chars) === chars && chars <= MAX_AMOUNT_CHARS;
 }
@@ -390,8 +391,12 @@ function decodePartialFee(queryInfoResult) {
     if (!Number.isSafeInteger(f) || f < 0) throw new Error("malformed partialFee in queryInfo result");
     return BigInt(f);
   }
-  if (typeof f === "string" && /^\d+$/.test(f)) return BigInt(f);
-  if (typeof f === "string" && /^0x[0-9a-fA-F]+$/.test(f)) return BigInt(f);
+  /* Integer-string length bound before BigInt (white-hat, Batch 195):
+   * the node is an untrusted boundary — an unbounded fee string was
+   * BigInt()-converted whole (superlinear) before any check; cap 512
+   * chars on length alone, in this parser's throw convention. */
+  if (typeof f === "string" && f.length <= MAX_INT_CHARS && /^\d+$/.test(f)) return BigInt(f);
+  if (typeof f === "string" && f.length <= MAX_INT_CHARS && /^0x[0-9a-fA-F]+$/.test(f)) return BigInt(f);
   throw new Error("malformed partialFee in queryInfo result");
 }
 

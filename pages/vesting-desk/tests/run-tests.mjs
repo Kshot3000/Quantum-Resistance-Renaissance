@@ -368,4 +368,11 @@ t("boundary: a non-array payload fails closed instead of throwing", () => {
   assert.equal(VApp.validateSchedules("x", ANCHOR_V).length, 0);
 });
 
+t("int bound (Batch 195): decStr length gate before its BigInt canonicalization", () => {
+  assert.equal(VApp.decStr("7000000000000"), "7000000000000");
+  assert.equal(VApp.decStr("9".repeat(600)), null);
+  assert.equal(VApp.decStr("9".repeat(512)), "9".repeat(512));
+  assert.equal(VApp.decStr("9".repeat(2000000)), null);
+});
+
 console.log(`\nvesting-core: ${pass} tests green`);

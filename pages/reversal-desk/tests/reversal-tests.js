@@ -168,6 +168,11 @@ ok(RC.validateSnapshot(snapClone(), NOW) !== null, "boundary: the REAL snapshot 
 eq(RC.validBlockHeight(202509), 202509, "validBlockHeight: plain height");
 eq(RC.validBlockHeight("202509"), 202509, "validBlockHeight: canonical digit string");
 eq(RC.validBlockHeight(9007199254740991), null, "validBlockHeight: absurd height rejects");
+/* Batch 195: integer-string length bound before BigInt. */
+eq(RC.validPlancks("7000000000000"), "7000000000000", "int bound: validPlancks genuine");
+eq(RC.validPlancks("9".repeat(600)), null, "int bound: 600-digit refused by gate");
+eq(RC.validPlancks("9".repeat(512)), "9".repeat(512), "int bound: at-cap not refused by gate");
+eq(RC.validPlancks("9".repeat(2000000)), null, "int bound: 2M-digit refused");
 eq(RC.validBlockHeight(202509.5), null, "validBlockHeight: fractional rejects");
 eq(RC.validBlockHeight("2.02e5"), null, "validBlockHeight: scientific string rejects");
 eq(RC.validBlockHeight(true), null, "validBlockHeight: boolean rejects");

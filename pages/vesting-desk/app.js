@@ -72,12 +72,15 @@
    * non-array payload fail closed instead of throwing. */
   const ADDR_RE = /^qz[1-9A-HJ-NP-Za-km-z]{47}$/;
   const MS_MIN = 946684800000, MS_MAX = 4102444800000; // 2000-01-01 .. 2100-01-01
+  const MAX_INT_CHARS = 512; // Batch 195: integer-string length bound before BigInt (fleet cap)
   function decStr(v) {
     // Canonical decimal string for a non-negative integer, or null.
     // Strings must be pure digits ("1.5"/"1e3"/"-5"/"null" all reject);
     // numbers only when safe integers (planck amounts exceed 2^53, so a
     // numeric amount has already lost precision — reject rather than lie).
-    if (typeof v === "string" && /^(0|[1-9]\d*)$/.test(v)) return BigInt(v).toString();
+    // Length first (Batch 195): BigInt(v) below converted an unbounded
+    // digit string whole — superlinear — before any relation could refuse it.
+    if (typeof v === "string" && v.length <= MAX_INT_CHARS && /^(0|[1-9]\d*)$/.test(v)) return BigInt(v).toString();
     if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return String(v);
     return null;
   }
@@ -737,6 +740,6 @@
    * testable without a browser — pages/vesting-desk/tests/run-tests.mjs
    * requires this file and drives validSchedule/validBlockHeight. */
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { validSchedule, validateSchedules, validBlockHeight, validFetchedAtMs, MAX_SCHEDULES };
+    module.exports = { validSchedule, validateSchedules, validBlockHeight, validFetchedAtMs, MAX_SCHEDULES, decStr };
   }
 })();

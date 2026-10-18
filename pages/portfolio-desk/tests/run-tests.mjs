@@ -137,6 +137,11 @@ test("validPlancks/nonNegInt accept only canonical non-negative integers", () =>
   assert.equal(P.parseableTs("not a date"), null);
   assert.equal(P.parseableTs(null), null);
 });
+test("int bound (Batch 195): validPlancks length gate before downstream BigInt", () => {
+  assert.equal(P.validPlancks("0".repeat(596) + "7"), null);
+  assert.equal(P.validPlancks("9".repeat(512)), "9".repeat(512));
+  assert.equal(P.validPlancks("9".repeat(2000000)), null);
+});
 
 test("sanitizeBalance drops poisoned rows, defaults absent reserved/frozen to 0", () => {
   assert.deepEqual(P.sanitizeBalance({ free: "100", reserved: "2", frozen: "0" }), { free: "100", reserved: "2", frozen: "0" });

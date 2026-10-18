@@ -240,7 +240,10 @@ export function validExtrinsicHex(s) {
  * a pure-digit string; anything else renders as a dash, never String(x). */
 export function validPlanckField(v) {
   if (typeof v === 'number') return Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
-  if (typeof v === 'string' && /^[0-9]+$/.test(v.trim())) return v.trim();
+  // Length first (Batch 195): callers BigInt() the returned string —
+  // an unbounded digit string converted whole (superlinear) before any
+  // check; cap 512 chars (the fleet cap) on length alone.
+  if (typeof v === 'string' && v.trim().length <= 512 && /^[0-9]+$/.test(v.trim())) return v.trim();
   return null;
 }
 
@@ -396,8 +399,15 @@ export const RECIPE_BUILDERS = {
  * summarizer previously hand-rolled this and printed "1." / "0." for
  * whole-QTC and zero fees (its `|| '0'` guard never fired on the truthy
  * "1." string). Missing/garbage input renders as a dash, never a guess. */
+/* Integer-string length bound before BigInt (white-hat, Batch 195): the
+ * partialFee comes straight from the node's queryInfo answer — an
+ * unbounded digit string was BigInt()-converted whole (superlinear)
+ * inside the try, so the catch never helped. Cap 512 chars (the fleet
+ * cap; a genuine fee is at most a u128) on length alone, dash convention. */
+const MAX_INT_CHARS = 512;
 export function formatPartialFeeQtc(partialFee) {
   if (partialFee === null || partialFee === undefined || partialFee === '') return '—';
+  if (typeof partialFee === 'string' && partialFee.length > MAX_INT_CHARS) return '—';
   try { return plancksToQtc(BigInt(partialFee)); } catch { return '—'; }
 }
 

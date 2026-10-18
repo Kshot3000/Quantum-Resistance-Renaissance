@@ -9,14 +9,14 @@ var E = EnergyCore;
 
 /* ---------- constants ---------- */
 var FALLBACK = {
-  difficulty: "432105395864046",
-  height: 248712,
+  difficulty: "440603732830848",
+  height: 248991,
   // total supply in plancks (free + reserved + frozen), balances aggregate @ block
-  // 248,712, fetched 2026-10-18 — the SAME capture as the difficulty above
-  // (@ block 248,712, fetched 1 seconds apart; never mix snapshot dates in one bundle).
+  // 248,991, fetched 2026-10-18 — the SAME capture as the difficulty above
+  // (@ block 248,991, fetched 2 seconds apart; never mix snapshot dates in one bundle).
   // This is total_issuance for the emission formula, NOT mined rewards alone
   // (genesis endowments count toward issuance).
-  totalSupplyPlancks: "5832872244024049119",
+  totalSupplyPlancks: "5833019135683219572",
   fetchedAt: null,
   txRate: null,
   txRateSub: null,
@@ -59,8 +59,9 @@ function intField(v) {
   if (typeof v === "number") return Number.isInteger(v) ? v : null;
   return null;
 }
+/* Batch 195: integer-string length bound before BigInt — this validator admits an unbounded digit string that downstream code BigInt()-converts whole (superlinear); cap 512 chars on length alone. */
 function validPlancks(v) {
-  if (typeof v === "string") return /^\d+$/.test(v.trim()) ? v.trim() : null;
+  if (typeof v === "string") return (v.trim().length <= 512 && /^\d+$/.test(v.trim())) ? v.trim() : null;
   if (typeof v === "number" && Number.isInteger(v) && v >= 0) return String(v);
   return null;
 }

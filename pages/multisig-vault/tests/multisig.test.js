@@ -148,6 +148,14 @@ eq(cm.derived.ss58, r1.ss58, "create payload derives same address");
 ok(!C.deriveMultisigAddress(V1_SIGNERS, 2, 1.5).ok, "rejects fractional numeric nonce");
 ok(!C.deriveMultisigAddress(V1_SIGNERS, 2, NaN).ok, "rejects NaN nonce");
 eq(C.deriveMultisigAddress(V1_SIGNERS, 2, "42").nonce, "42", "accepts decimal-string nonce");
+/* Batch 195: nonce integer-string length bound before BigInt. */
+{
+  const over = C.deriveMultisigAddress(V1_SIGNERS, 2, "0".repeat(596) + "7");
+  ok(!over.ok && /512/.test(over.error), "int bound: long-but-tiny nonce refused naming cap", over.error);
+  const atCap = C.deriveMultisigAddress(V1_SIGNERS, 2, "0".repeat(511) + "7");
+  ok(atCap.ok && atCap.nonce === "7", "int bound: 512-char nonce not refused by gate", atCap.error);
+  ok(!C.deriveMultisigAddress(V1_SIGNERS, 2, "9".repeat(2000000)).ok, "int bound: 2M-digit nonce refused");
+}
 eq(C.deriveMultisigAddress(V1_SIGNERS, 2, 42).nonce, "42", "accepts numeric nonce");
 eq(C.deriveMultisigAddress(V1_SIGNERS, 2, 42n).nonce, "42", "accepts BigInt nonce");
 ok(!C.deriveMultisigAddress(V1_SIGNERS, 2, "18446744073709551616").ok, "rejects nonce > u64 max");
