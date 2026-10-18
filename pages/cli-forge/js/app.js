@@ -172,6 +172,36 @@ function listItemRoom(item) {
   return room >= 0 ? room : -1;
 }
 
+/* Single-argument field length bound (string / path / positional kinds,
+ * plus the text globals nodeUrl / coldRequestOut / coldResponseIn). Each
+ * of these values is emitted as ONE shell-quoted argument in the built
+ * command, so the same MAX_ARG_STRLEN ceiling as the json and csv bounds
+ * applies: 131,072. validateField used to return null UNCONDITIONALLY
+ * for string, path, and positional values, and buildCommand emitted the
+ * globals with no check at all — a 20,000,000-char paste in any of them
+ * built a 20,000,029-char command (~73 ms in Node) with zero problems
+ * reported, re-quoted and re-joined on every keystroke (buildCommand
+ * runs per input event), for a command the OS could never execute.
+ * Over-cap values are now refused on length alone. Genuine forms sit far
+ * under the cap: wallet names are capped at 64 chars by the address/name
+ * grammar, filesystem paths at PATH_MAX = 4,096, and node URLs,
+ * derivation paths, and SS58 positionals are all short. */
+var MAX_SINGLE_ARG_CHARS = 131072;
+
+/* Characters of room left for a single-argument value, or -1 when the
+ * value is not a string or is already over the cap (fail-closed). */
+function singleArgRoom(value) {
+  if (typeof value !== "string") return -1;
+  var room = MAX_SINGLE_ARG_CHARS - value.length;
+  return room >= 0 ? room : -1;
+}
+
+function singleArgTooLongMsg(value) {
+  return "value too long: " + value.length.toLocaleString("en-US") +
+    " characters (max " + MAX_SINGLE_ARG_CHARS.toLocaleString("en-US") +
+    " — one command-line argument cannot exceed that)";
+}
+
 /* Validate one field value. Returns null when OK, else an error string. */
 function validateField(field, raw) {
   var v = trim(raw);
@@ -226,6 +256,7 @@ function validateField(field, raw) {
     case "path":
     case "string":
     case "positional":
+      if (singleArgRoom(v) < 0) return singleArgTooLongMsg(v);
       return null;
     default:
       return null;
@@ -253,12 +284,21 @@ function buildCommand(cmd, values, globals) {
 
   // global flags first (clap: globals may appear anywhere; forge puts them up front)
   if (globals.verbose) parts.push("--verbose");
+  /* Each text global is emitted as ONE argument, so each is held to the
+   * single-argument cap (see the bound note above): an over-cap value is
+   * a blocking problem and NO flag is emitted — the camera-index gate
+   * shape below. */
   var nu = trim(globals.nodeUrl || "");
-  if (nu && nu !== "ws://127.0.0.1:9944") parts.push("--node-url", shellQuote(nu));
+  if (nu && singleArgRoom(nu) < 0) problems.push({ field: "nodeUrl", msg: singleArgTooLongMsg(nu) });
+  else if (nu && nu !== "ws://127.0.0.1:9944") parts.push("--node-url", shellQuote(nu));
   if (globals.finalizedTx) parts.push("--finalized-tx");
   if (globals.waitForTx) parts.push("--wait-for-transaction");
-  if (trim(globals.coldRequestOut || "")) parts.push("--cold-request-out", shellQuote(trim(globals.coldRequestOut)));
-  if (trim(globals.coldResponseIn || "")) parts.push("--cold-response-in", shellQuote(trim(globals.coldResponseIn)));
+  var cro = trim(globals.coldRequestOut || "");
+  if (cro && singleArgRoom(cro) < 0) problems.push({ field: "coldRequestOut", msg: singleArgTooLongMsg(cro) });
+  else if (cro) parts.push("--cold-request-out", shellQuote(cro));
+  var cri = trim(globals.coldResponseIn || "");
+  if (cri && singleArgRoom(cri) < 0) problems.push({ field: "coldResponseIn", msg: singleArgTooLongMsg(cri) });
+  else if (cri) parts.push("--cold-response-in", shellQuote(cri));
   /* The camera index is a u32 global (GLOBALS declares kind "uint", u:32),
    * and the command-level camera-index field is held to isValidUint — but
    * this global used to be parseInt-coerced straight into the command:
@@ -317,6 +357,11 @@ function buildCommand(cmd, values, globals) {
     }
     var err = validateField(f, v);
     if (err) problems.push({ field: f.f, msg: err });
+    /* Single-argument kinds: the only validation error they can carry is
+     * the length refusal, and emitting the value anyway would rebuild the
+     * giant command string the bound exists to prevent — so an over-cap
+     * value is NOT emitted (the repeat-branch gate shape). */
+    if (err && (f.kind === "string" || f.kind === "path" || f.kind === "positional")) { seen[f.f] = true; return; }
     if (f.kind === "amount") {
       var p = parseQtcToPlancks(v);
       if (p !== null) plancks[f.f] = p.toString();
@@ -1981,6 +2026,8 @@ if (typeof module !== "undefined" && module.exports) {
     csvFieldRoom: csvFieldRoom,
     repeatFieldRoom: repeatFieldRoom,
     listItemRoom: listItemRoom,
+    MAX_SINGLE_ARG_CHARS: MAX_SINGLE_ARG_CHARS,
+    singleArgRoom: singleArgRoom,
     classifyAddressOrName: classifyAddressOrName,
     parseQtcToPlancks: parseQtcToPlancks,
     plancksToQtcString: plancksToQtcString,

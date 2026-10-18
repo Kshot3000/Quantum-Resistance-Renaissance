@@ -233,6 +233,58 @@ r = build("ms-create", { signers: "a".repeat(131073), threshold: "2", from: "ali
 t("buildCommand flags over-cap csv naming the cap",
   r.problems.some(p => p.field === "signers" && /131,072/.test(p.msg)), JSON.stringify(r.problems));
 
+/* ---- single-argument field length bound (string / path / positional
+ * kinds + the nodeUrl / coldRequestOut / coldResponseIn globals): every
+ * one of these values is emitted as ONE command-line argument, so the
+ * same MAX_ARG_STRLEN = 131,072 ceiling applies. validateField used to
+ * return null unconditionally for the three kinds and the globals were
+ * emitted unchecked — a 20,000,000-char paste built a 20,000,029-char
+ * command (~73 ms) with zero problems. Genuine forms are far under the
+ * cap: wallet names ≤ 64 chars, paths ≤ PATH_MAX 4,096. ---- */
+eq("single-arg cap is the argv limit", F.MAX_SINGLE_ARG_CHARS, 131072);
+eq("single-arg room of empty is the cap", F.singleArgRoom(""), 131072);
+eq("single-arg room at exactly cap is 0", F.singleArgRoom("x".repeat(131072)), 0);
+eq("single-arg room at cap+1 is -1", F.singleArgRoom("x".repeat(131073)), -1);
+t("single-arg room fail-closed on non-strings",
+  F.singleArgRoom(null) === -1 && F.singleArgRoom(undefined) === -1 &&
+  F.singleArgRoom(42) === -1 && F.singleArgRoom({}) === -1, "");
+["string", "path", "positional"].forEach(k => {
+  eq(k + " small value validates", F.validateField({ f: "x", kind: k }, "abc"), null);
+  eq(k + " exactly-cap validates", F.validateField({ f: "x", kind: k }, "a".repeat(131072)), null);
+  let e = F.validateField({ f: "x", kind: k }, "a".repeat(131073));
+  t(k + " cap+1 refused on length naming size + cap",
+    typeof e === "string" && /131,073/.test(e) && /131,072/.test(e), e);
+});
+let saGiant = F.validateField({ f: "name", kind: "string" }, "x".repeat(20000000));
+t("string 20M-char value refused on length",
+  typeof saGiant === "string" && /20,000,000/.test(saGiant) && /131,072/.test(saGiant), saGiant);
+r = build("wallet-create", { name: "x".repeat(20000000) });
+t("buildCommand refuses over-cap string, emits no flag, no giant cmd",
+  r.problems.some(p => p.field === "name" && /131,072/.test(p.msg)) &&
+  r.cmd.indexOf("--name") === -1 && r.cmd.length < 1000, r.cmd.slice(0, 120));
+r = build("wallet-create", { name: "ops", "password-file": "/" + "a".repeat(131073) });
+t("buildCommand refuses over-cap path, emits no flag",
+  r.problems.some(p => p.field === "password-file" && /131,072/.test(p.msg)) &&
+  r.cmd.indexOf("--password-file") === -1, r.cmd.slice(0, 120));
+r = build("transfers-hash", { address: "a".repeat(131073) });
+t("buildCommand refuses over-cap positional, emits nothing",
+  r.problems.some(p => p.field === "address" && /131,072/.test(p.msg)) && r.cmd === "quantus transfers hash-address", r.cmd.slice(0, 120));
+r = build("wallet-create", { name: "a".repeat(131072) });
+t("buildCommand emits exactly-cap string",
+  r.problems.length === 0 && r.cmd.indexOf("--name") >= 0, JSON.stringify(r.problems));
+r = build("send", { to: GOOD, amount: "1", from: "alice" }, { nodeUrl: "wss://" + "a".repeat(131073) });
+t("buildCommand refuses over-cap nodeUrl global, emits no flag",
+  r.problems.some(p => p.field === "nodeUrl" && /131,072/.test(p.msg)) && r.cmd.indexOf("--node-url") === -1, r.cmd.slice(0, 120));
+r = build("send", { to: GOOD, amount: "1", from: "alice" }, { coldRequestOut: "/" + "a".repeat(131073) });
+t("buildCommand refuses over-cap coldRequestOut global, emits no flag",
+  r.problems.some(p => p.field === "coldRequestOut" && /131,072/.test(p.msg)) && r.cmd.indexOf("--cold-request-out") === -1, r.cmd.slice(0, 120));
+r = build("send", { to: GOOD, amount: "1", from: "alice" }, { coldResponseIn: "/" + "a".repeat(131073) });
+t("buildCommand refuses over-cap coldResponseIn global, emits no flag",
+  r.problems.some(p => p.field === "coldResponseIn" && /131,072/.test(p.msg)) && r.cmd.indexOf("--cold-response-in") === -1, r.cmd.slice(0, 120));
+r = build("send", { to: GOOD, amount: "1", from: "alice" }, { nodeUrl: "wss://" + "a".repeat(131066) });
+t("buildCommand emits exactly-cap nodeUrl global",
+  r.cmd.indexOf("--node-url") >= 0 && !r.problems.some(p => p.field === "nodeUrl"), r.cmd.slice(0, 120));
+
 r = build("scheduler-agenda", { range: "80..100" });
 eq("range exact", r.cmd, "quantus scheduler agenda --range 80..100");
 r = build("scheduler-agenda", { range: "80-100" });
