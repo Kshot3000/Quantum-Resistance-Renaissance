@@ -122,6 +122,56 @@ function jsonFieldRoom(value) {
   return room >= 0 ? room : -1;
 }
 
+/* List field length bounds (csv + repeat kinds) — the same OS argv
+ * ceilings as the json bound above, applied to the two list shapes:
+ *  - A csv field's value is emitted as ONE shell-quoted argument
+ *    (--signers alice,bob,charlie), so the whole value is capped at
+ *    MAX_ARG_STRLEN = 131,072 like any single argument.
+ *  - A repeat field is comma-split and each item is emitted as its OWN
+ *    argument (--proofs item --proofs item), so each ITEM is capped at
+ *    131,072, and the whole field is capped at ARG_MAX = 2,097,152:
+ *    the total argv of one command can never exceed that, so a longer
+ *    field can never be part of a runnable command.
+ * Both kinds used to run unbounded on every keystroke (buildCommand
+ * runs per input event): validateField returned null for csv values of
+ * any length, and the repeat branch split the WHOLE value
+ * (split(",").map(trim).filter + shellQuote per item + join) with no
+ * validation at all — a 20,000,000-char paste materialized 10,000,000
+ * tokens and built a 110,000,026-char command in ~8.3 s in Node, with
+ * zero problems reported. Over-cap values are now refused on length
+ * alone, before any split or parse. The caps hold every genuine list
+ * intact: the largest csv form, 100 multisig signers (the pallet cap)
+ * at the 64-char wallet-name maximum plus separators, is 6,499 chars,
+ * and a repeat field of a dozen 14,720-char ML-DSA-87-signature-sized
+ * items is 176,652 chars — both far under their caps. */
+var MAX_CSV_FIELD_CHARS = 131072;
+var MAX_LIST_ITEM_CHARS = 131072;
+var MAX_REPEAT_FIELD_CHARS = 2097152;
+
+/* Characters of room left for a csv field value, or -1 when the value
+ * is not a string or is already over the cap (fail-closed). */
+function csvFieldRoom(value) {
+  if (typeof value !== "string") return -1;
+  var room = MAX_CSV_FIELD_CHARS - value.length;
+  return room >= 0 ? room : -1;
+}
+
+/* Characters of room left for a repeat field value as a whole, or -1
+ * when the value is not a string or is already over the cap. */
+function repeatFieldRoom(value) {
+  if (typeof value !== "string") return -1;
+  var room = MAX_REPEAT_FIELD_CHARS - value.length;
+  return room >= 0 ? room : -1;
+}
+
+/* Characters of room left for one repeat item (its own argv), or -1
+ * when the item is not a string or is already over the cap. */
+function listItemRoom(item) {
+  if (typeof item !== "string") return -1;
+  var room = MAX_LIST_ITEM_CHARS - item.length;
+  return room >= 0 ? room : -1;
+}
+
 /* Validate one field value. Returns null when OK, else an error string. */
 function validateField(field, raw) {
   var v = trim(raw);
@@ -151,11 +201,30 @@ function validateField(field, raw) {
           " characters (max " + MAX_JSON_FIELD_CHARS.toLocaleString("en-US") +
           " — one command-line argument cannot exceed that)";
       try { JSON.parse(v); return null; } catch (e) { return "must be valid JSON"; }
+    case "csv":
+      if (csvFieldRoom(v) < 0)
+        return "comma-separated list too long: " + v.length.toLocaleString("en-US") +
+          " characters (max " + MAX_CSV_FIELD_CHARS.toLocaleString("en-US") +
+          " — the list is passed as one command-line argument, which cannot exceed that)";
+      return null;
+    case "repeat": {
+      if (repeatFieldRoom(v) < 0)
+        return "list too long: " + v.length.toLocaleString("en-US") +
+          " characters (max " + MAX_REPEAT_FIELD_CHARS.toLocaleString("en-US") +
+          " — a command's arguments cannot exceed that in total)";
+      var items = v.split(",").map(trim).filter(Boolean);
+      for (var ii = 0; ii < items.length; ii++) {
+        if (listItemRoom(items[ii]) < 0)
+          return "list item too long: " + items[ii].length.toLocaleString("en-US") +
+            " characters (max " + MAX_LIST_ITEM_CHARS.toLocaleString("en-US") +
+            " — one command-line argument cannot exceed that)";
+      }
+      return null;
+    }
     case "range":
       return /^\d+\.\.\d+$/.test(v) ? null : 'range like "80..100"';
     case "path":
     case "string":
-    case "csv":
     case "positional":
       return null;
     default:
@@ -218,7 +287,26 @@ function buildCommand(cmd, values, globals) {
       return;
     }
     if (f.kind === "repeat" || f.repeat) {
+      /* Length gates BEFORE the split (see the list-bound note above):
+       * an over-cap field is a blocking problem and NO flag is emitted
+       * for it — the same gate shape as the global camera index. The
+       * whole-field check runs first so the split below only ever runs
+       * on at most MAX_REPEAT_FIELD_CHARS characters. */
+      if (v && repeatFieldRoom(v) < 0) {
+        problems.push({ field: f.f, msg: "list too long: " + v.length.toLocaleString("en-US") +
+          " characters (max " + MAX_REPEAT_FIELD_CHARS.toLocaleString("en-US") +
+          " — a command's arguments cannot exceed that in total)" });
+        return;
+      }
       var items = v.split(",").map(trim).filter(Boolean);
+      for (var ii = 0; ii < items.length; ii++) {
+        if (listItemRoom(items[ii]) < 0) {
+          problems.push({ field: f.f, msg: "list item too long: " + items[ii].length.toLocaleString("en-US") +
+            " characters (max " + MAX_LIST_ITEM_CHARS.toLocaleString("en-US") +
+            " — one command-line argument cannot exceed that)" });
+          return;
+        }
+      }
       items.forEach(function (it) { parts.push("--" + f.f, shellQuote(it)); });
       if (f.req && !items.length) problems.push({ field: f.f, msg: "required (repeatable)" });
       return;
@@ -1887,6 +1975,12 @@ if (typeof module !== "undefined" && module.exports) {
     validateField: validateField,
     MAX_JSON_FIELD_CHARS: MAX_JSON_FIELD_CHARS,
     jsonFieldRoom: jsonFieldRoom,
+    MAX_CSV_FIELD_CHARS: MAX_CSV_FIELD_CHARS,
+    MAX_LIST_ITEM_CHARS: MAX_LIST_ITEM_CHARS,
+    MAX_REPEAT_FIELD_CHARS: MAX_REPEAT_FIELD_CHARS,
+    csvFieldRoom: csvFieldRoom,
+    repeatFieldRoom: repeatFieldRoom,
+    listItemRoom: listItemRoom,
     classifyAddressOrName: classifyAddressOrName,
     parseQtcToPlancks: parseQtcToPlancks,
     plancksToQtcString: plancksToQtcString,

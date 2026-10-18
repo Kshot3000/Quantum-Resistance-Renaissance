@@ -178,6 +178,61 @@ eq("json invalid under cap keeps the JSON error",
 r = build("call", { pallet: "Balances", call: "transfer_allow_death", args: "[\"" + "a".repeat(200000) + "\"]", from: "main" });
 t("buildCommand flags over-cap args", r.problems.some(p => p.field === "args" && /131,072/.test(p.msg)), JSON.stringify(r.problems));
 
+/* ---- list field length bounds (csv + repeat): a csv value is emitted
+ * as ONE command-line argument (cap MAX_ARG_STRLEN = 131,072); a repeat
+ * field's items are each their own argument (131,072 per item) inside
+ * one command whose argv total cannot exceed ARG_MAX = 2,097,152.
+ * Both kinds ran unbounded per keystroke before: csv validated null at
+ * any length and the repeat branch split the whole value unvalidated —
+ * a 20,000,000-char paste built a 110,000,026-char command (~8.3 s). ---- */
+eq("csv cap is the argv limit", F.MAX_CSV_FIELD_CHARS, 131072);
+eq("repeat whole cap is ARG_MAX", F.MAX_REPEAT_FIELD_CHARS, 2097152);
+eq("list item cap is the argv limit", F.MAX_LIST_ITEM_CHARS, 131072);
+eq("csv room of empty is the cap", F.csvFieldRoom(""), 131072);
+eq("csv room at exactly cap is 0", F.csvFieldRoom("x".repeat(131072)), 0);
+eq("csv room at cap+1 is -1", F.csvFieldRoom("x".repeat(131073)), -1);
+t("csv room fail-closed on non-strings",
+  F.csvFieldRoom(null) === -1 && F.csvFieldRoom(undefined) === -1 &&
+  F.csvFieldRoom(42) === -1 && F.csvFieldRoom({}) === -1, "");
+eq("repeat room of empty is ARG_MAX", F.repeatFieldRoom(""), 2097152);
+eq("repeat room at exactly cap is 0", F.repeatFieldRoom("x".repeat(2097152)), 0);
+eq("repeat room at cap+1 is -1", F.repeatFieldRoom("x".repeat(2097153)), -1);
+t("repeat room fail-closed on non-strings",
+  F.repeatFieldRoom(null) === -1 && F.repeatFieldRoom(undefined) === -1 &&
+  F.repeatFieldRoom(42) === -1 && F.repeatFieldRoom([]) === -1, "");
+t("list item room fail-closed + exact",
+  F.listItemRoom("x".repeat(131072)) === 0 && F.listItemRoom("x".repeat(131073)) === -1 &&
+  F.listItemRoom(null) === -1 && F.listItemRoom(7) === -1, "");
+const SIGNERS_FIELD = { f: "signers", kind: "csv" };
+eq("csv small list validates", F.validateField(SIGNERS_FIELD, "alice,bob,charlie"), null);
+eq("csv exactly-cap validates", F.validateField(SIGNERS_FIELD, "a".repeat(131072)), null);
+let csvErr = F.validateField(SIGNERS_FIELD, "a".repeat(131073));
+t("csv cap+1 refused on length naming size + cap",
+  typeof csvErr === "string" && /131,073/.test(csvErr) && /131,072/.test(csvErr), csvErr);
+eq("csv largest genuine form validates (100 signers x 64-char names)",
+  F.validateField(SIGNERS_FIELD, Array.from({ length: 100 }, () => "w".repeat(64)).join(",")), null);
+const PROOFS_FIELD = { f: "proofs", kind: "repeat" };
+eq("repeat small list validates", F.validateField(PROOFS_FIELD, "a.hex,b.hex"), null);
+eq("repeat item at exactly cap validates", F.validateField(PROOFS_FIELD, "a".repeat(131072)), null);
+let repItemErr = F.validateField(PROOFS_FIELD, "a".repeat(131073));
+t("repeat item cap+1 refused naming item size + cap",
+  typeof repItemErr === "string" && /131,073/.test(repItemErr) && /131,072/.test(repItemErr), repItemErr);
+let repWholeErr = F.validateField(PROOFS_FIELD, "x".repeat(2097153));
+t("repeat whole cap+1 refused naming size + ARG_MAX",
+  typeof repWholeErr === "string" && /2,097,153/.test(repWholeErr) && /2,097,152/.test(repWholeErr), repWholeErr);
+r = build("wh-aggregate", { proofs: "a".repeat(131073) });
+t("buildCommand refuses over-cap repeat item, emits no flag",
+  r.problems.some(p => p.field === "proofs" && /131,072/.test(p.msg)) && r.cmd.indexOf("--proofs") === -1, r.cmd.slice(0, 120));
+r = build("wh-aggregate", { proofs: "x".repeat(2097153) });
+t("buildCommand refuses over-cap repeat field, emits no flag",
+  r.problems.some(p => p.field === "proofs" && /2,097,152/.test(p.msg)) && r.cmd.indexOf("--proofs") === -1, r.cmd.slice(0, 120));
+r = build("wh-aggregate", { proofs: "a".repeat(131072) });
+t("buildCommand emits exactly-cap repeat item",
+  r.problems.length === 0 && r.cmd.indexOf("--proofs") >= 0, JSON.stringify(r.problems));
+r = build("ms-create", { signers: "a".repeat(131073), threshold: "2", from: "alice" });
+t("buildCommand flags over-cap csv naming the cap",
+  r.problems.some(p => p.field === "signers" && /131,072/.test(p.msg)), JSON.stringify(r.problems));
+
 r = build("scheduler-agenda", { range: "80..100" });
 eq("range exact", r.cmd, "quantus scheduler agenda --range 80..100");
 r = build("scheduler-agenda", { range: "80-100" });
