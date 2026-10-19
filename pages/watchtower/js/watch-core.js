@@ -581,6 +581,33 @@ function backupFileRoom(size) {
   return typeof size === "number" && isFinite(size) && size >= 0 && size <= MAX_BACKUP_FILE_BYTES;
 }
 
+/* ---------- fetched-response text bound (white-hat) ----------
+ * Both fetched-JSON paths in app.js used to buffer + JSON.parse the
+ * WHOLE body unbounded (r.json()): the same-origin snapshots via
+ * fetchJson and — the hostile surface — the live indexer POST, a
+ * remote third-party-operated endpoint. The sanitizers bound ROWS
+ * after the parse; nothing bounded the parse itself, so a hostile or
+ * broken endpoint could make the tab buffer and parse an arbitrarily
+ * large body before a single row was validated. The bound is sized
+ * from the genuine payloads, measured at block 251,820: the largest
+ * is data/flows.json at 810,370 bytes (the live indexer answer —
+ * status + 5 blocks — is a few KB), so 4 MiB leaves >5x headroom
+ * while an over-cap body is refused on length alone, before parsing.
+ * Fail-closed: non-string input refuses. Over-cap throws with the
+ * size + cap named, in this module's gate convention; the app's
+ * existing catch paths degrade (snapshot fallback / null) exactly as
+ * for any other fetch failure. */
+var MAX_RESPONSE_TEXT_CHARS = 4194304; // 4 MiB
+function responseTextRoom(text) {
+  return typeof text === "string" && text.length <= MAX_RESPONSE_TEXT_CHARS;
+}
+function parseResponseJson(text) {
+  if (typeof text !== "string") throw new Error("response body is not text; refused before parsing");
+  if (!responseTextRoom(text))
+    throw new Error("response is " + text.length + " characters — over the response cap of 4,194,304 characters; refused before parsing");
+  return JSON.parse(text);
+}
+
 /* ---------- rules ---------- */
 
 var RULE_TYPES = {
@@ -942,6 +969,7 @@ var api = {
   watchRoom: watchRoom, MAX_WATCHLIST: MAX_WATCHLIST,
   ruleRoom: ruleRoom, MAX_RULES: MAX_RULES,
   backupFileRoom: backupFileRoom, MAX_BACKUP_FILE_BYTES: MAX_BACKUP_FILE_BYTES,
+  parseResponseJson: parseResponseJson, responseTextRoom: responseTextRoom, MAX_RESPONSE_TEXT_CHARS: MAX_RESPONSE_TEXT_CHARS,
   advanceAddressBaseline: advanceAddressBaseline,
   blankChainBaseline: blankChainBaseline,
   blankAddressBaseline: blankAddressBaseline,

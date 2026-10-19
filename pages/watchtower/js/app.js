@@ -209,10 +209,13 @@ function fetchJson(url, timeoutMs) {
   var t = setTimeout(function () { ctrl.abort(); }, timeoutMs || FETCH_TIMEOUT_MS);
   return fetch(url, { signal: ctrl.signal, cache: "no-store" })
     /* The timer stays armed until the body is parsed: clearing it when the
-     * headers land would leave r.json() with no timeout, so a stalled
-     * snapshot body could hang the scan's data load forever. */
-    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(function (j) { clearTimeout(t); return j; })
+     * headers land would leave the body read with no timeout, so a stalled
+     * snapshot body could hang the scan's data load forever. The body is
+     * read as text and parsed through the core's response bound: an
+     * over-cap body (QWATCH.MAX_RESPONSE_TEXT_CHARS) is refused on length
+     * alone before JSON.parse ever sees it. */
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+    .then(function (text) { var j = QWATCH.parseResponseJson(text); clearTimeout(t); return j; })
     .catch(function (e) { clearTimeout(t); throw e; });
 }
 function loadChainData() {
@@ -225,8 +228,13 @@ function loadChainData() {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   }).then(function (r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.json();
-  }).then(function (j) {
+    /* The indexer is a remote endpoint: its body goes through the same
+     * core response bound as the snapshots — over-cap text is refused
+     * before parsing and degrades to the snapshot fallback below, like
+     * any other indexer failure. */
+    return r.text();
+  }).then(function (text) {
+    var j = QWATCH.parseResponseJson(text);
     if (j.errors) throw new Error(j.errors[0].message);
     return fetchJson(base + "live.json").catch(function () { return null; }).then(function (snap) {
       return { live: { ok: true, source: INDEXER, fetched_at: new Date().toISOString(), data: j.data }, snapshot: snap, mode: "live" };

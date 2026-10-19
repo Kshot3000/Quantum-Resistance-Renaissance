@@ -93,7 +93,7 @@ function pin(file, fromMarker, jsonMarker, timerName, label) {
   ok(j !== -1 && c !== -1 && j < c, `body covered by timeout :: ${label}`);
 }
 pin("block-explorer/app.js", "function gql(query)", "return res.json()", "timer", "block-explorer gql");
-pin("watchtower/js/app.js", "function fetchJson(url", "return r.json()", "t", "watchtower fetchJson");
+pin("watchtower/js/app.js", "function fetchJson(url", "QWATCH.parseResponseJson(text)", "t", "watchtower fetchJson");
 pin("portfolio-desk/js/app.js", "function fetchJson(url", "return r.json()", "t", "portfolio-desk fetchJson");
 pin("luck-lab/js/app.js", "function gql(query", "return r.json()", "to", "luck-lab gql");
 pin("supply-audit/app.js", "async function loadSupply()", "await r.json()", "t", "supply-audit loadSupply main query");

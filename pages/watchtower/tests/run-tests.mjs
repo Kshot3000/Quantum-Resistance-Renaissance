@@ -550,6 +550,30 @@ test("backupFileRoom admits every backup the exporter can produce, at the cap", 
   assert.equal(W.backupFileRoom(W.MAX_BACKUP_FILE_BYTES), true);
 });
 
+test("response text bound: genuine bodies parse, over-cap refused before parsing (Batch 207)", () => {
+  assert.equal(W.MAX_RESPONSE_TEXT_CHARS, 4194304);
+  // genuine bodies: the live indexer answer (status + 5 blocks) and a
+  // snapshot-shaped payload parse exactly
+  const small = '{"data":{"status":{"block_height":251820},"blocks":[{"height":251820}]}}';
+  assert.equal(W.parseResponseJson(small).data.status.block_height, 251820);
+  // exactly-cap text still parses (pad via a long string member)
+  const head = '{"pad":"', tail = '"}';
+  const padLen = W.MAX_RESPONSE_TEXT_CHARS - head.length - tail.length;
+  const exactCap = head + "x".repeat(padLen) + tail;
+  assert.equal(exactCap.length, W.MAX_RESPONSE_TEXT_CHARS);
+  assert.equal(W.parseResponseJson(exactCap).pad.length, padLen);
+  // cap+1 refused on length alone, size + cap named; non-string fail-closed
+  assert.throws(() => W.parseResponseJson(head + "x".repeat(padLen + 1) + tail), /4,194,304/);
+  assert.throws(() => W.parseResponseJson(null), /not text/);
+  assert.throws(() => W.parseResponseJson(undefined), /not text/);
+  // malformed in-cap text still throws (the app's catch/fallback path)
+  assert.throws(() => W.parseResponseJson("not json"));
+  // room gate boundaries
+  assert.equal(W.responseTextRoom("x".repeat(W.MAX_RESPONSE_TEXT_CHARS)), true);
+  assert.equal(W.responseTextRoom("x".repeat(W.MAX_RESPONSE_TEXT_CHARS + 1)), false);
+  assert.equal(W.responseTextRoom(42), false);
+});
+
 test("backupFileRoom refuses over-cap and sizeless picks, fail-closed", () => {
   assert.equal(W.backupFileRoom(W.MAX_BACKUP_FILE_BYTES + 1), false);
   assert.equal(W.backupFileRoom(100 * 1024 * 1024), false);
