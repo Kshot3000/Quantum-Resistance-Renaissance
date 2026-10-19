@@ -551,11 +551,20 @@ function sanitizeEthApi(api){
  * guess). Absent keys stay absent (undefined). Malformed text
  * yields null wholesale; the caller then falls back to the parsed
  * values, whose floats the sanitizer refuses as before. The scan
- * is a single linear pass with a nesting cap — no backtracking,
- * no unbounded allocation on hostile text.
+ * is a single linear pass with a nesting cap — no backtracking.
+ * Round 5 (2026-10-19): the text itself is now length-bounded —
+ * MAX_RESPONSE_TEXT_CHARS refuses an over-cap body BEFORE the
+ * scan (a 20 MB body measured ~2 s of scanning alone), returning
+ * null wholesale like any other malformed text. A genuine
+ * BlockCypher address payload is a few KB (totals plus a bounded
+ * txref page), so 1 MiB is >20x headroom; the app layer enforces
+ * the same cap on the raw response before JSON.parse, and an
+ * over-cap primary answer degrades to the Blockscout fallback.
  * ============================================================ */
+var MAX_RESPONSE_TEXT_CHARS = 1048576;
 function extractTopLevelInts(text, keys){
   if (typeof text !== "string" || !Array.isArray(keys)) return null;
+  if (text.length > MAX_RESPONSE_TEXT_CHARS) return null;
   var wanted = {};
   for (var ki = 0; ki < keys.length; ki++) wanted[keys[ki]] = true;
   var out = {}, seen = {};
@@ -861,6 +870,7 @@ var ExposureCore = {
   validPlancks: validPlancks, nonNegInt: nonNegInt,
   sanitizeBtcApi: sanitizeBtcApi, sanitizeEthApi: sanitizeEthApi,
   extractTopLevelInts: extractTopLevelInts,
+  MAX_RESPONSE_TEXT_CHARS: MAX_RESPONSE_TEXT_CHARS,
   MAX_AUDIT_SCAN_CHARS: MAX_AUDIT_SCAN_CHARS, parseAuditInput: parseAuditInput
 };
 

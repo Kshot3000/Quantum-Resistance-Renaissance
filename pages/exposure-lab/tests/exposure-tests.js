@@ -445,6 +445,16 @@ async function ta(name, fn){
     assert.strictEqual(ext.total_sent, "2000000000000000");
     assert.strictEqual(ext.final_balance, "3000000000000000");
   });
+  t("extractTopLevelInts refuses over-cap response text wholesale (round 5)", function(){
+    assert.strictEqual(C.MAX_RESPONSE_TEXT_CHARS, 1048576);
+    var head = '{"total_sent": 777, "note": "', tail = '"}';
+    var pad = C.MAX_RESPONSE_TEXT_CHARS - head.length - tail.length;
+    var exact = head + "x".repeat(pad) + tail;
+    assert.strictEqual(exact.length, C.MAX_RESPONSE_TEXT_CHARS);
+    assert.strictEqual(C.extractTopLevelInts(exact, TOT_KEYS).total_sent, "777"); // exactly cap fits
+    assert.strictEqual(C.extractTopLevelInts(head + "x".repeat(pad + 1) + tail, TOT_KEYS), null); // cap+1 refused
+    assert.strictEqual(C.extractTopLevelInts('{"total_sent": 5, "pad": "' + "x".repeat(2000000) + '"}', TOT_KEYS), null);
+  });
 
   /* --- audit-input scan window (white-hat bound) --- */
   t("parseAuditInput: small input dedupes in order, nothing skipped", function(){

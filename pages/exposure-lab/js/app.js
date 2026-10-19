@@ -112,6 +112,12 @@ async function fetchRawJSON(url, timeoutMs){
     if (!r.ok) throw new Error("HTTP " + r.status);
     if (typeof r.text === "function"){
       var text = await r.text();
+      // Round 5: the raw text is buffered whole, parsed, and char-scanned
+      // by the core — an unbounded body from a broken/hostile endpoint is
+      // an unbounded allocation + parse in the tab. Over the core cap the
+      // primary answer is refused wholesale (throws -> Blockscout fallback).
+      if (text.length > C.MAX_RESPONSE_TEXT_CHARS)
+        throw new Error("BlockCypher response too large (" + text.length + " chars, cap " + C.MAX_RESPONSE_TEXT_CHARS + ")");
       return { text: text, parsed: JSON.parse(text) };
     }
     if (typeof r.json === "function") return { text: null, parsed: await r.json() };
