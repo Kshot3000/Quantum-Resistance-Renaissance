@@ -670,7 +670,7 @@ $("liveproof-go").addEventListener("click", async () => {
 function renderExhaustion(leaves) {
   const rate = Number($("wh-rate").value);
   const out = $("wh-out");
-  if (!(rate > 0)) {
+  if (!Number.isFinite(rate) || !(rate > 0)) {
     out.hidden = false;
     out.textContent = "Enter a positive leaves/block rate.";
     return;

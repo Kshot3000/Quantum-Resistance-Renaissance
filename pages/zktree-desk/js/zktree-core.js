@@ -615,7 +615,7 @@ export function exhaustionProjection(currentLeaves, leavesPerBlock) {
   const cap = capacityAtDepth(CIRCUIT_MAX_TREE_DEPTH); // 4^16
   const remaining = cap - BigInt(currentLeaves);
   const rate = Number(leavesPerBlock);
-  if (!(rate > 0)) throw new Error("rate must be positive");
+  if (!Number.isFinite(rate) || !(rate > 0)) throw new Error("rate must be positive");
   const blocksLeft = Number(remaining) / rate;
   const secondsLeft = blocksLeft * BLOCK_TIME_S;
   return {

@@ -289,6 +289,12 @@ function throws(name, fn) {
   ok("~1,600 years at 1 leaf/block", p.yearsLeft > 1600 && p.yearsLeft < 1640);
   const p2 = ZK.exhaustionProjection(0, 120); // 10 leaves/sec = 120/block
   ok("~13.6 years at 10 leaves/sec", p2.yearsLeft > 13 && p2.yearsLeft < 14);
+  /* Batch 202: a pasted "1e999" rate Number()-coerces to Infinity, which
+   * passed the !(rate > 0) throw gate and collapsed blocksLeft to 0 — a
+   * false "exhausts now" verdict. Non-finite rates refuse like non-positive. */
+  throws("non-finite rate: Infinity refused", () => ZK.exhaustionProjection(150000, Infinity));
+  throws("non-finite rate: -Infinity refused", () => ZK.exhaustionProjection(150000, -Infinity));
+  throws("non-finite rate: Number('1e999') refused", () => ZK.exhaustionProjection(150000, Number("1e999")));
 }
 
 // --- 14. amount parsing/formatting ---
