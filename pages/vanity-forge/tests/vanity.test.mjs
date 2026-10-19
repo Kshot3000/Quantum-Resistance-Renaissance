@@ -6,7 +6,7 @@ import {
   probFoundBy, attemptsForQuantile, medianAttempts,
   expectedSeconds, fmtInt, fmtDuration, difficultyLadder,
   addressMatches, SS58_189_RE, sanitizeVault, sanitizeBench,
-  vaultRoom, MAX_VAULT_RECORDS,
+  vaultRoom, MAX_VAULT_RECORDS, plausibleRate, MAX_PLAUSIBLE_RATE,
 } from '../js/vanity.js';
 
 test('base58 alphabet has 58 chars and excludes 0/O/I/l', () => {
@@ -123,6 +123,30 @@ test('attemptsForQuantile: 90th percentile', () => {
 test('expectedSeconds: Infinity at zero rate', () => {
   assert.equal(expectedSeconds(1000, 0), Infinity);
   assert.equal(expectedSeconds(1000, 50), 20);
+});
+
+test('expectedSeconds: a non-finite rate is refused, never a 0-second ETA', () => {
+  // !(x > 0) passes Infinity: expected/Infinity collapsed to 0 and
+  // fmtDuration painted "< 1 second" for multi-year grinds.
+  assert.equal(expectedSeconds(1000, Infinity), Infinity);
+  assert.equal(expectedSeconds(1000, -Infinity), Infinity);
+  assert.equal(expectedSeconds(1000, NaN), Infinity);
+  assert.equal(expectedSeconds(Infinity, Infinity), Infinity); // never NaN
+  assert.equal(expectedSeconds(Infinity, 50), Infinity); // impossible pattern stays unknown
+  const rows = difficultyLadder(Infinity);
+  assert.ok(rows.every((r) => r.seconds === Infinity));
+  assert.equal(fmtDuration(rows[5].seconds), '—');
+});
+
+test('plausibleRate: only finite in-cap measured rates are quotable', () => {
+  assert.equal(plausibleRate(42.5), 42.5);
+  assert.equal(plausibleRate(MAX_PLAUSIBLE_RATE), MAX_PLAUSIBLE_RATE);
+  assert.equal(plausibleRate(Infinity), null); // 0 ms benchmark timer
+  assert.equal(plausibleRate(NaN), null);
+  assert.equal(plausibleRate(0), null);
+  assert.equal(plausibleRate(-3), null);
+  assert.equal(plausibleRate(MAX_PLAUSIBLE_RATE + 1), null);
+  assert.equal(plausibleRate('fast'), null);
 });
 
 test('fmtDuration bands', () => {

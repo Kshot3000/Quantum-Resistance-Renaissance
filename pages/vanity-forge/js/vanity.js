@@ -121,10 +121,23 @@ export function attemptsForQuantile(q, expected) {
 
 export const medianAttempts = (expected) => attemptsForQuantile(0.5, expected);
 
-/** Expected wall-clock seconds at a measured grind rate (keys/second). */
+/** Expected wall-clock seconds at a measured grind rate (keys/second).
+ * A non-finite rate is not a fast machine: !(x > 0) passes Infinity, and
+ * expected / Infinity collapsed every ETA to 0 ("< 1 second" for a
+ * 6-character grind). Refuse it to Infinity — the unknown-duration
+ * convention fmtDuration already renders as "—". */
 export function expectedSeconds(expected, keysPerSec) {
-  if (!(keysPerSec > 0)) return Infinity;
+  if (!Number.isFinite(keysPerSec) || !(keysPerSec > 0)) return Infinity;
   return expected / keysPerSec;
+}
+
+/** A measured grind rate the forge will quote ETAs from: finite,
+ * positive, and at most MAX_PLAUSIBLE_RATE. A benchmark whose timer
+ * resolved to 0 ms computes N / 0 = Infinity — that is a broken
+ * measurement, not a rate, and storing it poisoned every ETA until
+ * the next load's sanitizeBench dropped it. Returns null to refuse. */
+export function plausibleRate(r) {
+  return Number.isFinite(r) && r > 0 && r <= MAX_PLAUSIBLE_RATE ? r : null;
 }
 
 export function fmtInt(n) {
@@ -275,8 +288,8 @@ export function sanitizeBench(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const out = {};
   for (const scheme of ['65', '87']) {
-    const r = raw[scheme];
-    if (Number.isFinite(r) && r > 0 && r <= MAX_PLAUSIBLE_RATE) out[scheme] = r;
+    const clean = plausibleRate(raw[scheme]);
+    if (clean !== null) out[scheme] = clean;
   }
   return out;
 }

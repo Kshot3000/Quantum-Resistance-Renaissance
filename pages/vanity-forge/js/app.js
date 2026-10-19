@@ -10,7 +10,7 @@ import {
   validatePattern, expectedAttempts, probFoundBy,
   attemptsForQuantile, medianAttempts, expectedSeconds,
   fmtInt, fmtDuration, difficultyLadder, addressMatches,
-  sanitizeVault, sanitizeBench, vaultRoom, MAX_VAULT_RECORDS,
+  sanitizeVault, sanitizeBench, vaultRoom, MAX_VAULT_RECORDS, plausibleRate,
 } from './vanity.js';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { pubkeyToAddress, hexEncode, ss58Decode } from '../../key-forge/js/quantus-crypto.js';
@@ -201,8 +201,13 @@ $('benchBtn').addEventListener('click', async () => {
       await new Promise((r) => setTimeout(r, 0));
     }
     const rate = (N / (performance.now() - t0)) * 1000;
-    bench[scheme] = rate;
-    saveBench();
+    /* A 0 ms timer resolution computes Infinity and an implausibly
+     * fast run is a broken measurement, not a rate: refuse both at
+     * the write, exactly as sanitizeBench refuses them at load —
+     * an ungated store painted "Infinity/s" and 0-second ETAs for
+     * the rest of the session. Keep any previous honest rate. */
+    const cleanRate = plausibleRate(rate);
+    if (cleanRate !== null) { bench[scheme] = cleanRate; saveBench(); }
     out.innerHTML = `<p class="hint">Benchmarking ${SCHEMES[scheme].label}… done.</p>`;
   }
   saveBench();
@@ -283,7 +288,10 @@ async function grindLoop() {
 
 function renderGrindStats(exp) {
   const el = performance.now() - grind.t0;
-  const rate = grind.rate || effectiveRate(grind.cfg.scheme);
+  /* grind.rate is attempts/elapsed: at a 0 ms elapsed it is Infinity
+   * and would paint "Infinity/s" with a "< 1 second" ETA. Fall back
+   * to the measured/estimated rate until a finite live rate exists. */
+  const rate = Number.isFinite(grind.rate) && grind.rate > 0 ? grind.rate : effectiveRate(grind.cfg.scheme);
   const remain = Math.max(0, exp - grind.attempts);
   $('gAttempts').textContent = fmtInt(grind.attempts);
   $('gElapsed').textContent = fmtClock(el);
