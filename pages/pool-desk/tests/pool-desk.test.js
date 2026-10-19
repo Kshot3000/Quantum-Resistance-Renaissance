@@ -229,6 +229,12 @@ approx("grossPerDay 4th param pace", P.grossPerDay(1e12, 2e12, 0.3, 6465), 0.5 *
 approx("grossPerDay default 7200", P.grossPerDay(1e12, 2e12, 0.3), 0.5 * 7200 * 0.3, 1e-9);
 const s2 = P.soloStats(1e12, 2e12, 6465);
 approx("soloStats honors pace param", s2.blocksPerDay, 0.5 * 6465, 1e-9);
+eq("nonfinite: gross Inf user -> 0", P.grossPerDay(Infinity, 1e14, 0.42, 7200), 0);
+eq("nonfinite: gross Inf net -> 0", P.grossPerDay(1e12, Infinity, 0.42, 7200), 0);
+eq("nonfinite: gross Inf reward -> 0", P.grossPerDay(1e12, 1e14, Infinity, 7200), 0);
+eq("nonfinite: gross both Inf -> 0", P.grossPerDay(Infinity, Infinity, 0.42, 7200), 0);
+eq("nonfinite: solo Inf user daysPerBlock Inf", P.soloStats(Infinity, 1e14, 7200).daysPerBlock, Infinity);
+eq("nonfinite: toHS Inf -> 0", P.toHS(Infinity, "TH/s"), 0);
 
 // --- snapshot-boundary hardening (2026-10-10): strict shapes, the fetch
 // scripts' exact cross-checks, provenance, sample gate, one-capture rule.

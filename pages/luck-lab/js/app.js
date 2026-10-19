@@ -9,19 +9,19 @@
   var $ = function (id) { return document.getElementById(id); };
 
   // Fallback bundle — ONE capture, never mixed dates: every field below comes
-  // from the 2026-10-19 00:25Z snapshot refresh (consensus @ block 250,167 +
-  // supply @ block 250,167, fetched 2 seconds apart). The previous bundle paired
+  // from the 2026-10-19 01:27Z snapshot refresh (consensus @ block 250,435 +
+  // supply @ block 250,435, fetched 2 seconds apart). The previous bundle paired
   // Oct 1 difficulty/head with an Oct 2 supply-derived reward, which silently
   // skewed every fallback-painted figure. Guarded by tests/luck-core.test.js
   // (cross-checked against energy-observatory's fallback bundle).
   var state = {
-    difficulty: 442214758844310,   // fallback: consensus snapshot 2026-10-19
-    netHs: 36851229903692,         // = difficulty / 12 s (indexer est. hashrate)
-    reward: 0.3033255,             // fallback: (21M − 5,833,725.0803 total supply) / 50M, same capture
-    blocksPerDay: 5909,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
-    avgBlockMs: 14623,
-    head: 250167,
-    fetchedAt: "2026-10-19T00:25:19.691Z",
+    difficulty: 447184539407480,   // fallback: consensus snapshot 2026-10-19
+    netHs: 37265378283956,         // = difficulty / 12 s (indexer est. hashrate)
+    reward: 0.3033223,             // fallback: (21M − 5,833,886.6678 total supply) / 50M, same capture
+    blocksPerDay: 6004,            // = 86,400,000 / avgBlockMs (consensus 3,000-block sample, same snapshot)
+    avgBlockMs: 14391,
+    head: 250435,
+    fetchedAt: "2026-10-19T01:27:37.081Z",
     source: "snapshot"
   };
 
@@ -438,8 +438,10 @@
 
   /* --- inputs ------------------------------------------------------------- */
   function readHashrate(id, uid) {
-    var v = parseFloat($(id).value) || 0;
-    var mult = parseFloat($(uid).value) || 1;
+    var v = parseFloat($(id).value);
+    if (!isFinite(v)) v = 0; // "1e999" pastes to Infinity — fall back like an empty field (Batch 201)
+    var mult = parseFloat($(uid).value);
+    if (!isFinite(mult)) mult = 1;
     return v * mult;
   }
 
@@ -461,7 +463,9 @@
 
   function renderProb() {
     var h = readHashrate("solo-h", "solo-hu");
-    var t = (parseFloat($("prob-t").value) || 0) * (parseFloat($("prob-tu").value) || 86400);
+    var pt = parseFloat($("prob-t").value); if (!isFinite(pt)) pt = 0;
+    var tu = parseFloat($("prob-tu").value); if (!isFinite(tu)) tu = 86400;
+    var t = pt * tu;
     var p = L.probAtLeastOneBlock(state.difficulty, h, t);
     $("prob-out").textContent = L.fmtPct(p, 2);
   }

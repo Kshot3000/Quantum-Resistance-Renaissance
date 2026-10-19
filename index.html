@@ -736,7 +736,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
           <span class="tag">Difficulty laboratory</span>
         </div>
         <h3>QTC Consensus Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
-        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+442,115% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
+        <p>The difficulty &amp; proof-of-work laboratory: the exact per-block Homestead-style retarget read from pallet_qpow source, difficulty history recomputed from every real block timestamp since genesis (+447,085% and counting), a step simulator that runs the runtime's own integer math, block-time observatory, Poseidon2 PoW anatomy with its 256-bit quantum security margin, target-based chain selection, the 100-block reorg bound, and an honest 51% attack-cost lab.</p>
         <div class="meta">86/86 consensus tests green · attack-cost lab sanitizes non-finite form floats in the core — a 1e999 hashrate paste no longer throws inside BigInt and freezes the pane, and infinite capex no longer paints "$∞" · snapshot boundary round 4: the trend series' length is exact-pinned to the producer's sampled size (every 100 blocks plus the head) before its points are walked, and the producer no longer duplicates the head point on a sample step · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card consensus" href="pages/node-desk/">
@@ -791,7 +791,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Pool Desk <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The mining-pool directory &amp; comparator: every known QTC pool with verified fees, payout terms, and PPLNS windows — an effective-fee comparator that stacks pool + miner dev fees honestly, a connection command builder that never invents endpoints, and the pool-vs-solo-vs-node tradeoff matrix. Every fact stamped with its source.</p>
-        <div class="meta">172/172 logic tests green · full browser QA green · zero console errors · the command builder now hard-refuses a payout address over 128 characters (a genuine address is 49) — the soft length warning no longer lets an unbounded paste build an unbounded command</div>
+        <div class="meta">178/178 logic tests green · full browser QA green · zero console errors · non-finite hashrate/reward inputs are refused (a pasted 1e999 no longer paints a “0.0 h per block” solo line) · the command builder now hard-refuses a payout address over 128 characters (a genuine address is 49) — the soft length warning no longer lets an unbounded paste build an unbounded command</div>
       </a>
       <a class="app-card pay" href="pages/pay-desk/">
         <div class="icon-row">
@@ -818,7 +818,7 @@ footer .sig{margin-top:10px;font-size:12px;letter-spacing:.08em;opacity:.7}
         </div>
         <h3>QTC Luck Lab <span class="arrow" aria-hidden="true">&rarr;</span></h3>
         <p>The mining-luck &amp; variance laboratory: solo block-wait luck quantiles, a seeded Monte Carlo wait histogram, a probability tool, drought odds, pool-vs-solo daily-earnings simulation, and difficulty-shock scenarios — the true distribution of outcomes on live chain numbers, not just the average.</p>
-        <div class="meta">88/88 logic tests green · full browser QA green · zero console errors</div>
+        <div class="meta">95/95 logic tests green · non-finite hashrate inputs are refused (a pasted 1e999 no longer paints an instant block or an “Infinity” blocks/day rate) · full browser QA green · zero console errors</div>
       </a>
       <a class="app-card notary" href="pages/notary-desk/">
         <div class="icon-row">

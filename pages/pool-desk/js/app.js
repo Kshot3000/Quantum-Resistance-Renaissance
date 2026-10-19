@@ -20,14 +20,14 @@ const NETWORK_DEFAULTS = {
   // Dated static FALLBACKS — replaced at load by deriveNetworkDefaults() from the
   // hourly data/*.json snapshots (initComparator -> loadLiveDefaults). Kept honest
   // and dated for the no-fetch path (file://, offline). All four figures come from
-  // ONE capture (2026-10-19 00:25Z): consensus difficulty @250,167 and total
-  // issuance @250,167, 2 seconds apart — never mix snapshot dates in one bundle
+  // ONE capture (2026-10-19 01:27Z): consensus difficulty @250,435 and total
+  // issuance @250,435, 2 seconds apart — never mix snapshot dates in one bundle
   // (the Sept-30 bundle survived to Oct 2 at half the real hashrate and skewed
   // every fallback-path earnings figure ~2x; guarded in tests).
-  blockRewardQTC: 0.3033255, // emission formula: (21M − 5,833,725.0803 total issuance) / 50M, data/supply.json @250167, 2026-10-19
-  blockRewardLabel: "0.3033 QTC · emission formula @ height 250167, 2026-10-19",
-  netHashHS: 36851229903692, // difficulty 442214758844310 / 12s, data/consensus.json @250167, 2026-10-19
-  netHashLabel: "≈36.85 TH/s · from difficulty 442214758844310 @ height 250167, 2026-10-19",
+  blockRewardQTC: 0.3033223, // emission formula: (21M − 5,833,886.6678 total issuance) / 50M, data/supply.json @250435, 2026-10-19
+  blockRewardLabel: "0.3033 QTC · emission formula @ height 250435, 2026-10-19",
+  netHashHS: 37265378283956, // difficulty 447184539407480 / 12s, data/consensus.json @250435, 2026-10-19
+  netHashLabel: "≈37.27 TH/s · from difficulty 447184539407480 @ height 250435, 2026-10-19",
 };
 
 const SOURCES = [
@@ -151,9 +151,11 @@ function effectiveFee(poolFee, devFee) {
  * blocksPerDay defaults to the 7200 protocol target; pass the observed network
  * pace (from snapshot block_times_ms) for honest expectation math. */
 function grossPerDay(userHashHS, netHashHS, blockRewardQTC, blocksPerDay) {
+  if (!isFinite(userHashHS) || !isFinite(netHashHS) || !isFinite(blockRewardQTC)) return 0;
   if (!(userHashHS > 0) || !(netHashHS > 0) || !(blockRewardQTC > 0)) return 0;
   const bpd = blocksPerDay > 0 ? blocksPerDay : BLOCKS_PER_DAY;
-  return (userHashHS / netHashHS) * bpd * blockRewardQTC;
+  const out = (userHashHS / netHashHS) * bpd * blockRewardQTC;
+  return isFinite(out) ? out : 0;
 }
 
 function netPerDay(userHashHS, netHashHS, blockRewardQTC, poolFee, devFee, blocksPerDay) {
@@ -162,9 +164,11 @@ function netPerDay(userHashHS, netHashHS, blockRewardQTC, poolFee, devFee, block
 
 /** Solo-lottery stats: expected days to find a block at current difficulty. */
 function soloStats(userHashHS, netHashHS, blocksPerDay) {
+  if (!isFinite(userHashHS) || !isFinite(netHashHS)) return { daysPerBlock: Infinity, blocksPerDay: 0 };
   if (!(userHashHS > 0) || !(netHashHS > 0)) return { daysPerBlock: Infinity, blocksPerDay: 0 };
   const bpd = blocksPerDay > 0 ? blocksPerDay : BLOCKS_PER_DAY;
   const pace = (userHashHS / netHashHS) * bpd;
+  if (!isFinite(pace)) return { daysPerBlock: Infinity, blocksPerDay: 0 };
   return { daysPerBlock: pace > 0 ? 1 / pace : Infinity, blocksPerDay: pace };
 }
 
@@ -176,6 +180,7 @@ function pplnsWindowBlocks(difficulty) {
 }
 
 function toHS(value, unit) {
+  if (!isFinite(value)) return 0; // "1e999" pastes to Infinity — fall back like an empty field (Batch 201)
   const mult = { "MH/s": 1e6, "GH/s": 1e9, "TH/s": 1e12 }[unit] || 1e12;
   return value * mult;
 }
@@ -607,7 +612,8 @@ function initComparator() {
   const recalc = () => {
     const uh = toHS(parseFloat(els.hash.value) || 0, els.unit.value);
     const nh = toHS(parseFloat(els.net.value) || 0, "TH/s");
-    const rw = parseFloat(els.reward.value) || 0;
+    const rwRaw = parseFloat(els.reward.value);
+    const rw = isFinite(rwRaw) ? rwRaw : 0;
     const gross = grossPerDay(uh, nh, rw, pace.value);
     let rows = "";
     POOLS.forEach((p) => {

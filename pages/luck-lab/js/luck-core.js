@@ -34,7 +34,11 @@ var LuckCore = (function () {
   /* --- Solo mining: the exponential wait -------------------------------- */
 
   // Expected seconds until the next solo block: E = D / h.
+  // Non-finite inputs are refused to the no-value convention (Infinity =
+  // never): a pasted "1e999" hashrate parseFloats to Infinity, and D / Inf
+  // = 0 painted an instant block + an "Infinity" blocks/day rate (Batch 201).
   function soloExpectedWaitSec(difficulty, hashrateHs) {
+    if (!isFinite(hashrateHs) || !isFinite(difficulty)) return Infinity;
     if (!(hashrateHs > 0) || !(difficulty > 0)) return Infinity;
     return difficulty / hashrateHs;
   }
@@ -59,7 +63,7 @@ var LuckCore = (function () {
   /* --- Poisson helpers --------------------------------------------------- */
 
   function poissonPmf(k, lambda) {
-    if (lambda < 0 || k < 0 || Math.floor(k) !== k) return 0;
+    if (!isFinite(lambda) || lambda < 0 || k < 0 || Math.floor(k) !== k) return 0;
     if (lambda === 0) return k === 0 ? 1 : 0;
     var logP = -lambda + k * Math.log(lambda);
     for (var i = 2; i <= k; i++) logP -= Math.log(i);
@@ -67,7 +71,7 @@ var LuckCore = (function () {
   }
 
   function samplePoisson(lambda, rand) {
-    if (!(lambda > 0)) return 0;
+    if (!(lambda > 0) || !isFinite(lambda)) return 0;
     if (lambda < 30) { // Knuth
       var L = Math.exp(-lambda), k = 0, p = 1;
       do { k++; p *= rand(); } while (p > L);
@@ -99,8 +103,10 @@ var LuckCore = (function () {
   // PPLNS-window noise is NOT modeled (stated in the UI).
   function simulatePoolDailyEarnings(hashrateHs, netHashrateHs, rewardQtc, feeFrac, blocksPerDay, days, seed) {
     var rand = makeRng(seed);
-    var f = netHashrateHs > 0 ? hashrateHs / netHashrateHs : 0;
+    var f = (isFinite(hashrateHs) && isFinite(netHashrateHs) && netHashrateHs > 0) ? hashrateHs / netHashrateHs : 0;
+    if (!isFinite(f)) f = 0;
     var perBlock = f * rewardQtc * (1 - feeFrac);
+    if (!isFinite(perBlock)) perBlock = 0;
     var out = new Array(days);
     for (var d = 0; d < days; d++) out[d] = samplePoisson(blocksPerDay, rand) * perBlock;
     return out;
@@ -109,7 +115,8 @@ var LuckCore = (function () {
   // Solo daily earnings: your own blocks per day ~ Poisson(h*86400/D).
   function simulateSoloDailyEarnings(hashrateHs, difficulty, rewardQtc, days, seed) {
     var rand = makeRng(seed);
-    var lambdaDay = (difficulty > 0 && hashrateHs > 0) ? hashrateHs * 86400 / difficulty : 0;
+    var lambdaDay = (isFinite(difficulty) && isFinite(hashrateHs) && difficulty > 0 && hashrateHs > 0) ? hashrateHs * 86400 / difficulty : 0;
+    if (!isFinite(lambdaDay)) lambdaDay = 0;
     var out = new Array(days);
     for (var d = 0; d < days; d++) out[d] = samplePoisson(lambdaDay, rand) * rewardQtc;
     return out;
@@ -117,8 +124,10 @@ var LuckCore = (function () {
 
   // Expected pool earnings per day under the fair-proportional model.
   function poolExpectedDailyQtc(hashrateHs, netHashrateHs, rewardQtc, feeFrac, blocksPerDay) {
+    if (!isFinite(hashrateHs) || !isFinite(netHashrateHs) || !isFinite(rewardQtc) || !isFinite(feeFrac) || !isFinite(blocksPerDay)) return 0;
     if (!(netHashrateHs > 0) || !(hashrateHs > 0)) return 0;
-    return (hashrateHs / netHashrateHs) * blocksPerDay * rewardQtc * (1 - feeFrac);
+    var out = (hashrateHs / netHashrateHs) * blocksPerDay * rewardQtc * (1 - feeFrac);
+    return isFinite(out) ? out : 0;
   }
 
   /* --- Difficulty scenarios ---------------------------------------------- */
@@ -170,8 +179,8 @@ var LuckCore = (function () {
 
   var RATE_UNITS = [["H/s", 0], ["kH/s", 3], ["MH/s", 6], ["GH/s", 9], ["TH/s", 12], ["PH/s", 15], ["EH/s", 18]];
   function fmtHashrate(hs) {
+    if (!isFinite(hs)) return "—";
     if (!(hs > 0)) return "0 H/s";
-    if (!isFinite(hs)) return "∞ H/s";
     var exp = Math.floor(Math.log10(hs)), u = RATE_UNITS[0];
     for (var i = 0; i < RATE_UNITS.length; i++) if (exp >= RATE_UNITS[i][1]) u = RATE_UNITS[i];
     var v = hs / Math.pow(10, u[1]);
