@@ -288,6 +288,10 @@ t("feeBpsLabel formats basis points", function () {
   assert.strictEqual(DistCore.feeBpsLabel(25), "0.25%");
   assert.strictEqual(DistCore.feeBpsLabel(50), "0.5%");
   assert.strictEqual(DistCore.feeBpsLabel(100), "1%");
+  // Batch 199: non-finite bps renders as no fee, never "Infinity.NaN%"
+  assert.strictEqual(DistCore.feeBpsLabel(Infinity), "0%");
+  assert.strictEqual(DistCore.feeBpsLabel(-Infinity), "0%");
+  assert.strictEqual(DistCore.feeBpsLabel(NaN), "0%");
 });
 t("withServiceFee: recipients untouched, fee row last, exact sums", function () {
   var rows = DistCore.parseInput(POOL + " 10\n" + MSIG + " 2.5\n");

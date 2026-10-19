@@ -317,6 +317,9 @@ eq(RC.feeBpsLabel(0), "0%", "fee label: 0");
 eq(RC.feeBpsLabel(25), "0.25%", "fee label: 25 bps");
 eq(RC.feeBpsLabel(50), "0.5%", "fee label: 50 bps");
 eq(RC.feeBpsLabel(100), "1%", "fee label: 100 bps");
+eq(RC.feeBpsLabel(Infinity), "0%", "fee label: Infinity -> 0% (Batch 199)");
+eq(RC.feeBpsLabel(-Infinity), "0%", "fee label: -Infinity -> 0% (Batch 199)");
+eq(RC.feeBpsLabel(NaN), "0%", "fee label: NaN -> 0% (Batch 199)");
 
 /* compact encoder: standard SCALE boundary vectors */
 eq(RC.compactU128(63n), [252], "compact: 63 single-byte mode edge");

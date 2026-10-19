@@ -215,6 +215,9 @@ eq(C.feeBpsLabel(0), "0%", "label 0");
 eq(C.feeBpsLabel(25), "0.25%", "label 25");
 eq(C.feeBpsLabel(50), "0.5%", "label 50");
 eq(C.feeBpsLabel(100), "1%", "label 100");
+eq(C.feeBpsLabel(Infinity), "0%", "label Infinity -> 0% (Batch 199)");
+eq(C.feeBpsLabel(-Infinity), "0%", "label -Infinity -> 0% (Batch 199)");
+eq(C.feeBpsLabel(NaN), "0%", "label NaN -> 0% (Batch 199)");
 
 /* batch_all encoding: [9, 2, compact(count), call bytes concatenated] */
 {

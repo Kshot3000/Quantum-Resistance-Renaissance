@@ -165,7 +165,8 @@ export function computeServiceFee(amountPlancks, feeBps) {
 }
 
 export function feeBpsLabel(bps) {
-  const b = Math.floor(Number(bps) || 0);
+  const b0 = Math.floor(Number(bps) || 0);
+  const b = isFinite(b0) ? b0 : 0; // Batch 199: non-finite bps is no fee (computeServiceFee convention) — never paint "Infinity.NaN%"
   const whole = Math.floor(b / 100), rem = b % 100;
   if (rem === 0) return whole + '%';
   const frac = String(rem).padStart(2, '0').replace(/0+$/, '');

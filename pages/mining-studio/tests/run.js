@@ -239,7 +239,7 @@ ok("fallback curSupply within emission bounds", Number(csVal) >= 5670000 && Numb
 var hintM = html.match(/id="supplyHint"[^>]*>([\s\S]*?)<\/p>/);
 ok("fallback hint cites a dated capture height", !!hintM && /block [0-9]{1,3},[0-9]{3} on 2026-/.test(hintM[1]), hintM && hintM[1].slice(0, 80));
 ok("fallback hint difficulty matches painted netHash (one capture)",
-   !!hintM && /436,472,464,630,985/.test(hintM[1]) && Math.abs(Number(nhVal) - 436472464630985 / 12 / 1e9) < 1,
+   !!hintM && /439,872,561,186,620/.test(hintM[1]) && Math.abs(Number(nhVal) - 439872561186620 / 12 / 1e9) < 1,
    nhVal);
 ok("stale 45,125 example gone", !/45,125/.test(html));
 

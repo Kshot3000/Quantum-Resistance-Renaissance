@@ -609,3 +609,34 @@ test("int bound: validPlancks length gate", () => {
   assert.equal(W.validPlancks("9".repeat(512)), BigInt("9".repeat(512)));
   assert.equal(W.validPlancks("9".repeat(2000000)), null);
 });
+
+/* Batch 199: float-threshold gate — parseFloat("1e999") is Infinity and
+ * Infinity > 0 passed every form/sanitize gate, arming stall/pct rules
+ * that could never fire. */
+test("float gate: floatThreshold refuses non-finite thresholds", () => {
+  assert.equal(W.floatThreshold("30"), 30);
+  assert.equal(W.floatThreshold("0.5"), 0.5);
+  assert.equal(W.floatThreshold("1e2"), 100);
+  assert.equal(W.floatThreshold("1e999"), null);
+  assert.equal(W.floatThreshold("Infinity"), null);
+  assert.equal(W.floatThreshold("-Infinity"), null);
+  assert.equal(W.floatThreshold("0"), null);
+  assert.equal(W.floatThreshold("-5"), null);
+  assert.equal(W.floatThreshold("abc"), null);
+  assert.equal(W.floatThreshold(""), null);
+  assert.equal(W.floatThreshold(45), 45);
+  assert.equal(W.floatThreshold(Infinity), null);
+});
+
+test("float gate: poisoned stall rule never fires, finite one does", () => {
+  const now = 1_800_000_000_000;
+  const mk = (ageMin, head) => ({
+    balances: new Map(), byAddr: W.indexTransfers([]), transfers: [],
+    referenda: 0, upgrades: 0, upgradesList: [], headHeight: head,
+    headTsMs: now - ageMin * 60000, snapshotCapturedAt: null,
+  });
+  const poison = W.evaluateRules([{ id: "p1", type: "chain_stall", threshold: "1e999", enabled: true }], {}, mk(60, 100), now);
+  assert.equal(poison.alerts.length, 0);
+  const sane = W.evaluateRules([{ id: "p2", type: "chain_stall", threshold: "30", enabled: true }], {}, mk(60, 100), now);
+  assert.equal(sane.alerts.length, 1);
+});

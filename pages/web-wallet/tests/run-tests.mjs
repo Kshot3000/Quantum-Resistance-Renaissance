@@ -635,6 +635,10 @@ test('service fee: labels', () => {
   assert.equal(feeBpsLabel(50), '0.5%');
   assert.equal(feeBpsLabel(100), '1%');
   assert.equal(feeBpsLabel(33), '0.33%');
+  // Batch 199: non-finite bps renders as no fee, never "Infinity.NaN%"
+  assert.equal(feeBpsLabel(Infinity), '0%');
+  assert.equal(feeBpsLabel(-Infinity), '0%');
+  assert.equal(feeBpsLabel(NaN), '0%');
 });
 
 test('batch_all: encoding is [9, 2, compact(count), calls…]', () => {

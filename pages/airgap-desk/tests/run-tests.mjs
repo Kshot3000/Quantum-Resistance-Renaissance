@@ -434,6 +434,10 @@ test('fee: computeServiceFee is exact floor math, capped at 100 bps', () => {
   assert.equal(feeBpsLabel(25), '0.25%');
   assert.equal(feeBpsLabel(50), '0.5%');
   assert.equal(feeBpsLabel(100), '1%');
+  // Batch 199: non-finite bps renders as no fee, never "Infinity.NaN%"
+  assert.equal(feeBpsLabel(Infinity), '0%');
+  assert.equal(feeBpsLabel(-Infinity), '0%');
+  assert.equal(feeBpsLabel(NaN), '0%');
 });
 
 test('units: qtcToPlancks supply cap (21M QTC hard cap)', () => {

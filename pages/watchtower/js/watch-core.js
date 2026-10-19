@@ -150,6 +150,22 @@ function nonNegInt(v) {
   return null;
 }
 
+/* Float threshold gate (white-hat, Batch 199): the two float-measured
+ * rule types (chain_stall minutes, balance_change percent) validated
+ * with `parseFloat(thr) > 0` — but parseFloat("1e999") is Infinity and
+ * Infinity > 0, so a rule could be ARMED with an infinite threshold
+ * from the free-text form field, a backup import, or stored state, and
+ * then NEVER fire (ageMs > Infinity and pct >= Infinity are both
+ * always false): a stall/change alert silently disarmed while the UI
+ * showed it armed. floatThreshold is the one gate every layer routes
+ * through — form, stored-rule sanitizer, and the evaluators — and it
+ * returns the finite positive number or null. A finite exponent form
+ * ("1e2" = 100) stays valid, exactly as parseFloat read it before. */
+function floatThreshold(v) {
+  var n = typeof v === "number" ? v : parseFloat(String(v == null ? "" : v).trim());
+  return isFinite(n) && n > 0 ? n : null;
+}
+
 /* Integer-string length bound before BigInt (white-hat, Batch 195): the
  * digit grammar below admits an UNBOUNDED string and BigInt() converts it
  * whole BEFORE any range/supply check can refuse it — BigInt decimal
@@ -674,8 +690,8 @@ function evalAddressRule(rule, address, baseline, ctx) {
       var fired = false, how;
       if (rule.changeMode === "pct") {
         var pct = Number(diff * 10000n / base) / 100; // 2dp
-        var need = parseFloat(rule.threshold);
-        if (pct >= need) { fired = true; how = pct.toFixed(2) + "% (" + formatQtc(diff) + " QTC)"; }
+        var need = floatThreshold(rule.threshold);
+        if (need !== null && pct >= need) { fired = true; how = pct.toFixed(2) + "% (" + formatQtc(diff) + " QTC)"; }
       } else {
         var needAbs = parseQtcToPlancks(rule.threshold);
         if (diff >= needAbs) { fired = true; how = formatQtc(diff) + " QTC"; }
@@ -790,8 +806,8 @@ function evalChainRule(rule, chain, ctx) {
       break;
     }
     case "chain_stall": {
-      var mins = parseFloat(rule.threshold);
-      if (!(mins > 0)) break;
+      var mins = floatThreshold(rule.threshold);
+      if (mins === null) break;
       var ageMs = ctx.nowMs - ctx.headTsMs;
       if (ageMs > mins * 60000 && chain.stallFiredHead !== ctx.headHeight) {
         mk("No new block for " + formatAge(ageMs),
@@ -908,6 +924,7 @@ var api = {
   ruleLabel: ruleLabel,
   ensureBaselines: ensureBaselines,
   parseHeight: parseHeight,
+  floatThreshold: floatThreshold,
   nonNegInt: nonNegInt,
   validPlancks: validPlancks,
   parseableTs: parseableTs,

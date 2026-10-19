@@ -16,7 +16,7 @@ import {
 } from './rpc.js?v=1.3.0';
 import { sanitizeActivityRows } from './rpc-validate.js?v=1.3.0';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
-import { plancksToQtc, qtcToPlancks, EXISTENTIAL_DEPOSIT, SIGNING_CONTEXT, describeExtrinsicParts, SERVICE_FEE_ADDRESS, feeBpsLabel, computeServiceFee } from './scale.js?v=1.3.0';
+import { plancksToQtc, qtcToPlancks, EXISTENTIAL_DEPOSIT, SIGNING_CONTEXT, describeExtrinsicParts, SERVICE_FEE_ADDRESS, feeBpsLabel, computeServiceFee } from './scale.js?v=1.4.0';
 
 const $ = (id) => document.getElementById(id);
 const te = new TextEncoder();

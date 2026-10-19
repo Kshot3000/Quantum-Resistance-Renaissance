@@ -157,10 +157,10 @@ function sanitizeRule(r) {
     if (!thr) return null;
     try {
       if (r.type === "chain_stall") {
-        if (!(parseFloat(thr) > 0)) return null;
+        if (QWATCH.floatThreshold(thr) === null) return null;
       } else if (r.type === "balance_change") {
         clean.changeMode = r.changeMode === "pct" ? "pct" : "abs";
-        if (clean.changeMode === "pct") { if (!(parseFloat(thr) > 0)) return null; }
+        if (clean.changeMode === "pct") { if (QWATCH.floatThreshold(thr) === null) return null; }
         else QWATCH.parseQtcToPlancks(thr);
       } else {
         QWATCH.parseQtcToPlancks(thr);
@@ -632,8 +632,8 @@ $("rule-form").addEventListener("submit", function (ev) {
   if (ruleNeedsThreshold(type)) {
     var thr = $("rule-threshold").value.trim();
     try {
-      if (type === "chain_stall") { if (!(parseFloat(thr) > 0)) throw new Error("minutes must be > 0"); }
-      else if (type === "balance_change" && $("rule-mode").value === "pct") { if (!(parseFloat(thr) > 0)) throw new Error("percent must be > 0"); }
+      if (type === "chain_stall") { if (QWATCH.floatThreshold(thr) === null) throw new Error("minutes must be a finite number > 0"); }
+      else if (type === "balance_change" && $("rule-mode").value === "pct") { if (QWATCH.floatThreshold(thr) === null) throw new Error("percent must be a finite number > 0"); }
       else QWATCH.parseQtcToPlancks(thr);
     } catch (e) { toast("Bad threshold: " + e.message, "err"); return; }
     rule.threshold = thr;
