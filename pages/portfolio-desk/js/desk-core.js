@@ -590,6 +590,33 @@ function parseVaultJson(text, opts) {
  * were allocated. File.size is known before a byte is read: the
  * importer asks this fail-closed gate first and refuses over-cap
  * picks unread. 128 KiB is ~2x the worst-escaping maximum. */
+/* Fetched-response bound before JSON.parse (white-hat, Batch 209):
+ * both fetched-JSON paths in the app — fetchJson (the same-origin
+ * snapshots) and liveBalanceQuery (the remote Subsquid indexer POST) —
+ * buffered + parsed the WHOLE body via r.json(); the sanitizers in
+ * this core bound rows only AFTER the parse, so nothing bounded the
+ * parse itself. A hostile or broken indexer (a remote third-party
+ * endpoint) or a corrupted snapshot could return an arbitrarily large
+ * body the tab must buffer and parse before a single row was
+ * validated. The bound is sized from the genuine payloads, measured
+ * at block 252,051: the largest is data/flows.json at 813,746 bytes
+ * (the live balance answer for 60 addresses is a few KB), so 4 MiB
+ * leaves >5x headroom while an over-cap body is refused on length
+ * alone, before parsing. Fail-closed: non-string input refuses.
+ * Over-cap throws with the size + cap named; the app's existing catch
+ * paths degrade (snapshot -> null, live -> snapshot mode) exactly as
+ * for any other fetch failure. */
+var MAX_RESPONSE_TEXT_CHARS = 4194304; // 4 MiB
+function responseTextRoom(text) {
+  return typeof text === "string" && text.length <= MAX_RESPONSE_TEXT_CHARS;
+}
+function parseResponseJson(text) {
+  if (typeof text !== "string") throw new Error("response body is not text; refused before parsing");
+  if (!responseTextRoom(text))
+    throw new Error("response is " + text.length + " characters — over the response cap of 4,194,304 characters; refused before parsing");
+  return JSON.parse(text);
+}
+
 var MAX_VAULT_FILE_BYTES = 128 * 1024;
 function vaultFileRoom(size) {
   return typeof size === "number" && isFinite(size) && size >= 0 && size <= MAX_VAULT_FILE_BYTES;
@@ -651,6 +678,7 @@ var api = {
   addToVault: addToVault, removeFromVault: removeFromVault,
   parseVaultJson: parseVaultJson, csvExport: csvExport,
   MAX_VAULT_FILE_BYTES: MAX_VAULT_FILE_BYTES, vaultFileRoom: vaultFileRoom,
+  parseResponseJson: parseResponseJson, responseTextRoom: responseTextRoom, MAX_RESPONSE_TEXT_CHARS: MAX_RESPONSE_TEXT_CHARS,
   csvGuardText: csvGuardText, csvTextCell: csvTextCell,
 };
 

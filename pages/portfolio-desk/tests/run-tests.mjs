@@ -485,3 +485,19 @@ test("amount bound: parseQtcToPlancks length gate", () => {
   assert.throws(() => P.parseQtcToPlancks("9".repeat(2000000)), /512/);
   assert.equal(typeof P.parseQtcToPlancks("9".repeat(512)), "bigint");
 });
+
+/* Batch 209: fetched-response bound — parseResponseJson refuses over-cap
+ * text on length alone before JSON.parse (both app fetch paths). */
+test("response bound: parseResponseJson cap gate", () => {
+  assert.equal(P.MAX_RESPONSE_TEXT_CHARS, 4194304);
+  assert.deepEqual(P.parseResponseJson('{"a":1}'), { a: 1 });
+  const head = '{"data":{},"pad":"'; const tail = '"}';
+  const exact = head + "x".repeat(4194304 - head.length - tail.length) + tail;
+  assert.equal(P.parseResponseJson(exact).pad.length, exact.length - head.length - tail.length);
+  assert.throws(() => P.parseResponseJson(exact + " "), /4,194,304/);
+  assert.throws(() => P.parseResponseJson(null), /not text/);
+  assert.throws(() => P.parseResponseJson("{nope"), SyntaxError);
+  assert.equal(P.responseTextRoom("x".repeat(4194304)), true);
+  assert.equal(P.responseTextRoom("x".repeat(4194305)), false);
+  assert.equal(P.responseTextRoom(undefined), false);
+});

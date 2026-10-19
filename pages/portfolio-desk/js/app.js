@@ -112,10 +112,10 @@ function fetchJson(url, timeoutMs) {
   var t = setTimeout(function () { ctrl.abort(); }, timeoutMs || FETCH_TIMEOUT_MS);
   return fetch(url, { signal: ctrl.signal, cache: "no-store" })
     /* The timer stays armed until the body is parsed: clearing it when the
-     * headers land would leave r.json() with no timeout, so a stalled
+     * headers land would leave the body parse with no timeout, so a stalled
      * snapshot body could hang the desk's data load forever. */
-    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(function (j) { clearTimeout(t); return j; })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+    .then(function (txt) { var j = QPORT.parseResponseJson(txt); clearTimeout(t); return j; })
     .catch(function (e) { clearTimeout(t); throw e; });
 }
 
@@ -129,7 +129,8 @@ function liveBalanceQuery(addresses) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query: q }),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+    .then(function (txt) { return QPORT.parseResponseJson(txt); })
     .then(function (j) {
       if (!j || typeof j !== "object") throw new Error("indexer returned a malformed response");
       if (j.errors) {
