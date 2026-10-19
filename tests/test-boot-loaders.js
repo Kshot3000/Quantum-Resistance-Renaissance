@@ -6114,7 +6114,7 @@ console.log(`\n${pass} passed, ${fail} failed`);
   ok(read("pages/airgap-desk/js/app.js").includes("normalizeMnemonic($('cold-mnemonic').value)"), "mnemonicbound: airgap app re-splits through normalizeMnemonic");
   ok(read("pages/web-wallet/index.html").includes("js/app.js?v=1.54.0"), "mnemonicbound: wallet app cache key bumped (1.49.0)");
   ok(read("pages/airgap-desk/index.html").includes("js/app.js?v=1.62.0"), "mnemonicbound: airgap app cache key bumped (1.56.0)");
-  ok(read("index.html").includes("73/73 wallet tests green"), "mnemonicbound: hub wallet card corrected 62/62 -> 64/64 (superseded by Batch 193: 69/69)");
+  ok(read("index.html").includes("74/74 wallet tests green"), "mnemonicbound: hub wallet card corrected 62/62 -> 64/64 (superseded by Batch 193: 69/69)");
   ok(read("index.html").includes("59/59 protocol tests green"), "mnemonicbound: hub airgap card corrected 52/52 -> 53/53 (superseded by the Batch 183 54/54 correction and the Batch 189 57/57 correction)");
 }
 
@@ -6368,7 +6368,7 @@ console.log(`\n${pass} passed, ${fail} failed`);
   ok(read("pages/notary-desk/index.html").includes("js/app.js?v=1.58.0"), "endpointbound: notary app cache key bumped (1.57.0)");
   ok(read("pages/zktree-desk/index.html").includes("js/app.js?v=1.57.0"), "endpointbound: zktree app cache key bumped (1.54.0)");
   ok(read("index.html").includes("157/157 console tests green"), "endpointbound: hub chain-console card corrected 145/145 -> 150/150");
-  ok(read("index.html").includes("73/73 wallet tests green"), "endpointbound: hub wallet card corrected 64/64 -> 65/65 (superseded by Batch 193: 69/69)");
+  ok(read("index.html").includes("74/74 wallet tests green"), "endpointbound: hub wallet card corrected 64/64 -> 65/65 (superseded by Batch 193: 69/69)");
   ok(read("index.html").includes("59/59 protocol tests green"), "endpointbound: hub airgap card corrected 54/54 -> 55/55 (superseded by the Batch 189 57/57 correction)");
   ok(read("index.html").includes("22/22 logic tests green"), "endpointbound: hub mempool card corrected 18/18 -> 19/19, superseded by the 20/20 hexbound correction");
   ok(read("index.html").includes("31/31 decoder tests green"), "endpointbound: hub extrinsic card corrected 30/30 -> 31/31");
@@ -6692,7 +6692,7 @@ console.log(`\n${pass} passed, ${fail} failed`);
   ok(ks.includes("assertPasswordBound(password);"), "passwordbound: wallet derivation + fingerprint assert the bound");
   ok(read("pages/web-wallet/js/app.js").includes("keystore.js?v=1.3.0"), "passwordbound: keystore cache key bumped (1.3.0)");
   ok(read("pages/web-wallet/index.html").includes("js/app.js?v=1.54.0"), "passwordbound: wallet app cache key bumped (1.51.0)");
-  ok(read("index.html").includes("73/73 wallet tests green"), "passwordbound: hub wallet card corrected 65/65 -> 69/69");
+  ok(read("index.html").includes("74/74 wallet tests green"), "passwordbound: hub wallet card corrected 65/65 -> 69/69");
   for (const c of ["pages/web-wallet/js/mnemonic.js", "pages/airgap-desk/js/lib/mnemonic.js"]) {
     const src = read(c);
     ok(src.includes("export const MAX_PASSPHRASE_CHARS = 1024;") && src.includes("export function passphraseRoom(chars)"),
@@ -6814,7 +6814,7 @@ console.log(`\n${pass} passed, ${fail} failed`);
   ok(nc.includes("var MAX_FEE_QTC_CHARS = 512;") && nc.includes("if (feeQTC.length > MAX_FEE_QTC_CHARS) return false;"),
     "amountbound: notary stored-fee validator gated before BigInt");
   ok(read("pages/notary-desk/index.html").includes("js/notary-codec.js?v=1.55.0"), "amountbound: notary codec cache key bumped (1.55.0)");
-  ok(read("index.html").includes("73/73 wallet tests green"), "amountbound: hub wallet card corrected 69/69 -> 72/72");
+  ok(read("index.html").includes("74/74 wallet tests green"), "amountbound: hub wallet card corrected 69/69 -> 72/72");
   ok(read("index.html").includes("157/157 console tests green"), "amountbound: hub chain-console card corrected 150/150 -> 154/154");
   ok(read("index.html").includes("251/251 logic tests green"), "amountbound: hub multisig card corrected 239/239 -> 245/245");
   ok(read("index.html").includes("139/139 logic tests green"), "amountbound: hub notary card corrected 136/136 -> 139/139");
@@ -6921,7 +6921,7 @@ console.log(`\n${pass} passed, ${fail} failed`);
   ok(read("pages/reversal-desk/index.html").includes("js/reversal-core.js?v=1.57.0"), "intbound: reversal-core cache key bumped (1.56.0)");
   ok(read("pages/mempool-desk/index.html").includes("js/rpc-core.js?v=1.40.0"), "intbound: mempool rpc-core cache key bumped (1.40.0)");
   ok(read("pages/multisig-vault/index.html").includes("js/msig-core.js?v=1.35.0"), "intbound: multisig msig-core cache key bumped (1.34.0)");
-  ok(read("index.html").includes("73/73 wallet tests green"), "intbound: hub wallet card corrected 72/72 -> 73/73");
+  ok(read("index.html").includes("74/74 wallet tests green"), "intbound: hub wallet card corrected 72/72 -> 73/73");
   ok(read("index.html").includes("157/157 console tests green"), "intbound: hub chain-console card corrected 154/154 -> 157/157");
   ok(read("index.html").includes("251/251 logic tests green"), "intbound: hub multisig card corrected 245/245 -> 248/248");
   ok(read("index.html").includes("124/124 logic tests green"), "intbound: hub zktree card corrected 114/114 -> 121/121");
@@ -7226,6 +7226,7 @@ console.log(`\n${pass} passed, ${fail} failed`);
   ok(app.includes("from './rpc-validate.js?v=1.4.0'"), "walletresp: app pins the bumped rpc-validate module (1.4.0)");
   ok(read("pages/web-wallet/js/rpc.js").includes("from './rpc-validate.js?v=1.4.0'"), "walletresp: rpc pins the bumped rpc-validate module (1.4.0)");
   ok(read("pages/web-wallet/index.html").includes("js/app.js?v=1.54.0"), "walletresp: wallet app cache key bumped (1.54.0)");
+  ok(read("index.html").includes("74/74 wallet tests green"), "walletresp: hub wallet card corrected 73/73 -> 74/74");
   ok(read("pages/mining-calculator/index.html").includes("app.js?v=1.12.167"), "walletresp: miningcalc sync patch-bump pin (.167)");
   ok(read("pages/pool-desk/index.html").includes("js/app.js?v=1.50.167"), "walletresp: pool-desk sync patch-bump pin (.167)");
   ok(read("pages/energy-observatory/index.html").includes("app.js?v=1.52.167"), "walletresp: energy sync patch-bump pin (.167)");
