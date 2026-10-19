@@ -100,7 +100,7 @@
   <section class="panel" id="trace-panel" aria-label="Trace console">
     <h2><span class="sec-ico">&#128269;</span> Trace console</h2>
     <p class="panel-sub">Enter a Quantus address (<code>qz&hellip;</code>, SS58 prefix 189 — checksum-validated). The console tries the live indexer first (8s), then falls back to the snapshot graph. Tracing is limited to the transfers in the active dataset; see Methodology.</p>
-    <form id="trace-form" class="trace-form" autocomplete="off">
+    <form id="trace-form" class="trace-form" autocomplete="off" onsubmit="return false">
       <input id="trace-addr" class="addr-input" type="text" spellcheck="false"
              placeholder="qz… address" aria-label="Address to trace">
       <select id="trace-dir" aria-label="Direction">

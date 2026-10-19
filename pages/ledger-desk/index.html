@@ -96,7 +96,7 @@
     <h2 id="h-vault">1 &middot; Wallet vault</h2>
     <p class="sec-sub">Addresses you control. Each one is checksum-validated (SS58 prefix 189)
     and you read its human checkphrase back before it is stored.</p>
-    <form id="addrForm" class="form-row" autocomplete="off">
+    <form id="addrForm" class="form-row" autocomplete="off" onsubmit="return false">
       <input id="addrInput" class="mono" type="text" spellcheck="false"
         placeholder="qz&hellip; Quantus address" aria-label="Quantus address" size="52">
       <input id="addrLabel" type="text" placeholder="Label (e.g. DGX rig wallet)" aria-label="Label" size="22">
@@ -135,7 +135,7 @@
     <h2 id="h-events">3 &middot; Event ledger</h2>
     <p class="sec-sub">The single source of truth. Inflows create cost-basis lots; outflows
     consume them. Edit anything &mdash; the report recomputes instantly.</p>
-    <form id="eventForm" class="event-form" autocomplete="off">
+    <form id="eventForm" class="event-form" autocomplete="off" onsubmit="return false">
       <label>Date <input id="evDate" type="date" required></label>
       <label>Type
         <select id="evType">
@@ -180,7 +180,7 @@
     OTC trade, or your own good-faith estimate &mdash; and the desk applies the latest entry
     on or before each event's date. Events with no applicable price are <strong>flagged, never
     silently zeroed</strong>.</p>
-    <form id="priceForm" class="form-row" autocomplete="off">
+    <form id="priceForm" class="form-row" autocomplete="off" onsubmit="return false">
       <label>Date <input id="pxDate" type="date" required></label>
       <label>USD per QTC <input id="pxValue" type="text" inputmode="decimal" placeholder="e.g. 4.25" required></label>
       <button class="btn" type="submit">Add price</button>

@@ -122,7 +122,7 @@
     <div class="panel">
       <h2>Watch an address</h2>
       <p class="muted">SS58 addresses on prefix 189 are checksum-validated before they join the tower. Each watched address gets its human checkphrase — the same five-word upstream algorithm the Contact Vault uses — so you can confirm at a glance that the address on screen is the one you meant.</p>
-      <form id="watch-form" class="form-grid" autocomplete="off">
+      <form id="watch-form" class="form-grid" autocomplete="off" onsubmit="return false">
         <label>Address
           <input id="watch-address" name="address" placeholder="qz…" spellcheck="false" required>
         </label>
@@ -145,7 +145,7 @@
     <div class="panel">
       <h2>Arm a rule</h2>
       <p class="muted">Address rules watch one address from your list. Chain rules watch the whole network. Rules fire on <em>transitions and new events</em> — a balance that is already below your threshold does not re-alert on every scan; the moment it crosses does.</p>
-      <form id="rule-form" class="form-grid" autocomplete="off">
+      <form id="rule-form" class="form-grid" autocomplete="off" onsubmit="return false">
         <label>Rule type
           <select id="rule-type">
             <optgroup label="Address rules">

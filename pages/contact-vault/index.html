@@ -109,7 +109,7 @@
       <div class="card">
         <h2><span class="p-ico">📇</span>Add contact</h2>
         <p class="sub">The address is checksum-validated (SS58, prefix 189) and its checkphrase is derived with the upstream algorithm before anything is stored.</p>
-        <form id="addForm" autocomplete="off">
+        <form id="addForm" autocomplete="off" onsubmit="return false">
           <label class="f" for="nc-label">Label</label>
           <input type="text" id="nc-label" maxlength="80" placeholder="e.g. Exchange hot wallet" required>
           <label class="f" for="nc-addr">Quantus address (qz…)</label>
