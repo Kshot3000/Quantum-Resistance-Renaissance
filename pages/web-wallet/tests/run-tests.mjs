@@ -503,7 +503,7 @@ test('rpc boundary: account storage — null is not-on-chain, poison is malforme
 /* ---- Activity boundary round 2: indexer rows must be ABOUT this
  * wallet, between real SS58-189 addresses, at real heights, for
  * amounts the chain can hold (verified against live indexer data). */
-import { validBlockHeight, sanitizeActivityRows, MAX_SUPPLY_PLANCKS } from '../js/rpc-validate.js';
+import { validBlockHeight, sanitizeActivityRows, MAX_SUPPLY_PLANCKS, parseResponseJson, responseTextRoom, MAX_RESPONSE_TEXT_CHARS } from '../js/rpc-validate.js';
 
 const WALLET = 'qznY8nwuvWcCCVys4da1oQdysyh8YUZYRjRqgk3S8Wos8kbau';
 const SENTINEL = 'qzjUYyuN4L3HKmBPMxHvK2n8HYnaLZcQvLSQTgdwB2nQ1g2mc';
@@ -512,6 +512,26 @@ const NOW = Date.parse('2026-10-11T04:30:00Z');
 const aRow = (over = {}) => ({
   id: 'r1', from_id: SENTINEL, to_id: WALLET, amount: '300000000000',
   block_height: 203723, extrinsic_id: null, timestamp: '2026-10-11T04:20:31.721+00:00', ...over,
+});
+
+test('activity response bound: indexer body is length-gated before JSON.parse (Batch 208)', () => {
+  assert.equal(MAX_RESPONSE_TEXT_CHARS, 1048576);
+  // genuine shape: the limit:25 answer is a few KB — parses whole
+  const genuine = JSON.stringify({ data: { transfer: [{ id: 'r1' }] } });
+  assert.deepEqual(parseResponseJson(genuine), { data: { transfer: [{ id: 'r1' }] } });
+  // exactly-cap text still parses; cap+1 is refused on length alone
+  const head = '{"data":{"transfer":[]},"pad":"';
+  const tail = '"}';
+  const pad = MAX_RESPONSE_TEXT_CHARS - head.length - tail.length;
+  assert.equal(parseResponseJson(head + 'x'.repeat(pad) + tail).data.transfer.length, 0);
+  assert.throws(() => parseResponseJson(head + 'x'.repeat(pad + 1) + tail), /1,048,576/);
+  assert.throws(() => parseResponseJson('{"pad":"' + 'x'.repeat(20_000_000) + '"}'), /refused before parsing/);
+  // fail-closed: non-string refuses; malformed JSON still throws
+  assert.throws(() => parseResponseJson(null), /not text/);
+  assert.throws(() => parseResponseJson('{not json'));
+  assert.equal(responseTextRoom('x'.repeat(MAX_RESPONSE_TEXT_CHARS)), true);
+  assert.equal(responseTextRoom('x'.repeat(MAX_RESPONSE_TEXT_CHARS + 1)), false);
+  assert.equal(responseTextRoom(undefined), false);
 });
 
 test('activity-validate: block heights are fleet-shaped (1..10M, canonical)', () => {

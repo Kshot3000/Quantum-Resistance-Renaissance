@@ -14,7 +14,7 @@ import {
   getAccountInfo, getNonce, buildUnsignedTransfer, finalizeTransfer, submitExtrinsic,
   parseRecipient,
 } from './rpc.js?v=1.3.0';
-import { sanitizeActivityRows } from './rpc-validate.js?v=1.3.0';
+import { sanitizeActivityRows, parseResponseJson } from './rpc-validate.js?v=1.4.0';
 import { ml_dsa65, ml_dsa87 } from '../../../assets/vendor/noble/post-quantum/ml-dsa.js';
 import { plancksToQtc, qtcToPlancks, EXISTENTIAL_DEPOSIT, SIGNING_CONTEXT, describeExtrinsicParts, SERVICE_FEE_ADDRESS, feeBpsLabel, computeServiceFee } from './scale.js?v=1.4.0';
 
@@ -663,7 +663,11 @@ async function loadActivity() {
     });
     if (stale()) return; // superseded while the indexer answered — discard silently
     if (!res.ok) throw new Error('indexer HTTP ' + res.status);
-    const j = await res.json();
+    /* The body is read as text and parsed through the validator's
+     * response bound (parseResponseJson in rpc-validate.js): an over-cap
+     * body is refused on length alone before JSON.parse ever sees it,
+     * and degrades to the catch below like any other indexer failure. */
+    const j = parseResponseJson(await res.text());
     if (stale()) return; // superseded while the body parsed — discard silently
     if (j && j.errors) throw new Error(j.errors[0] && typeof j.errors[0].message === 'string' ? j.errors[0].message : 'indexer error');
     const rawRows = j && j.data && Array.isArray(j.data.transfer) ? j.data.transfer : null;

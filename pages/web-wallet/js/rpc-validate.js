@@ -103,6 +103,29 @@ export const GENESIS_FLOOR_MS = Date.UTC(2026, 8, 1);
 /* The activity query is limit:25 — a longer list is not that query. */
 export const ACTIVITY_LIMIT = 25;
 
+/* ---- Response-text bound before JSON.parse (white-hat, Batch 208) ----
+ * loadActivity buffered + parsed the WHOLE indexer body via res.json():
+ * sanitizeActivityRows bounds the ROWS, but only after the parse — a
+ * hostile or broken indexer (a remote third-party endpoint) could return
+ * an arbitrarily large body the tab must buffer and JSON.parse before a
+ * single row was validated. The bound is sized from the genuine payload:
+ * the limit:25 answer measures 3,913 bytes in its genuine shape, so
+ * MAX_RESPONSE_TEXT_CHARS = 1,048,576 (1 MiB) leaves >250x headroom
+ * while an over-cap body is refused on length alone, before parsing.
+ * Fail-closed: non-string input refuses. Over-cap throws with the size
+ * + cap named; the caller's existing catch degrades to its honest
+ * "Indexer unreachable" error exactly as for any other fetch failure. */
+export const MAX_RESPONSE_TEXT_CHARS = 1048576; // 1 MiB
+export function responseTextRoom(text) {
+  return typeof text === "string" && text.length <= MAX_RESPONSE_TEXT_CHARS;
+}
+export function parseResponseJson(text) {
+  if (typeof text !== "string") throw new Error("response body is not text; refused before parsing");
+  if (!responseTextRoom(text))
+    throw new Error("response is " + text.length + " characters — over the response cap of 1,048,576 characters; refused before parsing");
+  return JSON.parse(text);
+}
+
 function isQuantusAddress(s) {
   if (typeof s !== "string") return false;
   try {
