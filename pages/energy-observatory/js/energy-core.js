@@ -74,7 +74,12 @@ var EnergyCore = (function () {
   }
 
   // Expected QTC/day for a rig = its share of blocks × reward.
+  // Non-finite inputs refuse to 0 (the no-value convention): the rig
+  // builder's count field is free text, parseFloat("1e999") is Infinity,
+  // and the app paints this result via direct .toFixed() — an infinite
+  // result would paint "Infinity" QTC/day and a "$NaN" break-even.
   function rigExpectedQtcPerDay(rigHs, netHs, rewardQtc) {
+    if (!isFinite(rigHs) || !isFinite(netHs) || !isFinite(rewardQtc)) return 0;
     if (!(netHs > 0) || !(rigHs > 0)) return 0;
     return (rigHs / netHs) * BLOCKS_PER_DAY * rewardQtc;
   }
@@ -341,8 +346,16 @@ var EnergyCore = (function () {
 
   /* ---------- formatting ---------- */
 
+  /* Non-finite values refuse to "—" in every formatter. The guards used
+   * to be negated comparisons (!(x > 0), !(x >= 0)), which Infinity
+   * PASSES — so a pasted "1e999" in a free number field (its max attribute
+   * is not enforced on typed/pasted values) painted "Infinity EH/s",
+   * "$InfinityM" and "Infinity TWh". fmtNum already refused via isFinite;
+   * the rest now match it. perTxEnergyKWh's deliberate Infinity (a young
+   * chain's divide-by-zero) therefore renders "—", its honest no-value. */
+
   function fmtHashrate(hs) {
-    if (!(hs > 0)) return "—";
+    if (!isFinite(hs) || !(hs > 0)) return "—";
     var units = ["H/s", "KH/s", "MH/s", "GH/s", "TH/s", "PH/s", "EH/s"];
     var i = 0;
     while (hs >= 1000 && i < units.length - 1) { hs /= 1000; i++; }
@@ -350,14 +363,14 @@ var EnergyCore = (function () {
   }
 
   function fmtPowerMW(mw) {
-    if (!(mw > 0)) return "—";
+    if (!isFinite(mw) || !(mw > 0)) return "—";
     if (mw >= 1000) return (mw / 1000).toFixed(2) + " GW";
     if (mw >= 1) return mw.toFixed(2) + " MW";
     return (mw * 1000).toFixed(1) + " kW";
   }
 
   function fmtKwh(kwh) {
-    if (!(kwh > 0)) return "—";
+    if (!isFinite(kwh) || !(kwh > 0)) return "—";
     if (kwh >= 1e9) return (kwh / 1e9).toFixed(2) + " TWh";
     if (kwh >= 1e6) return (kwh / 1e6).toFixed(2) + " GWh";
     if (kwh >= 1e3) return (kwh / 1e3).toFixed(2) + " MWh";
@@ -365,7 +378,7 @@ var EnergyCore = (function () {
   }
 
   function fmtJoules(j) {
-    if (!(j > 0)) return "—";
+    if (!isFinite(j) || !(j > 0)) return "—";
     if (j >= 1e9) return (j / 1e9).toFixed(1) + " GJ";
     if (j >= 1e6) return (j / 1e6).toFixed(1) + " MJ";
     if (j >= 1e3) return (j / 1e3).toFixed(1) + " kJ";
@@ -373,7 +386,7 @@ var EnergyCore = (function () {
   }
 
   function fmtMoney(usd) {
-    if (!(usd >= 0)) return "—";
+    if (!isFinite(usd) || !(usd >= 0)) return "—";
     if (usd >= 1e6) return "$" + (usd / 1e6).toFixed(2) + "M";
     if (usd >= 1e3) return "$" + (usd / 1e3).toFixed(2) + "k";
     return "$" + usd.toFixed(2);

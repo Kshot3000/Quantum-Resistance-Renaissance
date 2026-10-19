@@ -9,14 +9,14 @@ var E = EnergyCore;
 
 /* ---------- constants ---------- */
 var FALLBACK = {
-  difficulty: "439872561186620",
-  height: 249899,
+  difficulty: "442214758844310",
+  height: 250167,
   // total supply in plancks (free + reserved + frozen), balances aggregate @ block
-  // 249,899, fetched 2026-10-18 — the SAME capture as the difficulty above
-  // (@ block 249,899, fetched 12 seconds apart; never mix snapshot dates in one bundle).
+  // 250,167, fetched 2026-10-19 — the SAME capture as the difficulty above
+  // (@ block 250,167, fetched 2 seconds apart; never mix snapshot dates in one bundle).
   // This is total_issuance for the emission formula, NOT mined rewards alone
   // (genesis endowments count toward issuance).
-  totalSupplyPlancks: "5833573176335883648",
+  totalSupplyPlancks: "5833725080341700313",
   fetchedAt: null,
   txRate: null,
   txRateSub: null,
@@ -40,6 +40,11 @@ var state = {
 /* ---------- tiny dom ---------- */
 function $(id) { return document.getElementById(id); }
 function setText(id, s) { var el = $(id); if (el) el.textContent = s; }
+/* Free number fields are free text for the non-finite class: a pasted
+ * "1e999" parseFloats to Infinity and `|| fallback` keeps it (truthy), so
+ * every user-field read routes through finiteOr — non-finite falls back
+ * exactly like an empty field. */
+function finiteOr(v, fallback) { return isFinite(v) ? v : fallback; }
 
 /* ---------- data ---------- */
 
@@ -293,7 +298,7 @@ function renderHero() {
   } else {
     pill.textContent = "no snapshot — using fallback figures";
     pill.classList.add("warn");
-    note.textContent = "The chain snapshots could not be loaded, so this page is showing fallback figures from the last verified capture (Oct 18, 2026) instead of inventing chain state.";
+    note.textContent = "The chain snapshots could not be loaded, so this page is showing fallback figures from the last verified capture (Oct 19, 2026) instead of inventing chain state.";
   }
 }
 
@@ -308,7 +313,7 @@ function renderBand() {
   if (!(eff > 0)) eff = 1.2;
   setText("effVal", eff.toFixed(2));
   var d = bandDerived(eff);
-  var rate = parseFloat($("rateInput").value) || 0;
+  var rate = finiteOr(parseFloat($("rateInput").value), 0) || 0;
   var ci = parseFloat($("ciInput").value);
   if (!(ci >= 0)) ci = 0.42;
   setText("bPower", E.fmtPowerMW(d.mw));
@@ -375,7 +380,7 @@ function fleetShares() {
   rows.forEach(function (row) {
     var sel = row.querySelector("select"), n = row.querySelector("input");
     var p = E.presetById(sel.value);
-    var c = Math.max(0, Math.floor(parseFloat(n.value) || 0));
+    var c = Math.max(0, Math.floor(finiteOr(parseFloat(n.value), 0) || 0));
     row.querySelector(".row-eff").textContent = p ? E.presetEfficiency(p).toFixed(2) + " MH/J" : "";
     if (!p || c <= 0) return;
     var hs = p.hashrateMHs * 1e6 * c;
@@ -394,6 +399,10 @@ function renderFleet() {
     return;
   }
   var eff = E.mixEfficiency(s.mix);
+  if (!(eff > 0) || !isFinite(eff)) {
+    setText("fEff", "—"); setText("fSize", "—"); setText("fPower", "—"); setText("fAnnual", "—");
+    return;
+  }
   var mw = E.powerMW(state.netHs, eff);
   setText("fEff", eff.toFixed(2) + " MH/J");
   setText("fSize", E.fmtNum(s.gpus) + " GPUs · " + E.fmtHashrate(s.totalHs));
@@ -448,8 +457,8 @@ function renderRigPresets() {
 }
 function renderRig() {
   var p = E.presetById($("rigPreset").value);
-  var count = Math.max(1, Math.floor(parseFloat($("rigCount").value) || 1));
-  var rate = parseFloat($("rigRate").value) || 0;
+  var count = Math.max(1, Math.floor(finiteOr(parseFloat($("rigCount").value), 1) || 1));
+  var rate = finiteOr(parseFloat($("rigRate").value), 0) || 0;
   if (!p) return;
   var rigHs = p.hashrateMHs * 1e6 * count;
   var qtcDay = E.rigExpectedQtcPerDay(rigHs, state.netHs, state.rewardQtc);
